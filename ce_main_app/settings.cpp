@@ -235,6 +235,12 @@ void Settings::binToHex(BYTE *inBfr, int len, char *outBfr)
     }
 }
 //-------------------------
+void Settings::generateLicenseKeyName(BYTE* hwSerial, char *keyName)
+{
+    strcpy(keyName, "HW_LICENSE_");                             // start with "HW_LICENSE_"
+    Settings::binToHex(hwSerial, 13, keyName + 11);    // take hwSerial and convert it from binary to hex string and append it to key name
+}
+//-------------------------
 void Settings::setBinaryString(const char *key, BYTE *inBfr, int len)
 {
     char tmp[512];

@@ -29,7 +29,7 @@ enum CS_ACTION { CS_CREATE_ACSI = 1,    CS_CREATE_TRANSLATED,   CS_CREATE_SHARED
                  CS_SHARED_TEST,        CS_SHARED_SAVE,
                  CS_FLOPPY_IMAGE_SAVE,  CS_FLOPPY_CONFIG_SAVE,
                  CS_OTHER_SAVE,         CS_RESET_SETTINGS,      CS_SEND_SETTINGS,
-                 CS_IKBD_SAVE
+                 CS_IKBD_SAVE,          CS_CREATE_HW_LICENSE,   CS_HW_LICENSE_SAVE
                 };
 
 
@@ -63,7 +63,9 @@ enum COMPIDS {  COMPID_TRAN_FIRST = 1,      COMPID_TRAN_SHARED,         COMPID_T
                 COMPID_JOY0_FIRST,          COMPID_MOUSEWHEEL_ENABLED,  COMPID_KEYB_JOY0, COMPID_KEYB_JOY1,
 
                 COMPID_KEYBJOY0_BUTTON, COMPID_KEYBJOY0_LEFT, COMPID_KEYBJOY0_DOWN, COMPID_KEYBJOY0_RIGHT, COMPID_KEYBJOY0_UP,
-                COMPID_KEYBJOY1_BUTTON, COMPID_KEYBJOY1_LEFT, COMPID_KEYBJOY1_DOWN, COMPID_KEYBJOY1_RIGHT, COMPID_KEYBJOY1_UP
+                COMPID_KEYBJOY1_BUTTON, COMPID_KEYBJOY1_LEFT, COMPID_KEYBJOY1_DOWN, COMPID_KEYBJOY1_RIGHT, COMPID_KEYBJOY1_UP,
+
+                COMPID_HW_LICENSE
             };
 
 #define ST_RESOLUTION_LOW       0
@@ -109,6 +111,7 @@ public:
     void createScreen_floppy_config(void);
     void createScreen_other(void);
     void createScreen_ikbd(void);
+    void createScreen_hwLicense(void);
 
     ConfigComponent *findComponentById(int compId);
     bool getTextByComponentId(int componentId, std::string &text);
@@ -187,7 +190,8 @@ private:
     void onIkbdSave(void);
     void onResetSettings(void);
     void onSendSettings(void);
-    
+    void onHwLicenseConfigSave(void);
+
     bool verifyAndFixIPaddress(std::string &in, std::string &out, bool emptyIsOk);
 
     void replaceNewLineWithGoto(std::string &line, int startX, int startY);

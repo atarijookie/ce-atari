@@ -37,7 +37,6 @@ private:
     void getUpdate(BYTE *cmd);
     void hostShutdown(BYTE *cmd);
 
-    void generateLicenseKeyName(char *keyName);
     bool getLicenseForSerialFromSettings(BYTE *bfrLicense);
     void retrieveLicenseForSerial(void);
 };

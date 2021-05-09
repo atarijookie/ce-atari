@@ -55,7 +55,17 @@ void ConfigStream::createScreen_homeScreen(void)
     ConfigComponent *comp;
 
     int line = 4;
-    
+
+    // show license menu only for devices versions which support licenses and if the license is not valid
+    bool showLicenseMenu = ((hwConfig.version == 3) && !hwConfig.hwLicenseValid);
+
+    if(showLicenseMenu) {   // should show license menu?
+        comp = new ConfigComponent(this, ConfigComponent::button, " ! License key  ! ", 18, 10, line, gotoOffset);
+        comp->setOnEnterFunctionCode(CS_CREATE_HW_LICENSE);
+        screen.push_back(comp);
+        line += 2;
+    }
+
     const char *idConfigLabel = (hwConfig.hddIface == HDD_IF_SCSI) ? " SCSI IDs config " : " ACSI IDs config ";
     comp = new ConfigComponent(this, ConfigComponent::button, idConfigLabel,        18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_ACSI);
@@ -92,10 +102,12 @@ void ConfigStream::createScreen_homeScreen(void)
     screen.push_back(comp);
     line += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Other ",            18, 10, line, gotoOffset);
-    comp->setOnEnterFunctionCode(CS_CREATE_OTHER);
-    screen.push_back(comp);
-    line += 2;
+    if(!showLicenseMenu) {  // show 'Other' only if we're not showing license menu, as we want to fit it all on the screen
+        comp = new ConfigComponent(this, ConfigComponent::button, " Other ",            18, 10, line, gotoOffset);
+        comp->setOnEnterFunctionCode(CS_CREATE_OTHER);
+        screen.push_back(comp);
+        line += 2;
+    }
 
     comp = new ConfigComponent(this, ConfigComponent::button, " Update software ",  18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_UPDATE);

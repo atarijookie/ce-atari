@@ -73,7 +73,9 @@ typedef struct {
     int  hddIface;              // returned from Hans: HDD interface type (ACSI or SCSI (added in 2015))
     int  scsiMachine;           // when HwHddIface is HDD_IF_SCSI, this specifies what machine (TT or Falcon) is using this device
     bool fwMismatch;            // when HW and FW types don't match (e.g. SCSI HW + ACSI FW, or ACSI HW + SCSI FW)
+
     BYTE hwSerial[13];          // contains HW serial number, if HW version is 3 and device is running for few seconds
+    bool hwLicenseValid;        // if true, then HW has a valid license and we don't need to show HW lincese screen in config
 
     bool changed;               // true if the value has changes recently
 } THwConfig;

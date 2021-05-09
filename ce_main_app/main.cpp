@@ -380,6 +380,9 @@ void loadLastHwConfig(void)
     hwConfig.scsiMachine    = s.getInt("HW_SCSI_MACHINE",  SCSI_MACHINE_UNKNOWN);
     hwConfig.fwMismatch     = false;
     hwConfig.changed        = false;
+
+    memset(hwConfig.hwSerial, 0, 13);
+    hwConfig.hwLicenseValid = false;
 }
 
 void initializeFlags(void)

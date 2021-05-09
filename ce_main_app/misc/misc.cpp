@@ -88,6 +88,7 @@ void Misc::recvHwSerialAndDeleteLicense(BYTE *cmd)
     }
 
     bool deleteLicenseOnHost = (cmd[5] == 1);       // if this is 1, then should delete (invalid) license on this host
+    hwConfig.hwLicenseValid = (cmd[6] == 1);        // if this is 1, then HW finds current license as valid
 
     if(dataBuffer[0] != 3) {                        // HW version not 3? fail
         Debug::out(LOG_DEBUG, "Misc::sendSerialAndDeleteLicense - wrong HW version");
@@ -105,7 +106,7 @@ void Misc::recvHwSerialAndDeleteLicense(BYTE *cmd)
     if(deleteLicenseOnHost) {
         // find current license in settings
         char keyName[64];
-        generateLicenseKeyName(keyName);                        // generate key name containing HW serial number
+        Settings::generateLicenseKeyName(hwConfig.hwSerial, keyName);   // generate key name containing HW serial number
 
         Settings s;
         char *storedLicense = s.getBinaryString(keyName, 10);   // get current license
@@ -151,16 +152,10 @@ void Misc::getLicense(BYTE *cmd)
     dataTrans->setStatus(E_OK);
 }
 
-void Misc::generateLicenseKeyName(char *keyName)
-{
-    strcpy(keyName, "HW_LICENSE_");                 // start with "HW_LICENSE_"
-    Settings::binToHex(hwConfig.hwSerial, 13, keyName + 11);  // take hwSerial and convert it from binary to hex string and append it to key name
-}
-
 bool Misc::getLicenseForSerialFromSettings(BYTE *bfrLicense)
 {
     char keyName[64];
-    generateLicenseKeyName(keyName);                // generate key name containing HW serial number
+    Settings::generateLicenseKeyName(hwConfig.hwSerial, keyName);   // generate key name containing HW serial number
 
     Settings s;
     char *license = s.getBinaryString(keyName, 10);
@@ -177,7 +172,7 @@ bool Misc::getLicenseForSerialFromSettings(BYTE *bfrLicense)
 void Misc::retrieveLicenseForSerial(void)
 {
     char keyName[64];
-    generateLicenseKeyName(keyName);                // generate key name containing HW serial number
+    Settings::generateLicenseKeyName(hwConfig.hwSerial, keyName);   // generate key name containing HW serial number
 
     // construct url for license retrieval
     char getLicenseUrl[100];

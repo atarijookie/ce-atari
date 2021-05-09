@@ -785,6 +785,9 @@ void ConfigStream::enterKeyHandler(int event)
     case CS_SHARED_SAVE:        onSharedSave();             break;
 
     case CS_FLOPPY_CONFIG_SAVE: onFloppyConfigSave();       break;
+
+    case CS_CREATE_HW_LICENSE:  createScreen_hwLicense();   break;
+    case CS_HW_LICENSE_SAVE:    onHwLicenseConfigSave();    break;
     }
 }
 
