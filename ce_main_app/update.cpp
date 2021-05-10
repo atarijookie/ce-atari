@@ -39,7 +39,7 @@ bool Update::createUpdateScript(bool withLinuxRestart, bool withForceXilinx)
 {
     bool res;
 
-    if(withForceXilinx) {       // should force xilinx flash?
+    if(hwConfig.version < 3 && withForceXilinx) {   // for v1 and v2, and should force xilinx flash?
         res = writeSimpleTextFile(UPDATE_FLASH_XILINX, NULL);     // create this file to force xilinx flash
 
         if(!res) {              // if failed to create first file, just quit already

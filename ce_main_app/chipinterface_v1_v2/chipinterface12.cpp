@@ -12,6 +12,7 @@
 #endif
 
 extern THwConfig hwConfig;
+extern TFlags    flags;                 // global flags from command line
 
 ChipInterface12::ChipInterface12()
 {
@@ -171,6 +172,17 @@ void ChipInterface12::setHDDconfig(BYTE hddEnabledIDs, BYTE sdCardId, BYTE fddEn
         } else {                                                // if we should skip sending config this time, then don't skip it next time (if needed)
             hansConfigWords.skipNextSet = false;
         }
+    }
+
+    //--------------
+    if(flags.deviceGetLicense) {                                // should the device get new hw license?
+        flags.deviceGetLicense = false;
+        responseAddWord(bufOut, CMD_GET_LICENSE);
+    }
+
+    if(flags.deviceDoUpdate) {                                  // should the device do the ?
+        flags.deviceDoUpdate = false;
+        responseAddWord(bufOut, CMD_DO_UPDATE);
     }
 
     //--------------

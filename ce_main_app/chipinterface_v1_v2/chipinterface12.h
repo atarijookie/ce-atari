@@ -14,7 +14,7 @@
 #define MFM_STREAM_SIZE         13800
 #define TX_RX_BUFF_SIZE         600
 
-// commands sent from host to device
+// Hans: commands sent from host to device
 #define CMD_ACSI_CONFIG                 0x10
 #define CMD_DATA_WRITE                  0x20
 #define CMD_DATA_READ_WITH_STATUS       0x30
@@ -22,9 +22,11 @@
 #define CMD_DATA_READ_WITHOUT_STATUS    0x50
 #define CMD_FLOPPY_CONFIG               0x70
 #define CMD_FLOPPY_SWITCH               0x80
+#define CMD_GET_LICENSE                 0xa0
+#define CMD_DO_UPDATE                   0xb0
 #define CMD_DATA_MARKER                 0xda
 
-// commands sent from host to device
+// Franz: commands sent from host to device
 #define CMD_WRITE_PROTECT_OFF       0x10
 #define CMD_WRITE_PROTECT_ON        0x20
 #define CMD_DISK_CHANGE_OFF         0x30

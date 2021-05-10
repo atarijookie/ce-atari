@@ -119,7 +119,7 @@ int main(int argc, char *argv[])
     }
 
     //------------------------------------------------------------
-    // Opening of chip interface. 
+    // Opening of chip interface.
 
     bool good = false;
 
@@ -351,7 +351,7 @@ int main(int argc, char *argv[])
     }
 
     //---------------------------------------------------
-    // Closing of GPIO should be done after stopping IKBD thread and DISPLAY thread 
+    // Closing of GPIO should be done after stopping IKBD thread and DISPLAY thread
     // as they also use some GPIO pins and we want them to be able to use them until the end.
     chipInterface->close();                             // close gpio
     delete chipInterface;
@@ -399,6 +399,9 @@ void initializeFlags(void)
     flags.ikbdLogs     = false;         // no ikbd logs by default
     flags.fakeOldApp   = false;         // don't fake old app by default
     flags.display      = false;         // if set to true, show string on front display, if possible
+
+    flags.deviceGetLicense  = false;    // if true, device should get license again
+    flags.deviceDoUpdate    = false;    // if true, device should download update and write it to flash
 
     flags.gotHansFwVersion  = false;
     flags.gotFranzFwVersion = false;

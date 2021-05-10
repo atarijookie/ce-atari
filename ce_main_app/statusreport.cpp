@@ -96,7 +96,7 @@ void StatusReport::createReport(std::string &report, int reportFormat)
             dumpPair(report, driveName.c_str(), reportString.c_str(), reportFormat, false, TEXT_COL1_WIDTH, 60);
         }
     }
-    
+
     endSection  (report, reportFormat);
 
     //------------------
@@ -177,8 +177,14 @@ void StatusReport::createReport(std::string &report, int reportFormat)
     // chips and interfaces
     startSection   (report, "chips and interfaces live status",        reportFormat);
     putStatusHeader(report, reportFormat);
-    dumpStatus     (report, "Hans  chip",          statuses.hans,      reportFormat);
-    dumpStatus     (report, "Franz chip",          statuses.franz,     reportFormat);
+
+    const char* chipName = (hwConfig.version < 3) ? "Hans  chip" : "Horst chip";
+    dumpStatus     (report, chipName,              statuses.hans,      reportFormat);
+
+    if(hwConfig.version < 3) {  // v1 and v2 contain Franz, v3 it's only horst
+        dumpStatus (report, "Franz chip",          statuses.franz,     reportFormat);
+    }
+
     dumpStatus     (report, "Hard Drive IF",       statuses.hdd,       reportFormat);
     dumpStatus     (report, "Floppy IF",           statuses.fdd,       reportFormat);
     dumpStatus     (report, "IKBD from ST",        statuses.ikbdSt,    reportFormat);
@@ -287,7 +293,7 @@ void StatusReport::dumpStatus(std::string &report, const char *desciprion, volat
 void StatusReport::dumpPair(std::string &report, const char *key, const char *value, int reportFormat, bool centerValue, int len1, int len2)
 {
     switch(reportFormat) {
-    case REPORTFORMAT_RAW_TEXT: 
+    case REPORTFORMAT_RAW_TEXT:
         report += fixStringToLength(key,    len1);
         report += ": ";
         report += fixStringToLength(value,  len2);
@@ -326,7 +332,7 @@ void StatusReport::startSection(std::string &report, const char *sectionName, in
     noOfElements = 0;
 
     switch(reportFormat) {
-    case REPORTFORMAT_RAW_TEXT: 
+    case REPORTFORMAT_RAW_TEXT:
         report += sectionName;
         report += "\n----------------------------------------\n";
         break;
@@ -355,7 +361,7 @@ void StatusReport::startSection(std::string &report, const char *sectionName, in
 void StatusReport::endSection(std::string &report, int reportFormat)
 {
     switch(reportFormat) {
-    case REPORTFORMAT_RAW_TEXT: 
+    case REPORTFORMAT_RAW_TEXT:
         report += "\n\n";
         break;
 
@@ -376,7 +382,7 @@ void StatusReport::startReport(std::string &report, int reportFormat)
     noOfSections = 0;
 
     switch(reportFormat) {
-    case REPORTFORMAT_RAW_TEXT: 
+    case REPORTFORMAT_RAW_TEXT:
         report += "CosmosEx device report\n";
         report += "----------------------\n\n";
         break;
@@ -398,7 +404,7 @@ void StatusReport::startReport(std::string &report, int reportFormat)
 void StatusReport::endReport(std::string &report, int reportFormat)
 {
     switch(reportFormat) {
-    case REPORTFORMAT_RAW_TEXT: 
+    case REPORTFORMAT_RAW_TEXT:
         report += "\n";
         break;
 
@@ -428,8 +434,8 @@ const char *StatusReport::aliveSignIntToString(int aliveSign)
         case ALIVE_MOUSEVENT:   return "mouse moved / clicked";
         case ALIVE_JOYEVENT:    return "joy moved / pressed";
 
-        case ALIVE_DEAD:    
-        default:    
+        case ALIVE_DEAD:
+        default:
             return "nothing";
     }
 }
@@ -437,7 +443,7 @@ const char *StatusReport::aliveSignIntToString(int aliveSign)
 char *StatusReport::fixStringToLength(const char *inStr, int outLen)
 {
     static char tmp[100];
-    
+
     memset(tmp, ' ', outLen);                               // first fill it with spaces
     tmp[outLen] = 0;
 

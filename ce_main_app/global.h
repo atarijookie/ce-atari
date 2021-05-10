@@ -14,10 +14,10 @@
 #define MFM_8US     3
 
 
-#define VERSION_STRING          "CosmosEx v2.20 (by Jookie)"
-#define VERSION_STRING_SHORT    "2.20"
-#define DATE_STRING             "05/10/18"
-                                // MM/DD/YY
+#define VERSION_STRING          "CosmosEx v3.00 (by Jookie)"
+#define VERSION_STRING_SHORT    "3.00"
+#define DATE_STRING             "05/09/21"
+                              // MM/DD/YY
 
 
 #define DEVTYPE_OFF                 0
@@ -93,6 +93,9 @@ typedef struct {
     bool ikbdLogs;              // if set to true, will generate ikbd logs file
     bool fakeOldApp;            // if set to true, will always return old app version, so you can test app installation over and over
     bool display;               // if set to true, show string on front display, if possible
+
+    bool deviceGetLicense;      // if true, device should get license again
+    bool deviceDoUpdate;        // if true, device should download update and write it to flash
 
     bool gotHansFwVersion;
     bool gotFranzFwVersion;

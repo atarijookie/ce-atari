@@ -15,6 +15,7 @@
 #include "netsettings.h"
 
 extern THwConfig hwConfig;          // info about the current HW setup
+extern TFlags    flags;             // global flags from command line (and others)
 
 //--------------------------
 // screen creation methods
@@ -137,6 +138,8 @@ void ConfigStream::onHwLicenseConfigSave(void)
     // store the new hw lincese to settings
     Settings s;
     s.setString(keyName, hwLicense.c_str());
+
+    flags.deviceGetLicense  = true;    // set to true, so device should get license again
 
     // now back to the home screen
     createScreen_homeScreen();
