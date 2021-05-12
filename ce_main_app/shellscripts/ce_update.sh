@@ -1,17 +1,14 @@
 #!/bin/sh
 
 start=$( date )
-echo "ce_update.sh started at : $start"     # show start time
+printf "ce_update.sh started at : $start"     # show start time
 
 # Stop any cosmosex app, and pass 1st and 2nd argument of this script to the stop script
 # When arguments are not given, ce_stop will stop not only CosmosEx app, but also cesuper.sh script, which is fine when called manually from shell by user.
 # When 'nosystemctl dontkillcesuper' arguments are given, ce_stop will stop onl CosmosEx app, but not cesuper.sh script, which is what we want when ce_update.sh is called as a part of update process within the cesuper.sh script
 /ce/ce_stop.sh $1 $2
 
-echo " "
-echo "Updating CosmosEx from internet, this will take a while."
-echo "DO NOT POWER OFF THE DEVICE!!!"
-echo " "
+printf "\n\nUpdating CosmosEx from internet or USB drive, this will take a while.\nDO NOT POWER OFF THE DEVICE!!!\n\n"
 
 distro=$( /ce/whichdistro.sh )
 url_zip="http://joo.kie.sk/cosmosex/update/$distro.zip"
@@ -22,31 +19,26 @@ path_to_tmp_update="/tmp/$distro.zip"
 # check if should do update from USB
 
 if [ -f /tmp/UPDATE_FROM_USB ]; then                    # if we're doing update from USB
-    echo "update from USB"
+    printf "update from USB"
 
     path_to_usb_update=$( cat /tmp/UPDATE_FROM_USB )    # get content of file into variable
     rm -f /tmp/UPDATE_FROM_USB                          # delete file so we won't do it again next time
 
     unzip -o $path_to_usb_update -d /ce                 # unzip update into /ce directory, overwrite without prompting
-
 else    # download update from internet, by wget
-    echo "update from internet - will use wget"
-
+    printf "update from internet - will use wget"
 
     rm -f $path_to_tmp_update                       # delete if file exists
     wget -O $path_to_tmp_update $url_zip            # download to /tmp/yocto.zip
 
     unzip -o $path_to_tmp_update -d /ce             # unzip update into /ce directory, overwrite without prompting
-
-    # store hash where we will expect it next time we'll check_for_update (.sh)
-    hash_new=$( wget -O- $url_hash 2> /dev/null )   # get last online hash for this distro
-    echo "$hash_new" > /ce/update/hash.current      # save hash here
 fi
 
 #--------------------------
 # add execute permissions to scripts and binaries (if they don't have them yet)
 chmod +x /ce/app/cosmosex
 chmod +x /ce/update/flash_stm32
+chmod +x /ce/update/flash_stm32_2021
 chmod +x /ce/update/flash_xilinx
 chmod +x /ce/*.sh
 chmod +x /ce/update/*.sh
@@ -79,19 +71,19 @@ addCoreFreq=0           # don't add it yet
 
 # A) no core_freq? Add it
 if [ "$coreFreqCountAny" -eq "0" ]; then
-    echo "No core_freq in /boot/config.txt, adding it"
+    printf "No core_freq in /boot/config.txt, adding it"
     addCoreFreq=1
 fi
 
 # B) more than one core_freq? Remove them, then add one
 if [ "$coreFreqCountAny" -gt "1" ]; then
-    echo "Too many core_freq in /boot/config.txt, fixing it"
+    printf "Too many core_freq in /boot/config.txt, fixing it"
     addCoreFreq=1
 fi
 
 # C) There is some core_freq, but it's not correct? Remove it, then add correct one
 if [ "$coreFreqCountAny" -gt "0" ] && [ "$coreFreqCountCorrect" -eq "0" ]; then
-    echo "core_freq in /boot/config.txt is incorrect, fixing it"
+    printf "core_freq in /boot/config.txt is incorrect, fixing it"
     addCoreFreq=1
 fi
 
@@ -104,7 +96,7 @@ if [ "$addCoreFreq" -gt "0" ]; then
     echo "core_freq=250" >> /boot/config.txt
 else
     # we don't need to do anything for case D), where there is one core_freq there and it's correct
-    echo "core_freq is ok in /boot/config.txt"
+    printf "core_freq is ok in /boot/config.txt"
 fi
 
 #------------------------
@@ -123,9 +115,7 @@ if [ -f /tmp/REBOOT_AFTER_UPDATE ]; then
     reboot now
 fi
 
-echo " "
-echo "Update done, you may start the /ce/ce_start.sh now!";
-echo " "
+printf "\nUpdate done, you may start the /ce/ce_start.sh now!\n";
 
 stop=$( date )
-echo "ce_update.sh finished at: $stop"     # show stop time
+printf "ce_update.sh finished at: $stop\n\n"     # show stop time

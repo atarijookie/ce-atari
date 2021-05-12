@@ -28,11 +28,9 @@ void Update::initialize(void)
     char appVersion[16];
     Version::getAppVersion(appVersion);
 
-    Update::versions.current.app.fromString(                (char *) appVersion);
-    Update::versions.current.xilinx.fromFirstLineOfFile(    (char *) XILINX_VERSION_FILE, false);   // xilinx version file without dashes
-    Update::versions.current.imageList.fromFirstLineOfFile( (char *) IMAGELIST_LOCAL);
-    Update::versions.updateListWasProcessed = false;
-    Update::versions.gotUpdate              = false;
+    Update::versions.app.fromString(                (char *) appVersion);
+    Update::versions.xilinx.fromFirstLineOfFile(    (char *) XILINX_VERSION_FILE, false);   // xilinx version file without dashes
+    Update::versions.imageList.fromFirstLineOfFile( (char *) IMAGELIST_LOCAL);
 }
 
 bool Update::createUpdateScript(bool withLinuxRestart, bool withForceXilinx)

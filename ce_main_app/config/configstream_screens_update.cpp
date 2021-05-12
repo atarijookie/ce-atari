@@ -201,17 +201,17 @@ void ConfigStream::fillUpdateWithCurrentVersions(void)
     std::string str;
 
     if(hwConfig.version < 3) {  // for v1 and v2
-        datesToStrings(Update::versions.current.franz, str);
+        datesToStrings(Update::versions.franz, str);
         setTextByComponentId(COMPID_UPDATE_FRANZ, str);         // set it to component
 
-        datesToStrings(Update::versions.current.xilinx, str);
+        datesToStrings(Update::versions.xilinx, str);
         setTextByComponentId(COMPID_UPDATE_XILINX, str);        // set it to component
     }
 
-    datesToStrings(Update::versions.current.app, str);
+    datesToStrings(Update::versions.app, str);
     setTextByComponentId(COMPID_UPDATE_COSMOSEX, str);      // set it to component
 
-    datesToStrings(Update::versions.current.hans, str);
+    datesToStrings(Update::versions.hans, str);
     setTextByComponentId(COMPID_UPDATE_HANZ, str);          // set it to component
 }
 

@@ -42,16 +42,11 @@ private:
 };
 
 typedef struct {
-        struct {
             Version app;
             Version hans;
             Version xilinx;
             Version franz;
             Version imageList;
-        } current;
-
-        bool updateListWasProcessed;
-        bool gotUpdate;
     } Versions;
 
 #endif

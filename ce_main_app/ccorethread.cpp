@@ -743,7 +743,7 @@ void CCoreThread::handleFwVersion_hans(void)
             setDiskChanged  = true;
         }
 
-        Debug::out(LOG_DEBUG, "FW: Hans,  %d-%02d-%02d, LED is: %d", Update::versions.current.hans.getYear(), Update::versions.current.hans.getMonth(), Update::versions.current.hans.getDay(), currentLed);
+        Debug::out(LOG_DEBUG, "FW: Hans,  %d-%02d-%02d, LED is: %d", Update::versions.hans.getYear(), Update::versions.hans.getMonth(), Update::versions.hans.getDay(), currentLed);
     }
 
     //----------------------------------
@@ -808,7 +808,7 @@ void CCoreThread::handleFwVersion_franz(void)
     int chipIfType = chipInterface->chipInterfaceType();
 
     if(chipIfType == CHIP_IF_V1_V2) {                   // only on IF v1 v2 show info about Franz
-        Debug::out(LOG_DEBUG, "FW: Franz, %d-%02d-%02d", Update::versions.current.franz.getYear(), Update::versions.current.franz.getMonth(), Update::versions.current.franz.getDay());
+        Debug::out(LOG_DEBUG, "FW: Franz, %d-%02d-%02d", Update::versions.franz.getYear(), Update::versions.franz.getMonth(), Update::versions.franz.getDay());
     }
 }
 

@@ -158,8 +158,8 @@ void ChipInterface12::setHDDconfig(BYTE hddEnabledIDs, BYTE sdCardId, BYTE fddEn
     hansConfigWords.next.acsi   = MAKEWORD(hddEnabledIDs, sdCardId);
     hansConfigWords.next.fdd    = MAKEWORD(fddEnabledSlots, 0);
 
-    if( (hansConfigWords.next.acsi  != hansConfigWords.current.acsi) ||
-        (hansConfigWords.next.fdd   != hansConfigWords.current.fdd )) {
+    if( (hansConfigWords.next.acsi  != hansConfigWords.acsi) ||
+        (hansConfigWords.next.fdd   != hansConfigWords.fdd )) {
 
         // hansConfigWords.skipNextSet - it's a flag used for skipping one config sending, because we send the new config now, but receive it processed in the next (not this) fw version packet
 
@@ -231,17 +231,17 @@ void ChipInterface12::getFWversion(bool hardNotFloppy, BYTE *inFwVer)
 
         convertXilinxInfo(inFwVer[5]);  // convert xilinx info into hwInfo struct
 
-        hansConfigWords.current.acsi = MAKEWORD(inFwVer[6], inFwVer[7]);
-        hansConfigWords.current.fdd  = MAKEWORD(inFwVer[8],        0);
+        hansConfigWords.acsi = MAKEWORD(inFwVer[6], inFwVer[7]);
+        hansConfigWords.fdd  = MAKEWORD(inFwVer[8],        0);
 
         int year = bcdToInt(inFwVer[1]) + 2000;
-        Update::versions.current.hans.fromInts(year, bcdToInt(inFwVer[2]), bcdToInt(inFwVer[3]));       // store found FW version of Hans
+        Update::versions.hans.fromInts(year, bcdToInt(inFwVer[2]), bcdToInt(inFwVer[3]));       // store found FW version of Hans
     } else {                // for FDD
         // bufOut should be filled with Franz config - by calling setFDDconfig() (and not calling anything else inbetween)
         conSpi->txRx(SPI_CS_FRANZ, FDD_FW_RESPONSE_LEN, bufOut, inFwVer);
 
         int year = bcdToInt(inFwVer[1]) + 2000;
-        Update::versions.current.franz.fromInts(year, bcdToInt(inFwVer[2]), bcdToInt(inFwVer[3]));              // store found FW version of Franz
+        Update::versions.franz.fromInts(year, bcdToInt(inFwVer[2]), bcdToInt(inFwVer[3]));              // store found FW version of Franz
     }
 #endif
 }

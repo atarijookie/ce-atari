@@ -706,7 +706,7 @@ void ConfigStream::screen_addHeaderAndFooter(StupidVector &scr, const char *scre
 
     // insert header
     char headerText[50];
-    snprintf(headerText, sizeof(headerText), ">> CosmosEx config tool - 2013 - %d <<", Update::versions.current.app.getYear());
+    snprintf(headerText, sizeof(headerText), ">> CosmosEx config tool - 2013 - %d <<", Update::versions.app.getYear());
 
     comp = new ConfigComponent(this, ConfigComponent::label, headerText, 40, 0, 0, gotoOffset);
     comp->setReverse(true);

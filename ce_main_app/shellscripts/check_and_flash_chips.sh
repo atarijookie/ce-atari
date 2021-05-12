@@ -21,6 +21,7 @@ read_from_file()
 # add execute permissions to scripts and binaries (if they don't have them yet)
 chmod +x /ce/app/cosmosex
 chmod +x /ce/update/flash_stm32
+chmod +x /ce/update/flash_stm32_2021
 chmod +x /ce/update/flash_xilinx
 chmod +x /ce/*.sh
 chmod +x /ce/update/*.sh
@@ -28,36 +29,25 @@ chmod +x /ce/update/*.sh
 #--------------------------
 # check what chips we really need to flash
 
-hans_curr=$( read_from_file /ce/update/hans.current 0 )
-franz_curr=$( read_from_file /ce/update/franz.current 0 )
-xilinx_curr=$( read_from_file /ce/update/xilinx.current 0 )
+horst_curr=$(  read_from_file /ce/update/horst.current       0 )
+hans_curr=$(   read_from_file /ce/update/hans.current        0 )
+franz_curr=$(  read_from_file /ce/update/franz.current       0 )
+xilinx_curr=$( read_from_file /ce/update/xilinx.current      0 )
 
-hans_new=$( read_from_file /ce/update/hans.version 1 )
-franz_new=$( read_from_file /ce/update/franz.version 1 )
-xilinx_new=$( read_from_file /ce/update/xilinx_used.version 1 ) # get new version for last used xilinx type by using this symlink
+horst_new=$(   read_from_file /ce/update/horst.version       1 )
+hans_new=$(    read_from_file /ce/update/hans.version        1 )
+franz_new=$(   read_from_file /ce/update/franz.version       1 )
+xilinx_new=$(  read_from_file /ce/update/xilinx_used.version 1 ) # get new version for last used xilinx type by using this symlink
 
-update_hans=0
-update_franz=0
-update_xilinx=0
-
-# check if Hans has new FW available
-if [ "$hans_new" != "$hans_curr" ]; then           # got different FW than current? do update (don't check for newer only, as someone might want to use older version)
-    update_hans=1
-fi
-
-# check if Franz has new FW available
-if [ "$franz_new" != "$franz_curr" ]; then         # got different FW than current? do update (don't check for newer only, as someone might want to use older version)
-    update_franz=1
-fi
-
-# check if Xilinx has new FW available
-if [ "$xilinx_new" != "$xilinx_curr" ]; then       # got different FW than current? do update (don't check for newer only, as someone might want to use older version)
-    update_xilinx=1
-fi
+update_horst=$(  [ "$horst_new"  != "$horst_curr"  ] && echo "1" || echo "0" )
+update_hans=$(   [ "$hans_new"   != "$hans_curr"   ] && echo "1" || echo "0" )
+update_franz=$(  [ "$franz_new"  != "$franz_curr"  ] && echo "1" || echo "0" )
+update_xilinx=$( [ "$xilinx_new" != "$xilinx_curr" ] && echo "1" || echo "0" )
 
 # check if forcing flash all
 if [ -f /tmp/FW_FLASH_ALL ]; then       # if we're forcing to flash all chips (e.g. on new device)
     rm -f /tmp/FW_FLASH_ALL             # delete file so we won't force flash all next time
+    update_horst=1
     update_hans=1
     update_franz=1
     update_xilinx=1
@@ -71,12 +61,12 @@ fi
 
 #--------------------------
 # find out which HW version we're running
-# If we're not running v1 or v2, we can skip flashing Hans and Franz, as they are not present in v3.
+# If we're not running v1 or v2, we can skip flashing Franz and Xilinx, as they are not present in v3.
 hw_ver=$( /ce/whichhw.sh )
 
-if [ "$hw_ver" -eq "3"]; then           # on v3 hardware don't flash Hans and Franz (they are not there!)
-    update_hans=0
+if [ "$hw_ver" -eq "3" ]; then           # on v3 hardware don't flash Franz and Xilinx (they are not there!)
     update_franz=0
+    update_xilinx=0
 fi
 
 #--------------------------
@@ -88,7 +78,7 @@ if [ "$update_xilinx" -gt "0" ]; then
 fi
 
 # update hans
-if [ "$update_hans" -gt "0" ]; then
+if [ "$update_hans" -gt "0" ] || [ "$update_horst" -gt "0" ]; then
     /ce/update/update_hans.sh
     cp -f /ce/update/hans.version /ce/update/hans.current     # copy version the file to CURRENT so we'll know what we have flashed
 fi
@@ -97,6 +87,11 @@ fi
 if [ "$update_franz" -gt "0" ]; then
     /ce/update/update_franz.sh
     cp -f /ce/update/franz.version /ce/update/franz.current   # copy version the file to CURRENT so we'll know what we have flashed
+fi
+
+#--------------
+if [ "$hw_ver" -eq "3" ]; then          # on v3 hardware there is no Xilinx, so we can skip the last part which resolves the Xilinx FW mismatch
+    exit 0
 fi
 
 #--------------
@@ -110,4 +105,4 @@ if [ "$mm" = "HWFWMM: MISMATCH" ]; then
 fi
 #--------------
 
-echo "check_and_flash_chips.sh finished"
+printf "\ncheck_and_flash_chips.sh finished\n"
