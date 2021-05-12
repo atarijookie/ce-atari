@@ -122,7 +122,7 @@ static const char *action2str(enum actions act)
 
 static void err_multi_action(enum actions new)
 {
-    fprintf(stderr,
+    printf(
         "ERROR: Invalid options !\n"
         "\tCan't execute \"%s\" and \"%s\" at the same time.\n",
         action2str(action), action2str(new));
@@ -217,7 +217,7 @@ static uint32_t flash_page_to_addr(int page)
 #if defined(__WIN32__) || defined(__CYGWIN__)
 BOOL CtrlHandler( DWORD fdwCtrlType )
 {
-    fprintf(stderr, "\nCaught signal %lu\n",fdwCtrlType);
+    printf("\nCaught signal %lu\n",fdwCtrlType);
     if (p_st &&  parser ) parser->close(p_st);
     if (stm  ) stm32_close  (stm);
     if (port) port->close(port);
@@ -225,7 +225,7 @@ BOOL CtrlHandler( DWORD fdwCtrlType )
 }
 #else
 void sighandler(int s){
-    fprintf(stderr, "\nCaught signal %d\n",s);
+    printf("\nCaught signal %d\n",s);
     if (p_st &&  parser ) parser->close(p_st);
     if (stm  ) stm32_close  (stm);
     if (port) port->close(port);
@@ -237,13 +237,14 @@ int main(int argc, char* argv[]) {
     int ret = 1;
     stm32_err_t s_err;
     parser_err_t perr;
+
     diag = stdout;
 
-    fprintf(stderr, "\n");
-    fprintf(stderr, "stm32flash " VERSION "\n");
-    fprintf(stderr, "http://stm32flash.sourceforge.net/\n");
-    fprintf(stderr, " - with the fix for DS1818\n");
-    fprintf(stderr, " - with H730 support\n\n");
+    printf("\n");
+    printf("stm32flash " VERSION "\n");
+    printf("http://stm32flash.sourceforge.net/\n");
+    printf(" - with the fix for DS1818\n");
+    printf(" - with H730 support\n\n");
 
     if(!gpio_open()) {                          // open RPi GPIO
         return 0;
@@ -255,15 +256,15 @@ int main(int argc, char* argv[]) {
     }
 
     if(!flashHans && !flashFranz) {             // user didn't specify if he wants to flash Franz or Hanz?
-        fprintf(stderr, "You didn't specify if you want to flash Hans (-x) or Franz (-y).\n");
+        printf("You didn't specify if you want to flash Hans (-x) or Franz (-y).\n");
         gpio_close();
         return 0;
     }
 
     if(flashHans) {                                             // show that flashing Hans
-        fprintf(stderr, ">>> Will flash HANS <<<\n\n");
+        printf(">>> Will flash HANS <<<\n\n");
     } else {                                                    // show that flashing Franz
-        fprintf(stderr, ">>> Will flash FRANZ <<<\n\n");
+        printf(">>> Will flash FRANZ <<<\n\n");
     }
 
     //----------------------------
@@ -277,10 +278,6 @@ int main(int argc, char* argv[]) {
     // Now hold reset down until the serial port is open and setup,
     // because that will create some pulse on TX line which confuses the STM32 bootloader.
     //----------------------------
-
-    if (action == ACT_READ && use_stdinout) {
-        diag = stderr;
-    }
 
 #if defined(__WIN32__) || defined(__CYGWIN__)
     SetConsoleCtrlHandler( (PHANDLER_ROUTINE) CtrlHandler, TRUE );
@@ -300,7 +297,7 @@ int main(int argc, char* argv[]) {
             parser = &PARSER_HEX;
             p_st = parser->init();
             if (!p_st) {
-                fprintf(stderr, "%s Parser failed to initialize\n", parser->name);
+                printf("%s Parser failed to initialize\n", parser->name);
                 goto close;
             }
         }
@@ -316,7 +313,7 @@ int main(int argc, char* argv[]) {
                 parser = &PARSER_BINARY;
                 p_st = parser->init();
                 if (!p_st) {
-                    fprintf(stderr, "%s Parser failed to initialize\n", parser->name);
+                    printf("%s Parser failed to initialize\n", parser->name);
                     goto close;
                 }
                 perr = parser->open(p_st, filename, 0);
@@ -324,13 +321,13 @@ int main(int argc, char* argv[]) {
 
             /* if still have an error, fail */
             if (perr != PARSER_ERR_OK) {
-                fprintf(stderr, "%s ERROR: %s\n", parser->name, parser_errstr(perr));
+                printf("%s ERROR: %s\n", parser->name, parser_errstr(perr));
                 if (perr == PARSER_ERR_SYSTEM) perror(filename);
                 goto close;
             }
         }
 
-        fprintf(diag, "Using Parser : %s\n", parser->name);
+        printf("Using Parser : %s\n", parser->name);
 
         /* We may know from the file how much data there is */
         if (!use_stdinout && !readwrite_len)
@@ -339,13 +336,13 @@ int main(int argc, char* argv[]) {
         parser = &PARSER_BINARY;
         p_st = parser->init();
         if (!p_st) {
-            fprintf(stderr, "%s Parser failed to initialize\n", parser->name);
+            printf("%s Parser failed to initialize\n", parser->name);
             goto close;
         }
     }
 
     if (port_open(&port_opts, &port) != PORT_ERR_OK) {
-        fprintf(stderr, "Failed to open port: %s\n", port_opts.device);
+        printf("Failed to open port: %s\n", port_opts.device);
         goto close;
     }
 
@@ -364,10 +361,10 @@ int main(int argc, char* argv[]) {
     usleep(260000);                                         // let the STM32 boot and run for 250 + 10 ms (because DS1818 might cause 250 ms RESET signal)
     //---------------------------------------------------   
 
-    fprintf(diag, "Interface %s: %s\n", port->name, port->get_cfg_str(port));
+    printf("Interface %s: %s\n", port->name, port->get_cfg_str(port));
     if (init_flag && init_bl_entry(port, gpio_seq)){
         ret = 1;
-        fprintf(stderr, "Failed to send boot enter sequence\n");
+        printf("Failed to send boot enter sequence\n");
         goto close;
     }
 
@@ -377,16 +374,16 @@ int main(int argc, char* argv[]) {
     if (!stm)
         goto close;
 
-    fprintf(diag, "Version      : 0x%02x\n", stm->bl_version);
+    printf("Version      : 0x%02x\n", stm->bl_version);
     if (port->flags & PORT_GVR_ETX) {
-        fprintf(diag, "Option 1     : 0x%02x\n", stm->option1);
-        fprintf(diag, "Option 2     : 0x%02x\n", stm->option2);
+        printf("Option 1     : 0x%02x\n", stm->option1);
+        printf("Option 2     : 0x%02x\n", stm->option2);
     }
-    fprintf(diag, "Device ID    : 0x%04x (%s)\n", stm->pid, stm->dev->name);
-    fprintf(diag, "- RAM        : Up to %dKiB  (%db reserved by bootloader)\n", (stm->dev->ram_end - 0x20000000) / 1024, stm->dev->ram_start - 0x20000000);
-    fprintf(diag, "- Flash      : Up to %dKiB (size first sector: %dx%d)\n", (stm->dev->fl_end - stm->dev->fl_start ) / 1024, stm->dev->fl_pps, stm->dev->fl_ps[0]);
-    fprintf(diag, "- Option RAM : %db\n", stm->dev->opt_end - stm->dev->opt_start + 1);
-    fprintf(diag, "- System RAM : %dKiB\n", (stm->dev->mem_end - stm->dev->mem_start) / 1024);
+    printf("Device ID    : 0x%04x (%s)\n", stm->pid, stm->dev->name);
+    printf("- RAM        : Up to %dKiB  (%db reserved by bootloader)\n", (stm->dev->ram_end - 0x20000000) / 1024, stm->dev->ram_start - 0x20000000);
+    printf("- Flash      : Up to %dKiB (size first sector: %dx%d)\n", (stm->dev->fl_end - stm->dev->fl_start ) / 1024, stm->dev->fl_pps, stm->dev->fl_ps[0]);
+    printf("- Option RAM : %db\n", stm->dev->opt_end - stm->dev->opt_start + 1);
+    printf("- System RAM : %dKiB\n", (stm->dev->mem_end - stm->dev->mem_start) / 1024);
 
     uint8_t     buffer[256];
     uint32_t    addr, start, end;
@@ -448,7 +445,7 @@ int main(int argc, char* argv[]) {
         first_page = spage;
         start = flash_page_to_addr(first_page);
         if (start > stm->dev->fl_end) {
-            fprintf(stderr, "Address range exceeds flash size.\n");
+            printf("Address range exceeds flash size.\n");
             goto close;
         }
 
@@ -469,97 +466,97 @@ int main(int argc, char* argv[]) {
     if (action == ACT_READ) {
         unsigned int max_len = port_opts.rx_frame_max;
 
-        fprintf(diag, "Memory read\n");
+        printf("Memory read\n");
 
         perr = parser->open(p_st, filename, 1);
         if (perr != PARSER_ERR_OK) {
-            fprintf(stderr, "%s ERROR: %s\n", parser->name, parser_errstr(perr));
+            printf("%s ERROR: %s\n", parser->name, parser_errstr(perr));
             if (perr == PARSER_ERR_SYSTEM)
                 perror(filename);
             goto close;
         }
 
-        fflush(diag);
+        fflush(stdout);
         addr = start;
         while(addr < end) {
             uint32_t left   = end - addr;
             len     = max_len > left ? left : max_len;
             s_err = stm32_read_memory(stm, addr, buffer, len);
             if (s_err != STM32_ERR_OK) {
-                fprintf(stderr, "Failed to read memory at address 0x%08x, target write-protected?\n", addr);
+                printf("Failed to read memory at address 0x%08x, target write-protected?\n", addr);
                 goto close;
             }
             if (parser->write(p_st, buffer, len) != PARSER_ERR_OK)
             {
-                fprintf(stderr, "Failed to write data to file\n");
+                printf("Failed to write data to file\n");
                 goto close;
             }
             addr += len;
 
-            fprintf(diag,
+            printf(
                 "\rRead address 0x%08x (%.2f%%) ",
                 addr,
                 (100.0f / (float)(end - start)) * (float)(addr - start)
             );
-            fflush(diag);
+            fflush(stdout);
         }
-        fprintf(diag,   "Done.\n");
+        printf(  "Done.\n");
         ret = 0;
         goto close;
     } else if (action == ACT_READ_PROTECT) {
-        fprintf(diag, "Read-Protecting flash\n");
+        printf("Read-Protecting flash\n");
         /* the device automatically performs a reset after the sending the ACK */
         reset_flag = 0;
         s_err = stm32_readprot_memory(stm);
         if (s_err != STM32_ERR_OK) {
-            fprintf(stderr, "Failed to read-protect flash\n");
+            printf("Failed to read-protect flash\n");
             goto close;
         }
-        fprintf(diag,   "Done.\n");
+        printf(  "Done.\n");
         ret = 0;
     } else if (action == ACT_READ_UNPROTECT) {
-        fprintf(diag, "Read-UnProtecting flash\n");
+        printf("Read-UnProtecting flash\n");
         /* the device automatically performs a reset after the sending the ACK */
         reset_flag = 0;
         s_err = stm32_runprot_memory(stm);
         if (s_err != STM32_ERR_OK) {
-            fprintf(stderr, "Failed to read-unprotect flash\n");
+            printf("Failed to read-unprotect flash\n");
             goto close;
         }
-        fprintf(diag,   "Done.\n");
+        printf(  "Done.\n");
         ret = 0;
     } else if (action == ACT_ERASE_ONLY) {
         ret = 0;
-        fprintf(diag, "Erasing flash\n");
+        printf("Erasing flash\n");
 
         if (num_pages != STM32_MASS_ERASE &&
             (start != flash_page_to_addr(first_page)
              || end != flash_page_to_addr(first_page + num_pages))) {
-            fprintf(stderr, "Specified start & length are invalid (must be page aligned)\n");
+            printf("Specified start & length are invalid (must be page aligned)\n");
             ret = 1;
             goto close;
         }
 
         s_err = stm32_erase_memory(stm, first_page, num_pages);
         if (s_err != STM32_ERR_OK) {
-            fprintf(stderr, "Failed to erase memory\n");
+            printf("Failed to erase memory\n");
             ret = 1;
             goto close;
         }
         ret = 0;
     } else if (action == ACT_WRITE_UNPROTECT) {
-        fprintf(diag, "Write-unprotecting flash\n");
+        printf("Write-unprotecting flash\n");
         /* the device automatically performs a reset after the sending the ACK */
         reset_flag = 0;
         s_err = stm32_wunprot_memory(stm);
         if (s_err != STM32_ERR_OK) {
-            fprintf(stderr, "Failed to write-unprotect flash\n");
+            printf("Failed to write-unprotect flash\n");
             goto close;
         }
-        fprintf(diag,   "Done.\n");
+        printf(  "Done.\n");
         ret = 0;
     } else if (action == ACT_WRITE) {
-        fprintf(diag, "Write to memory\n");
+        printf("Write to memory\n");
 
         unsigned int offset = 0;
         unsigned int r;
@@ -581,22 +578,22 @@ int main(int argc, char* argv[]) {
         // TODO: It is possible to write to non-page boundaries, by reading out flash
         //       from partial pages and combining with the input data
         // if ((start % stm->dev->fl_ps[i]) != 0 || (end % stm->dev->fl_ps[i]) != 0) {
-        //  fprintf(stderr, "Specified start & length are invalid (must be page aligned)\n");
+        //  printf("Specified start & length are invalid (must be page aligned)\n");
         //  goto close;
         // }
 
         // TODO: If writes are not page aligned, we should probably read out existing flash
         //       contents first, so it can be preserved and combined with new data
         if (!no_erase && num_pages) {
-            fprintf(diag, "Erasing memory\n");
+            printf("Erasing memory\n");
             s_err = stm32_erase_memory(stm, first_page, num_pages);
             if (s_err != STM32_ERR_OK) {
-                fprintf(stderr, "Failed to erase memory\n");
+                printf("Failed to erase memory\n");
                 goto close;
             }
         }
 
-        fflush(diag);
+        fflush(stdout);
         addr = start;
         while(addr < end && offset < size) {
             uint32_t left   = end - addr;
@@ -610,7 +607,7 @@ int main(int argc, char* argv[]) {
                 if (use_stdinout) {
                     break;
                 } else {
-                    fprintf(stderr, "Failed to read input file\n");
+                    printf("Failed to read input file\n");
                     goto close;
                 }
             }
@@ -618,7 +615,7 @@ int main(int argc, char* argv[]) {
             again:
             s_err = stm32_write_memory(stm, addr, buffer, len);
             if (s_err != STM32_ERR_OK) {
-                fprintf(stderr, "Failed to write memory at address 0x%08x\n", addr);
+                printf("Failed to write memory at address 0x%08x\n", addr);
                 goto close;
             }
 
@@ -632,7 +629,7 @@ int main(int argc, char* argv[]) {
                     rlen = rlen < max_rlen ? rlen : max_rlen;
                     s_err = stm32_read_memory(stm, addr + offset, compare + offset, rlen);
                     if (s_err != STM32_ERR_OK) {
-                        fprintf(stderr, "Failed to read memory at address 0x%08x\n", addr + offset);
+                        printf("Failed to read memory at address 0x%08x\n", addr + offset);
                         goto close;
                     }
                     offset += rlen;
@@ -641,7 +638,7 @@ int main(int argc, char* argv[]) {
                 for(r = 0; r < len; ++r)
                     if (buffer[r] != compare[r]) {
                         if (failed == retry) {
-                            fprintf(stderr, "Failed to verify at address 0x%08x, expected 0x%02x and found 0x%02x\n",
+                            printf("Failed to verify at address 0x%08x, expected 0x%02x and found 0x%02x\n",
                                 (uint32_t)(addr + r),
                                 buffer [r],
                                 compare[r]
@@ -658,30 +655,30 @@ int main(int argc, char* argv[]) {
             addr    += len;
             offset  += len;
 
-            fprintf(diag,
+            printf(
                 "\rWrote %saddress 0x%08x (%.2f%%) ",
                 verify ? "and verified " : "",
                 addr,
                 (100.0f / size) * offset
             );
-            fflush(diag);
+            fflush(stdout);
 
         }
 
-        fprintf(diag,   "Done.\n");
+        printf(  "Done.\n");
         ret = 0;
         goto close;
     } else if (action == ACT_CRC) {
         uint32_t crc_val = 0;
 
-        fprintf(diag, "CRC computation\n");
+        printf("CRC computation\n");
 
         s_err = stm32_crc_wrapper(stm, start, end - start, &crc_val);
         if (s_err != STM32_ERR_OK) {
-            fprintf(stderr, "Failed to read CRC\n");
+            printf("Failed to read CRC\n");
             goto close;
         }
-        fprintf(diag, "CRC(0x%08x-0x%08x) = 0x%08x\n", start, end,
+        printf("CRC(0x%08x-0x%08x) = 0x%08x\n", start, end,
             crc_val);
         ret = 0;
         goto close;
@@ -708,23 +705,23 @@ close:
         if (execute == 0)
             execute = stm->dev->fl_start;
 
-        fprintf(diag, "\nStarting execution at address 0x%08x... ", execute);
-        fflush(diag);
+        printf("\nStarting execution at address 0x%08x... ", execute);
+        fflush(stdout);
         if (stm32_go(stm, execute) == STM32_ERR_OK) {
             reset_flag = 0;
-            fprintf(diag, "done.\n");
+            printf("done.\n");
         } else
-            fprintf(diag, "failed.\n");
+            printf("failed.\n");
     }
 
     if (stm && reset_flag) {
-        fprintf(diag, "\nResetting device... \n");
-        fflush(diag);
+        printf("\nResetting device... \n");
+        fflush(stdout);
         if (init_bl_exit(stm, port, gpio_seq)) {
             ret = 1;
-            fprintf(diag, "Reset failed.\n");
+            printf("Reset failed.\n");
         } else
-            fprintf(diag, "Reset done.\n");
+            printf("Reset done.\n");
     } else if (port) {
         /* Always run exit sequence if present */
         if (gpio_seq && strchr(gpio_seq, ':'))
@@ -736,7 +733,7 @@ close:
     if (port)
         port->close(port);
 
-    fprintf(diag, "\n");
+    printf("\n");
     return ret;
 }
 
@@ -765,9 +762,9 @@ int parse_options(int argc, char *argv[])
                 port_opts.baudRate = serial_get_baud(strtoul(optarg, NULL, 0));
                 if (port_opts.baudRate == SERIAL_BAUD_INVALID) {
                     serial_baud_t baudrate;
-                    fprintf(stderr, "Invalid baud rate, valid options are:\n");
+                    printf("Invalid baud rate, valid options are:\n");
                     for (baudrate = SERIAL_BAUD_1200; baudrate != SERIAL_BAUD_INVALID; ++baudrate)
-                        fprintf(stderr, " %d\n", serial_get_baud_int(baudrate));
+                        printf(" %d\n", serial_get_baud_int(baudrate));
                     return 1;
                 }
                 break;
@@ -777,7 +774,7 @@ int parse_options(int argc, char *argv[])
                     || serial_get_bits(optarg) == SERIAL_BITS_INVALID
                     || serial_get_parity(optarg) == SERIAL_PARITY_INVALID
                     || serial_get_stopbit(optarg) == SERIAL_STOPBIT_INVALID) {
-                    fprintf(stderr, "Invalid serial mode\n");
+                    printf("Invalid serial mode\n");
                     return 1;
                 }
                 port_opts.serial_mode = optarg;
@@ -798,12 +795,12 @@ int parse_options(int argc, char *argv[])
                 break;
             case 'e':
                 if (readwrite_len || start_addr) {
-                    fprintf(stderr, "ERROR: Invalid options, can't specify start page / num pages and start address/length\n");
+                    printf("ERROR: Invalid options, can't specify start page / num pages and start address/length\n");
                     return 1;
                 }
                 npages = strtoul(optarg, NULL, 0);
                 if (npages > STM32_MAX_PAGES || npages < 0) {
-                    fprintf(stderr, "ERROR: You need to specify a page count between 0 and 0xffff");
+                    printf("ERROR: You need to specify a page count between 0 and 0xffff");
                     return 1;
                 }
                 if (!npages)
@@ -853,25 +850,25 @@ int parse_options(int argc, char *argv[])
                 exec_flag = 1;
                 execute   = strtoul(optarg, NULL, 0);
                 if (execute % 4 != 0) {
-                    fprintf(stderr, "ERROR: Execution address must be word-aligned\n");
+                    printf("ERROR: Execution address must be word-aligned\n");
                     return 1;
                 }
                 break;
             case 's':
                 if (readwrite_len || start_addr) {
-                    fprintf(stderr, "ERROR: Invalid options, can't specify start page / num pages and start address/length\n");
+                    printf("ERROR: Invalid options, can't specify start page / num pages and start address/length\n");
                     return 1;
                 }
                 spage    = strtoul(optarg, NULL, 0);
                 break;
             case 'S':
                 if (spage || npages) {
-                    fprintf(stderr, "ERROR: Invalid options, can't specify start page / num pages and start address/length\n");
+                    printf("ERROR: Invalid options, can't specify start page / num pages and start address/length\n");
                     return 1;
                 } else {
                     start_addr = strtoul(optarg, &pLen, 0);
                     if (start_addr % 4 != 0) {
-                        fprintf(stderr, "ERROR: Start address must be word-aligned\n");
+                        printf("ERROR: Start address must be word-aligned\n");
                         return 1;
                     }
                     /* we decode 0 as 1 (which is unaligned and thus invalid anyway)
@@ -882,7 +879,7 @@ int parse_options(int argc, char *argv[])
                         pLen++;
                         readwrite_len = strtoul(pLen, NULL, 0);
                         if (readwrite_len == 0) {
-                            fprintf(stderr, "ERROR: Invalid options, can't specify zero length\n");
+                            printf("ERROR: Invalid options, can't specify zero length\n");
                             return 1;
                         }
                     }
@@ -896,7 +893,7 @@ int parse_options(int argc, char *argv[])
                 }
                 if (port_opts.rx_frame_max < 0
                     || port_opts.tx_frame_max < 0) {
-                    fprintf(stderr, "ERROR: Invalid negative value for option -F\n");
+                    printf("ERROR: Invalid negative value for option -F\n");
                     return 1;
                 }
                 if (port_opts.rx_frame_max == 0)
@@ -905,16 +902,16 @@ int parse_options(int argc, char *argv[])
                     port_opts.tx_frame_max = STM32_MAX_TX_FRAME;
                 if (port_opts.rx_frame_max < 20
                     || port_opts.tx_frame_max < 6) {
-                    fprintf(stderr, "ERROR: current code cannot work with small frames.\n");
-                    fprintf(stderr, "min(RX) = 20, min(TX) = 6\n");
+                    printf("ERROR: current code cannot work with small frames.\n");
+                    printf("min(RX) = 20, min(TX) = 6\n");
                     return 1;
                 }
                 if (port_opts.rx_frame_max > STM32_MAX_RX_FRAME) {
-                    fprintf(stderr, "WARNING: Ignore RX length in option -F\n");
+                    printf("WARNING: Ignore RX length in option -F\n");
                     port_opts.rx_frame_max = STM32_MAX_RX_FRAME;
                 }
                 if (port_opts.tx_frame_max > STM32_MAX_TX_FRAME) {
-                    fprintf(stderr, "WARNING: Ignore TX length in option -F\n");
+                    printf("WARNING: Ignore TX length in option -F\n");
                     port_opts.tx_frame_max = STM32_MAX_TX_FRAME;
                 }
                 break;
@@ -950,7 +947,7 @@ int parse_options(int argc, char *argv[])
 
     for (c = optind; c < argc; ++c) {
         if (port_opts.device) {
-            fprintf(stderr, "ERROR: Invalid parameter specified\n");
+            printf("ERROR: Invalid parameter specified\n");
             show_help(argv[0]);
             return 1;
         }
@@ -958,13 +955,13 @@ int parse_options(int argc, char *argv[])
     }
 
     if (port_opts.device == NULL) {
-        fprintf(stderr, "ERROR: Device not specified\n");
+        printf("ERROR: Device not specified\n");
         show_help(argv[0]);
         return 1;
     }
 
     if ((action != ACT_WRITE) && verify) {
-        fprintf(stderr, "ERROR: Invalid usage, -v is only valid when writing\n");
+        printf("ERROR: Invalid usage, -v is only valid when writing\n");
         show_help(argv[0]);
         return 1;
     }
@@ -973,7 +970,7 @@ int parse_options(int argc, char *argv[])
 }
 
 void show_help(char *name) {
-    fprintf(stderr,
+    printf(
         "Usage: %s [-bvngfhc] [-[rw] filename] tty_device\n"
         "   -x flash Hans\n"
         "   -y flash Franz\n"
