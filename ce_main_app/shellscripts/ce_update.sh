@@ -1,7 +1,7 @@
 #!/bin/sh
 
 start=$( date )
-printf "ce_update.sh started at : $start"     # show start time
+printf "ce_update.sh started at : $start\n"     # show start time
 
 # Stop any cosmosex app, and pass 1st and 2nd argument of this script to the stop script
 # When arguments are not given, ce_stop will stop not only CosmosEx app, but also cesuper.sh script, which is fine when called manually from shell by user.
@@ -19,14 +19,14 @@ path_to_tmp_update="/tmp/$distro.zip"
 # check if should do update from USB
 
 if [ -f /tmp/UPDATE_FROM_USB ]; then                    # if we're doing update from USB
-    printf "update from USB"
+    printf "update from USB\n"
 
     path_to_usb_update=$( cat /tmp/UPDATE_FROM_USB )    # get content of file into variable
     rm -f /tmp/UPDATE_FROM_USB                          # delete file so we won't do it again next time
 
     unzip -o $path_to_usb_update -d /ce                 # unzip update into /ce directory, overwrite without prompting
 else    # download update from internet, by wget
-    printf "update from internet - will use wget"
+    printf "update from internet - will use wget\n"
 
     rm -f $path_to_tmp_update                       # delete if file exists
     wget -O $path_to_tmp_update $url_zip            # download to /tmp/yocto.zip
@@ -71,19 +71,19 @@ addCoreFreq=0           # don't add it yet
 
 # A) no core_freq? Add it
 if [ "$coreFreqCountAny" -eq "0" ]; then
-    printf "No core_freq in /boot/config.txt, adding it"
+    printf "No core_freq in /boot/config.txt, adding it\n"
     addCoreFreq=1
 fi
 
 # B) more than one core_freq? Remove them, then add one
 if [ "$coreFreqCountAny" -gt "1" ]; then
-    printf "Too many core_freq in /boot/config.txt, fixing it"
+    printf "Too many core_freq in /boot/config.txt, fixing it\n"
     addCoreFreq=1
 fi
 
 # C) There is some core_freq, but it's not correct? Remove it, then add correct one
 if [ "$coreFreqCountAny" -gt "0" ] && [ "$coreFreqCountCorrect" -eq "0" ]; then
-    printf "core_freq in /boot/config.txt is incorrect, fixing it"
+    printf "core_freq in /boot/config.txt is incorrect, fixing it\n"
     addCoreFreq=1
 fi
 
@@ -96,7 +96,7 @@ if [ "$addCoreFreq" -gt "0" ]; then
     echo "core_freq=250" >> /boot/config.txt
 else
     # we don't need to do anything for case D), where there is one core_freq there and it's correct
-    printf "core_freq is ok in /boot/config.txt"
+    printf "core_freq is ok in /boot/config.txt\n"
 fi
 
 #------------------------

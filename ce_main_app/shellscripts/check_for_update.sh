@@ -36,7 +36,7 @@ hash_new=$( wget -O- $url_hash 2> /dev/null )
 # try to read currently stored (used) hash from file
 hash_curr=$( read_from_file /ce/update/hash.current 0 )
 
-if [ "$hash_curr" != "$hash_new" ]; then    # commits are different? do update
+if [ "$hash_curr" != "$hash_new" ]; then    # current and new hash don't match? do update
     echo "Found new version online, will update"
     echo "( $hash_curr != $hash_new )"
 

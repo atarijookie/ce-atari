@@ -13,7 +13,7 @@ printf "\n----------------------------------\n>>> Updating Franz - START\n"
 
 # if symlink serial0 exists, use it, otherwise try to use ttyAMA0
 serialport=$( [ -e /dev/serial0 ] && echo "/dev/serial0" || echo "/dev/ttyAMA0" )
-printf "Will use serial port: " $serialport
+printf "Will use serial port: $serialport\n"
 
 /ce/update/flash_stm32 -y -w /ce/update/franz.hex $serialport
 

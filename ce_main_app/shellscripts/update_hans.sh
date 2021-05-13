@@ -8,7 +8,7 @@ printf "\n----------------------------------\n>>> Updating $dev_name - START\n"
 
 # if symlink serial0 exists, use it, otherwise try to use ttyAMA0
 serialport=$( [ -e /dev/serial0 ] && echo "/dev/serial0" || echo "/dev/ttyAMA0" )
-printf "Will use serial port: " $serialport
+printf "Will use serial port: $serialport\n"
 
 if [ "$hw_ver" -eq "3" ]; then      # for for v3 - we got Horst
     /ce/update/flash_stm32_2021 -x -w /ce/update/horst.hex $serialport || exit 1

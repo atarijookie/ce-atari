@@ -77,16 +77,31 @@ if [ "$update_xilinx" -gt "0" ]; then
     /ce/update/update_xilinx.sh
 fi
 
-# update hans
-if [ "$update_hans" -gt "0" ] || [ "$update_horst" -gt "0" ]; then
-    /ce/update/update_hans.sh
-    cp -f /ce/update/hans.version /ce/update/hans.current     # copy version the file to CURRENT so we'll know what we have flashed
+# update Hans or Horst
+if [ "$hw_ver" -eq "3" ]; then              # on HW v3 - update Horst if needed
+    if [ "$update_horst" -gt "0" ]; then    # should update Horst?
+        /ce/update/update_hans.sh           # run same script as for update of Hans, it will use the right .hex file
+        cp -f /ce/update/horst.version /ce/update/horst.current     # copy version the file to CURRENT so we'll know what we have flashed
+    else
+        printf "Flashing of Horst not needed.\n"
+    fi
+else                                        # on HW v1 and v2 - update Hans if needed
+    if [ "$update_hans" -gt "0" ]; then     # should update Hans?
+        /ce/update/update_hans.sh
+        cp -f /ce/update/hans.version /ce/update/hans.current       # copy version the file to CURRENT so we'll know what we have flashed
+    else
+        printf "Flashing of Hans not needed.\n"
+    fi
 fi
 
 # update franz
 if [ "$update_franz" -gt "0" ]; then
     /ce/update/update_franz.sh
     cp -f /ce/update/franz.version /ce/update/franz.current   # copy version the file to CURRENT so we'll know what we have flashed
+fi
+
+if [ "$update_xilinx" -eq "0" ] && [ "$update_franz" -eq "0" ] && [ "$update_horst" -eq "0" ] && [ "$update_hans" -eq "0" ]; then
+    printf "No chip flashing seems to be needed.\n"
 fi
 
 #--------------
