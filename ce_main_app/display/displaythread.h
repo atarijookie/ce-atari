@@ -20,18 +20,21 @@ void display_print_center(char *str);
 #define DISP_LINE_DATETIME   10
 #define DISP_LINE_RECOVERY1  11
 #define DISP_LINE_RECOVERY2  12
-#define DISP_LINE_COUNT      13     // how many disply lines we have? last index + 1
+#define DISP_LINE_POWEROFF1  13
+#define DISP_LINE_COUNT      14     // how many disply lines we have? last index + 1
 
 #define DISP_SCREEN_HDD1_IDX    0
 #define DISP_SCREEN_HDD2_IDX    1
 #define DISP_SCREEN_TRANS_IDX   2
 #define DISP_SCREEN_RECOVERY    3
-#define DISP_SCREEN_COUNT       4   // how many different screens we have?
+#define DISP_SCREEN_POWEROFF    4
+#define DISP_SCREEN_COUNT       5   // how many different screens we have?
 
 #define DISP_SCREEN_HDD1_LINES     {DISP_LINE_HDD_IDS,   DISP_LINE_FLOPPY, DISP_LINE_IKDB, DISP_LINE_LAN}
 #define DISP_SCREEN_HDD2_LINES     {DISP_LINE_HDD_TYPES, DISP_LINE_FLOPPY, DISP_LINE_IKDB, DISP_LINE_WLAN}
 #define DISP_SCREEN_TRANS_LINES    {DISP_LINE_TRAN_SETT, DISP_LINE_CONF_SHAR, DISP_LINE_TRAN_DRIV, DISP_LINE_DATETIME}
 #define DISP_SCREEN_RECOVERY_LINES {DISP_LINE_EMPTY,     DISP_LINE_RECOVERY1, DISP_LINE_RECOVERY2, DISP_LINE_EMPTY}
+#define DISP_SCREEN_POWEROFF_LINES {DISP_LINE_EMPTY,     DISP_LINE_POWEROFF1, DISP_LINE_EMPTY, DISP_LINE_EMPTY}
 
 void display_setLine(int displayLineId, const char *newLineString);
 void display_showNow(int screenIndex);
@@ -39,10 +42,17 @@ void display_showNow(int screenIndex);
 void *displayThreadCode(void *ptr);
 
 //----------------------------
+// interval for power-off button release
+#define PWR_OFF_PRESS_TIME_MIN          1000
+#define PWR_OFF_PRESS_TIME_MAX          2000
+#define PWR_OFF_PRESS_TIME_MAX_SECONDS  (PWR_OFF_PRESS_TIME_MAX / 1000)
+//----------------------------
 // beeper related stuff
 #define BEEP_SHORT              0
 #define BEEP_MEDIUM             1
 #define BEEP_LONG               2
+
+#define BEEP_POWER_OFF_INTERVAL 4
 
 #define BEEP_RELOAD_SETTINGS    10
 

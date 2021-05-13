@@ -65,7 +65,7 @@ static void fillLine_recovery(int buttonDownTime);
 char display_lines[DISPLAY_LINES_SIZE];
 
 // each screen here is a group of 4 line numbers, because display can show only 4 lines at the time, and this defines which screen shows which 4 lines
-int display_screens[DISP_SCREEN_COUNT][4] = {DISP_SCREEN_HDD1_LINES, DISP_SCREEN_HDD2_LINES, DISP_SCREEN_TRANS_LINES, DISP_SCREEN_RECOVERY_LINES};
+int display_screens[DISP_SCREEN_COUNT][5] = {DISP_SCREEN_HDD1_LINES, DISP_SCREEN_HDD2_LINES, DISP_SCREEN_TRANS_LINES, DISP_SCREEN_RECOVERY_LINES, DISP_SCREEN_POWEROFF_LINES};
 
 // this defines for each existing screen which will be the next screen - this allows us to create a loop between them, plus have extra screens which are not normally shown but switch back to loop
 int display_screens_next[DISP_SCREEN_COUNT];
@@ -95,11 +95,15 @@ void *displayThreadCode(void *ptr)
     bool  btnDownPrev = false;
     DWORD btnDownStart = 0;
     int   btnDownTime = 0, btnDownTimePrev = 0;
+    bool  powerOffIs = false;
+    bool  powerOffWas = false;
 
 #ifndef ONPC
     bcm2835_gpio_fsel(PIN_BEEPER, BCM2835_GPIO_FSEL_OUTP);      // config these extra GPIO pins here (not in the gpio_open())
     bcm2835_gpio_fsel(PIN_BUTTON, BCM2835_GPIO_FSEL_INPT);
 #endif
+
+    display_setLine(DISP_LINE_POWEROFF1, "     Power off?      ");
 
     FloppyConfig floppyConfig;                                  // this contains floppy sound settings
     handleBeeperCommand(BEEP_RELOAD_SETTINGS, &floppyConfig);   // load settings
@@ -114,7 +118,8 @@ void *displayThreadCode(void *ptr)
     display_screens_next[DISP_SCREEN_HDD1_IDX]  = DISP_SCREEN_HDD2_IDX;
     display_screens_next[DISP_SCREEN_HDD2_IDX]  = DISP_SCREEN_TRANS_IDX;
     display_screens_next[DISP_SCREEN_TRANS_IDX] = DISP_SCREEN_HDD1_IDX;
-    display_screens_next[DISP_SCREEN_RECOVERY]  = DISP_SCREEN_HDD1_IDX;		// if you show RECOVERY screen, next screen will be the 1st screen in the loop
+    display_screens_next[DISP_SCREEN_RECOVERY]  = DISP_SCREEN_HDD1_IDX;     // if you show RECOVERY screen, next screen will be the 1st screen in the loop
+    display_screens_next[DISP_SCREEN_POWEROFF]  = DISP_SCREEN_HDD1_IDX;     // if you show POWER-OFF screen, next screen will be the 1st screen in the loop
 
     Debug::out(LOG_DEBUG, "Display thread starting...");
 
@@ -166,12 +171,28 @@ void *displayThreadCode(void *ptr)
                         btnDownStart = now;                     // store button down time
                     }
 
-                    btnDownTime = (now - btnDownStart) / 1000;  // calculate how long the button is down (in seconds)
+                    DWORD btnDownTimeMs = (now - btnDownStart); // calculate how long the button is down in ms
+
+                    //-------------
+                    // it's the power off interval, if button down time is between this MIN and MAX time
+                    powerOffIs = (btnDownTimeMs >= PWR_OFF_PRESS_TIME_MIN) && (btnDownTimeMs < PWR_OFF_PRESS_TIME_MAX);
+
+                    if(!powerOffWas && powerOffIs) {            // if we just entered power off interval (not was, but now is)
+                        display_showNow(DISP_SCREEN_POWEROFF);      // show power off question
+                        nextScreenTime = Utils::getEndTime(1000);   // redraw display in 1 second
+                    }
+
+                    powerOffWas = powerOffIs;                   // store previous value of are-we-in-the-power-off-interval flag
+
+                    //-------------
+                    btnDownTime = btnDownTimeMs / 1000;         // ms to seconds
                     if(btnDownTime != btnDownTimePrev) {        // if button down time (in seconds) changed since the last time we've checked, update strings, show on screen
                         btnDownTimePrev = btnDownTime;          // store this as previous time
 
-                        fillLine_recovery(btnDownTime);         // fill recovery screen lines
-                        display_showNow(DISP_SCREEN_RECOVERY);  // show the recovery screen
+                        if(btnDownTime >= PWR_OFF_PRESS_TIME_MAX_SECONDS) { // if we're after the power-off interval
+                            fillLine_recovery(btnDownTime);         // fill recovery screen lines
+                            display_showNow(DISP_SCREEN_RECOVERY);  // show the recovery screen
+                        }
                     }
                 } else if(!btnDown && btnDownPrev) {    // if button was just released (rising edge)
                     // if user was holding button down, we should redraw the recovery screen to something normal
@@ -217,6 +238,10 @@ void *displayThreadCode(void *ptr)
         if(redrawDisplay) {
             // draw screen on display
             display_drawScreen(currentScreen);
+
+            if(currentScreen == DISP_SCREEN_POWEROFF) { // in case we've just shown power off screen, do also the power off beep
+                beeper_beep(BEEP_POWER_OFF_INTERVAL);
+            }
 
             // move to next screen
             currentScreen = display_screens_next[currentScreen];
@@ -423,6 +448,18 @@ static void handleBeeperCommand(int beeperCommand, FloppyConfig *fc)
         return;
     }
 
+    // should do the button-press-is-in-the-power-off-interval sound
+    if(beeperCommand == BEEP_POWER_OFF_INTERVAL) {
+        for(int i=0; i<100; i++) {
+            bcm2835_gpio_write(PIN_BEEPER, HIGH);
+            Utils::sleepMs(1);
+            bcm2835_gpio_write(PIN_BEEPER, LOW);
+            Utils::sleepMs(5);
+        }
+
+        return;
+    }
+
     // should be floppy seek noise?
     if((beeperCommand & BEEP_FLOPPY_SEEK) == BEEP_FLOPPY_SEEK) {
         int trackCount = beeperCommand - BEEP_FLOPPY_SEEK;
@@ -552,15 +589,13 @@ void display_showNow(int screenIndex)
 
 void beeper_beep(int beepLen)
 {
-    // invalid beep? quit
-    if(beepLen < BEEP_SHORT || beepLen > BEEP_LONG) {
-        return;
-    }
-
-    // got pipe?
-    if(beeperPipeFd[1] > 0) {
-        char outBfr = (char) beepLen;
-        write(beeperPipeFd[1], &outBfr, 1);
+    // if beep is ranging from short to long, or it's power-off interval beep
+    if((beepLen >= BEEP_SHORT && beepLen <= BEEP_LONG) || (beepLen == BEEP_POWER_OFF_INTERVAL)){
+        // got pipe?
+        if(beeperPipeFd[1] > 0) {
+            char outBfr = (char) beepLen;
+            write(beeperPipeFd[1], &outBfr, 1);
+        }
     }
 }
 
