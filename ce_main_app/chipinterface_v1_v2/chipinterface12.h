@@ -47,12 +47,14 @@ public:
 
     //----------------
     // chip interface initialization and deinitialization - e.g. open GPIO, or open socket, ...
-    bool open(void);
-    void close(void);
+    bool ciOpen(void);
+    void ciClose(void);
 
     //----------------
     // call this with true to enable ikdb UART communication
-    void ikdbUartEnable(bool enable);
+    void ikbdUartEnable(bool enable);
+    int  ikbdUartReadFd(void);
+    int  ikbdUartWriteFd(void);
 
     //----------------
     // reset both or just one of the parts
@@ -90,6 +92,9 @@ public:
 private:
     CConSpi *conSpi;
 
+    int ikbdReadFd;     // fd used for IKBD read
+    int ikbdWriteFd;    // fd used for IKDB write
+
     BYTE *bufOut;
     BYTE *bufIn;
 
@@ -118,6 +123,8 @@ private:
 
     int bcdToInt(int bcd);
     void convertXilinxInfo(BYTE xilinxInfo);            // used to process xilinx info into hwInfo struct
+
+    void serialSetup(void);                             // open IKDB serial port
 };
 
 #endif // CHIPINTERFACE12_H

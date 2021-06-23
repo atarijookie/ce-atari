@@ -9,18 +9,23 @@
 #include "utils.h"
 #include "statusreport.h"
 
+#include "chipinterface.h"
 #include "ikbd.h"
+
+extern ChipInterface* chipInterface;
 
 void Ikbd::processReceivedCommands(bool skipKeyboardTranslation)
 {
-    if(fdUart == -1) {                                          // uart not open? quit
+    int fdUartRead = chipInterface->ikbdUartReadFd();           // get FD for reading from IKBD
+
+    if(fdUartRead == -1) {                                      // uart not open? quit
         return;
     }
 
     //-----------------
     // receive if there is something to receive
     BYTE bfr[128];
-    int res = read(fdUart, bfr, 128);                       // try to read data from uart
+    int res = read(fdUartRead, bfr, 128);                       // try to read data from uart
 
     // no data was received, nothing to resend
     if(res <= 0) {
@@ -129,7 +134,8 @@ void Ikbd::dumpBuffer(bool fromStNotKeyboard)
         text += bfr;
 
         if(!fromStNotKeyboard) {                // if it's from keyboard, send it to ST
-            fdWrite(fdUart, &val, 1);
+            int fdUartWrite = chipInterface->ikbdUartWriteFd();     // get FD for writing to IKBD
+            fdWrite(fdUartWrite, &val, 1);
         }
     }
 
@@ -361,7 +367,7 @@ void Ikbd::processStCommands(void)
                 ikbdLog( "Ikbd::processStCommands -- STCMD_INTERROGATE_MOUSE_POS -- will send USB mouse position (either we're in SOLO mode and / or we gotUsbMouse() )");
             }
 
-			sendMousePosAbsolute(fdUart, absMouse.buttons);				// send position and accumulated buttons
+			sendMousePosAbsolute(absMouse.buttons);				// send position and accumulated buttons
 			absMouse.buttons = 0;										// no buttons for now
 			break;
 
@@ -518,7 +524,8 @@ void Ikbd::processGetCommand(BYTE getCmd)
 	}
 
 	if(send) {										// if command was handled
-		fdWrite(fdUart, bfr, 8);
+        int fdUartWrite = chipInterface->ikbdUartWriteFd();     // get FD for writing to IKBD
+		fdWrite(fdUartWrite, bfr, 8);
 	}
 }
 
@@ -548,6 +555,8 @@ void Ikbd::processKeyboardData(bool skipKeyboardTranslation)
     if(cbKeyboardData.count <= 0) {                             // no data? quit
         return;
     }
+
+    int fdUartWrite = chipInterface->ikbdUartWriteFd();     // get FD for writing to IKBD
 
     statuses.ikbdSt.aliveTime = Utils::getCurrentMs();          // store current time, so we won't have to call this many times in the loop
     statuses.ikbdSt.aliveSign = ALIVE_KEYDOWN;                  // we don't know at this moment if it's a key down event, but store it just to make sure that user will not see it's a ST IKBD command from ST, but something from original keyboard
@@ -643,7 +652,7 @@ void Ikbd::processKeyboardData(bool skipKeyboardTranslation)
 			}
 
 			if(resendTheseData) {								    // if we should resend this data
-				fdWrite(fdUart, bfr, len);                          // send the whole sequence to ST
+				fdWrite(fdUartWrite, bfr, len);                          // send the whole sequence to ST
             }
 
 			continue;
@@ -659,7 +668,7 @@ void Ikbd::processKeyboardData(bool skipKeyboardTranslation)
             }
 
             if(!wasHandled) {                              // if not handled as keyb joy, send it to ST
-                fdWrite(fdUart, &val, 1);                           // send byte to ST
+                fdWrite(fdUartWrite, &val, 1);             // send byte to ST
             }
         }
     }
@@ -678,7 +687,8 @@ void Ikbd::sendBothJoyReport(void)
     bfr[1] = !firstJoyIs0 ? joy0state : joy1state;
     bfr[2] = !firstJoyIs0 ? joy1state : joy0state;
 
-	res = fdWrite(fdUart, bfr, 3);
+    int fdUartWrite = chipInterface->ikbdUartWriteFd();     // get FD for writing to IKBD
+	res = fdWrite(fdUartWrite, bfr, 3);
 
     if(res < 0) {
         logDebugAndIkbd(LOG_ERROR, "write to uart failed, errno: %d", errno);
@@ -700,7 +710,8 @@ void Ikbd::sendJoyState(int joyNumber, int dirTotal)
 
     bfr[1] = dirTotal;
 
-    res = fdWrite(fdUart, bfr, 2);
+    int fdUartWrite = chipInterface->ikbdUartWriteFd();           // get FD for writing to IKBD
+    res = fdWrite(fdUartWrite, bfr, 2);
 
     if(res < 0) {
         logDebugAndIkbd(LOG_ERROR, "write to uart (0) failed, errno: %d", errno);
@@ -723,7 +734,8 @@ void Ikbd::sendJoyButtonsInMouseMode(void)
     bfr[1] = 0;
     bfr[2] = 0;
 
-    int res = fdWrite(fdUart, bfr, 3);
+    int fdUartWrite = chipInterface->ikbdUartWriteFd();     // get FD for writing to IKBD
+    int res = fdWrite(fdUartWrite, bfr, 3);
 
     if(res < 0) {
         logDebugAndIkbd(LOG_ERROR, "write to uart (1) failed, errno: %d", errno);
@@ -776,9 +788,11 @@ void Ikbd::fillSpecialCodeLengthTable(void)
     specialCodeLen[KEYBDATA_JOY1		- KEYBDATA_SPECIAL_LOWEST] = KEYBDATA_JOY1_LEN;
 }
 
-void Ikbd::sendMousePosAbsolute(int fd, BYTE absButtons)
+void Ikbd::sendMousePosAbsolute(BYTE absButtons)
 {
-    if(fd == -1) {                      // no UART open?
+    int fdUartWrite = chipInterface->ikbdUartWriteFd();           // get FD for writing to IKBD
+
+    if(fdUartWrite == -1) {                      // no UART open?
         return;
     }
 
@@ -800,16 +814,18 @@ void Ikbd::sendMousePosAbsolute(int fd, BYTE absButtons)
 	bfr[4] = absMouse.y >> 8;
 	bfr[5] = (BYTE) absMouse.y;
 
-	int res = fdWrite(fd, bfr, 6);
+	int res = fdWrite(fdUartWrite, bfr, 6);
 
 	if(res < 0) {
 		logDebugAndIkbd(LOG_ERROR, "sendMousePosAbsolute failed, errno: %d", errno);
 	}
 }
 
-void Ikbd::sendMousePosRelative(int fd, BYTE buttons, BYTE xRel, BYTE yRel)
+void Ikbd::sendMousePosRelative(BYTE buttons, BYTE xRel, BYTE yRel)
 {
-    if(fd == -1) {                      // no UART open? quit
+    int fdUartWrite = chipInterface->ikbdUartWriteFd();           // get FD for writing to IKBD
+
+    if(fdUartWrite == -1) {                      // no UART open? quit
         return;
     }
 
@@ -833,7 +849,7 @@ void Ikbd::sendMousePosRelative(int fd, BYTE buttons, BYTE xRel, BYTE yRel)
 	bfr[1] = xRel;
     bfr[2] = yRelVal;
 
-	int res = fdWrite(fd, bfr, 3);
+	int res = fdWrite(fdUartWrite, bfr, 3);
 
 	if(res < 0) {
 		logDebugAndIkbd(LOG_ERROR, "sendMousePosRelative failed, errno: %d", errno);

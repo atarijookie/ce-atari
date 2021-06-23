@@ -232,14 +232,6 @@ void Update::createNewScripts(void)
 
     wasRunOnce = true;                      // mark that we've runned this once
 
-    // check if the git hidden directory exists, and if it does, then don't copy the scripts - it will be all handled by git
-    struct stat sb;
-
-    if (stat("/ce/.git", &sb) == 0 && S_ISDIR(sb.st_mode)) {    // path exists and it's a dir, quit
-        Debug::out(LOG_DEBUG, "Update::createNewScripts() - /ce/ dir is already under git, won't try to update scripts");
-        return;
-    }
-
     // it seems that we should update the scripts, so update them
     printf("Will try to update scripts\n");
     Debug::out(LOG_DEBUG, "Update::createNewScripts() - will try to update scripts");

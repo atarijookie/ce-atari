@@ -1,4 +1,14 @@
 #include <string.h>
+#include <termios.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <fcntl.h>
+#include <string>
+#include <unistd.h>
+#include <sys/select.h>
+#include <sys/inotify.h>
+#include <limits.h>
 
 #include "chipinterface12.h"
 #include "gpio.h"
@@ -6,6 +16,7 @@
 #include "../debug.h"
 #include "../global.h"
 #include "../update.h"
+#include "../ikbd/ikbd.h"
 
 #ifndef ONPC
     #include <bcm2835.h>
@@ -17,6 +28,9 @@ extern TFlags    flags;                 // global flags from command line
 ChipInterface12::ChipInterface12()
 {
     conSpi = new CConSpi();
+
+    ikbdReadFd = -1;
+    ikbdWriteFd = -1;
 
     bufOut = new BYTE[MFM_STREAM_SIZE];
     bufIn = new BYTE[MFM_STREAM_SIZE];
@@ -37,29 +51,110 @@ int ChipInterface12::chipInterfaceType(void)
     return CHIP_IF_V1_V2;
 }
 
-bool ChipInterface12::open(void)
+bool ChipInterface12::ciOpen(void)
 {
 #ifndef ONPC
-    return gpio_open();
+    serialSetup();          // open and configure UART for IKBD
+    return gpio_open();     // open GPIO and SPI
 #else
     return false;
 #endif
 }
 
-void ChipInterface12::close(void)
+void ChipInterface12::ciClose(void)
 {
 #ifndef ONPC
-    gpio_close();
+    if(ikbdReadFd != -1) {  // if got fd, close it
+        close(ikbdReadFd);
+        ikbdReadFd = -1;
+    }
+
+    if(ikbdWriteFd != -1) { // if got fd, close it
+        close(ikbdWriteFd);
+        ikbdWriteFd = -1;
+    }
+
+    gpio_close();           // close GPIO and SPI
 #endif
 }
 
-void ChipInterface12::ikdbUartEnable(bool enable)
+void ChipInterface12::ikbdUartEnable(bool enable)
 {
 #ifndef ONPC
     if(enable) {
         bcm2835_gpio_write(PIN_TX_SEL1N2, HIGH);            // TX_SEL1N2, switch the RX line to receive from Franz, which does the 9600 to 7812 baud translation
     }
 #endif
+}
+
+int ChipInterface12::ikbdUartReadFd(void)
+{
+    return ikbdReadFd;
+}
+
+int ChipInterface12::ikbdUartWriteFd(void)
+{
+    return ikbdWriteFd;
+}
+
+void ChipInterface12::serialSetup(void)
+{
+    struct termios termiosStruct;
+    termios *ts = &termiosStruct;
+
+    int fd;
+
+    ikbdReadFd = -1;
+    ikbdWriteFd = -1;
+
+    fd = open(UARTFILE, O_RDWR | O_NOCTTY | O_NDELAY | O_NONBLOCK);
+    if(fd == -1) {
+        logDebugAndIkbd(LOG_ERROR, "Failed to open %s", UARTFILE);
+        return;
+    }
+
+    fcntl(fd, F_SETFL, 0);
+    tcgetattr(fd, ts);
+
+    /* reset the settings */
+    cfmakeraw(ts);
+    ts->c_cflag &= ~(CSIZE | CRTSCTS);
+    ts->c_iflag &= ~(IXON | IXOFF | IXANY | IGNPAR);
+    ts->c_lflag &= ~(ECHOK | ECHOCTL | ECHOKE);
+    ts->c_oflag &= ~(OPOST | ONLCR);
+
+    /* setup the new settings */
+    cfsetispeed(ts, B19200);
+    cfsetospeed(ts, B19200);
+    ts->c_cflag |=  CS8 | CLOCAL | CREAD;            // uart: 8N1
+
+    ts->c_cc[VMIN ] = 0;
+    ts->c_cc[VTIME] = 0;
+
+    /* set the settings */
+    tcflush(fd, TCIFLUSH);
+
+    if (tcsetattr(fd, TCSANOW, ts) != 0) {
+        close(fd);
+        return;
+    }
+
+    /* confirm they were set */
+    struct termios settings;
+    tcgetattr(fd, &settings);
+    if (settings.c_iflag != ts->c_iflag ||
+        settings.c_oflag != ts->c_oflag ||
+        settings.c_cflag != ts->c_cflag ||
+        settings.c_lflag != ts->c_lflag) {
+        close(fd);
+        return;
+    }
+
+    fcntl(fd, F_SETFL, FNDELAY);                    // make reading non-blocking
+
+    // on real UART same fd is used for read and write
+    ikbdReadFd = fd;
+    ikbdWriteFd = fd;
 }
 
 void ChipInterface12::resetHDDandFDD(void)

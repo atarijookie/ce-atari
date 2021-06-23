@@ -87,8 +87,6 @@ public:
 
     void processReceivedCommands(bool skipKeyboardTranslation);
 
-    int     fdUart;
-
 private:
     enum JoystickState {
         Disabled,
@@ -172,8 +170,8 @@ private:
     void sendJoyButtonsInMouseMode(void);
     void sendJoyState(int joyNumber, int dirTotal);
     void sendBothJoyReport(void);
-    void sendMousePosRelative(int fd, BYTE buttons, BYTE xRel, BYTE yRel);
-    void sendMousePosAbsolute(int fd, BYTE absButtons);
+    void sendMousePosRelative(BYTE buttons, BYTE xRel, BYTE yRel);
+    void sendMousePosAbsolute(BYTE absButtons);
     void fixAbsMousePos(void);
 
     void processStCommands(void);

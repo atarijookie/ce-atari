@@ -37,7 +37,6 @@ extern ChipInterface* chipInterface;
 
 void *ikbdThreadCode(void *ptr)
 {
-    struct termios    termiosStruct;
     Ikbd ikbd;
     int max_fd;
     int fd;
@@ -51,12 +50,7 @@ void *ikbdThreadCode(void *ptr)
     ikbdLog("----------------------------------------------------------");
     ikbdLog("ikbdThreadCode will enter loop...");
 
-    chipInterface->ikdbUartEnable(true);        // enable UART for IKDB via some hardware magic
-
-    // open and set up uart
-    if(ikbd.serialSetup(&termiosStruct) == -1) {
-        logDebugAndIkbd(LOG_ERROR, "ikbd.serialSetup failed, won't be able to send IKDB data");
-    }
+    chipInterface->ikbdUartEnable(true);        // enable UART for IKDB via some hardware magic
 
     inotifyFd = inotify_init();
     if(inotifyFd < 0) {
@@ -91,10 +85,14 @@ void *ikbdThreadCode(void *ptr)
                 if(fd > max_fd) max_fd = fd;
             }
         }
-        if(ikbd.fdUart >= 0) {
-            FD_SET(ikbd.fdUart, &readfds);
-            if(ikbd.fdUart > max_fd) max_fd = ikbd.fdUart;
+
+        int fdUart = chipInterface->ikbdUartReadFd();       // get FD for reading from IKBD
+
+        if(fdUart >= 0) {                                   // if fdUart is valid (open)
+            FD_SET(fdUart, &readfds);
+            if(fdUart > max_fd) max_fd = fdUart;
         }
+
         if(inotifyFd >= 0) {
             FD_SET(inotifyFd, &readfds);
             if(inotifyFd > max_fd) max_fd = inotifyFd;
@@ -140,7 +138,7 @@ void *ikbdThreadCode(void *ptr)
 
         bool clientConnected = ((Utils::getCurrentMs() - shared.configStream.acsi->getLastCmdTimestamp()) <= 2000);
 
-        if(ikbd.fdUart >= 0 && FD_ISSET(ikbd.fdUart, &readfds)) {
+        if(fdUart >= 0 && FD_ISSET(fdUart, &readfds)) {
             // process the incomming data from original keyboard and from ST
             ikbd.processReceivedCommands(clientConnected);
         }
@@ -200,7 +198,7 @@ void *ikbdThreadCode(void *ptr)
     }
     ikbd.closeDevs();
 
-    chipInterface->ikdbUartEnable(false);        // disable UART for IKDB via some hardware magic, so Atari keyboard and mouse will work even if ce_main_app doesn't run
+    chipInterface->ikbdUartEnable(false);        // disable UART for IKDB via some hardware magic, so Atari keyboard and mouse will work even if ce_main_app doesn't run
 
     logDebugAndIkbd(LOG_DEBUG, "ikbdThreadCode has quit");
     return 0;
@@ -217,7 +215,6 @@ Ikbd::Ikbd()
 
     ceIkbdMode = CE_IKBDMODE_SOLO;
 
-    fdUart      = -1;
     mouseBtnNow = 0;
 
     // init uart RX cyclic buffers
@@ -287,61 +284,6 @@ void Ikbd::resetInternalIkbdVars(void)
     f11sPressed        = 0;
     f12sPressed        = 0;
     waitingForHotkeyRelease = false;
-}
-
-int Ikbd::serialSetup(termios *ts)
-{
-    int fd;
-
-    fdUart = -1;
-
-    fd = open(UARTFILE, O_RDWR | O_NOCTTY | O_NDELAY | O_NONBLOCK);
-    if(fd == -1) {
-        logDebugAndIkbd(LOG_ERROR, "Failed to open %s", UARTFILE);
-        return -1;
-    }
-
-    fcntl(fd, F_SETFL, 0);
-    tcgetattr(fd, ts);
-
-    /* reset the settings */
-    cfmakeraw(ts);
-    ts->c_cflag &= ~(CSIZE | CRTSCTS);
-    ts->c_iflag &= ~(IXON | IXOFF | IXANY | IGNPAR);
-    ts->c_lflag &= ~(ECHOK | ECHOCTL | ECHOKE);
-    ts->c_oflag &= ~(OPOST | ONLCR);
-
-    /* setup the new settings */
-    cfsetispeed(ts, B19200);
-    cfsetospeed(ts, B19200);
-    ts->c_cflag |=  CS8 | CLOCAL | CREAD;            // uart: 8N1
-
-    ts->c_cc[VMIN ] = 0;
-    ts->c_cc[VTIME] = 0;
-
-    /* set the settings */
-    tcflush(fd, TCIFLUSH);
-
-    if (tcsetattr(fd, TCSANOW, ts) != 0) {
-        close(fd);
-        return -1;
-    }
-
-    /* confirm they were set */
-    struct termios settings;
-    tcgetattr(fd, &settings);
-    if (settings.c_iflag != ts->c_iflag ||
-        settings.c_oflag != ts->c_oflag ||
-        settings.c_cflag != ts->c_cflag ||
-        settings.c_lflag != ts->c_lflag) {
-        close(fd);
-        return -1;
-    }
-
-    fcntl(fd, F_SETFL, FNDELAY);                    // make reading non-blocking
-
-    fdUart = fd;
-    return fd;
 }
 
 int Ikbd::fdWrite(int fd, BYTE *bfr, int cnt)

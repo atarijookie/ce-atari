@@ -67,19 +67,10 @@ bool otherInstanceIsRunning(void);
 int  singleInstanceSocketFd;
 
 void showOnDisplay(int argc, char *argv[]);
+int runCore(void);
 
 int main(int argc, char *argv[])
 {
-    CCoreThread *core;
-    pthread_t   mountThreadInfo;
-    pthread_t   downloadThreadInfo;
-#ifndef ONPC
-    pthread_t   ikbdThreadInfo;
-#endif
-    pthread_t   floppyEncThreadInfo;
-    pthread_t   periodicThreadInfo;
-    pthread_t   displayThreadInfo;
-
     pthread_mutex_init(&shared.mtxScsi,             NULL);
     pthread_mutex_init(&shared.mtxConfigStreams,    NULL);
     pthread_mutex_init(&shared.mtxImages,           NULL);
@@ -129,7 +120,7 @@ int main(int argc, char *argv[])
         chipInterface = new ChipInterface12();              // create chip interface v1/v2
         hwConfig.version = 2;
 
-        good = chipInterface->open();                       // try to open chip interface v1/v2
+        good = chipInterface->ciOpen();                       // try to open chip interface v1/v2
 
         if(!good) {
             Debug::out(LOG_INFO, "ChipInterface auto-detect: v1/v2 failed, terminating");
@@ -174,21 +165,36 @@ int main(int argc, char *argv[])
         } else if(flags.getHwInfo) {                    // if should just get HW info, do a shorter / simpler version of app run
             Debug::out(LOG_INFO, ">>> Starting app as HW INFO tool <<<\n");
 
-            core = new CCoreThread(NULL, NULL, NULL);   // create main thread
-            core->run();                                // run the main thread
+            CCoreThread *core = new CCoreThread(NULL, NULL, NULL);   // create main thread
+            core->run();                               // run the main thread
 
         } else if(flags.justDoReset) {                  // is this a reset command? (used with STM32 ST-Link debugger)
             chipInterface->resetHDDandFDD();
-
         }
 
         // close the chip interface
-        chipInterface->close();
+        chipInterface->ciClose();
         delete chipInterface;
         chipInterface = NULL;
 
         return 0;
     }
+
+    // if came here, we should run this app as the main core
+    return runCore();
+}
+
+int runCore(void)
+{   
+    CCoreThread *core;
+    pthread_t   mountThreadInfo;
+    pthread_t   downloadThreadInfo;
+#ifndef ONPC
+    pthread_t   ikbdThreadInfo;
+#endif
+    pthread_t   floppyEncThreadInfo;
+    pthread_t   periodicThreadInfo;
+    pthread_t   displayThreadInfo;
 
     //------------------------------------
     // we should fork this and run shell in the forked child
@@ -353,7 +359,7 @@ int main(int argc, char *argv[])
     //---------------------------------------------------
     // Closing of GPIO should be done after stopping IKBD thread and DISPLAY thread
     // as they also use some GPIO pins and we want them to be able to use them until the end.
-    chipInterface->close();                             // close gpio
+    chipInterface->ciClose();                           // close gpio
     delete chipInterface;
     chipInterface = NULL;
     //---------------------------------------------------

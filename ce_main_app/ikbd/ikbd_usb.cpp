@@ -19,10 +19,12 @@
 #include "../config/configstream.h"
 #include "../display/displaythread.h"
 
+#include "chipinterface.h"
 #include "ikbd.h"
 
 extern TInputDevice ikbdDevs[INTYPE_MAX+1];
 extern SharedObjects shared;
+extern ChipInterface* chipInterface;
 
 void Ikbd::initDevs(void)
 {
@@ -294,6 +296,8 @@ void Ikbd::processFoundDev(const char *linkName, const char *fullPath)
 
 void Ikbd::processMouse(input_event *ev)
 {
+    int fdUartWrite = chipInterface->ikbdUartWriteFd();           // get FD for writing to IKBD
+
     if(ev->type == EV_KEY) {        // on button press
         int btnNew = mouseBtnNow;
 
@@ -347,10 +351,10 @@ void Ikbd::processMouse(input_event *ev)
             BYTE bfr;
 
             switch(absButtons) {
-                case MOUSEABS_BTN_LEFT_DOWN:    bfr = 0x74; fdWrite(fdUart, &bfr, 1); break;
-                case MOUSEABS_BTN_LEFT_UP:      bfr = 0xf4; fdWrite(fdUart, &bfr, 1); break;
-                case MOUSEABS_BTN_RIGHT_DOWN:   bfr = 0x75; fdWrite(fdUart, &bfr, 1); break;
-                case MOUSEABS_BTN_RIGHT_UP:     bfr = 0xf5; fdWrite(fdUart, &bfr, 1); break;
+                case MOUSEABS_BTN_LEFT_DOWN:    bfr = 0x74; fdWrite(fdUartWrite, &bfr, 1); break;
+                case MOUSEABS_BTN_LEFT_UP:      bfr = 0xf4; fdWrite(fdUartWrite, &bfr, 1); break;
+                case MOUSEABS_BTN_RIGHT_DOWN:   bfr = 0x75; fdWrite(fdUartWrite, &bfr, 1); break;
+                case MOUSEABS_BTN_RIGHT_UP:     bfr = 0xf5; fdWrite(fdUartWrite, &bfr, 1); break;
             }
         }
 
@@ -361,10 +365,10 @@ void Ikbd::processMouse(input_event *ev)
             bool reportDown    = (mouseAbsBtnAct    & MOUSEBTN_REPORT_PRESS)    != 0;
 
             if(    (wasUp && reportUp) || (wasDown && reportDown) ) {    // if button pressed / released and we should report that
-                sendMousePosAbsolute(fdUart, absButtons);
+                sendMousePosAbsolute(absButtons);
             }
         } else {                                                // for relative mouse mode
-            sendMousePosRelative(fdUart, mouseBtnNow, 0, 0);    // send them to ST
+            sendMousePosRelative(mouseBtnNow, 0, 0);    // send them to ST
         }
         return;
     }
@@ -378,7 +382,7 @@ void Ikbd::processMouse(input_event *ev)
             absMouse.x += ev->value;
             fixAbsMousePos();
 
-            sendMousePosRelative(fdUart, mouseBtnNow, ev->value, 0);    // send movement to ST
+            sendMousePosRelative(mouseBtnNow, ev->value, 0);    // send movement to ST
         }
 
         if(ev->code == REL_Y) {
@@ -390,7 +394,7 @@ void Ikbd::processMouse(input_event *ev)
             }
             fixAbsMousePos();
 
-            sendMousePosRelative(fdUart, mouseBtnNow, 0, ev->value);    // send movement to ST
+            sendMousePosRelative(mouseBtnNow, 0, ev->value);    // send movement to ST
         }
 
         //--------------------------
@@ -404,7 +408,7 @@ void Ikbd::processMouse(input_event *ev)
                 stKey = keyTranslator.pcKeyToSt(KEY_DOWN);
             }
 
-            if(stKey == 0 || fdUart == -1) {    // key not found, or UART not open? quit
+            if(stKey == 0 || fdUartWrite == -1) {    // key not found, or UART not open? quit
                 return;
             }
 
@@ -414,7 +418,7 @@ void Ikbd::processMouse(input_event *ev)
             bfr[0] = stKey;                     // key down
             bfr[1] = stKey | 0x80;              // key up
 
-            int res = fdWrite(fdUart, bfr, 2);
+            int res = fdWrite(fdUartWrite, bfr, 2);
 
             if(res < 0) {
                 logDebugAndIkbd(LOG_ERROR, "processMouse - sending to ST failed, errno: %d", errno);
@@ -428,6 +432,8 @@ void Ikbd::processKeyboard(input_event *ev, bool skipKeyboardTranslation)
     int stKey = 0;
     int res;
 //    ikbdLog("processKeyboard");
+
+   int fdUartWrite = chipInterface->ikbdUartWriteFd();           // get FD for writing to IKBD
 
     switch(ev->type) {
     case EV_SYN:
@@ -457,7 +463,7 @@ void Ikbd::processKeyboard(input_event *ev, bool skipKeyboardTranslation)
             return;
         }
 
-        if(stKey == 0 || stKey == 0x80 || fdUart == -1) {           // key not found, no UART open? quit
+        if(stKey == 0 || stKey == 0x80 || fdUartWrite == -1) {           // key not found, no UART open? quit
             return;
         }
 
@@ -479,7 +485,7 @@ void Ikbd::processKeyboard(input_event *ev, bool skipKeyboardTranslation)
         BYTE bfr;
         bfr = stKey;
 
-        res = fdWrite(fdUart, &bfr, 1);
+        res = fdWrite(fdUartWrite, &bfr, 1);
 
         if(res < 0) {
             logDebugAndIkbd(LOG_ERROR, "processKeyboard - sending to ST failed, errno: %d", errno);
@@ -496,7 +502,8 @@ void Ikbd::processKeyboard(input_event *ev, bool skipKeyboardTranslation)
 void Ikbd::processJoystick(js_event *jse, int joyNumber)
 {
     TJoystickState *js;
-
+    int fdUartWrite = chipInterface->ikbdUartWriteFd();           // get FD for writing to IKBD
+    
     if(joyNumber == 0 || joyNumber == 1) {          // if the index is OK, use it
         js = &joystick[joyNumber];
     } else {                                        // index is not OK, quit
@@ -552,7 +559,7 @@ void Ikbd::processJoystick(js_event *jse, int joyNumber)
         }
     }
 
-    if(fdUart == -1) {                  // nowhere to send data? quit
+    if(fdUartWrite == -1) {             // nowhere to send data? quit
         return;
     }
 

@@ -39,12 +39,14 @@ public:
 
     //----------------
     // chip interface initialization and deinitialization - e.g. open GPIO, or open socket, ...
-    virtual bool open(void) = 0;
-    virtual void close(void) = 0;
+    virtual bool ciOpen(void) = 0;
+    virtual void ciClose(void) = 0;
 
     //----------------
     // call this with true to enable ikdb UART communication
-    virtual void ikdbUartEnable(bool enable) = 0;
+    virtual void ikbdUartEnable(bool enable) = 0;
+    virtual int  ikbdUartReadFd(void) = 0;
+    virtual int  ikbdUartWriteFd(void) = 0;
 
     //----------------
     // reset both or just one of the parts
