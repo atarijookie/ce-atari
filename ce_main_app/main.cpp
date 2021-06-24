@@ -67,7 +67,8 @@ bool otherInstanceIsRunning(void);
 int  singleInstanceSocketFd;
 
 void showOnDisplay(int argc, char *argv[]);
-int runCore(void);
+int runCore(int instanceNo, bool localNotNetwork);
+void networkServerMain(void);
 
 int main(int argc, char *argv[])
 {
@@ -117,10 +118,10 @@ int main(int argc, char *argv[])
     if(flags.chipInterface == CHIPIF_UNKNOWN) {                 // unknown chip interface? do the auto detection
         Debug::out(LOG_INFO, "ChipInterface auto-detect: trying v1/v2");
 
-        chipInterface = new ChipInterface12();              // create chip interface v1/v2
+        chipInterface = new ChipInterface12();                  // create chip interface v1/v2
         hwConfig.version = 2;
 
-        good = chipInterface->ciOpen();                       // try to open chip interface v1/v2
+        good = chipInterface->ciOpen();                         // try to open chip interface v1/v2
 
         if(!good) {
             Debug::out(LOG_INFO, "ChipInterface auto-detect: v1/v2 failed, terminating");
@@ -128,6 +129,10 @@ int main(int argc, char *argv[])
             Debug::out(LOG_INFO, "ChipInterface auto-detect: v1/v2 opened, continuing.");
             printf("\nChipInterface auto-detect: v1/v2 opened\n");
         }
+    } else if(flags.chipInterface == CHIPIF_NETWORK) {
+        Debug::out(LOG_INFO, "ChipInterface: starting NETWORK server");
+        networkServerMain();
+        return 0;
     } else {
         Debug::out(LOG_INFO, "ChipInterface - unknown option, terminating.");
         printf("\nChipInterface - unknown option, terminating.\n");
@@ -145,7 +150,7 @@ int main(int argc, char *argv[])
     }
 
     //------------------------------------------------------------
-    loadLastHwConfig();                                         // load last found HW IF, HW version, SCSI machine
+    loadLastHwConfig();                                     // load last found HW IF, HW version, SCSI machine
 
     //------------------------------------
     // register signal handlers
@@ -181,10 +186,12 @@ int main(int argc, char *argv[])
     }
 
     // if came here, we should run this app as the main core
-    return runCore();
+    return runCore(0, true);
 }
 
-int runCore(void)
+// instanceNo: number of core instance, used for separating folders and ports
+// localNotNetwork: if true, will access local hardware for communication; if false then will use network interface
+int runCore(int instanceNo, bool localNotNetwork)
 {   
     CCoreThread *core;
     pthread_t   mountThreadInfo;
@@ -260,7 +267,7 @@ int runCore(void)
     WebServer xServer;
     xServer.addModule(new ApiModule(pxVKbdService,pxVMouseService,pxFloppyService));
     xServer.addModule(new AppModule(pxDateService,pxFloppyService,pxScreencastService));
-    xServer.start();
+    xServer.start(instanceNo);
 
     //-------------
     // Copy the configdrive to /tmp so we can change the content as needed.
@@ -498,8 +505,11 @@ void parseCmdLineArguments(int argc, char *argv[])
             if(ci >= 48 && ci <= 57) {                              // if it's a number between 0 and 9
                 ci = ci - 48;
 
-                if(ci == 1 || ci == 2) {                            // 1 or 2 means SPI interface
-                    flags.chipInterface = CHIPIF_V1_V2;
+                switch(ci) {
+                    case 1:
+                    case 2: flags.chipInterface = CHIPIF_V1_V2;     break;  // 1 or 2 means SPI interface
+
+                    case 9: flags.chipInterface = CHIPIF_NETWORK;   break;  // 9 for network server
                 }
             }
 
@@ -581,7 +591,7 @@ void printfPossibleCmdLineArgs(void)
     printf("reset    - reset Hans and Franz, release lines, quit\n");
     printf("noreset  - when starting, don't reset Hans and Franz\n");
     printf("llx      - set log level to x (default is 1, max is 3)\n");
-    printf("cix      - set chip interface type to x (1 & 2 mean SPI, 3 means parallel)\n");
+    printf("cix      - set chip interface type to x (1 & 2 mean SPI, 9 means network server)\n");
     printf("test     - some default config for device testing\n");
     printf("ce_conf  - use this app as ce_conf on RPi (the app must be running normally, too)\n");
     printf("hwinfo   - get HW version and HDD interface type\n");

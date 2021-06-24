@@ -20,7 +20,7 @@ void WebServer::addModule(IWebModule *pxModule)
     lHandlers.push_back(pxModule);
 }
 
-void WebServer::start()
+void WebServer::start(int portOfset)
 {
     Debug::out(LOG_DEBUG, "Webserver starting...");
 

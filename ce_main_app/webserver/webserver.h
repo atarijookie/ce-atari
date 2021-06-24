@@ -15,7 +15,7 @@ private:
 public:
     WebServer();
     void addModule(IWebModule *pxModule);
-    void start();
+    void start(int portOfset);
     void stop();
     static std::string sLastUploadedFile;
     bool bInited;
