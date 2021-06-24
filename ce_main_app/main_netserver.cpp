@@ -16,6 +16,8 @@
 #include "settings.h"
 #include "global.h"
 #include "debug.h"
+#include "utils.h"
+#include "main_netserver.h"
 
 void sigint_handler(int sig);
 void handlePthreadCreate(int res, const char *threadName, pthread_t *pThread);
@@ -28,7 +30,8 @@ extern TFlags              flags;                              // global flags f
 extern RPiConfig           rpiConfig;                          // RPi model, revision, serial
 extern InterProcessEvents  events;
 
-#define MAIN_PORT       7200
+#define MAX_SERVER_COUNT    16
+TCEServerStatus serverStatus[MAX_SERVER_COUNT];
 
 int netServerOpenSocket(void)
 {
@@ -77,6 +80,12 @@ void networkServerMain(void)
     Debug::out(LOG_ERROR, "Starting CosmosEx network server");
     printf("Starting CosmosEx network server");
 
+    // init the server status structs
+    for(int i=0; i<MAX_SERVER_COUNT; i++) {
+        serverStatus[i].status = SERVER_STATUS_NOT_RUNNING;
+        serverStatus[i].lastUpdate = Utils::getCurrentMs();
+    }
+
     struct timeval timeout;
     fd_set readfds;
     uint8_t recvData[64];
@@ -104,12 +113,60 @@ void networkServerMain(void)
 
             ssize_t n = recvfrom(udpSocket, recvData, sizeof(recvData), 0, (struct sockaddr *) &clientAddr, &slen);
 
-            if(n < 1) {                     // empty packet or error? 
+            if(n < 4) {                                     // packet not big enough or error?
                 continue;
             }
 
-            recvData[n] = 0;                // zero terminate string
+            uint32_t clientIp = clientAddr.sin_addr.s_addr; // get client address
 
+            if(memcmp(recvData, "CELS", 4) == 0) {          // CE Lite Server tells us his status?
+                int index = recvData[4];                    // 4: server index - from 0 to (MAX_SERVER_COUNT-1)
+
+                if(index >= MAX_SERVER_COUNT || n < 8) {    // if server index is more that we store or packet too short, ignore it
+                    continue;
+                }
+
+                TCEServerStatus *ss = &serverStatus[index]; // get pointer to status struct
+                ss->port = Utils::getWord(&recvData[5]);    // 5,6: port
+                ss->status = recvData[7];                   // 7: status
+                ss->clientIp = clientIp;                    // store client IP
+                ss->lastUpdate = Utils::getCurrentMs();     // updated time: now
+
+            } else if(memcmp(recvData, "CELC", 4) == 0) {       // CE Lite Client wants something?
+                int idxFree = -1;
+                int idxClient = -1;
+                int idxNotRunning = -1;
+
+                for(int i=0; i<MAX_SERVER_COUNT; i++) {
+                    if(serverStatus[i].clientIp == clientIp) {  // if we got this client IP already
+                        idxClient = i;
+                    }
+
+                    if(idxFree == -1 && serverStatus[i].status == SERVER_STATUS_FREE) { // didn't find free slot yet, but found one now?
+                        idxFree = i;
+                    }
+
+                    if(idxNotRunning == -1 &&  serverStatus[i].status == SERVER_STATUS_NOT_RUNNING) {   // didn't find not running slot but found one now?
+                        idxNotRunning = i;
+                    }
+                }
+
+                int idxUse = -1;                    // which index should we use?
+                if(idxClient != -1) {               // got index where client is / was connected? use that
+                    idxUse = idxClient;
+                } else if(idxFree != -1) {          // got index where server is running but nobody is connected? use that
+                    idxUse = idxFree;
+                } else if(idxNotRunning == -1) {    // got index where no server is running? start it and run it
+                    // TODO: start server on this index and fill serverStatus
+
+                    idxUse = idxNotRunning;
+                }
+
+                // if idxUse is still -1, nothing is available
+
+                // TODO: send response to client with info about this index
+
+            }
         }
     }
 
