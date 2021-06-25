@@ -38,9 +38,6 @@ public:
     bool actionNeeded(bool &hardNotFloppy, BYTE *inBuf);
 
     // to handle FW version, first call setHDDconfig() / setFDDconfig() to fill config into bufOut, then call getFWversion to get the FW version from chip
-    void setHDDconfig(BYTE hddEnabledIDs, BYTE sdCardId, BYTE fddEnabledSlots, bool setNewFloppyImageLed, BYTE newFloppyImageLed);
-    void setFDDconfig(bool setFloppyConfig, bool fddEnabled, int id, int writeProtected, bool setDiskChanged, bool diskChanged);
-
     void getFWversion(bool hardNotFloppy, BYTE *inFwVer);
 
     //----------------
@@ -77,32 +74,6 @@ private:
 
     BYTE *bufOut;
     BYTE *bufIn;
-
-    struct {
-        struct {
-            WORD acsi;
-            WORD fdd;
-        } current;
-
-        struct {
-            WORD acsi;
-            WORD fdd;
-        } next;
-
-        bool skipNextSet;
-    } hansConfigWords;
-
-    struct {
-        int bfrLengthInBytes;
-        int currentLength;
-    } response;
-
-    void responseStart(int bufferLengthInBytes);        // use this to start creating response (commands) to Hans or Franz
-    void responseAddWord(BYTE *bfr, WORD value);        // add a WORD to the response (command) to Hans or Franz
-    void responseAddByte(BYTE *bfr, BYTE value);        // add a BYTE to the response (command) to Hans or Franz
-
-    int bcdToInt(int bcd);
-    void convertXilinxInfo(BYTE xilinxInfo);            // used to process xilinx info into hwInfo struct
 
     void createListeningSocket(void);
     void acceptSocketIfNeededAndPossible(void);

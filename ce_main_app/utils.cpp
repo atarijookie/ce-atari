@@ -686,3 +686,12 @@ bool Utils::fileExists(const char *hostPath)
     return (res != -1);     // if not error, file exists
 }
 
+int Utils::bcdToInt(int bcd)
+{
+    int a,b;
+
+    a = bcd >> 4;       // upper nibble
+    b = bcd &  0x0f;    // lower nibble
+
+    return ((a * 10) + b);
+}

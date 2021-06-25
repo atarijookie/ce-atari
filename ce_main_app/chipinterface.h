@@ -26,6 +26,41 @@
 #define ATN_SECTOR_WRITTEN          0x03            // sent: 3, side (highest bit) + track #, current sector #
 #define ATN_SEND_TRACK              0x04            // send the whole track
 
+#define COMMAND_SIZE            10
+#define ACSI_CMD_SIZE           14
+#define WRITTENMFMSECTOR_SIZE   2048
+#define MFM_STREAM_SIZE         13800
+#define TX_RX_BUFF_SIZE         600
+
+// Hans: commands sent from host to device
+#define CMD_ACSI_CONFIG                 0x10
+#define CMD_DATA_WRITE                  0x20
+#define CMD_DATA_READ_WITH_STATUS       0x30
+#define CMD_SEND_STATUS                 0x40
+#define CMD_DATA_READ_WITHOUT_STATUS    0x50
+#define CMD_FLOPPY_CONFIG               0x70
+#define CMD_FLOPPY_SWITCH               0x80
+#define CMD_GET_LICENSE                 0xa0
+#define CMD_DO_UPDATE                   0xb0
+#define CMD_DATA_MARKER                 0xda
+
+// Franz: commands sent from host to device
+#define CMD_WRITE_PROTECT_OFF       0x10
+#define CMD_WRITE_PROTECT_ON        0x20
+#define CMD_DISK_CHANGE_OFF         0x30
+#define CMD_DISK_CHANGE_ON          0x40
+#define CMD_SET_DRIVE_ID_0          0x70
+#define CMD_SET_DRIVE_ID_1          0x80
+#define CMD_DRIVE_ENABLED           0xa0
+#define CMD_DRIVE_DISABLED          0xb0
+
+#define MAKEWORD(A, B)  ( (((WORD)A)<<8) | ((WORD)B) )
+
+#define HDD_FW_RESPONSE_LEN     12
+#define FDD_FW_RESPONSE_LEN     8
+
+#define FW_RESPONSE_LEN_BIGGER  ((HDD_FW_RESPONSE_LEN > FDD_FW_RESPONSE_LEN) ? HDD_FW_RESPONSE_LEN : FDD_FW_RESPONSE_LEN)
+
 // This class is interface definition for communication with low-level chips.
 // The derived object will handle all the low-level chip communication (e.g. via SPI or paralel data port)
 // without exposing anything to higher levels of app. This should then simplify writing any other low-level chip interface support.
@@ -60,10 +95,9 @@ public:
     virtual bool actionNeeded(bool &hardNotFloppy, BYTE *inBuf) = 0;
 
     // to handle FW version, first call setHDDconfig() / setFDDconfig() to fill config into bufOut, then call getFWversion to get the FW version from chip
-    virtual void setHDDconfig(BYTE hddEnabledIDs, BYTE sdCardId, BYTE fddEnabledSlots, bool setNewFloppyImageLed, BYTE newFloppyImageLed) = 0;
-    virtual void setFDDconfig(bool setFloppyConfig, bool fddEnabled, int id, int writeProtected, bool setDiskChanged, bool diskChanged) = 0;
-
     virtual void getFWversion(bool hardNotFloppy, BYTE *inFwVer) = 0;
+    virtual void setHDDconfig(BYTE hddEnabledIDs, BYTE sdCardId, BYTE fddEnabledSlots, bool setNewFloppyImageLed, BYTE newFloppyImageLed);
+    virtual void setFDDconfig(bool setFloppyConfig, bool fddEnabled, int id, int writeProtected, bool setDiskChanged, bool diskChanged);
 
     //----------------
     // HDD: READ/WRITE functions for large (>1 MB) block transfers (Scsi::readSectors(), Scsi::writeSectors()) and also by the convenient functions above
@@ -80,6 +114,34 @@ public:
     // FDD: all you need for handling the floppy interface
     virtual void fdd_sendTrackToChip(int byteCount, BYTE *encodedTrack) = 0;    // send encodedTrack to chip for MFM streaming
     virtual BYTE* fdd_sectorWritten(int &side, int &track, int &sector, int &byteCount) = 0;
+
+protected:
+    BYTE fwResponseBfr[FW_RESPONSE_LEN_BIGGER];
+
+    struct {
+        struct {
+            WORD acsi;
+            WORD fdd;
+        } current;
+
+        struct {
+            WORD acsi;
+            WORD fdd;
+        } next;
+
+        bool skipNextSet;
+    } hansConfigWords;
+
+    struct {
+        int bfrLengthInBytes;
+        int currentLength;
+    } response;
+
+    virtual void responseStart(int bufferLengthInBytes);        // use this to start creating response (commands) to Hans or Franz
+    virtual void responseAddWord(BYTE *bfr, WORD value);        // add a WORD to the response (command) to Hans or Franz
+    virtual void responseAddByte(BYTE *bfr, BYTE value);        // add a BYTE to the response (command) to Hans or Franz
+
+    static void convertXilinxInfo(BYTE xilinxInfo);
 };
 
 #endif // CHIPINTERFACE

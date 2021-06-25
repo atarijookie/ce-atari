@@ -8,34 +8,6 @@
 // SPI interface for connection to Hans (hard drive chip) and Franz (floppy chip).
 // Used in CosmosEx v1 and v2.
 
-#define COMMAND_SIZE            10
-#define ACSI_CMD_SIZE           14
-#define WRITTENMFMSECTOR_SIZE   2048
-#define MFM_STREAM_SIZE         13800
-#define TX_RX_BUFF_SIZE         600
-
-// Hans: commands sent from host to device
-#define CMD_ACSI_CONFIG                 0x10
-#define CMD_DATA_WRITE                  0x20
-#define CMD_DATA_READ_WITH_STATUS       0x30
-#define CMD_SEND_STATUS                 0x40
-#define CMD_DATA_READ_WITHOUT_STATUS    0x50
-#define CMD_FLOPPY_CONFIG               0x70
-#define CMD_FLOPPY_SWITCH               0x80
-#define CMD_GET_LICENSE                 0xa0
-#define CMD_DO_UPDATE                   0xb0
-#define CMD_DATA_MARKER                 0xda
-
-// Franz: commands sent from host to device
-#define CMD_WRITE_PROTECT_OFF       0x10
-#define CMD_WRITE_PROTECT_ON        0x20
-#define CMD_DISK_CHANGE_OFF         0x30
-#define CMD_DISK_CHANGE_ON          0x40
-#define CMD_SET_DRIVE_ID_0          0x70
-#define CMD_SET_DRIVE_ID_1          0x80
-#define CMD_DRIVE_ENABLED           0xa0
-#define CMD_DRIVE_DISABLED          0xb0
-
 class ChipInterface12: public ChipInterface
 {
 public:
@@ -67,9 +39,6 @@ public:
     bool actionNeeded(bool &hardNotFloppy, BYTE *inBuf);
 
     // to handle FW version, first call setHDDconfig() / setFDDconfig() to fill config into bufOut, then call getFWversion to get the FW version from chip
-    void setHDDconfig(BYTE hddEnabledIDs, BYTE sdCardId, BYTE fddEnabledSlots, bool setNewFloppyImageLed, BYTE newFloppyImageLed);
-    void setFDDconfig(bool setFloppyConfig, bool fddEnabled, int id, int writeProtected, bool setDiskChanged, bool diskChanged);
-
     void getFWversion(bool hardNotFloppy, BYTE *inFwVer);
 
     //----------------
@@ -97,32 +66,6 @@ private:
 
     BYTE *bufOut;
     BYTE *bufIn;
-
-    struct {
-        struct {
-            WORD acsi;
-            WORD fdd;
-        } current;
-
-        struct {
-            WORD acsi;
-            WORD fdd;
-        } next;
-
-        bool skipNextSet;
-    } hansConfigWords;
-
-    struct {
-        int bfrLengthInBytes;
-        int currentLength;
-    } response;
-
-    void responseStart(int bufferLengthInBytes);        // use this to start creating response (commands) to Hans or Franz
-    void responseAddWord(BYTE *bfr, WORD value);        // add a WORD to the response (command) to Hans or Franz
-    void responseAddByte(BYTE *bfr, BYTE value);        // add a BYTE to the response (command) to Hans or Franz
-
-    int bcdToInt(int bcd);
-    void convertXilinxInfo(BYTE xilinxInfo);            // used to process xilinx info into hwInfo struct
 
     void serialSetup(void);                             // open IKDB serial port
 };

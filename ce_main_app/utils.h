@@ -69,6 +69,8 @@ public:
     static bool fileExists(std::string &hostPath);
     static bool fileExists(const char *hostPath);
 
+    static int bcdToInt(int bcd);
+
 private:
     static bool copyFileByHandles(FILE *from, FILE *to);
 

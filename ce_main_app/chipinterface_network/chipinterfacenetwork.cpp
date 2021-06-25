@@ -237,6 +237,10 @@ bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
         sendReportToMainServerSocket();
     }
 
+    if(fdClient <= 0) {     // no client connected? no action needed
+        return false;
+    }
+
     // if waitForATN() succeeds, it fills 8 bytes of data in buffer
     // ...but then we might need some little more, so let's determine what it was
     // and keep reading as much as needed
@@ -283,134 +287,29 @@ bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
     return false;
 }
 
-#define MAKEWORD(A, B)  ( (((WORD)A)<<8) | ((WORD)B) )
-
-#define HDD_FW_RESPONSE_LEN     12
-
-void ChipInterfaceNetwork::setHDDconfig(BYTE hddEnabledIDs, BYTE sdCardId, BYTE fddEnabledSlots, bool setNewFloppyImageLed, BYTE newFloppyImageLed)
-{
-    memset(bufOut, 0, HDD_FW_RESPONSE_LEN);
-
-    // WORD sent (bytes shown): 01 23 45 67
-
-    responseStart(HDD_FW_RESPONSE_LEN);                         // init the response struct
-
-    hansConfigWords.next.acsi   = MAKEWORD(hddEnabledIDs, sdCardId);
-    hansConfigWords.next.fdd    = MAKEWORD(fddEnabledSlots, 0);
-
-    if( (hansConfigWords.next.acsi  != hansConfigWords.current.acsi) ||
-        (hansConfigWords.next.fdd   != hansConfigWords.current.fdd )) {
-
-        // hansConfigWords.skipNextSet - it's a flag used for skipping one config sending, because we send the new config now, but receive it processed in the next (not this) fw version packet
-
-        if(!hansConfigWords.skipNextSet) {
-            responseAddWord(bufOut, CMD_ACSI_CONFIG);             // CMD: send acsi config
-            responseAddWord(bufOut, hansConfigWords.next.acsi);   // store ACSI enabled IDs and which ACSI ID is used for SD card
-            responseAddWord(bufOut, hansConfigWords.next.fdd);    // store which floppy images are enabled
-
-            hansConfigWords.skipNextSet = true;                 // we have just sent the config, skip the next sending, so we won't send it twice in a row
-        } else {                                                // if we should skip sending config this time, then don't skip it next time (if needed)
-            hansConfigWords.skipNextSet = false;
-        }
-    }
-
-    //--------------
-    if(flags.deviceGetLicense) {                                // should the device get new hw license?
-        flags.deviceGetLicense = false;
-        responseAddWord(bufOut, CMD_GET_LICENSE);
-    }
-
-    if(flags.deviceDoUpdate) {                                  // should the device do the ?
-        flags.deviceDoUpdate = false;
-        responseAddWord(bufOut, CMD_DO_UPDATE);
-    }
-
-    //--------------
-    if(setNewFloppyImageLed) {
-        responseAddWord(bufOut, CMD_FLOPPY_SWITCH);               // CMD: set new image LED (bytes 8 & 9)
-        responseAddWord(bufOut, MAKEWORD(fddEnabledSlots, newFloppyImageLed));  // store which floppy images LED should be on
-    }
-}
-
-#define FDD_FW_RESPONSE_LEN     8
-
-void ChipInterfaceNetwork::setFDDconfig(bool setFloppyConfig, bool fddEnabled, int id, int writeProtected, bool setDiskChanged, bool diskChanged)
-{
-    memset(bufOut, 0, FDD_FW_RESPONSE_LEN);
-
-    responseStart(FDD_FW_RESPONSE_LEN);                             // init the response struct
-
-    if(setFloppyConfig) {                                   // should set floppy config?
-        responseAddByte(bufOut, ( fddEnabled     ? CMD_DRIVE_ENABLED     : CMD_DRIVE_DISABLED) );
-        responseAddByte(bufOut, ((id == 0)       ? CMD_SET_DRIVE_ID_0    : CMD_SET_DRIVE_ID_1) );
-        responseAddByte(bufOut, ( writeProtected ? CMD_WRITE_PROTECT_ON  : CMD_WRITE_PROTECT_OFF) );
-    }
-
-    if(setDiskChanged) {
-        responseAddByte(bufOut, ( diskChanged    ? CMD_DISK_CHANGE_ON    : CMD_DISK_CHANGE_OFF) );
-    }
-}
-
-int ChipInterfaceNetwork::bcdToInt(int bcd)
-{
-    int a,b;
-
-    a = bcd >> 4;       // upper nibble
-    b = bcd &  0x0f;    // lower nibble
-
-    return ((a * 10) + b);
-}
-
 void ChipInterfaceNetwork::getFWversion(bool hardNotFloppy, BYTE *inFwVer)
 {
     if(hardNotFloppy) {     // for HDD
-        // bufOut should be filled with Hans config - by calling setHDDconfig() (and not calling anything else inbetween)
+        // fwResponseBfr should be filled with Hans config - by calling setHDDconfig() (and not calling anything else inbetween)
         // TODO:
-        //conSpi->txRx(SPI_CS_HANS, HDD_FW_RESPONSE_LEN, bufOut, inFwVer);
+        //conSpi->txRx(SPI_CS_HANS, HDD_FW_RESPONSE_LEN, fwResponseBfr, inFwVer);
 
-        convertXilinxInfo(inFwVer[5]);  // convert xilinx info into hwInfo struct
+        ChipInterface::convertXilinxInfo(inFwVer[5]);  // convert xilinx info into hwInfo struct
 
         hansConfigWords.current.acsi = MAKEWORD(inFwVer[6], inFwVer[7]);
         hansConfigWords.current.fdd  = MAKEWORD(inFwVer[8],        0);
 
-        int year = bcdToInt(inFwVer[1]) + 2000;
-        Update::versions.hans.fromInts(year, bcdToInt(inFwVer[2]), bcdToInt(inFwVer[3]));       // store found FW version of Hans
+        int year = Utils::bcdToInt(inFwVer[1]) + 2000;
+        Update::versions.hans.fromInts(year, Utils::bcdToInt(inFwVer[2]), Utils::bcdToInt(inFwVer[3]));       // store found FW version of Hans
     } else {                // for FDD
-        // bufOut should be filled with Franz config - by calling setFDDconfig() (and not calling anything else inbetween)
+        // fwResponseBfr should be filled with Franz config - by calling setFDDconfig() (and not calling anything else inbetween)
 
         // TODO:
-        // conSpi->txRx(SPI_CS_FRANZ, FDD_FW_RESPONSE_LEN, bufOut, inFwVer);
+        // conSpi->txRx(SPI_CS_FRANZ, FDD_FW_RESPONSE_LEN, fwResponseBfr, inFwVer);
 
-        int year = bcdToInt(inFwVer[1]) + 2000;
-        Update::versions.franz.fromInts(year, bcdToInt(inFwVer[2]), bcdToInt(inFwVer[3]));              // store found FW version of Franz
+        int year = Utils::bcdToInt(inFwVer[1]) + 2000;
+        Update::versions.franz.fromInts(year, Utils::bcdToInt(inFwVer[2]), Utils::bcdToInt(inFwVer[3]));              // store found FW version of Franz
     }
-}
-
-void ChipInterfaceNetwork::responseStart(int bufferLengthInBytes)        // use this to start creating response (commands) to Hans or Franz
-{
-    response.bfrLengthInBytes   = bufferLengthInBytes;
-    response.currentLength      = 0;
-}
-
-void ChipInterfaceNetwork::responseAddWord(BYTE *bfr, WORD value)        // add a WORD to the response (command) to Hans or Franz
-{
-    if(response.currentLength >= response.bfrLengthInBytes) {
-        return;
-    }
-
-    bfr[response.currentLength + 0] = (BYTE) (value >> 8);
-    bfr[response.currentLength + 1] = (BYTE) (value & 0xff);
-    response.currentLength += 2;
-}
-
-void ChipInterfaceNetwork::responseAddByte(BYTE *bfr, BYTE value)        // add a BYTE to the response (command) to Hans or Franz
-{
-    if(response.currentLength >= response.bfrLengthInBytes) {
-        return;
-    }
-
-    bfr[response.currentLength] = value;
-    response.currentLength++;
 }
 
 bool ChipInterfaceNetwork::hdd_sendData_start(DWORD totalDataCount, BYTE scsiStatus, bool withStatus)
@@ -558,33 +457,4 @@ BYTE* ChipInterfaceNetwork::fdd_sectorWritten(int &side, int &track, int &sector
     side    = (bufIn[0] & 0x80) ? 1 : 0;
 
     return bufIn;                                           // return pointer to received written sector
-}
-
-void ChipInterfaceNetwork::convertXilinxInfo(BYTE xilinxInfo)
-{
-    THwConfig hwConfigOld = hwConfig;
-
-    switch(xilinxInfo) {
-        // GOOD
-        case 0x31:  hwConfig.version        = 3;                        // v.3
-                    hwConfig.hddIface       = HDD_IF_ACSI;              // HDD int: ACSI
-                    hwConfig.fwMismatch     = false;
-                    break;
-
-        // GOOD
-        case 0x32:  hwConfig.version        = 3;                        // v.3
-                    hwConfig.hddIface       = HDD_IF_SCSI;              // HDD int: SCSI
-                    hwConfig.fwMismatch     = false;
-                    break;
-    }
-
-    // if the HD IF changed (received the 1st HW info) and we're on SCSI bus, we need to send the new (limited) SCSI IDs to Hans, so he won't answer on Initiator SCSI ID
-    if((hwConfigOld.hddIface != hwConfig.hddIface) && hwConfig.hddIface == HDD_IF_SCSI) {
-        hwConfig.changed = true;
-        Debug::out(LOG_DEBUG, "Found out that we're running on SCSI bus - will resend the ID bits configuration to Hans");
-    }
-
-    if(memcmp(&hwConfigOld, &hwConfig, sizeof(THwConfig)) != 0) {    // config changed? save it
-        hwConfig.changed = true;
-    }
 }
