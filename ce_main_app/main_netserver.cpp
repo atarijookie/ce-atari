@@ -24,6 +24,11 @@ void handlePthreadCreate(int res, const char *threadName, pthread_t *pThread);
 void loadLastHwConfig(void);
 int  runCore(int instanceNo, bool localNotNetwork);
 
+void onServerStatus(uint8_t* recvData, int len);
+void onClientRequest(sockaddr_in *clientAddr, uint8_t *recvData, int len);
+void forkCEliteServer(int serverIndex);
+void udpSend(uint32_t ip, uint16_t port, uint8_t* data, uint16_t len);
+
 extern volatile sig_atomic_t sigintReceived;
 extern THwConfig           hwConfig;                           // info about the current HW setup
 extern TFlags              flags;                              // global flags from command line
@@ -49,7 +54,7 @@ int netServerOpenSocket(void)
     // fill in server information
     servaddr.sin_family         = AF_INET;          // IPv4
     servaddr.sin_addr.s_addr    = INADDR_ANY;
-    servaddr.sin_port           = htons(MAIN_PORT);
+    servaddr.sin_port           = htons(SERVER_UDP_PORT);
 
     // bind the socket with the server address
     if (bind(sockfd, (const struct sockaddr *) &servaddr, sizeof(servaddr)) < 0) {
@@ -77,7 +82,7 @@ void networkServerMain(void)
         return;
     }
 
-    Debug::out(LOG_ERROR, "Starting CosmosEx network server");
+    Debug::out(LOG_INFO, "Starting CosmosEx network server");
     printf("Starting CosmosEx network server");
 
     // init the server status structs
@@ -113,62 +118,136 @@ void networkServerMain(void)
 
             ssize_t n = recvfrom(udpSocket, recvData, sizeof(recvData), 0, (struct sockaddr *) &clientAddr, &slen);
 
-            if(n < 4) {                                     // packet not big enough or error?
+            if(n < 8) {                                     // packet not big enough or error?
                 continue;
             }
 
-            uint32_t clientIp = clientAddr.sin_addr.s_addr; // get client address
-
             if(memcmp(recvData, "CELS", 4) == 0) {          // CE Lite Server tells us his status?
-                int index = recvData[4];                    // 4: server index - from 0 to (MAX_SERVER_COUNT-1)
-
-                if(index >= MAX_SERVER_COUNT || n < 8) {    // if server index is more that we store or packet too short, ignore it
-                    continue;
-                }
-
-                TCEServerStatus *ss = &serverStatus[index]; // get pointer to status struct
-                ss->port = Utils::getWord(&recvData[5]);    // 5,6: port
-                ss->status = recvData[7];                   // 7: status
-                ss->clientIp = clientIp;                    // store client IP
-                ss->lastUpdate = Utils::getCurrentMs();     // updated time: now
-
-            } else if(memcmp(recvData, "CELC", 4) == 0) {       // CE Lite Client wants something?
-                int idxFree = -1;
-                int idxClient = -1;
-                int idxNotRunning = -1;
-
-                for(int i=0; i<MAX_SERVER_COUNT; i++) {
-                    if(serverStatus[i].clientIp == clientIp) {  // if we got this client IP already
-                        idxClient = i;
-                    }
-
-                    if(idxFree == -1 && serverStatus[i].status == SERVER_STATUS_FREE) { // didn't find free slot yet, but found one now?
-                        idxFree = i;
-                    }
-
-                    if(idxNotRunning == -1 &&  serverStatus[i].status == SERVER_STATUS_NOT_RUNNING) {   // didn't find not running slot but found one now?
-                        idxNotRunning = i;
-                    }
-                }
-
-                int idxUse = -1;                    // which index should we use?
-                if(idxClient != -1) {               // got index where client is / was connected? use that
-                    idxUse = idxClient;
-                } else if(idxFree != -1) {          // got index where server is running but nobody is connected? use that
-                    idxUse = idxFree;
-                } else if(idxNotRunning == -1) {    // got index where no server is running? start it and run it
-                    // TODO: start server on this index and fill serverStatus
-
-                    idxUse = idxNotRunning;
-                }
-
-                // if idxUse is still -1, nothing is available
-
-                // TODO: send response to client with info about this index
-
+                onServerStatus(recvData, n);
+            } else if(memcmp(recvData, "CELC", 4) == 0) {   // CE Lite Client wants something?
+                onClientRequest(&clientAddr, recvData, n);
             }
         }
     }
 
+    close(udpSocket);
     Debug::out(LOG_ERROR, "Terminating CosmosEx network server");
 }
+
+void onServerStatus(uint8_t* recvData, int len)
+{
+    int index = recvData[4];                        // 4: server index - from 0 to (MAX_SERVER_COUNT-1)
+
+    if(index >= MAX_SERVER_COUNT) {                 // if server index is more that we store, ignore it
+        return;
+    }
+
+    TCEServerStatus *ss = &serverStatus[index];     // get pointer to status struct
+    ss->status = recvData[5];                       // 5: status
+    ss->lastUpdate = Utils::getCurrentMs();         // updated time: now
+    // don't modify clientIp here, it's not the IP of client but rather IP of server itself
+}
+
+void onClientRequest(sockaddr_in *clientAddr, uint8_t *recvData, int len)
+{
+    uint32_t clientIp = clientAddr->sin_addr.s_addr;    // get client address
+
+    int idxFree = -1;
+    int idxClient = -1;
+    int idxNotRunning = -1;
+
+    for(int i=0; i<MAX_SERVER_COUNT; i++) {
+        if(serverStatus[i].clientIp == clientIp) {  // if we got this client IP already
+            idxClient = i;
+        }
+
+        if(idxFree == -1 && serverStatus[i].status == SERVER_STATUS_FREE) { // didn't find free slot yet, but found one now?
+            idxFree = i;
+        }
+
+        if(idxNotRunning == -1 &&  serverStatus[i].status == SERVER_STATUS_NOT_RUNNING) {   // didn't find not running slot but found one now?
+            idxNotRunning = i;
+        }
+    }
+
+    int idxUse = -1;                    // which index should we use?
+
+    if(idxClient != -1) {               // got index where client is / was connected? use that
+        idxUse = idxClient;
+        Debug::out(LOG_INFO, "onClientRequest - reusing server # %d for client", idxUse);
+    } else if(idxFree != -1) {          // got index where server is running but nobody is connected? use that
+        idxUse = idxFree;
+        Debug::out(LOG_INFO, "onClientRequest - using free server # %d", idxUse);
+    } else if(idxNotRunning == -1) {        // got index where no server is running? start it and run it
+        forkCEliteServer(idxNotRunning);    // start server on this index
+        idxUse = idxNotRunning;
+        Debug::out(LOG_INFO, "onClientRequest - using new server # %d", idxUse);
+    }
+
+    uint8_t response[10];
+    memset(response, 0, sizeof(response));  // clear all bytes
+    memcpy(response, "CELR", 4);            // 0..3: CE Lite Response
+
+    if(idxUse != -1) {                      // if idxUse is not -1, fill in the response (and response with all zeros means nothing available)
+        serverStatus[idxUse].clientIp = clientIp;
+
+        uint8_t bfr[10];
+        Utils::getIpAdds(bfr);
+        uint8_t *serverIp = NULL;
+
+        if(bfr[0] == 1) {                   // eth0 enabled? add its IP
+            serverIp = &bfr[1];
+        } else if(bfr[5] == 1) {            // wlan0 enabled? add its IP
+            serverIp = &bfr[6];
+        }
+
+        if(serverIp != NULL) {                      // if found valid IP address
+            memcpy(&response[4], serverIp, 4);      // 4..7: store server's IP
+        }
+
+        Utils::storeWord(&response[8], SERVER_TCP_PORT_FIRST + idxUse);   // 8,9: server's port
+    }
+
+    // send response to client with info about this index
+    udpSend(clientIp, CLIENT_UDP_PORT, response, sizeof(response));
+}
+
+void forkCEliteServer(int serverIndex)
+{
+    // fork process
+    int childPid = fork();              // fork child to own process
+
+    if(childPid == 0) {                 // code executed only by child
+        runCore(serverIndex, false);    // run network (not local) device server with this serverIndex
+        return;
+    }
+
+    // parent (main server process) continues here
+    Utils::sleepMs(500);         // give forked server bit time to start, then reply to client
+}
+
+void udpSend(uint32_t ip, uint16_t port, uint8_t* data, uint16_t len)
+{
+    sockaddr_in servaddr;
+
+    int sockFd = socket(AF_INET, SOCK_DGRAM, 0);
+
+    if(sockFd < 0) {        // on error
+        Debug::out(LOG_ERROR, "updSend - failed to open socket for response");
+        return;
+    }
+    
+    bzero(&servaddr,sizeof(servaddr));
+
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = ip;
+    servaddr.sin_port = htons(port);
+
+    int rv = sendto(sockFd, data, len, 0, (sockaddr*) &servaddr, sizeof(servaddr));
+    close(sockFd);
+    
+    if(rv < 0) {
+        Debug::out(LOG_ERROR, "updSend - failed to sendto() response");
+    }
+}
+

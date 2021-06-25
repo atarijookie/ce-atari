@@ -25,7 +25,7 @@ void WebServer::start(int portOfset)
     Debug::out(LOG_DEBUG, "Webserver starting...");
 
     const char * options[] = { "document_root", DOCUMENT_ROOT,
-                               "listening_ports", PORT, 0
+                               "listening_ports", PORT + portOfset, 0
                              };
     struct mg_callbacks callbacks;
     memset(&callbacks, 0, sizeof(callbacks));

@@ -67,7 +67,8 @@ bool otherInstanceIsRunning(void);
 int  singleInstanceSocketFd;
 
 void showOnDisplay(int argc, char *argv[]);
-int runCore(int instanceNo, bool localNotNetwork);
+void forkLinuxConsole(void);
+int  runCore(int instanceNo, bool localNotNetwork);
 void networkServerMain(void);
 
 int main(int argc, char *argv[])
@@ -131,6 +132,7 @@ int main(int argc, char *argv[])
         }
     } else if(flags.chipInterface == CHIPIF_NETWORK) {
         Debug::out(LOG_INFO, "ChipInterface: starting NETWORK server");
+        forkLinuxConsole();     // start only ONE linux console for all the network servers, get fd to pipe for talking to console
         networkServerMain();
         return 0;
     } else {
@@ -185,24 +187,13 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    // if came here, we should run this app as the main core
+    // if came here, we should run this app as the main local core
+    forkLinuxConsole();         // start a linux console, get fd to pipe for talking to console
     return runCore(0, true);
 }
 
-// instanceNo: number of core instance, used for separating folders and ports
-// localNotNetwork: if true, will access local hardware for communication; if false then will use network interface
-int runCore(int instanceNo, bool localNotNetwork)
-{   
-    CCoreThread *core;
-    pthread_t   mountThreadInfo;
-    pthread_t   downloadThreadInfo;
-#ifndef ONPC
-    pthread_t   ikbdThreadInfo;
-#endif
-    pthread_t   floppyEncThreadInfo;
-    pthread_t   periodicThreadInfo;
-    pthread_t   displayThreadInfo;
-
+void forkLinuxConsole(void)
+{
     //------------------------------------
     // we should fork this and run shell in the forked child
     childPid = forkpty(&linuxConsole_fdMaster, NULL, NULL, NULL);
@@ -218,10 +209,25 @@ int runCore(int instanceNo, bool localNotNetwork)
         }
         execlp(shell, shell, "-i", (char *) NULL);  // -i for interactive
 
-        return 0;
+        return;
     }
 
     // parent (full app) continues here
+}
+
+// instanceNo: number of core instance, used for separating folders and ports
+// localNotNetwork: if true, will access local hardware for communication; if false then will use network interface
+int runCore(int instanceNo, bool localNotNetwork)
+{   
+    CCoreThread *core;
+    pthread_t   mountThreadInfo;
+    pthread_t   downloadThreadInfo;
+#ifndef ONPC
+    pthread_t   ikbdThreadInfo;
+#endif
+    pthread_t   floppyEncThreadInfo;
+    pthread_t   periodicThreadInfo;
+    pthread_t   displayThreadInfo;
 
     //------------------------------------
     // normal app run follows
@@ -264,10 +270,12 @@ int runCore(int instanceNo, bool localNotNetwork)
     pxScreencastService->start();
 
     //this runs its own thread
+    int webServerPortOffset = localNotNetwork ? 0 : (1 + instanceNo); // local device runs on port 80 (offset 0), network server instances run on port 81-96 (offset 1-16)
+
     WebServer xServer;
     xServer.addModule(new ApiModule(pxVKbdService,pxVMouseService,pxFloppyService));
     xServer.addModule(new AppModule(pxDateService,pxFloppyService,pxScreencastService));
-    xServer.start(instanceNo);
+    xServer.start(webServerPortOffset);
 
     //-------------
     // Copy the configdrive to /tmp so we can change the content as needed.
