@@ -220,11 +220,6 @@ void CCoreThread::run(void)
         chipInterface->resetHDDandFDD();
     }
 
-#ifdef ONPC
-    shouldCheckHansFranzAlive   = false;
-    flags.noReset               = true;
-#endif
-
     Debug::out(LOG_DEBUG, "Will check for Hans and Franz alive: %s", (shouldCheckHansFranzAlive ? "yes" : "no") );
     //------------------------------
 
@@ -250,10 +245,8 @@ void CCoreThread::run(void)
     lastFwInfoTime.hansResetTime    = Utils::getCurrentMs();
     lastFwInfoTime.franzResetTime   = Utils::getCurrentMs();
 
-#ifndef ONPC
     bool needsAction;
     bool hardNotFloppy;
-#endif
 
     DWORD nextFloppyEncodingCheck   = Utils::getEndTime(1000);
     //bool prevFloppyEncodingRunning  = false;
@@ -355,7 +348,6 @@ void CCoreThread::run(void)
 
         load.busy.markStart();                          // mark the start of the busy part of the code
 
-#ifndef ONPC
         needsAction = chipInterface->actionNeeded(hardNotFloppy, inBuff);
 
         if(needsAction && hardNotFloppy) {    // hard drive needs action?
@@ -389,14 +381,12 @@ void CCoreThread::run(void)
                 break;
             }
         }
-#endif
 
         if(events.insertSpecialFloppyImageId != 0) {                       // very stupid way of letting web IF to insert special image
             insertSpecialFloppyImage(events.insertSpecialFloppyImageId);
             events.insertSpecialFloppyImageId = 0;
         }
 
-#ifndef ONPC
         // check for any ATN code waiting from Franz
         if(flags.noFranz) {                         // if running without Franz, don't communicate
             needsAction = false;
@@ -439,9 +429,7 @@ void CCoreThread::run(void)
                 break;
             }
         }
-#else
-    flags.gotFranzFwVersion = true;
-#endif
+
         load.busy.markEnd();                        // mark the end of the busy part of the code
 
         if(!gotAtn) {                                // no ATN was processed?

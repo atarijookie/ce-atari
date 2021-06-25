@@ -1,7 +1,7 @@
 # control verbosity. use make V=1
 V = 0
 
-#ONPC   = yes
+ONPC   = yes
 
 CXX	    = g++
 CC	    = gcc
@@ -89,7 +89,8 @@ SUBDIR11 = ikbd
 SUBDIR12 = mediastreaming
 SUBDIR13 = display
 SUBDIR14 = chipinterface_v1_v2
-SUBDIR15 = misc
+SUBDIR15 = chipinterface_network
+SUBDIR16 = misc
 
 SRCS  = $(wildcard *.cpp) 
 SRCS += $(wildcard $(SUBDIR1)/*.cpp) 
@@ -109,6 +110,7 @@ SRCS += $(wildcard $(SUBDIR12)/*.cpp)
 SRCS += $(wildcard $(SUBDIR13)/*.cpp)
 SRCS += $(wildcard $(SUBDIR14)/*.cpp)
 SRCS += $(wildcard $(SUBDIR15)/*.cpp)
+SRCS += $(wildcard $(SUBDIR16)/*.cpp)
 
 HDRS  = $(wildcard *.h)
 HDRS += $(wildcard $(SUBDIR1)/*.h)
@@ -128,6 +130,7 @@ HDRS += $(wildcard $(SUBDIR12)/*.h)
 HDRS += $(wildcard $(SUBDIR13)/*.h)
 HDRS += $(wildcard $(SUBDIR14)/*.h)
 HDRS += $(wildcard $(SUBDIR15)/*.h)
+HDRS += $(wildcard $(SUBDIR16)/*.h)
 
 OBJS = $(addprefix $(OBJDIR)/, $(patsubst %.cpp,%.o,$(SRCS:.c=.o)))
 DEPS = $(patsubst %.o,%.d,$(OBJS))

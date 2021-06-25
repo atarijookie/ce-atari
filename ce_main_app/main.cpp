@@ -25,6 +25,7 @@
 #include "display/displaythread.h"
 #include "floppy/floppyencoder.h"
 #include "chipinterface_v1_v2/chipinterface12.h"
+#include "chipinterface_network/chipinterfacenetwork.h"
 
 #include "webserver/webserver.h"
 #include "webserver/api/apimodule.h"
@@ -222,12 +223,24 @@ int runCore(int instanceNo, bool localNotNetwork)
     CCoreThread *core;
     pthread_t   mountThreadInfo;
     pthread_t   downloadThreadInfo;
-#ifndef ONPC
     pthread_t   ikbdThreadInfo;
-#endif
     pthread_t   floppyEncThreadInfo;
     pthread_t   periodicThreadInfo;
     pthread_t   displayThreadInfo;
+
+    //------------------------------------
+    // if should run this core as network server
+    if(!localNotNetwork) {
+        Debug::out(LOG_INFO, "runCore as network server instance # %d", instanceNo);
+
+        hwConfig.version = 3;
+        flags.noReset = true;
+
+        ChipInterfaceNetwork *cin = new ChipInterfaceNetwork(); // create network chip interface
+        cin->setServerIndex(instanceNo);            // set index of this instance
+        chipInterface = cin;
+        chipInterface->ciOpen();                    // try to open it
+    }
 
     //------------------------------------
     // normal app run follows
@@ -293,10 +306,8 @@ int runCore(int instanceNo, bool localNotNetwork)
     res = pthread_create(&downloadThreadInfo, NULL, downloadThreadCode, NULL);  // create download thread and run it
     handlePthreadCreate(res, "ce download", &downloadThreadInfo);
 
-#ifndef ONPC
     res = pthread_create(&ikbdThreadInfo, NULL, ikbdThreadCode, NULL);          // create the keyboard emulation thread and run it
     handlePthreadCreate(res, "ce ikbd", &ikbdThreadInfo);
-#endif
 
     res = pthread_create(&floppyEncThreadInfo, NULL, floppyEncodeThreadCode, NULL); // create the floppy encoding thread and run it
     handlePthreadCreate(res, "ce floppy encode", &floppyEncThreadInfo);
@@ -351,11 +362,9 @@ int runCore(int instanceNo, bool localNotNetwork)
     Downloader::stop();
     pthread_join(downloadThreadInfo, NULL);             // wait until download  thread finishes
 
-#ifndef ONPC
     printf("Stoping ikbd thread\n");
     pthread_kill(ikbdThreadInfo, SIGINT);               // stop the select()
     pthread_join(ikbdThreadInfo, NULL);                 // wait until ikbd      thread finishes
-#endif
 
     printf("Stoping floppy encoder thread\n");
     floppyEncoder_stop();
