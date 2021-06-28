@@ -71,6 +71,12 @@ private:
     int ikbdReadFd;     // fd used for IKBD read
     int ikbdWriteFd;    // fd used for IKDB write
 
+    // got 2 pipes, with 2 ends...
+    // pipefd[0] refers to the read end of the pipe.
+    // pipefd[1] refers to the write end of the pipe.
+    int pipeFromAtariToRPi[2];
+    int pipeFromRPiToAtari[2];
+
     uint32_t nextReportTime;    // when should we send next report to main server socket
 
     BYTE *bufOut;
@@ -90,6 +96,7 @@ private:
     void handleZerosAndIkbd(int atnId);
 
     void serialSetup(void);                             // open IKDB serial port
+    void sendIkbdDataToAtari(void);
 };
 
 #endif // CHIPINTERFACE12_H

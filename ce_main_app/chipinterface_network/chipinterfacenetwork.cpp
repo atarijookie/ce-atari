@@ -34,8 +34,8 @@ ChipInterfaceNetwork::ChipInterfaceNetwork()
     fdClient = -1;
     fdReport = -1;
 
-    ikbdReadFd = -1;
-    ikbdWriteFd = -1;
+    pipeFromAtariToRPi[0] = pipeFromAtariToRPi[1] = -1;
+    pipeFromRPiToAtari[0] = pipeFromRPiToAtari[1] = -1;
 
     bufOut = new BYTE[MFM_STREAM_SIZE];
     bufIn = new BYTE[MFM_STREAM_SIZE];
@@ -188,8 +188,10 @@ void ChipInterfaceNetwork::ciClose(void)
     closeFdIfOpen(fdReport);
 
     // close IKDB pipes
-    closeFdIfOpen(ikbdReadFd);
-    closeFdIfOpen(ikbdWriteFd);
+    closeFdIfOpen(pipeFromAtariToRPi[0]);
+    closeFdIfOpen(pipeFromAtariToRPi[1]);
+    closeFdIfOpen(pipeFromRPiToAtari[0]);
+    closeFdIfOpen(pipeFromRPiToAtari[1]);
 }
 
 void ChipInterfaceNetwork::ikbdUartEnable(bool enable)
@@ -199,26 +201,30 @@ void ChipInterfaceNetwork::ikbdUartEnable(bool enable)
 
 int ChipInterfaceNetwork::ikbdUartReadFd(void)
 {
-    return ikbdReadFd;
+    return pipeFromAtariToRPi[0];       // IKBD thread will READ from read end ([0]) of pipe going from Atari to RPi
 }
 
 int ChipInterfaceNetwork::ikbdUartWriteFd(void)
 {
-    return ikbdWriteFd;
+    return pipeFromRPiToAtari[1];       // IKBD thread will WRITE to write end ([1]) of pipe going from RPi to Atari
 }
 
 void ChipInterfaceNetwork::serialSetup(void)
 {
     // create pipes for communication with ikbd thread
-    int fd = -1;
+    int res;
 
+    res = pipe(pipeFromAtariToRPi);
 
-    // TODO:
+    if(res  < 0) {
+        Debug::out(LOG_ERROR, "failed to create pipeFromAtariToRPi");
+    }
 
+    res = pipe(pipeFromRPiToAtari);
 
-    // on real UART same fd is used for read and write
-    ikbdReadFd = fd;
-    ikbdWriteFd = fd;
+    if(res  < 0) {
+        Debug::out(LOG_ERROR, "failed to create pipeFromRPiToAtari");
+    }
 }
 
 void ChipInterfaceNetwork::resetHDDandFDD(void)
@@ -238,11 +244,6 @@ void ChipInterfaceNetwork::resetFDD(void)
 
 bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
 {
-
-
-    // TODO: send IKBD data to ST when got some
-
-
     // send current status report every once in a while
     if(Utils::getCurrentMs() >= nextReportTime) {
         nextReportTime = Utils::getEndTime(1000);
@@ -259,6 +260,7 @@ bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
     int rv = ioctl(fdClient, FIONREAD, &bytesAvailable);    // how many bytes we can read?
 
     if(rv <= 0 || bytesAvailable <= 0) {                    // ioctl fail or nothing to read? no action needed
+        sendIkbdDataToAtari();                              // but send IKBD data to Atari
         return false;
     }
 
@@ -480,8 +482,11 @@ void ChipInterfaceNetwork::handleZerosAndIkbd(int atnId)
         return;
     }
 
-    if(atnId == NET_ATN_IKBD_ID) {                      // for IKBD - read data, feed to pipe
-        // TODO: put data in ikbd pipe
+    if(atnId == NET_ATN_IKBD_ID) {                          // for IKBD - read data, feed to pipe
+        // write data WRITE end ([1]) in ikbd pipe going from Atari to RPi
+        if(pipeFromAtariToRPi[1] != -1) {                   // got this pipe open?
+            write(pipeFromAtariToRPi[1], bufIn, cntGot);    // write all the data into pipe
+        }
     }
 
     // for NET_ATN_ZEROS_ID - nothing to do, just ignore the zeros
@@ -534,4 +539,27 @@ bool ChipInterfaceNetwork::waitForAtn(int atnIdWant, uint8_t atnCode, DWORD time
 
     // wanted ATN didn't come
     return false;
+}
+
+void ChipInterfaceNetwork::sendIkbdDataToAtari(void)
+{
+    if(pipeFromRPiToAtari[0] < 0) {                         // no pipe open? quit
+        return;
+    }
+    
+    int bytesAvailable;
+    int rv = ioctl(pipeFromRPiToAtari[0], FIONREAD, &bytesAvailable);    // how many bytes we can read?
+
+    if(rv <= 0 || bytesAvailable <= 0) {                        // ioctl fail or nothing to read? no action needed
+        return;
+    }
+
+    ssize_t cntWant = MIN(bytesAvailable, MFM_STREAM_SIZE);   // limit read size to maximum of buffer size
+    ssize_t cntGot = read(pipeFromRPiToAtari[0], bufOut, cntWant);
+
+    if(cntGot > 0) {                        // got some data from pipe? send it to socket
+        // TODO: write some header here so chip can identify these data
+
+        write(fdClient, bufOut, cntGot);    // write all the data into pipe
+    }
 }
