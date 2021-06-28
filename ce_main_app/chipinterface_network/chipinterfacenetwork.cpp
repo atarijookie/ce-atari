@@ -40,6 +40,9 @@ ChipInterfaceNetwork::ChipInterfaceNetwork()
     bufOut = new BYTE[MFM_STREAM_SIZE];
     bufIn = new BYTE[MFM_STREAM_SIZE];
 
+    gotAtnId = 0;
+    gotAtnCode = 0;
+
     memset(&hansConfigWords, 0, sizeof(hansConfigWords));
 }
 
@@ -117,6 +120,7 @@ void ChipInterfaceNetwork::acceptSocketIfNeededAndPossible(void)
 
     // got the new client socket now
     fdClient = newSock;
+    bufReader.setFd(newSock);
 }
 
 void ChipInterfaceNetwork::createServerReportSocket(void)
@@ -209,6 +213,9 @@ void ChipInterfaceNetwork::serialSetup(void)
     int fd = -1;
 
 
+    // TODO:
+
+
     // on real UART same fd is used for read and write
     ikbdReadFd = fd;
     ikbdWriteFd = fd;
@@ -231,56 +238,63 @@ void ChipInterfaceNetwork::resetFDD(void)
 
 bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
 {
+
+
+    // TODO: send IKBD data to ST when got some
+
+
     // send current status report every once in a while
     if(Utils::getCurrentMs() >= nextReportTime) {
         nextReportTime = Utils::getEndTime(1000);
         sendReportToMainServerSocket();
     }
 
-    if(fdClient <= 0) {     // no client connected? no action needed
+    acceptSocketIfNeededAndPossible();  // if don't have client connected, try to accept connection from client
+
+    if(fdClient <= 0) {                 // (still) no client connected? no action needed
+        return false;
+    }
+
+    int bytesAvailable;
+    int rv = ioctl(fdClient, FIONREAD, &bytesAvailable);    // how many bytes we can read?
+
+    if(rv <= 0 || bytesAvailable <= 0) {                    // ioctl fail or nothing to read? no action needed
         return false;
     }
 
     // if waitForATN() succeeds, it fills 8 bytes of data in buffer
     // ...but then we might need some little more, so let's determine what it was
     // and keep reading as much as needed
-    int moreData = 0;
 
-    // check for any ATN code waiting from Hans
-    // TODO:
-    //bool res = conSpi->waitForATN(SPI_CS_HANS, (BYTE) ATN_ANY, 0, inBuf);
-    bool res = false;
+    // we might need to wait for ATN multiple times, as there might be ZEROS packet or IKBD packet before we read wanted Hans or Franz packet
+    while(sigintReceived == 0) {
+        // check for any ATN code waiting from Hans
+        bool good = waitForAtn(NET_ATN_ANY_ID, ATN_ANY, 0, inBuf);    // which chip wants to communicate? (which chip's stream we should process?)
 
-    if(res) {    // HANS is signaling attention?
-        if(inBuf[3] == ATN_ACSI_COMMAND) {
-            moreData = 14;                              // all ACSI command bytes
+        if(!good) {                                         // not good? break loop, no action needed
+            break;
         }
 
-        if(moreData) {
-            // TODO:
-            //conSpi->txRx(SPI_CS_HANS, moreData, bufOut, inBuf + 8);   // get more data, offset in input buffer by header size
+        if(gotAtnId == NET_ATN_HANS_ID) {                   // for Hans
+            if(gotAtnCode == ATN_ACSI_COMMAND) {            // for this command read all ACSI command bytes
+                read(fdClient, inBuf + 8, 14);
+            }
+
+            hardNotFloppy = true;
+            return true;
         }
 
-        hardNotFloppy = true;
-        return true;
-    }
+        if(gotAtnId == NET_ATN_FRANZ_ID) {                  // for Franz
+            if(gotAtnCode == ATN_SEND_TRACK) {              // for this command read 2 more bytes: side + track
+                read(fdClient, inBuf + 8, 2);
+            }
 
-    // check for any ATN code waiting from Franz
-    // TODO:
-    //res = conSpi->waitForATN(SPI_CS_FRANZ, (BYTE) ATN_ANY, 0, inBuf);
-
-    if(res) {    // FRANZ is signaling attention?
-        if(inBuf[3] == ATN_SEND_TRACK) {
-            moreData = 2;                               // side + track
+            hardNotFloppy = false;
+            return true;
         }
 
-        if(moreData) {
-            // TODO:
-            //conSpi->txRx(SPI_CS_FRANZ, moreData, bufOut, inBuf + 8);   // get more data, offset in input buffer by header size
-        }
-
-        hardNotFloppy = false;
-        return true;
+        // if came here, probably weird situation, quit
+        break;
     }
 
     // no action needed
@@ -291,8 +305,8 @@ void ChipInterfaceNetwork::getFWversion(bool hardNotFloppy, BYTE *inFwVer)
 {
     if(hardNotFloppy) {     // for HDD
         // fwResponseBfr should be filled with Hans config - by calling setHDDconfig() (and not calling anything else inbetween)
-        // TODO:
-        //conSpi->txRx(SPI_CS_HANS, HDD_FW_RESPONSE_LEN, fwResponseBfr, inFwVer);
+        write(fdClient, fwResponseBfr,  HDD_FW_RESPONSE_LEN);
+        read (fdClient, inFwVer,        HDD_FW_RESPONSE_LEN);
 
         ChipInterface::convertXilinxInfo(inFwVer[5]);  // convert xilinx info into hwInfo struct
 
@@ -304,8 +318,8 @@ void ChipInterfaceNetwork::getFWversion(bool hardNotFloppy, BYTE *inFwVer)
     } else {                // for FDD
         // fwResponseBfr should be filled with Franz config - by calling setFDDconfig() (and not calling anything else inbetween)
 
-        // TODO:
-        // conSpi->txRx(SPI_CS_FRANZ, FDD_FW_RESPONSE_LEN, fwResponseBfr, inFwVer);
+        write(fdClient, fwResponseBfr,  FDD_FW_RESPONSE_LEN);
+        read (fdClient, inFwVer,        FDD_FW_RESPONSE_LEN);
 
         int year = Utils::bcdToInt(inFwVer[1]) + 2000;
         Update::versions.franz.fromInts(year, Utils::bcdToInt(inFwVer[2]), Utils::bcdToInt(inFwVer[3]));              // store found FW version of Franz
@@ -327,8 +341,8 @@ bool ChipInterfaceNetwork::hdd_sendData_start(DWORD totalDataCount, BYTE scsiSta
     bufOut[6] = totalDataCount  & 0xff;
     bufOut[7] = scsiStatus;                                     // store status
 
-    // TODO:
-    //conSpi->txRx(SPI_CS_HANS, COMMAND_SIZE, bufOut, bufIn);        // transmit this command
+    // transmit this command
+    write(fdClient, bufOut, COMMAND_SIZE);
 
     return true;
 }
@@ -343,11 +357,9 @@ bool ChipInterfaceNetwork::hdd_sendData_transferBlock(BYTE *pData, DWORD dataCou
     }
 
     while(dataCount > 0) {                                          // while there's something to send
-        // TODO:
-        // bool res = conSpi->waitForATN(SPI_CS_HANS, ATN_READ_MORE_DATA, 1000, bufIn);   // wait for ATN_READ_MORE_DATA
-        bool res = true;
+        bool good = waitForAtn(NET_ATN_HANS_ID, ATN_READ_MORE_DATA, 1000, bufIn);
 
-        if(!res) {                                                  // this didn't come? fuck!
+        if(!good) {         // failed to get right CMD from Hans? fail
             return false;
         }
 
@@ -355,8 +367,8 @@ bool ChipInterfaceNetwork::hdd_sendData_transferBlock(BYTE *pData, DWORD dataCou
 
         memcpy(bufOut + 2, pData, cntNow);                          // copy the data after the header (2 bytes)
 
-        // TODO:
-        // conSpi->txRx(SPI_CS_HANS, cntNow + 4, bufOut, bufIn);          // transmit this buffer with header + terminating zero (WORD)
+        // transmit this buffer with header + terminating zero (WORD)
+        write(fdClient, bufOut, cntNow + 4);
 
         pData       += cntNow;                                      // move the data pointer further
         dataCount   -= cntNow;
@@ -381,8 +393,9 @@ bool ChipInterfaceNetwork::hdd_recvData_start(BYTE *recvBuffer, DWORD totalDataC
     bufOut[6] = totalDataCount  & 0xff;
     bufOut[7] = 0xff;                                           // store INVALID status, because the real status will be sent on CMD_SEND_STATUS
 
-    // TODO:
-    // conSpi->txRx(SPI_CS_HANS, COMMAND_SIZE, bufOut, bufIn);        // transmit this command
+    // transmit this command
+    write(fdClient, bufOut, COMMAND_SIZE);
+
     return true;
 }
 
@@ -395,16 +408,15 @@ bool ChipInterfaceNetwork::hdd_recvData_transferBlock(BYTE *pData, DWORD dataCou
         // request maximum 512 bytes from host
         DWORD subCount = (dataCount > 512) ? 512 : dataCount;
 
-        // TODO:
-        //bool res = conSpi->waitForATN(SPI_CS_HANS, ATN_WRITE_MORE_DATA, 1000, inBuf); // wait for ATN_WRITE_MORE_DATA
-        bool res = true;
+        bool good = waitForAtn(NET_ATN_HANS_ID, ATN_WRITE_MORE_DATA, 1000, inBuf);
 
-        if(!res) {                                          // this didn't come? fuck!
+        if(!good) {         // failed to get right CMD from Hans? fail
             return false;
         }
 
-        // TODO:
-        // conSpi->txRx(SPI_CS_HANS, subCount + 8 - 4, bufOut, bufIn);    // transmit data (size = subCount) + header and footer (size = 8) - already received 4 bytes
+        // transmit data (size = subCount) + header and footer (size = 8) - already received 4 bytes
+        read(fdClient, bufIn, subCount + 8 - 4);
+
         memcpy(pData, bufIn + 2, subCount);                 // copy just the data, skip sequence number
 
         dataCount   -= subCount;                            // decreate the data counter
@@ -416,11 +428,9 @@ bool ChipInterfaceNetwork::hdd_recvData_transferBlock(BYTE *pData, DWORD dataCou
 
 bool ChipInterfaceNetwork::hdd_sendStatusToHans(BYTE statusByte)
 {
-    // TODO:
-    //bool res = conSpi->waitForATN(SPI_CS_HANS, ATN_GET_STATUS, 1000, bufIn);   // wait for ATN_GET_STATUS
-    bool res = true;
+    bool good = waitForAtn(NET_ATN_HANS_ID, ATN_GET_STATUS, 1000, bufIn);
 
-    if(!res) {
+    if(!good) {         // failed to get right CMD from Hans? fail
         return false;
     }
 
@@ -428,8 +438,8 @@ bool ChipInterfaceNetwork::hdd_sendStatusToHans(BYTE statusByte)
     bufOut[1] = CMD_SEND_STATUS;                          // set the command and the statusByte
     bufOut[2] = statusByte;
 
-    // TODO:
-    //conSpi->txRx(SPI_CS_HANS, 16 - 8, bufOut, bufIn);        // transmit the statusByte (16 bytes total, but 8 already received)
+    // transmit the statusByte (16 bytes total, but 8 already received)
+    write(fdClient, bufOut, 16 - 8);
 
     return true;
 }
@@ -437,19 +447,15 @@ bool ChipInterfaceNetwork::hdd_sendStatusToHans(BYTE statusByte)
 void ChipInterfaceNetwork::fdd_sendTrackToChip(int byteCount, BYTE *encodedTrack)
 {
     // send encoded track out, read garbage into bufIn and don't care about it
-    // TODO:
-    //conSpi->txRx(SPI_CS_FRANZ, byteCount, encodedTrack, bufIn);
+    write(fdClient, encodedTrack, byteCount);
 }
 
 BYTE* ChipInterfaceNetwork::fdd_sectorWritten(int &side, int &track, int &sector, int &byteCount)
 {
-    // TODO:
-    //byteCount = conSpi->getRemainingLength();               // get how many data we still have
+    byteCount = bufReader.getRemainingLength();             // get how many data we still have
 
-    memset(bufOut, 0, byteCount);                           // clear the output buffer before sending it to Franz (just in case)
-
-    // TODO:
-    //conSpi->txRx(SPI_CS_FRANZ, byteCount, bufOut, bufIn);   // get all the remaining data
+    // get all the remaining data
+    read(fdClient, bufIn, byteCount);
 
     // get the written sector, side, track number
     sector  = bufIn[1];
@@ -457,4 +463,75 @@ BYTE* ChipInterfaceNetwork::fdd_sectorWritten(int &side, int &track, int &sector
     side    = (bufIn[0] & 0x80) ? 1 : 0;
 
     return bufIn;                                           // return pointer to received written sector
+}
+
+void ChipInterfaceNetwork::handleZerosAndIkbd(int atnId)
+{
+    ssize_t cntWant = bufReader.getRemainingLength();   // get how much we should get to receive whole packet
+    cntWant = MIN(cntWant, MFM_STREAM_SIZE);            // limit the received lenght to buffer size
+
+    ssize_t cntGot = read(fdClient, bufIn, cntWant);    // read data
+
+    if(cntGot < cntWant) {                              // not enough data read? 
+        Debug::out(LOG_DEBUG, "handleZerosAndIkbd: got %d bytes, but wanted %d bytes (%d < %d)", cntGot, cntWant, cntGot, cntWant);
+    }
+
+    if(cntGot <= 0) {                                   // on error, nothing more to do
+        return;
+    }
+
+    if(atnId == NET_ATN_IKBD_ID) {                      // for IKBD - read data, feed to pipe
+        // TODO: put data in ikbd pipe
+    }
+
+    // for NET_ATN_ZEROS_ID - nothing to do, just ignore the zeros
+
+    bufReader.clear(); 
+}
+
+bool ChipInterfaceNetwork::waitForAtn(int atnIdWant, uint8_t atnCode, DWORD timeoutMs, BYTE *inBuf)
+{
+    gotAtnId = 0;
+    gotAtnCode = 0;
+
+    // we might need to wait for ATN multiple times, as there might be ZEROS packet or IKBD packet before we read wanted Hans or Franz packet
+    while(sigintReceived == 0) {
+        // check for any ATN code waiting from Hans
+        int atnIdGot = bufReader.waitForATN(atnCode, timeoutMs, inBuf);     // which chip wants to communicate? (which chip's stream we should process?)
+        uint8_t atnCode = bufReader.getAtnCode();                           // what command does this chip wants us to handle?
+
+        // if ZEROS or IKBD packed was found, process it and then try looking for Franz or Hans packet again
+        if(atnIdGot == NET_ATN_ZEROS_ID || atnIdGot == NET_ATN_IKBD_ID) {
+            handleZerosAndIkbd(atnIdGot);
+            continue;
+        }
+
+        // it's not ZEROS and not IKBD, but it's NONE? fail
+        if(atnIdGot == NET_ATN_NONE_ID) {
+            return false;
+        }
+
+        // if we got here, it'z not ZEROS, IKDB or NONE, so it's FRANZ or HANS
+        memcpy(inBuf, bufReader.getHeaderPointer(), 8); // copy in the header to start of buffer
+        bufReader.clear();                              // clear buffered reader after reading data
+
+        // store which chip wants which command to be handled
+        gotAtnId = atnIdGot;
+        gotAtnCode = atnCode;
+
+        if(atnIdWant == NET_ATN_ANY_ID) {               // waiting for ANY? then Franz or Hans is fine
+            return true;
+        }
+
+        // wanted Hans and got Hans, or wanted Franz and got Franz? good
+        if(atnIdWant == atnIdGot) {  
+            return true;
+        }
+
+        // if arrived here, no wanted ATN was found
+        break;
+    }
+
+    // wanted ATN didn't come
+    return false;
 }

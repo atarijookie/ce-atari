@@ -3,6 +3,7 @@
 
 #include "../datatypes.h"
 #include "../chipinterface.h"
+#include "bufferedreader.h"
 
 class ChipInterfaceNetwork: public ChipInterface
 {
@@ -75,11 +76,18 @@ private:
     BYTE *bufOut;
     BYTE *bufIn;
 
+    uint8_t  gotAtnId;      // which chip wants to talk? Franz, Hans?
+    uint8_t  gotAtnCode;    // which command code chips sends? 
+    BufferedReader bufReader;
+
     void createListeningSocket(void);
     void acceptSocketIfNeededAndPossible(void);
     void closeFdIfOpen(int& sock);
     void createServerReportSocket(void);
     void sendReportToMainServerSocket(void);
+
+    bool waitForAtn(int atnIdWant, uint8_t atnCode, DWORD timeoutMs, BYTE *inBuf);
+    void handleZerosAndIkbd(int atnId);
 
     void serialSetup(void);                             // open IKDB serial port
 };
