@@ -1,9 +1,15 @@
-#ifndef CHIPINTERFACENETWORK_H
-#define CHIPINTERFACENETWORK_H
+#ifndef __CHIPINTERFACENETWORK_H__
+#define __CHIPINTERFACENETWORK_H__
 
 #include "../datatypes.h"
 #include "../chipinterface.h"
 #include "bufferedreader.h"
+
+// tags that are being sent from RPi to chip to mark start of data
+#define NET_TAG_HANS_STR    "TGHA"
+#define NET_TAG_FRANZ_STR   "TGFR"
+#define NET_TAG_IKBD_STR    "TGIK"
+#define NET_TAG_ZEROS_STR   "TGZE"
 
 class ChipInterfaceNetwork: public ChipInterface
 {
@@ -97,6 +103,8 @@ private:
 
     void serialSetup(void);                             // open IKDB serial port
     void sendIkbdDataToAtari(void);
+
+    void sendDataToChip(const char* tag, uint8_t* data, uint16_t len);    // send data to chip with specified tag
 };
 
-#endif // CHIPINTERFACE12_H
+#endif // __CHIPINTERFACENETWORK_H__

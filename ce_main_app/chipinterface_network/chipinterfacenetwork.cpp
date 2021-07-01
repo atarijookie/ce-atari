@@ -307,7 +307,8 @@ void ChipInterfaceNetwork::getFWversion(bool hardNotFloppy, BYTE *inFwVer)
 {
     if(hardNotFloppy) {     // for HDD
         // fwResponseBfr should be filled with Hans config - by calling setHDDconfig() (and not calling anything else inbetween)
-        write(fdClient, fwResponseBfr,  HDD_FW_RESPONSE_LEN);
+        sendDataToChip(NET_TAG_HANS_STR, fwResponseBfr, HDD_FW_RESPONSE_LEN);
+
         read (fdClient, inFwVer,        HDD_FW_RESPONSE_LEN);
 
         ChipInterface::convertXilinxInfo(inFwVer[5]);  // convert xilinx info into hwInfo struct
@@ -320,7 +321,8 @@ void ChipInterfaceNetwork::getFWversion(bool hardNotFloppy, BYTE *inFwVer)
     } else {                // for FDD
         // fwResponseBfr should be filled with Franz config - by calling setFDDconfig() (and not calling anything else inbetween)
 
-        write(fdClient, fwResponseBfr,  FDD_FW_RESPONSE_LEN);
+        sendDataToChip(NET_TAG_FRANZ_STR, fwResponseBfr, FDD_FW_RESPONSE_LEN);
+
         read (fdClient, inFwVer,        FDD_FW_RESPONSE_LEN);
 
         int year = Utils::bcdToInt(inFwVer[1]) + 2000;
@@ -344,7 +346,7 @@ bool ChipInterfaceNetwork::hdd_sendData_start(DWORD totalDataCount, BYTE scsiSta
     bufOut[7] = scsiStatus;                                     // store status
 
     // transmit this command
-    write(fdClient, bufOut, COMMAND_SIZE);
+    sendDataToChip(NET_TAG_HANS_STR, bufOut, COMMAND_SIZE);
 
     return true;
 }
@@ -370,7 +372,7 @@ bool ChipInterfaceNetwork::hdd_sendData_transferBlock(BYTE *pData, DWORD dataCou
         memcpy(bufOut + 2, pData, cntNow);                          // copy the data after the header (2 bytes)
 
         // transmit this buffer with header + terminating zero (WORD)
-        write(fdClient, bufOut, cntNow + 4);
+        sendDataToChip(NET_TAG_HANS_STR, bufOut, cntNow + 4);
 
         pData       += cntNow;                                      // move the data pointer further
         dataCount   -= cntNow;
@@ -396,7 +398,7 @@ bool ChipInterfaceNetwork::hdd_recvData_start(BYTE *recvBuffer, DWORD totalDataC
     bufOut[7] = 0xff;                                           // store INVALID status, because the real status will be sent on CMD_SEND_STATUS
 
     // transmit this command
-    write(fdClient, bufOut, COMMAND_SIZE);
+    sendDataToChip(NET_TAG_HANS_STR, bufOut, COMMAND_SIZE);
 
     return true;
 }
@@ -441,7 +443,7 @@ bool ChipInterfaceNetwork::hdd_sendStatusToHans(BYTE statusByte)
     bufOut[2] = statusByte;
 
     // transmit the statusByte (16 bytes total, but 8 already received)
-    write(fdClient, bufOut, 16 - 8);
+    sendDataToChip(NET_TAG_HANS_STR, bufOut, 16 - 8);
 
     return true;
 }
@@ -449,7 +451,7 @@ bool ChipInterfaceNetwork::hdd_sendStatusToHans(BYTE statusByte)
 void ChipInterfaceNetwork::fdd_sendTrackToChip(int byteCount, BYTE *encodedTrack)
 {
     // send encoded track out, read garbage into bufIn and don't care about it
-    write(fdClient, encodedTrack, byteCount);
+    sendDataToChip(NET_TAG_FRANZ_STR, encodedTrack, byteCount);
 }
 
 BYTE* ChipInterfaceNetwork::fdd_sectorWritten(int &side, int &track, int &sector, int &byteCount)
@@ -529,7 +531,7 @@ bool ChipInterfaceNetwork::waitForAtn(int atnIdWant, uint8_t atnCode, DWORD time
         }
 
         // wanted Hans and got Hans, or wanted Franz and got Franz? good
-        if(atnIdWant == atnIdGot) {  
+        if(atnIdWant == atnIdGot) {
             return true;
         }
 
@@ -543,23 +545,35 @@ bool ChipInterfaceNetwork::waitForAtn(int atnIdWant, uint8_t atnCode, DWORD time
 
 void ChipInterfaceNetwork::sendIkbdDataToAtari(void)
 {
-    if(pipeFromRPiToAtari[0] < 0) {                         // no pipe open? quit
+    if(pipeFromRPiToAtari[0] < 0 || fdClient < 0) {         // no pipe or socket open? quit
         return;
     }
-    
+
     int bytesAvailable;
     int rv = ioctl(pipeFromRPiToAtari[0], FIONREAD, &bytesAvailable);    // how many bytes we can read?
 
-    if(rv <= 0 || bytesAvailable <= 0) {                        // ioctl fail or nothing to read? no action needed
+    if(rv <= 0 || bytesAvailable <= 0) {                    // ioctl fail or nothing to read? no action needed
         return;
     }
 
-    ssize_t cntWant = MIN(bytesAvailable, MFM_STREAM_SIZE);   // limit read size to maximum of buffer size
+    ssize_t cntWant = MIN(bytesAvailable, MFM_STREAM_SIZE); // limit read size to maximum of buffer size
     ssize_t cntGot = read(pipeFromRPiToAtari[0], bufOut, cntWant);
 
-    if(cntGot > 0) {                        // got some data from pipe? send it to socket
-        // TODO: write some header here so chip can identify these data
-
-        write(fdClient, bufOut, cntGot);    // write all the data into pipe
+    if(cntGot > 0) {                                        // got some data from pipe? send it to socket
+        sendDataToChip(NET_TAG_IKBD_STR, bufOut, cntGot);         // write all the data into socket
     }
+}
+
+void ChipInterfaceNetwork::sendDataToChip(const char* tag, uint8_t* data, uint16_t len)        // send data to chip with specified tag
+{
+    if(fdClient < 0) {                      // no client socket? quit
+        return;
+    }
+
+    uint8_t head[6];
+    memcpy(head, tag, 4);                   // 0..3: tag
+    Utils::storeWord(head + 4, len);        // 4..5: length
+
+    write(fdClient, head, 6);               // send header
+    write(fdClient, data, len);             // send data
 }
