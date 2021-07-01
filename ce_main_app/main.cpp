@@ -236,10 +236,9 @@ int runCore(int instanceNo, bool localNotNetwork)
         hwConfig.version = 3;
         flags.noReset = true;
 
-        ChipInterfaceNetwork *cin = new ChipInterfaceNetwork(); // create network chip interface
-        cin->setServerIndex(instanceNo);            // set index of this instance
-        chipInterface = cin;
-        chipInterface->ciOpen();                    // try to open it
+        chipInterface = new ChipInterfaceNetwork();     // create network chip interface
+        chipInterface->setInstanceIndex(instanceNo);   // set index of this instance
+        chipInterface->ciOpen();                        // try to open it
     }
 
     //------------------------------------

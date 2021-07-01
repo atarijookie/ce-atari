@@ -8,6 +8,11 @@
 extern THwConfig  hwConfig;
 extern TFlags     flags;
 
+ChipInterface::ChipInterface()
+{
+    instanceIndex = -1;
+}
+
 void ChipInterface::convertXilinxInfo(BYTE xilinxInfo)
 {
     THwConfig hwConfigOld = hwConfig;
@@ -156,4 +161,14 @@ void ChipInterface::setFDDconfig(bool setFloppyConfig, bool fddEnabled, int id, 
     if(setDiskChanged) {
         responseAddByte(fwResponseBfr, ( diskChanged    ? CMD_DISK_CHANGE_ON    : CMD_DISK_CHANGE_OFF) );
     }
+}
+
+void ChipInterface::setInstanceIndex(int index)
+{
+    instanceIndex = index;
+}
+
+int  ChipInterface::getInstanceIndex(void)
+{
+    return instanceIndex;
 }

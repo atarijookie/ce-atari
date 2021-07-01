@@ -87,6 +87,7 @@ void networkServerMain(void)
 
     // init the server status structs
     for(int i=0; i<MAX_SERVER_COUNT; i++) {
+        serverStatus[i].clientIp = 0;
         serverStatus[i].status = SERVER_STATUS_NOT_RUNNING;
         serverStatus[i].lastUpdate = Utils::getCurrentMs();
     }
@@ -119,6 +120,7 @@ void networkServerMain(void)
             ssize_t n = recvfrom(udpSocket, recvData, sizeof(recvData), 0, (struct sockaddr *) &clientAddr, &slen);
 
             if(n < 8) {                                     // packet not big enough or error?
+                Debug::out(LOG_DEBUG, "netServer: rejecting short UDP packet (%d bytes)", n);
                 continue;
             }
 
@@ -126,6 +128,8 @@ void networkServerMain(void)
                 onServerStatus(recvData, n);
             } else if(memcmp(recvData, "CELC", 4) == 0) {   // CE Lite Client wants something?
                 onClientRequest(&clientAddr, recvData, n);
+            } else {
+                Debug::out(LOG_INFO, "netServer: ignoring unknown request %02X %02X %02X %02X", recvData[0], recvData[1], recvData[2], recvData[3]);
             }
         }
     }
@@ -139,6 +143,7 @@ void onServerStatus(uint8_t* recvData, int len)
     int index = recvData[4];                        // 4: server index - from 0 to (MAX_SERVER_COUNT-1)
 
     if(index >= MAX_SERVER_COUNT) {                 // if server index is more that we store, ignore it
+        Debug::out(LOG_DEBUG, "netServer: onServerStatus ignoring status with invalid server index %d", index);
         return;
     }
 
@@ -146,6 +151,8 @@ void onServerStatus(uint8_t* recvData, int len)
     ss->status = recvData[5];                       // 5: status
     ss->lastUpdate = Utils::getCurrentMs();         // updated time: now
     // don't modify clientIp here, it's not the IP of client but rather IP of server itself
+
+    Debug::out(LOG_DEBUG, "netServer: onServerStatus at index: %d, status: %d", index, ss->status);
 }
 
 void onClientRequest(sockaddr_in *clientAddr, uint8_t *recvData, int len)
@@ -157,7 +164,7 @@ void onClientRequest(sockaddr_in *clientAddr, uint8_t *recvData, int len)
     int idxNotRunning = -1;
 
     for(int i=0; i<MAX_SERVER_COUNT; i++) {
-        if(serverStatus[i].clientIp == clientIp) {  // if we got this client IP already
+        if(idxClient == -1 && serverStatus[i].clientIp == clientIp) {  // if we got this client IP already
             idxClient = i;
         }
 
@@ -178,10 +185,12 @@ void onClientRequest(sockaddr_in *clientAddr, uint8_t *recvData, int len)
     } else if(idxFree != -1) {          // got index where server is running but nobody is connected? use that
         idxUse = idxFree;
         Debug::out(LOG_INFO, "onClientRequest - using free server # %d", idxUse);
-    } else if(idxNotRunning == -1) {        // got index where no server is running? start it and run it
+    } else if(idxNotRunning != -1) {        // got index where no server is running? start it and run it
         forkCEliteServer(idxNotRunning);    // start server on this index
         idxUse = idxNotRunning;
-        Debug::out(LOG_INFO, "onClientRequest - using new server # %d", idxUse);
+        Debug::out(LOG_INFO, "onClientRequest - forking and using new server # %d", idxUse);
+    } else {
+        Debug::out(LOG_INFO, "onClientRequest - couldn't find free server slot to use");
     }
 
     uint8_t response[10];
@@ -203,6 +212,11 @@ void onClientRequest(sockaddr_in *clientAddr, uint8_t *recvData, int len)
 
         if(serverIp != NULL) {                      // if found valid IP address
             memcpy(&response[4], serverIp, 4);      // 4..7: store server's IP
+
+            Debug::out(LOG_INFO, "onClientRequest response: use server #%d, on %d.%d.%d.%d, port: %d", 
+                idxUse, serverIp[0], serverIp[1], serverIp[2], serverIp[3], SERVER_TCP_PORT_FIRST + idxUse);
+        } else {
+            Debug::out(LOG_INFO, "onClientRequest response: no valid IP of server");
         }
 
         Utils::storeWord(&response[8], SERVER_TCP_PORT_FIRST + idxUse);   // 8,9: server's port
@@ -218,6 +232,10 @@ void forkCEliteServer(int serverIndex)
     int childPid = fork();              // fork child to own process
 
     if(childPid == 0) {                 // code executed only by child
+        char logPath[50];
+        sprintf(logPath, "/var/log/ce_server_%d.log", serverIndex);
+        Debug::setLogFile(logPath);     // new network server will use different log file than the main thread
+
         runCore(serverIndex, false);    // run network (not local) device server with this serverIndex
         return;
     }

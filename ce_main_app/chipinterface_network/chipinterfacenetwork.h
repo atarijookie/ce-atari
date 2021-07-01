@@ -17,9 +17,6 @@ public:
     ChipInterfaceNetwork();
     virtual ~ChipInterfaceNetwork();
 
-    // as this network server interface will run multiple times, this index will tell it on which port it should run
-    void setServerIndex(int index);
-
     // this return CHIP_IF_V1_V2 or CHIP_IF_V3
     int chipInterfaceType(void);
 

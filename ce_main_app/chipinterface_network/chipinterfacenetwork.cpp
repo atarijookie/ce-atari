@@ -57,11 +57,6 @@ int ChipInterfaceNetwork::chipInterfaceType(void)
     return CHIP_IF_NETWORK;
 }
 
-void ChipInterfaceNetwork::setServerIndex(int index)
-{
-    serverIndex = index;
-}
-
 void ChipInterfaceNetwork::createListeningSocket(void)
 {
     if(fdListen >= 0) { // if the listening socket seems to be already created, just quit
@@ -244,9 +239,9 @@ void ChipInterfaceNetwork::resetFDD(void)
 
 bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
 {
-    // send current status report every once in a while
+    // send current status report every once in a while (could do it on change only, but doing it repeatedly as UDP packet might get lost, even on localhost only)
     if(Utils::getCurrentMs() >= nextReportTime) {
-        nextReportTime = Utils::getEndTime(1000);
+        nextReportTime = Utils::getEndTime(5000);
         sendReportToMainServerSocket();
     }
 

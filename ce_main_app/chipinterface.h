@@ -68,10 +68,14 @@
 class ChipInterface
 {
 public:
+    ChipInterface();
     virtual ~ChipInterface() {};
 
     // this return CHIP_IF_V1_V2 or CHIP_IF_V3
     virtual int chipInterfaceType(void) = 0;
+
+    void setInstanceIndex(int index);
+    int  getInstanceIndex(void);            // -1 for physical interface (only single instance), 0-15 for network interfaces
 
     //----------------
     // chip interface initialization and deinitialization - e.g. open GPIO, or open socket, ...
@@ -142,6 +146,8 @@ protected:
     virtual void responseAddByte(BYTE *bfr, BYTE value);        // add a BYTE to the response (command) to Hans or Franz
 
     static void convertXilinxInfo(BYTE xilinxInfo);
+
+    int instanceIndex;
 };
 
 #endif // CHIPINTERFACE
