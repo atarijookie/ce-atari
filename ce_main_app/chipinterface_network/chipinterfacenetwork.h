@@ -91,6 +91,7 @@ private:
 
     void createListeningSocket(void);
     void acceptSocketIfNeededAndPossible(void);
+    void closeClientSocket(void);
     void closeFdIfOpen(int& sock);
     void createServerReportSocket(void);
     void sendReportToMainServerSocket(void);

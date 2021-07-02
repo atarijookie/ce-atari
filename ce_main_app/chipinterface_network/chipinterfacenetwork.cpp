@@ -116,6 +116,18 @@ void ChipInterfaceNetwork::acceptSocketIfNeededAndPossible(void)
     // got the new client socket now
     fdClient = newSock;
     bufReader.setFd(newSock);
+
+    Debug::out(LOG_DEBUG, "acceptSocketIfNeededAndPossible() - client connected");
+
+    sendReportToMainServerSocket();     // let main server process know that we're occupied now
+}
+
+void ChipInterfaceNetwork::closeClientSocket(void)
+{
+    closeFdIfOpen(fdClient);            // close socket
+    sendReportToMainServerSocket();     // let main server process know that we're free now
+
+    Debug::out(LOG_DEBUG, "acceptSocketIfNeededAndPossible() - client disconnected");
 }
 
 void ChipInterfaceNetwork::createServerReportSocket(void)
@@ -274,7 +286,11 @@ bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
 
         if(gotAtnId == NET_ATN_HANS_ID) {                   // for Hans
             if(gotAtnCode == ATN_ACSI_COMMAND) {            // for this command read all ACSI command bytes
-                read(fdClient, inBuf + 8, 14);
+                rv = recv(fdClient, inBuf + 8, 14, 0);
+
+                if(rv == 0) {                               // if recv() returned 0, client has disconnected
+                    closeClientSocket();
+                }
             }
 
             hardNotFloppy = true;
@@ -283,7 +299,11 @@ bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
 
         if(gotAtnId == NET_ATN_FRANZ_ID) {                  // for Franz
             if(gotAtnCode == ATN_SEND_TRACK) {              // for this command read 2 more bytes: side + track
-                read(fdClient, inBuf + 8, 2);
+                rv = recv(fdClient, inBuf + 8, 2, 0);
+
+                if(rv == 0) {                               // if recv() returned 0, client has disconnected
+                    closeClientSocket();
+                }
             }
 
             hardNotFloppy = false;
@@ -328,7 +348,7 @@ void ChipInterfaceNetwork::getFWversion(bool hardNotFloppy, BYTE *inFwVer)
 bool ChipInterfaceNetwork::hdd_sendData_start(DWORD totalDataCount, BYTE scsiStatus, bool withStatus)
 {
     if(totalDataCount > 0xffffff) {
-        Debug::out(LOG_ERROR, "AcsiDataTrans::sendData_start -- trying to send more than 16 MB, fail");
+        Debug::out(LOG_ERROR, "ChipInterfaceNetwork::hdd_sendData_start -- trying to send more than 16 MB, fail");
         return false;
     }
 
@@ -379,7 +399,7 @@ bool ChipInterfaceNetwork::hdd_sendData_transferBlock(BYTE *pData, DWORD dataCou
 bool ChipInterfaceNetwork::hdd_recvData_start(BYTE *recvBuffer, DWORD totalDataCount)
 {
     if(totalDataCount > 0xffffff) {
-        Debug::out(LOG_ERROR, "AcsiDataTrans::recvData_start() -- trying to send more than 16 MB, fail");
+        Debug::out(LOG_ERROR, "ChipInterfaceNetwork::hdd_recvData_start() -- trying to send more than 16 MB, fail");
         return false;
     }
 
@@ -414,7 +434,12 @@ bool ChipInterfaceNetwork::hdd_recvData_transferBlock(BYTE *pData, DWORD dataCou
         }
 
         // transmit data (size = subCount) + header and footer (size = 8) - already received 4 bytes
-        read(fdClient, bufIn, subCount + 8 - 4);
+        ssize_t rv = recv(fdClient, bufIn, subCount + 8 - 4, 0);
+
+        if(rv == 0) {                                       // if recv() returned 0, client has disconnected
+            closeClientSocket();
+            return false;
+        }
 
         memcpy(pData, bufIn + 2, subCount);                 // copy just the data, skip sequence number
 
@@ -454,7 +479,11 @@ BYTE* ChipInterfaceNetwork::fdd_sectorWritten(int &side, int &track, int &sector
     byteCount = bufReader.getRemainingLength();             // get how many data we still have
 
     // get all the remaining data
-    read(fdClient, bufIn, byteCount);
+    size_t rv = recv(fdClient, bufIn, byteCount, 0);
+
+    if(rv == 0) {                                           // if recv() returned 0, client has disconnected
+        closeClientSocket();
+    }
 
     // get the written sector, side, track number
     sector  = bufIn[1];
@@ -469,13 +498,17 @@ void ChipInterfaceNetwork::handleZerosAndIkbd(int atnId)
     ssize_t cntWant = bufReader.getRemainingLength();   // get how much we should get to receive whole packet
     cntWant = MIN(cntWant, MFM_STREAM_SIZE);            // limit the received lenght to buffer size
 
-    ssize_t cntGot = read(fdClient, bufIn, cntWant);    // read data
+    ssize_t cntGot = recv(fdClient, bufIn, cntWant, 0); // read data
 
     if(cntGot < cntWant) {                              // not enough data read? 
         Debug::out(LOG_DEBUG, "handleZerosAndIkbd: got %d bytes, but wanted %d bytes (%d < %d)", cntGot, cntWant, cntGot, cntWant);
     }
 
     if(cntGot <= 0) {                                   // on error, nothing more to do
+        if(cntGot == 0) {                               // if recv() returned 0, client has disconnected
+            closeClientSocket();
+        }
+
         return;
     }
 
@@ -501,6 +534,11 @@ bool ChipInterfaceNetwork::waitForAtn(int atnIdWant, uint8_t atnCode, DWORD time
         // check for any ATN code waiting from Hans
         int atnIdGot = bufReader.waitForATN(atnCode, timeoutMs, inBuf);     // which chip wants to communicate? (which chip's stream we should process?)
         uint8_t atnCode = bufReader.getAtnCode();                           // what command does this chip wants us to handle?
+
+        if(atnIdGot == NET_ATN_DISCONNECTED) {         // if buffered reader detected client disconnect, close it and quit
+            closeClientSocket();
+            return false;
+        }
 
         // if ZEROS or IKBD packed was found, process it and then try looking for Franz or Hans packet again
         if(atnIdGot == NET_ATN_ZEROS_ID || atnIdGot == NET_ATN_IKBD_ID) {

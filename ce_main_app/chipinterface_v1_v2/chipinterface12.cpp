@@ -265,7 +265,7 @@ bool ChipInterface12::hdd_sendData_start(DWORD totalDataCount, BYTE scsiStatus, 
 {
 #ifndef ONPC
     if(totalDataCount > 0xffffff) {
-        Debug::out(LOG_ERROR, "AcsiDataTrans::sendData_start -- trying to send more than 16 MB, fail");
+        Debug::out(LOG_ERROR, "ChipInterface12::hdd_sendData_start -- trying to send more than 16 MB, fail");
         return false;
     }
 
@@ -317,7 +317,7 @@ bool ChipInterface12::hdd_recvData_start(BYTE *recvBuffer, DWORD totalDataCount)
 {
 #ifndef ONPC
     if(totalDataCount > 0xffffff) {
-        Debug::out(LOG_ERROR, "AcsiDataTrans::recvData_start() -- trying to send more than 16 MB, fail");
+        Debug::out(LOG_ERROR, "ChipInterface12::hdd_recvData_start() -- trying to send more than 16 MB, fail");
         return false;
     }
 

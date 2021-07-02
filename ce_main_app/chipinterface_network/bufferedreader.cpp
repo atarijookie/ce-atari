@@ -1,5 +1,6 @@
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 #include "../utils.h"
@@ -31,11 +32,7 @@ int BufferedReader::waitForATN(BYTE atnCode, DWORD timeoutMs, BYTE *inBuf)
         return NET_ATN_NONE_ID;
     }
 
-    int bytesAvailable, res;
-    int needCnt;
-    fd_set readfds;
-    struct timeval timeout;
-
+    bool waitedOnce = false;                                // when timeoutMs says don't wait for data, make it wait once for a short time to be able to detect client socket disconnect
     uint32_t endTime = Utils::getEndTime(timeoutMs);        // when this time is reached and no data is available, quit
 
     while(sigintReceived == 0) {
@@ -52,42 +49,64 @@ int BufferedReader::waitForATN(BYTE atnCode, DWORD timeoutMs, BYTE *inBuf)
             continue;
         } 
 
-        // not enough data? try to get more
+        // Not enough data in buffer?
+        // check if data was received and is present in socket by using ioctl().
+        // if data is  available, the rest does: ioctl()            + recv()
+        // if data not available, the rest does: ioctl() + select() + recv()
+
         // we need 12 bytes - 4 are the ATN STR, 8 are header (0xcafe, 0, ATN code, txLen, rxLen)
-        needCnt = 12 - gotBytes;
+        int needCnt = 12 - gotBytes;
 
-        res = ioctl(fd, FIONREAD, &bytesAvailable);     // how many bytes we can read?
+        int res, bytesAvailable;
+        res = ioctl(fd, FIONREAD, &bytesAvailable);     // how many bytes we can read immediately?
 
-        if(res != -1 && bytesAvailable >= needCnt) {    // we have those needed bytes available, read them
-            res = read(fd, &buffer[gotBytes], needCnt);
+        if(res < 0) {                                   // ioctl() failed? no bytes available
+            bytesAvailable = 0;
+        }
 
-            if(res != -1) {                             // if read was OK, we got those bytes and we can restart the loop
-                gotBytes += needCnt;
-                continue;
+        if(bytesAvailable <= 0) {                       // if no bytes available? wait at least once
+            uint32_t now = Utils::getCurrentMs();
+            uint32_t timeLeftUs = (endTime > now) ? ((endTime - now) * 1000) : 0;   // if still not timeout, calculate how much time is left in us; otherwise no time left
+
+            if(timeoutMs == 0 && !waitedOnce) {         // if this is the wait for 1st ATN (with 0 wait time), but didn't wait at least once, wait at least once for a short time
+                waitedOnce = true;                      // now were about to wait once
+                timeLeftUs = 1000;                      // just a short 1 ms wait
             }
 
-            // on failed to get data code continues here
+            if(timeLeftUs <= 0) {                       // no time left? quit loop, return NONE ATN
+                break;
+            }
+
+            struct timeval timeout;
+            timeout.tv_sec = 0;
+            timeout.tv_usec = timeLeftUs;               // set timeout in us
+
+            fd_set readfds;
+            FD_ZERO(&readfds);
+            FD_SET(fd, &readfds);
+
+            res = select(fd + 1, &readfds, NULL, NULL, &timeout);     // wait for data or timeout here
+
+            if(res < 0 || !FD_ISSET(fd, &readfds)) {    // if select() failed or cannot read from fd, skip rest
+                continue;
+            }
         }
 
-        // if don't have additional data, we can try to handle the situation below
+        // If got here, then either ioctl() told us we got some bytes available,
+        // or select() told us we can recv() from socket now.
 
-        // don't have data, but still have time? wait for data and get it if possible
-        uint32_t now = Utils::getCurrentMs();
-        uint32_t timeLeftUs = (endTime > now) ? ((endTime - now) * 1000) : 0;   // if still not timeout, calculate how much time is left in us; otherwise no time left
+        ssize_t recvCnt = recv(fd, &buffer[gotBytes], needCnt, 0);
 
-        if(timeLeftUs <= 0) {                   // no time left? quit loop, return NONE ATN
-            break;
+        if(recvCnt == 0) {                              // if recv() returned 0, then client disconnected
+            return NET_ATN_DISCONNECTED;
         }
 
-        memset(&timeout, 0, sizeof(timeout));
-        timeout.tv_sec = 0;
-        timeout.tv_usec = timeLeftUs;           // set timeout in us
+        if(recvCnt > 0) {                               // if read was OK, we got those bytes and we can restart the loop
+            gotBytes += recvCnt;
+            continue;
+        }
 
-        FD_ZERO(&readfds);
-        FD_SET(fd, &readfds);
-
-        select(fd + 1, &readfds, NULL, NULL, &timeout);     // wait for data or timeout here
-        // in case of socket issue, or signal received, or got some data, restart loop
+        // on failed to get data code continues here, try the loop again
     }
 
     return NET_ATN_NONE_ID;     // nothing usable found

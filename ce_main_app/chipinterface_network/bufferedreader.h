@@ -9,12 +9,13 @@
 #define NET_ATN_IKBD_STR    "ATIK"
 #define NET_ATN_ZEROS_STR   "ATZE"
 
-#define NET_ATN_NONE_ID     0
-#define NET_ATN_HANS_ID     1
-#define NET_ATN_FRANZ_ID    2
-#define NET_ATN_IKBD_ID     3
-#define NET_ATN_ZEROS_ID    4
-#define NET_ATN_ANY_ID      0xff
+#define NET_ATN_NONE_ID         0
+#define NET_ATN_HANS_ID         1
+#define NET_ATN_FRANZ_ID        2
+#define NET_ATN_IKBD_ID         3
+#define NET_ATN_ZEROS_ID        4
+#define NET_ATN_DISCONNECTED    0xee
+#define NET_ATN_ANY_ID          0xff
 
 class BufferedReader
 {
