@@ -428,6 +428,7 @@ void initializeFlags(void)
     flags.ikbdLogs     = false;         // no ikbd logs by default
     flags.fakeOldApp   = false;         // don't fake old app by default
     flags.display      = false;         // if set to true, show string on front display, if possible
+    flags.noCapture    = false;         // if true, don't do exclusive mouse and keyboard capture
 
     flags.deviceGetLicense  = false;    // if true, device should get license again
     flags.deviceDoUpdate    = false;    // if true, device should download update and write it to flash
@@ -595,6 +596,12 @@ void parseCmdLineArguments(int argc, char *argv[])
             flags.display       = true;
         }
 
+        // don't capture USB mouse and keyboard
+        if(strcmp(argv[i], "nocap") == 0) {
+            isKnownTag          = true;                             // this is a known tag
+            flags.noCapture     = true;
+        }
+
         if(!isKnownTag) {                                           // if tag unknown, show warning
             printf(">>> UNKNOWN APP ARGUMENT: '%s' <<<\n", argv[i]);
         }
@@ -614,6 +621,7 @@ void printfPossibleCmdLineArgs(void)
     printf("ikbdlogs - write IKBD logs to /var/log/ikbdlog.txt\n");
     printf("fakeold  - fake old app version for reinstall tests\n");
     printf("display  - show string on front display, if possible\n");
+    printf("nocap    - don't do exclusive USB mouse and keyboard capture\n");
 }
 
 void handlePthreadCreate(int res, const char *threadName, pthread_t *pThread)

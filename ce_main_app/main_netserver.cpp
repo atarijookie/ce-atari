@@ -47,6 +47,8 @@ TCEServerStatus serverStatus[MAX_SERVER_COUNT];
 std::string mainPage;
 void generateMainPage(void);
 
+uint8_t serverIp[4];
+
 int netServerOpenSocket(void)
 {
     int sockfd = 0;
@@ -89,6 +91,18 @@ void networkServerMain(void)
 
     if(udpSocket < 0) {     // on error, just quit
         return;
+    }
+
+    // get server's IP address for usage
+    uint8_t bfr[10];
+    Utils::getIpAdds(bfr);
+
+    if(bfr[0] == 1) {                   // eth0 enabled? add its IP
+        memcpy(serverIp, &bfr[1], 4);
+    } else if(bfr[5] == 1) {            // wlan0 enabled? add its IP
+        memcpy(serverIp, &bfr[6], 4);
+    } else {                            // nothing enabled, just zeros
+        memset(serverIp, 0, 4);
     }
 
     Debug::out(LOG_INFO, "Starting CosmosEx network server");
@@ -224,24 +238,10 @@ void onClientRequest(sockaddr_in *clientAddr, uint8_t *recvData, int len)
     if(idxUse != -1) {                      // if idxUse is not -1, fill in the response (and response with all zeros means nothing available)
         serverStatus[idxUse].clientIp = clientIp;
 
-        uint8_t bfr[10];
-        Utils::getIpAdds(bfr);
-        uint8_t *serverIp = NULL;
+        memcpy(&response[4], serverIp, 4);      // 4..7: store server's IP
 
-        if(bfr[0] == 1) {                   // eth0 enabled? add its IP
-            serverIp = &bfr[1];
-        } else if(bfr[5] == 1) {            // wlan0 enabled? add its IP
-            serverIp = &bfr[6];
-        }
-
-        if(serverIp != NULL) {                      // if found valid IP address
-            memcpy(&response[4], serverIp, 4);      // 4..7: store server's IP
-
-            Debug::out(LOG_INFO, "onClientRequest response: use server #%d, on %d.%d.%d.%d, port: %d", 
-                idxUse, serverIp[0], serverIp[1], serverIp[2], serverIp[3], SERVER_TCP_PORT_FIRST + idxUse);
-        } else {
-            Debug::out(LOG_INFO, "onClientRequest response: no valid IP of server");
-        }
+        Debug::out(LOG_INFO, "onClientRequest response: use server #%d, on %d.%d.%d.%d, port: %d",
+        idxUse, serverIp[0], serverIp[1], serverIp[2], serverIp[3], SERVER_TCP_PORT_FIRST + idxUse);
 
         Utils::storeWord(&response[8], SERVER_TCP_PORT_FIRST + idxUse);   // 8,9: server's port
     }
@@ -299,7 +299,7 @@ void generateMainPage(void)
 {
     // generate new report into string, check if changed since last time, if changed then write to file
     std::string mainPageNew;
-    NetServerMainPage::create(mainPageNew);
+    NetServerMainPage::create(mainPageNew, serverIp);
 
     if(mainPage != mainPageNew) {   // main page changed?
         mainPage = mainPageNew;

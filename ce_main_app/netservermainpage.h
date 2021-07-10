@@ -5,7 +5,7 @@
 
 class NetServerMainPage {
 public:
-    static void create(std::string &page);
+    static void create(std::string &page, uint8_t *serverIp);
 };
 
 #endif

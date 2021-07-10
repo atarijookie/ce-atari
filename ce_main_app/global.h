@@ -94,6 +94,7 @@ typedef struct {
     bool ikbdLogs;              // if set to true, will generate ikbd logs file
     bool fakeOldApp;            // if set to true, will always return old app version, so you can test app installation over and over
     bool display;               // if set to true, show string on front display, if possible
+    bool noCapture;             // if set to true, don't do exclusive USB mouse and keyboard capture
 
     bool deviceGetLicense;      // if true, device should get license again
     bool deviceDoUpdate;        // if true, device should download update and write it to flash

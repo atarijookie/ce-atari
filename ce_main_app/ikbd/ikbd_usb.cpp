@@ -25,6 +25,7 @@
 extern TInputDevice ikbdDevs[INTYPE_MAX+1];
 extern SharedObjects shared;
 extern ChipInterface* chipInterface;
+extern TFlags         flags;
 
 void Ikbd::initDevs(void)
 {
@@ -678,21 +679,34 @@ void Ikbd::handleKeyAsKeybJoy(bool pcNotSt, int joyNumber, int pcKey, bool keyDo
 
 void Ikbd::toggleKeyboardExclusiveAccess(void)
 {
-    int fd;
-    fd = getFdByIndex(INTYPE_KEYBOARD);
-    logDebugAndIkbd(LOG_DEBUG, "Ikbd::toggleKeyboardExclusiveAccess() fd=%d keyboardExclusiveAccess=%d\n", fd, keyboardExclusiveAccess);
-    if(fd < 0) return;
+    int fdKeyb, fdMouse;
+
+    fdKeyb  = getFdByIndex(INTYPE_KEYBOARD);
+    fdMouse = getFdByIndex(INTYPE_MOUSE);
+
+    logDebugAndIkbd(LOG_DEBUG, "Ikbd::toggleKeyboardExclusiveAccess() fdKeyb=%d, fdMouse=%d, keyboardExclusiveAccess=%d\n", fdKeyb, fdMouse, keyboardExclusiveAccess);
 
     if(keyboardExclusiveAccess) {
-        releaseExclusiveAccess(fd);
+        releaseExclusiveAccess(fdKeyb);
+        releaseExclusiveAccess(fdMouse);
     } else {
-        grabExclusiveAccess(fd);
+        grabExclusiveAccess(fdKeyb);
+        grabExclusiveAccess(fdMouse);
     }
+
     keyboardExclusiveAccess = !keyboardExclusiveAccess;
 }
 
 void Ikbd::grabExclusiveAccess(int fd)
 {
+    if(flags.noCapture) {       // if shouldn't do USB keyboard and mouse capture, just quit
+        return;
+    }
+
+    if(fd <= 0) {
+        return;
+    }
+
     if(ioctl(fd, EVIOCGRAB, (void*)1) < 0) { // grab exclusive
         logDebugAndIkbd(LOG_ERROR, "Ikbd::grabExclusiveAccess() ioctl failed : %s", strerror(errno));
     }
@@ -700,6 +714,10 @@ void Ikbd::grabExclusiveAccess(int fd)
 
 void Ikbd::releaseExclusiveAccess(int fd)
 {
+    if(fd <= 0) {
+        return;
+    }
+
     if(ioctl(fd, EVIOCGRAB, (void*)0) < 0) { // release
         logDebugAndIkbd(LOG_ERROR, "Ikbd::releaseExclusiveAccess() ioctl failed : %s", strerror(errno));
     }
