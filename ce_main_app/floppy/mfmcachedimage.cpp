@@ -294,7 +294,7 @@ void MfmCachedImage::log(char *str)
         return;
     }
 
-    fprintf(f, str);
+    fputs(str, f);
     fclose(f);
 }
 

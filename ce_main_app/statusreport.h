@@ -21,7 +21,7 @@
 #define ALIVE_MOUSEVENT 0x32
 #define ALIVE_JOYEVENT  0x33
 
-/* 
+/*
 Should also report:
 - ACSI or SCSI interface selected
 - component versions (main app, hans, franz, xilinx)
@@ -40,7 +40,7 @@ typedef struct {
 
 typedef struct {
     TStatus hans;
-    TStatus franz;    
+    TStatus franz;
 
     TStatus hdd;
     TStatus fdd;
@@ -70,7 +70,7 @@ private:
 
     void startReport    (std::string &report, int reportFormat);
     void endReport      (std::string &report, int reportFormat);
-    
+
     void startSection   (std::string &report, const char *sectionName,  int reportFormat);
     void endSection     (std::string &report,                           int reportFormat);
 

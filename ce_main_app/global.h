@@ -143,5 +143,8 @@ extern InterProcessEvents events;
 #define PATH_ATARI_CE_HDIMG_TTP             "CE_HDIMG.TTP"
 #define PATH_ATARI_CE_MEDIAPLAY             "CEMEDIAP.TTP"
 
+#define NETSERVER_WEBROOT                   "/tmp/ce_netserver_webroot"
+#define NETSERVER_WEBROOT_INDEX             NETSERVER_WEBROOT "/index.html"
+
 #endif // GLOBAL_H
 

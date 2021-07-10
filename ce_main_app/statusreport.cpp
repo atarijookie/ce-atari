@@ -453,6 +453,3 @@ char *StatusReport::fixStringToLength(const char *inStr, int outLen)
 
     return tmp;
 }
-
-
-

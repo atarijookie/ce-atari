@@ -16,4 +16,6 @@ typedef struct {
     uint32_t    lastUpdate;     // time when this struct was last updated
 } TCEServerStatus;
 
+#define MAX_SERVER_COUNT    16
+
 #endif

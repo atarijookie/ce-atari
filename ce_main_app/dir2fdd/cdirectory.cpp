@@ -48,7 +48,7 @@ void CDirectory::AddEntry(struct dirent *de, CDirectory *pSubDir, const char *pH
 
 void CDirectory::DirectoryScan(const char *pDir)
 {
-	char tmpName[_MAX_PATH];
+	char tmpName[_MAX_PATH + 32];
 	strcpy(tmpName,pDir);
 	strcat(tmpName,"\\*.*");
 	

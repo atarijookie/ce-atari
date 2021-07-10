@@ -219,7 +219,7 @@ void forkLinuxConsole(void)
 // instanceNo: number of core instance, used for separating folders and ports
 // localNotNetwork: if true, will access local hardware for communication; if false then will use network interface
 int runCore(int instanceNo, bool localNotNetwork)
-{   
+{
     CCoreThread *core;
     pthread_t   mountThreadInfo;
     pthread_t   downloadThreadInfo;
@@ -287,7 +287,7 @@ int runCore(int instanceNo, bool localNotNetwork)
     WebServer xServer;
     xServer.addModule(new ApiModule(pxVKbdService,pxVMouseService,pxFloppyService));
     xServer.addModule(new AppModule(pxDateService,pxFloppyService,pxScreencastService));
-    xServer.start(webServerPortOffset);
+    xServer.start(false, webServerPortOffset);
 
     //-------------
     // Copy the configdrive to /tmp so we can change the content as needed.

@@ -12,12 +12,20 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <sys/stat.h>
+#include <sys/mount.h>
+#include <sys/socket.h>
+#include <sys/ioctl.h>
 
 #include "settings.h"
 #include "global.h"
 #include "debug.h"
 #include "utils.h"
 #include "main_netserver.h"
+#include "netservermainpage.h"
+
+#include "webserver/webserver.h"
+#include "webserver/api/apimodule.h"
 
 void sigint_handler(int sig);
 void handlePthreadCreate(int res, const char *threadName, pthread_t *pThread);
@@ -35,8 +43,9 @@ extern TFlags              flags;                              // global flags f
 extern RPiConfig           rpiConfig;                          // RPi model, revision, serial
 extern InterProcessEvents  events;
 
-#define MAX_SERVER_COUNT    16
 TCEServerStatus serverStatus[MAX_SERVER_COUNT];
+std::string mainPage;
+void generateMainPage(void);
 
 int netServerOpenSocket(void)
 {
@@ -92,6 +101,17 @@ void networkServerMain(void)
         serverStatus[i].lastUpdate = Utils::getCurrentMs();
     }
 
+    // start one server on index 0
+    forkCEliteServer(0);
+    Debug::out(LOG_INFO, "Starting first server on index # 0");
+
+    // generate first main page
+    generateMainPage();
+
+    // start webserver with the main page
+    WebServer xServer;
+    xServer.start(true, 0);
+
     struct timeval timeout;
     fd_set readfds;
     uint8_t recvData[64];
@@ -135,6 +155,8 @@ void networkServerMain(void)
     }
 
     close(udpSocket);
+    xServer.stop();
+
     Debug::out(LOG_ERROR, "Terminating CosmosEx network server");
 }
 
@@ -153,6 +175,8 @@ void onServerStatus(uint8_t* recvData, int len)
     // don't modify clientIp here, it's not the IP of client but rather IP of server itself
 
     Debug::out(LOG_DEBUG, "netServer: onServerStatus at index: %d, status: %d", index, ss->status);
+
+    generateMainPage();
 }
 
 void onClientRequest(sockaddr_in *clientAddr, uint8_t *recvData, int len)
@@ -228,6 +252,8 @@ void onClientRequest(sockaddr_in *clientAddr, uint8_t *recvData, int len)
 
 void forkCEliteServer(int serverIndex)
 {
+    serverStatus[serverIndex].status = SERVER_STATUS_OCCUPIED;
+
     // fork process
     int childPid = fork();              // fork child to own process
 
@@ -254,7 +280,7 @@ void udpSend(uint32_t ip, uint16_t port, uint8_t* data, uint16_t len)
         Debug::out(LOG_ERROR, "updSend - failed to open socket for response");
         return;
     }
-    
+
     bzero(&servaddr,sizeof(servaddr));
 
     servaddr.sin_family = AF_INET;
@@ -263,9 +289,30 @@ void udpSend(uint32_t ip, uint16_t port, uint8_t* data, uint16_t len)
 
     int rv = sendto(sockFd, data, len, 0, (sockaddr*) &servaddr, sizeof(servaddr));
     close(sockFd);
-    
+
     if(rv < 0) {
         Debug::out(LOG_ERROR, "updSend - failed to sendto() response");
     }
 }
 
+void generateMainPage(void)
+{
+    // generate new report into string, check if changed since last time, if changed then write to file
+    std::string mainPageNew;
+    NetServerMainPage::create(mainPageNew);
+
+    if(mainPage != mainPageNew) {   // main page changed?
+        mainPage = mainPageNew;
+
+        // create dir if it doesn't exist
+        mkdir(NETSERVER_WEBROOT, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+
+        // try to write page to file
+        FILE *f = fopen(NETSERVER_WEBROOT_INDEX, "wt");
+
+        if(f) { // if could open file, write and close
+            fwrite(mainPage.c_str(), 1, mainPage.length(), f);
+            fclose(f);
+        }
+    }
+}
