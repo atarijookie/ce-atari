@@ -253,7 +253,10 @@ int runCore(int instanceNo, bool localNotNetwork)
     Debug::out(LOG_INFO, "CosmosEx starting, version: %s", appVersion);
 
     Version::getRaspberryPiInfo();                                  // fetch model, revision, serial of RPi
-    Update::createNewScripts();                                     // update the scripts if needed
+
+    if(localNotNetwork) {
+        Update::createNewScripts();                                 // update the scripts if needed
+    }
 
 //  system("sudo echo none > /sys/class/leds/led0/trigger");        // disable usage of GPIO 23 (pin 16) by LED
 
