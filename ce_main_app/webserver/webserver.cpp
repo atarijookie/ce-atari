@@ -5,8 +5,8 @@
 #include "global.h"
 #include "../debug.h"
 
-#define DOCUMENT_ROOT "/ce/app/webroot/"
-#define PORT "80"
+#define DOCUMENT_ROOT   "/ce/app/webroot/"
+#define PORT            80
 
 std::string WebServer::sLastUploadedFile;
 
@@ -22,26 +22,20 @@ void WebServer::addModule(IWebModule *pxModule)
 
 void WebServer::start(bool isNetServer, int portOfset)
 {
-    Debug::out(LOG_DEBUG, "Webserver starting...");
+    char port[32];
+    sprintf(port, "%d",  PORT + portOfset);
 
-    // normal webroot
-    const char * optionsNormal[] = { "document_root", DOCUMENT_ROOT,
-                               "listening_ports", PORT + portOfset, 0
-                             };
+    const char * options[5] = { "document_root", isNetServer ? NETSERVER_WEBROOT: DOCUMENT_ROOT,
+                                "listening_ports", port, 0 
+                              };
 
-    // netserver webroot
-    const char * optionsNetServer[] = { "document_root", NETSERVER_WEBROOT,
-                               "listening_ports", PORT, 0
-                             };
-
-    // options for normal / netserver
-    const char ** options = isNetServer ? optionsNetServer : optionsNormal;
+    Debug::out(LOG_DEBUG, "Webserver starting on port: %s", port);
 
     struct mg_callbacks callbacks;
     memset(&callbacks, 0, sizeof(callbacks));
     callbacks.upload = WebServer::onUpload;
 
-    pxServer=new CivetServer(options,&callbacks);
+    pxServer=new CivetServer(options, &callbacks);
     if( pxServer->getContext()==NULL ){
         Debug::out(LOG_ERROR, "Webserver could not start.");
         return;
@@ -56,6 +50,7 @@ void WebServer::start(bool isNetServer, int portOfset)
     Debug::out(LOG_DEBUG, "Webserver running...");
     bInited=true;
 }
+
 void WebServer::stop()
 {
     if( !bInited )

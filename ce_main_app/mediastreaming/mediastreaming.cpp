@@ -39,7 +39,6 @@ bool MediaStream::isFree(void)
 /* filename of url */
 bool MediaStream::open(const char * filename, const MediaParams * params)
 {
-	char command[256];
 	char escfilename[256];
 	{
 		// replace ' by '\''
@@ -60,11 +59,20 @@ bool MediaStream::open(const char * filename, const MediaParams * params)
 		}
 		*q = '\0';
 	}
-	snprintf(command, sizeof(command),
-	         "/usr/local/bin/ffmpeg -v 0 -i '%s' -ar %u %s-f au -c pcm_s8 -", // -ac 1 => mono
-	         escfilename, params->audioRate, params->forceMono ? "-ac 1 " : "");
-	Debug::out(LOG_DEBUG, "MediaStream::open \"%s\"", command);
-	f = popen(command, "r");
+
+	char audioRateStr[32];
+	sprintf(audioRateStr, "%u ", params->audioRate);
+
+	std::string command;
+	command  = "/usr/local/bin/ffmpeg -v 0 -i '";
+	command += escfilename;
+	command += "' -ar ";
+	command += audioRateStr;
+	command += params->forceMono ? "-ac 1" : "";
+	command += "-f au -c pcm_s8 -";
+
+	Debug::out(LOG_DEBUG, "MediaStream::open \"%s\"", command.c_str());
+	f = popen(command.c_str(), "r");
 	isPipe = true;
 	//f = fopen(filename, "rb");
 	if(f == NULL) {

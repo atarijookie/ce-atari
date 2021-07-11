@@ -47,7 +47,7 @@ TCEServerStatus serverStatus[MAX_SERVER_COUNT];
 std::string mainPage;
 void generateMainPage(void);
 
-uint8_t serverIp[4];
+uint8_t serverIp[4] = {127, 0, 0, 1};
 
 int netServerOpenSocket(void)
 {
@@ -101,9 +101,7 @@ void networkServerMain(void)
         memcpy(serverIp, &bfr[1], 4);
     } else if(bfr[5] == 1) {            // wlan0 enabled? add its IP
         memcpy(serverIp, &bfr[6], 4);
-    } else {                            // nothing enabled, just zeros
-        memset(serverIp, 0, 4);
-    }
+    }                                   // if nothing enabled, leave 127.0.0.1 as initialized
 
     Debug::out(LOG_INFO, "Starting CosmosEx network server");
     printf("Starting CosmosEx network server");

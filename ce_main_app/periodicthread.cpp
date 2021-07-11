@@ -90,7 +90,12 @@ void *periodicThreadCode(void *ptr)
 
     IfaceWatcher ifaceWatcher;
 
-    TimeSync timeSync;
+    TimeSync *timeSync = NULL;
+
+    // do timesync only for local device, or if it's network server core then only on instance 0 (we don't need 16x timeSync)
+    if(flags.localNotNetwork || (!flags.localNotNetwork && flags.instanceNo == 0)) {
+        timeSync = new TimeSync();
+    }
 
     while(sigintReceived == 0) {
         max_fd = -1;
@@ -132,10 +137,12 @@ void *periodicThreadCode(void *ptr)
             continue;
         }
 
-        if(now >= timeSync.nextProcessTime) {
-            timeSync.process(false);
-        } else {
-            if(now + wait > timeSync.nextProcessTime) wait = timeSync.nextProcessTime - now;
+        if(timeSync != NULL) {
+            if(now >= timeSync->nextProcessTime) {
+                timeSync->process(false);
+            } else {
+                if(now + wait > timeSync->nextProcessTime) wait = timeSync->nextProcessTime - now;
+            }
         }
 
         // file descriptors to "select"
@@ -155,10 +162,12 @@ void *periodicThreadCode(void *ptr)
             FD_SET(ifaceWatcher.getFd(), &readfds);
             if(ifaceWatcher.getFd() > max_fd) max_fd = ifaceWatcher.getFd();
         }
-        if(timeSync.waitingForDataOnFd()) {
-            FD_SET(timeSync.getFd(), &readfds);
-            if(timeSync.getFd() > max_fd) max_fd = timeSync.getFd();
+
+        if(timeSync != NULL && timeSync->waitingForDataOnFd()) {
+            FD_SET(timeSync->getFd(), &readfds);
+            if(timeSync->getFd() > max_fd) max_fd = timeSync->getFd();
         }
+
         memset(&timeout, 0, sizeof(timeout));
         timeout.tv_sec = wait / 1000;           // sec
         timeout.tv_usec = (wait % 1000)*1000;   // usec
@@ -215,12 +224,11 @@ void *periodicThreadCode(void *ptr)
         if(shared.configPipes.term.fd1 >= 0 && FD_ISSET(shared.configPipes.term.fd1, &readfds)) {
             handleConfigStreams(shared.configStream.term, shared.configPipes.term);
         }
+
         //------------------------------------
-
-        if(timeSync.waitingForDataOnFd() && FD_ISSET(timeSync.getFd(), &readfds)) {
-            timeSync.process(true);
+        if(timeSync != NULL && timeSync->waitingForDataOnFd() && FD_ISSET(timeSync->getFd(), &readfds)) {
+            timeSync->process(true);
         }
-
     }
 
     Debug::out(LOG_DEBUG, "Periodic thread terminated.");

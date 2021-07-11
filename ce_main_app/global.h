@@ -96,6 +96,9 @@ typedef struct {
     bool display;               // if set to true, show string on front display, if possible
     bool noCapture;             // if set to true, don't do exclusive USB mouse and keyboard capture
 
+    bool localNotNetwork;       // if true, this app runs handling localy connected device; if false then this core is part of the network server
+    bool instanceNo;            // number of core instance
+
     bool deviceGetLicense;      // if true, device should get license again
     bool deviceDoUpdate;        // if true, device should download update and write it to flash
 

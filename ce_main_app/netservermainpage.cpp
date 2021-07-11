@@ -19,19 +19,12 @@ extern TCEServerStatus serverStatus[MAX_SERVER_COUNT];
 
 void NetServerMainPage::create(std::string &page, uint8_t *serverIp)
 {
-    page  = "<html><head><title>CosmosEx network server</title></head><body>\n";
+    page  = "<html><head><title>CosmosEx network server</title>\n";
+    page += "<meta http-equiv='refresh' content='15'></head><body>\n";
     page += "<center><h1>CosmosEx network server</h1><br>\n";
     page += "Click on a link to open web page of individual device.<br><br>\n";
     page += "<center> <table border=1 cellspacing=0 cellpadding=5>\n";
     page += "<tr><td><center>#</center></td> <td>Device</td> <td>Status</td></tr>\n";
-
-    uint8_t *ip = serverIp;                 // init to server IP
-    uint8_t localhost[4] = {127, 0, 0, 1};  // localhost ip
-
-    // if server ip is zero, use localhost
-    if(serverIp[0] == 0 && serverIp[1] == 0 && serverIp[2] == 0 && serverIp[3] == 0) {
-        ip = localhost;
-    }
 
     char tmp[64];
     char url[100];
@@ -41,7 +34,7 @@ void NetServerMainPage::create(std::string &page, uint8_t *serverIp)
             continue;
         }
 
-        sprintf(url, "<a href='http://%d.%d.%d.%d:%d'>", ip[0], ip[1], ip[2], ip[3], 81 + i);
+        sprintf(url, "<a href='http://%d.%d.%d.%d:%d' target='_blank'>", serverIp[0], serverIp[1], serverIp[2], serverIp[3], 81 + i);
         std::string ahref = std::string(url);
 
         page += "<tr><td><center>";
@@ -57,12 +50,11 @@ void NetServerMainPage::create(std::string &page, uint8_t *serverIp)
         page += "Device Name";
 
         page += "</a> </td>\n  <td>";
-        page += ahref;
 
         // device status
         page += (serverStatus[i].status == SERVER_STATUS_OCCUPIED) ? "connected" : "waiting for device";
 
-        page += "</a> </td>  </tr>\n";
+        page += "</td>  </tr>\n";
     }
 
     page += "</table> </center>\n";

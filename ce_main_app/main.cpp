@@ -228,6 +228,9 @@ int runCore(int instanceNo, bool localNotNetwork)
     pthread_t   periodicThreadInfo;
     pthread_t   displayThreadInfo;
 
+    flags.localNotNetwork = localNotNetwork;            // store if this core runs as local device or as network server
+    flags.instanceNo = instanceNo;
+
     //------------------------------------
     // if should run this core as network server
     if(!localNotNetwork) {
@@ -237,7 +240,7 @@ int runCore(int instanceNo, bool localNotNetwork)
         flags.noReset = true;
 
         chipInterface = new ChipInterfaceNetwork();     // create network chip interface
-        chipInterface->setInstanceIndex(instanceNo);   // set index of this instance
+        chipInterface->setInstanceIndex(instanceNo);    // set index of this instance
         chipInterface->ciOpen();                        // try to open it
     }
 
@@ -432,6 +435,9 @@ void initializeFlags(void)
     flags.fakeOldApp   = false;         // don't fake old app by default
     flags.display      = false;         // if set to true, show string on front display, if possible
     flags.noCapture    = false;         // if true, don't do exclusive mouse and keyboard capture
+
+    flags.localNotNetwork   = true;     // if true, this app runs handling localy connected device; if false then this core is part of the network server
+    flags.instanceNo        = 0;
 
     flags.deviceGetLicense  = false;    // if true, device should get license again
     flags.deviceDoUpdate    = false;    // if true, device should download update and write it to flash
