@@ -15,7 +15,7 @@ MfmDecoder::MfmDecoder()
     byte = 0;
 }
 
-void MfmDecoder::decodeStream(BYTE *inStream, int inCount, BYTE *outData, int &outCount)
+void MfmDecoder::decodeStream(uint8_t *inStream, int inCount, uint8_t *outData, int &outCount)
 {
     decoded = outData;
     index   = 0;
@@ -50,10 +50,10 @@ void MfmDecoder::decodeStream(BYTE *inStream, int inCount, BYTE *outData, int &o
     outCount = index;                           // and store the count of data decoded
 }
 
-void MfmDecoder::appendEncodedByte(BYTE val)
+void MfmDecoder::appendEncodedByte(uint8_t val)
 {
     for(int i=0; i<4; i++) {
-        BYTE time = val >> 6;                   // get highest 2 bits
+        uint8_t time = val >> 6;                   // get highest 2 bits
         val = val << 2;
 
         switch(time) {
@@ -88,9 +88,9 @@ void MfmDecoder::appendEncodedByte(BYTE val)
     }
 }
 
-bool MfmDecoder::appendToSync(WORD val)
+bool MfmDecoder::appendToSync(uint16_t val)
 {
-    static DWORD syncDetector = 0;
+    static uint32_t syncDetector = 0;
 
     syncDetector = (syncDetector << 4) | val;
 
@@ -118,9 +118,9 @@ bool MfmDecoder::appendToSync(WORD val)
     return false;
 }
 
-void MfmDecoder::appendPatternBit(BYTE bit)
+void MfmDecoder::appendPatternBit(uint8_t bit)
 {
-    static BYTE pattern = 0;
+    static uint8_t pattern = 0;
 
     pattern = (pattern << 1) | bit;         // add this bit
     pattern = pattern & 0x03;               // leave only 2 lowest bits
@@ -138,7 +138,7 @@ void MfmDecoder::appendPatternBit(BYTE bit)
     }
 }
 
-void MfmDecoder::addNormalBit(BYTE bit)
+void MfmDecoder::addNormalBit(uint8_t bit)
 {
     byte = (byte << 1) | bit;               // append this bit
     bitCount++;

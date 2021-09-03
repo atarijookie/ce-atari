@@ -1,7 +1,7 @@
 #ifndef _STATUSREPORT_H_
 #define _STATUSREPORT_H_
 
-#include "datatypes.h"
+#include <stdint.h>
 
 // when not received anything
 #define ALIVE_DEAD      0
@@ -34,8 +34,8 @@ Should also report:
 */
 
 typedef struct {
-    DWORD   aliveTime;
-    BYTE    aliveSign;
+    uint32_t   aliveTime;
+    uint8_t    aliveSign;
 } TStatus;
 
 typedef struct {

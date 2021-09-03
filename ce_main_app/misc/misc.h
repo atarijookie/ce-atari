@@ -23,21 +23,21 @@ public:
     ~Misc();
 
     void setDataTrans(AcsiDataTrans *dt);
-    void processCommand(BYTE *cmd);
+    void processCommand(uint8_t *cmd);
 
 private:
-    BYTE dataBuffer[512];
+    uint8_t dataBuffer[512];
 
     AcsiDataTrans *dataTrans;
     const char *functionCodeToName(int code);
 
-    void recvHwSerialAndDeleteLicense(BYTE *cmd);
-    void getLicense(BYTE *cmd);
-    void getSettings(BYTE *cmd);
-    void getUpdate(BYTE *cmd);
-    void hostShutdown(BYTE *cmd);
+    void recvHwSerialAndDeleteLicense(uint8_t *cmd);
+    void getLicense(uint8_t *cmd);
+    void getSettings(uint8_t *cmd);
+    void getUpdate(uint8_t *cmd);
+    void hostShutdown(uint8_t *cmd);
 
-    bool getLicenseForSerialFromSettings(BYTE *bfrLicense);
+    bool getLicenseForSerialFromSettings(uint8_t *bfrLicense);
     void retrieveLicenseForSerial(void);
 };
 

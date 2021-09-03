@@ -19,7 +19,7 @@ BSD license, check license.txt for more information
 
 SSD1306::SSD1306()
 {
-    buffer = new BYTE[SSD1306_BUFFER_SIZE];
+    buffer = new uint8_t[SSD1306_BUFFER_SIZE];
     i2c = new i2c2();
 }
 
@@ -33,12 +33,12 @@ SSD1306::~SSD1306()
 }
 
 // the most basic function, set a single pixel
-void SSD1306::drawPixel(WORD x, WORD y, WORD color)
+void SSD1306::drawPixel(uint16_t x, uint16_t y, uint16_t color)
 {
     if ((x < 0) || (x >= SSD1306_LCDWIDTH) || (y < 0) || (y >= SSD1306_LCDHEIGHT))
         return;
 
-    WORD idx = x + (y/8) * SSD1306_LCDWIDTH;
+    uint16_t idx = x + (y/8) * SSD1306_LCDWIDTH;
 
     if(idx >= SSD1306_BUFFER_SIZE) {
         return;
@@ -53,7 +53,7 @@ void SSD1306::drawPixel(WORD x, WORD y, WORD color)
     }
 }
 
-bool SSD1306::begin(BYTE vccstate) {
+bool SSD1306::begin(uint8_t vccstate) {
     this->vccstate = vccstate;
 
     int res;
@@ -102,11 +102,11 @@ bool SSD1306::begin(BYTE vccstate) {
 }
 
 
-void SSD1306::invertDisplay(BYTE i) {
+void SSD1306::invertDisplay(uint8_t i) {
     command(i ? SSD1306_INVERTDISPLAY : SSD1306_NORMALDISPLAY);
 }
 
-int SSD1306::command(BYTE c) {
+int SSD1306::command(uint8_t c) {
     int res;
     res = i2c->i2c_smbus_write_byte_data(SSD1306_I2C_ADDRESS, 0, c);
     return (res == 0);      // if ACK bit on beginTransmission was 0, this command went OK
@@ -116,7 +116,7 @@ int SSD1306::command(BYTE c) {
 // Activate a right handed scroll for rows start through stop
 // Hint, the display is 16 rows tall. To scroll the whole display, run:
 // display.scrollright(0x00, 0x0F)
-void SSD1306::startscrollright(BYTE start, BYTE stop){
+void SSD1306::startscrollright(uint8_t start, uint8_t stop){
   command(SSD1306_RIGHT_HORIZONTAL_SCROLL);
   command(0X00);
   command(start);
@@ -131,7 +131,7 @@ void SSD1306::startscrollright(BYTE start, BYTE stop){
 // Activate a right handed scroll for rows start through stop
 // Hint, the display is 16 rows tall. To scroll the whole display, run:
 // display.scrollright(0x00, 0x0F)
-void SSD1306::startscrollleft(BYTE start, BYTE stop){
+void SSD1306::startscrollleft(uint8_t start, uint8_t stop){
   command(SSD1306_LEFT_HORIZONTAL_SCROLL);
   command(0X00);
   command(start);
@@ -146,7 +146,7 @@ void SSD1306::startscrollleft(BYTE start, BYTE stop){
 // Activate a diagonal scroll for rows start through stop
 // Hint, the display is 16 rows tall. To scroll the whole display, run:
 // display.scrollright(0x00, 0x0F)
-void SSD1306::startscrolldiagright(BYTE start, BYTE stop){
+void SSD1306::startscrolldiagright(uint8_t start, uint8_t stop){
   command(SSD1306_SET_VERTICAL_SCROLL_AREA);
   command(0X00);
   command(SSD1306_LCDHEIGHT);
@@ -163,7 +163,7 @@ void SSD1306::startscrolldiagright(BYTE start, BYTE stop){
 // Activate a diagonal scroll for rows start through stop
 // Hint, the display is 16 rows tall. To scroll the whole display, run:
 // display.scrollright(0x00, 0x0F)
-void SSD1306::startscrolldiagleft(BYTE start, BYTE stop){
+void SSD1306::startscrolldiagleft(uint8_t start, uint8_t stop){
   command(SSD1306_SET_VERTICAL_SCROLL_AREA);
   command(0X00);
   command(SSD1306_LCDHEIGHT);
@@ -184,7 +184,7 @@ void SSD1306::stopscroll(void){
 // dim = true: display is dimmed
 // dim = false: display is normal
 void SSD1306::dim(int dim) {
-    BYTE contrast;
+    uint8_t contrast;
 
     if (dim) {
         contrast = 0; // Dimmed display
@@ -211,7 +211,7 @@ void SSD1306::display(void)
 
     int y;
     for (y=0; y<SSD1306_LCDHEIGHT; y++) {
-        BYTE *data = buffer + (y * SSD1306_BYTES_PER_LINE);
+        uint8_t *data = buffer + (y * SSD1306_BYTES_PER_LINE);
         i2c->i2c_smbus_write_i2c_block_data(SSD1306_I2C_ADDRESS, 0x40, SSD1306_BYTES_PER_LINE, data);
     }
 }

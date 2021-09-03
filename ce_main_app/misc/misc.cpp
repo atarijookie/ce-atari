@@ -37,7 +37,7 @@ void Misc::setDataTrans(AcsiDataTrans *dt)
     dataTrans = dt;
 }
 
-void Misc::processCommand(BYTE *cmd)
+void Misc::processCommand(uint8_t *cmd)
 {
     if(dataTrans == 0 ) {
         Debug::out(LOG_ERROR, "processCommand was called without valid dataTrans!");
@@ -76,9 +76,9 @@ void Misc::processCommand(BYTE *cmd)
     dataTrans->sendDataAndStatus();     // send all the stuff after handling, if we got any
 }
 
-void Misc::recvHwSerialAndDeleteLicense(BYTE *cmd)
+void Misc::recvHwSerialAndDeleteLicense(uint8_t *cmd)
 {
-    DWORD res;
+    uint32_t res;
     res = dataTrans->recvData(dataBuffer, 512);     // get data from Hans
 
     if(!res) {                                      // failed to get data? internal error!
@@ -115,7 +115,7 @@ void Misc::recvHwSerialAndDeleteLicense(BYTE *cmd)
         if(memcmp(&dataBuffer[14], storedLicense, 10) == 0) {
             Debug::out(LOG_DEBUG, "Misc::recvHwSerialAndDeleteLicense - stored license wrong, deleting");
 
-            BYTE zeros[10];
+            uint8_t zeros[10];
             memset(zeros, 0, 10);                   // create buffer of 10 zeros
 
             s.setBinaryString(keyName, zeros, 10);  // set stored license to zeros
@@ -130,10 +130,10 @@ void Misc::recvHwSerialAndDeleteLicense(BYTE *cmd)
     dataTrans->setStatus(E_OK);
 }
 
-void Misc::getLicense(BYTE *cmd)
+void Misc::getLicense(uint8_t *cmd)
 {
     // take serial from hwSerial and see if got stored license for it
-    BYTE license[10];
+    uint8_t license[10];
     bool good = getLicenseForSerialFromSettings(license);
 
     dataTrans->addDataBfr(hwConfig.hwSerial, 13, false);  // add current serial to buffer
@@ -152,7 +152,7 @@ void Misc::getLicense(BYTE *cmd)
     dataTrans->setStatus(E_OK);
 }
 
-bool Misc::getLicenseForSerialFromSettings(BYTE *bfrLicense)
+bool Misc::getLicenseForSerialFromSettings(uint8_t *bfrLicense)
 {
     char keyName[64];
     Settings::generateLicenseKeyName(hwConfig.hwSerial, keyName);   // generate key name containing HW serial number
@@ -194,7 +194,7 @@ void Misc::retrieveLicenseForSerial(void)
     Downloader::add(tdr);
 }
 
-void Misc::getSettings(BYTE *cmd)
+void Misc::getSettings(uint8_t *cmd)
 {
     Settings s;
     FloppyConfig fc;
@@ -207,14 +207,14 @@ void Misc::getSettings(BYTE *cmd)
     dataTrans->setStatus(E_OK);
 }
 
-void Misc::getUpdate(BYTE *cmd)
+void Misc::getUpdate(uint8_t *cmd)
 {
     // TODO: based on the command, return update size or update data of size and offset
 
     dataTrans->setStatus(E_OK);
 }
 
-void Misc::hostShutdown(BYTE *cmd)
+void Misc::hostShutdown(uint8_t *cmd)
 {
     Debug::out(LOG_DEBUG, "Misc::hostShutdown - device requested host shutdown!");
 

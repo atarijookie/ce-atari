@@ -4,7 +4,7 @@
 
 #include <string>
 #include <queue>
-#include "datatypes.h"
+#include <stdint.h>
 
 #define MOUNTER_ACTION_MOUNT                0
 #define MOUNTER_ACTION_UMOUNT               1
@@ -19,8 +19,8 @@
 
 typedef struct {
     int     id;
-    BYTE    state;
-    DWORD   changeTime;
+    uint8_t    state;
+    uint32_t   changeTime;
 } TMountActionState;
 
 typedef struct {

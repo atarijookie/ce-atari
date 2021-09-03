@@ -2,7 +2,7 @@
 #define _VERSION_H_
 
 #include <string>
-#include "datatypes.h"
+#include <stdint.h>
 
 #define XILINX_VERSION_FILE     "/ce/update/xilinx.current"
 
@@ -23,14 +23,14 @@ public:
 
     void        setUrlAndChecksum(char *pUrl, char *chs);
     std::string getUrl(void);
-    WORD        getChecksum(void);
+    uint16_t        getChecksum(void);
 
     void toString(char *str);
     int  getYear(void);
     int  getMonth(void);
     int  getDay(void);
 
-    volatile BYTE downloadStatus;
+    volatile uint8_t downloadStatus;
 
 private:
     int year;
@@ -38,7 +38,7 @@ private:
     int day;
 
     std::string url;
-    WORD        checksum;
+    uint16_t        checksum;
 };
 
 typedef struct {

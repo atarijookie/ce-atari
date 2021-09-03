@@ -42,12 +42,12 @@ void NoMedia::getCapacity(int64_t &bytes, int64_t &sectors)
     sectors = 0;
 }
 
-bool NoMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
+bool NoMedia::readSectors(int64_t sectorNo, uint32_t count, uint8_t *bfr)
 {
     return true;
 }
 
-bool NoMedia::writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
+bool NoMedia::writeSectors(int64_t sectorNo, uint32_t count, uint8_t *bfr)
 {
     return true;
 }

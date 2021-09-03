@@ -11,7 +11,7 @@
 #include <errno.h>
 #include <arpa/inet.h> 
 
-#include "datatypes.h"
+#include <stdint.h>
 #include "socks.h"
 #include "debug.h"
 
@@ -204,11 +204,11 @@ int serverSocket_createConnection(void)
     return 1;
 }
 
-BYTE    header[16];
-BYTE    *bufferRead;
-BYTE    *bufferWrite;
-DWORD   sockByteCount;
-BYTE    sockReadNotWrite;
+uint8_t    header[16];
+uint8_t    *bufferRead;
+uint8_t    *bufferWrite;
+uint32_t   sockByteCount;
+uint8_t    sockReadNotWrite;
 
 bool gotCmd(void)
 {
@@ -254,10 +254,10 @@ bool gotCmd(void)
         }
         
         // now calculate and verify checksum
-        WORD sum = dataChecksum(bufferWrite, sockByteCount);
+        uint16_t sum = dataChecksum(bufferWrite, sockByteCount);
         
-        WORD cs = 0;
-        res = serverSocket_read((BYTE *) &cs, 2);
+        uint16_t cs = 0;
+        res = serverSocket_read((uint8_t *) &cs, 2);
         
         if(res != 2) {          // didn't receive data? 
             Debug::out(LOG_DEBUG, "gotCmd - failed to get checksum!");
@@ -265,7 +265,7 @@ bool gotCmd(void)
         
         if(cs != sum) {         // checksum mismatch? 
             Debug::out(LOG_DEBUG, "gotCmd - checksum fail -- %04x != %04x", cs, sum);
-            BYTE *p = bufferWrite;
+            uint8_t *p = bufferWrite;
             Debug::out(LOG_DEBUG, "%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x", p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9]);
         } else {                // checksum ok?
 //            Debug::out(LOG_DEBUG, "gotCmd - checksum good");
@@ -275,12 +275,12 @@ bool gotCmd(void)
     return true;
 }
 
-WORD dataChecksum(BYTE *data, int byteCount)
+uint16_t dataChecksum(uint8_t *data, int byteCount)
 {
     int i;
-    WORD sum = 0;
-    WORD *wp = (WORD *) data;
-    WORD wordCount = byteCount/2;
+    uint16_t sum = 0;
+    uint16_t *wp = (uint16_t *) data;
+    uint16_t wordCount = byteCount/2;
         
     for(i=0; i<wordCount; i++) {                // calculate checksum
         sum += *wp;

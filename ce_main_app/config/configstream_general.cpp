@@ -15,7 +15,7 @@
 #include "config_commands.h"
 #include "../debug.h"
 
-BYTE isUpdateStartingFlag = 0;
+uint8_t isUpdateStartingFlag = 0;
 
 ConfigStream::ConfigStream(int whereItWillBeShown)
 {
@@ -55,9 +55,9 @@ void ConfigStream::setSettingsReloadProxy(SettingsReloadProxy *rp)
     reloadProxy = rp;
 }
 
-void ConfigStream::processCommand(BYTE *cmd, int writeToFd)
+void ConfigStream::processCommand(uint8_t *cmd, int writeToFd)
 {
-    static BYTE readBuffer[READ_BUFFER_SIZE];
+    static uint8_t readBuffer[READ_BUFFER_SIZE];
     int streamCount;
 
     if(cmd[1] != 'C' || cmd[2] != 'E' || cmd[3] != HOSTMOD_CONFIG) {        // not for us?
@@ -112,7 +112,7 @@ void ConfigStream::processCommand(BYTE *cmd, int writeToFd)
 
     case CFG_CMD_UPDATING_QUERY:
     {
-        BYTE updateComponentsWithValidityNibble = 0xC0 | 0x0f;          // for now pretend all needs to be updated
+        uint8_t updateComponentsWithValidityNibble = 0xC0 | 0x0f;          // for now pretend all needs to be updated
 
         dataTrans->addDataByte(isUpdateStartingFlag);
         dataTrans->addDataByte(updateComponentsWithValidityNibble);
@@ -166,14 +166,14 @@ void ConfigStream::processCommand(BYTE *cmd, int writeToFd)
     }
 }
 
-void ConfigStream::onKeyDown(BYTE key)
+void ConfigStream::onKeyDown(uint8_t key)
 {
     StupidVector &scr = showingMessage ? message : screen;      // if we should show message, set reference to message, otherwise set reference to screen
 
     int focused = -1, firstFocusable = -1, lastFocusable = -1, firstButton = -1, lastButton = -1;
 
     // go through the current screen and find focused component, also first focusable component
-    for(WORD i=0; i<scr.size(); i++) {
+    for(uint16_t i=0; i<scr.size(); i++) {
         ConfigComponent *c = (ConfigComponent *) scr[i];
 
         if(c->isFocused()) {                        // if found focused component, store index
@@ -214,7 +214,7 @@ void ConfigStream::onKeyDown(BYTE key)
 
     int prevFocusable = -1, nextFocusable = -1;     // now find previous and next focusable item in the list of components
     int prevButton = -1, nextButton = -1;
-    for(WORD i=0; i<scr.size(); i++) {
+    for(uint16_t i=0; i<scr.size(); i++) {
         ConfigComponent *c = (ConfigComponent *) scr[i];
 
         if(!c->canFocus()) {                        // can't focus? fuck you!
@@ -329,7 +329,7 @@ void ConfigStream::onKeyDown(BYTE key)
     curr->onKeyPressed(key);
 }
 
-int ConfigStream::getStream(bool homeScreen, BYTE *bfr, int maxLen)
+int ConfigStream::getStream(bool homeScreen, uint8_t *bfr, int maxLen)
 {
     int totalCnt = 0;
 
@@ -369,7 +369,7 @@ int ConfigStream::getStream(bool homeScreen, BYTE *bfr, int maxLen)
     //--------
     int focused = -1;
 
-    for(WORD i=0; i<scr.size(); i++) {              // go through all the components of screen and gather their streams
+    for(uint16_t i=0; i<scr.size(); i++) {              // go through all the components of screen and gather their streams
         ConfigComponent *c = (ConfigComponent *) scr[i];
 
         if(c->isFocused()) {                            // if this component has focus, store it's index
@@ -398,7 +398,7 @@ int ConfigStream::getStream(bool homeScreen, BYTE *bfr, int maxLen)
 
     //-------
     // after the string store a flag if this screen is update screen, so the ST client could show good message on update
-    BYTE isUpdScreen = isUpdateScreen();
+    uint8_t isUpdScreen = isUpdateScreen();
     *bfr++ = isUpdScreen;
     totalCnt++;
 
@@ -455,7 +455,7 @@ void ConfigStream::destroyCurrentScreen(void)
 
 void ConfigStream::destroyScreen(StupidVector &scr)
 {
-    for(WORD i=0; i<scr.size(); i++) {              // go through this screen, delete all components
+    for(uint16_t i=0; i<scr.size(); i++) {              // go through this screen, delete all components
         ConfigComponent *c = (ConfigComponent *) scr[i];
         delete c;
     }
@@ -465,7 +465,7 @@ void ConfigStream::destroyScreen(StupidVector &scr)
 
 void ConfigStream::setFocusToFirstFocusable(void)
 {
-    for(WORD i=0; i<screen.size(); i++) {           // go through the current screen
+    for(uint16_t i=0; i<screen.size(); i++) {           // go through the current screen
         ConfigComponent *c = (ConfigComponent *) screen[i];
 
         if(c->canFocus()) {
@@ -477,7 +477,7 @@ void ConfigStream::setFocusToFirstFocusable(void)
 
 ConfigComponent *ConfigStream::findComponentById(int compId)
 {
-    for(WORD i=0; i<screen.size(); i++) {           // go through the current screen
+    for(uint16_t i=0; i<screen.size(); i++) {           // go through the current screen
         ConfigComponent *c = (ConfigComponent *) screen[i];
 
         if(c->getComponentId() == compId) {                     // found the component?
@@ -616,9 +616,9 @@ void ConfigStream::focusByComponentId(int componentId)
     c->setFocus(true);
 }
 
-bool ConfigStream::focusNextCheckboxGroup(BYTE key, int groupid, int chbid)
+bool ConfigStream::focusNextCheckboxGroup(uint8_t key, int groupid, int chbid)
 {
-    for(WORD i=0; i<screen.size(); i++) {           // go through the current screen
+    for(uint16_t i=0; i<screen.size(); i++) {           // go through the current screen
         ConfigComponent *c = (ConfigComponent *) screen[i];
 
         if(c->isGroupCheckBox()) {
@@ -657,7 +657,7 @@ bool ConfigStream::focusNextCheckboxGroup(BYTE key, int groupid, int chbid)
 
 int ConfigStream::checkboxGroup_getCheckedId(int groupId) 
 {
-    for(WORD i=0; i<screen.size(); i++) {                   // go through the current screen and find the checked checkbox
+    for(uint16_t i=0; i<screen.size(); i++) {                   // go through the current screen and find the checked checkbox
         ConfigComponent *c = (ConfigComponent *) screen[i];
 
         int thisGroupId, checkboxId;
@@ -677,7 +677,7 @@ int ConfigStream::checkboxGroup_getCheckedId(int groupId)
 
 void ConfigStream::checkboxGroup_setCheckedId(int groupId, int checkedId)
 {
-    for(WORD i=0; i<screen.size(); i++) {                   // go through the current screen and find the checked checkbox
+    for(uint16_t i=0; i<screen.size(); i++) {                   // go through the current screen and find the checked checkbox
         ConfigComponent *c = (ConfigComponent *) screen[i];
 
         int thisGroupId, checkboxId;
@@ -860,7 +860,7 @@ void ConfigStream::replaceNewLineWithGoto(std::string &line, int startX, int sta
     }
 }
 
-BYTE ConfigStream::isUpdateScreen(void)
+uint8_t ConfigStream::isUpdateScreen(void)
 {
     ConfigComponent *c1 = findComponentById(COMPID_UPDATE_COSMOSEX);    // if we have this component, then we're on update versions screen
     ConfigComponent *c2 = findComponentById(COMPID_DL1);                // if we have this component, then we're on update download screen
@@ -918,7 +918,7 @@ void ConfigStream::createConfigDump(void)
 
 void ConfigStream::dumpScreenToFile(FILE *f)
 {
-    BYTE vt52stream[READ_BUFFER_SIZE];
+    uint8_t vt52stream[READ_BUFFER_SIZE];
     int vt52count;
 
     #define RAW_CONSOLE_SIZE        (81 * 24)
@@ -932,7 +932,7 @@ void ConfigStream::dumpScreenToFile(FILE *f)
     fputs("\n--------------------------------------------------------------------------------\n", f);
 }
 
-void ConfigStream::translateVT52rawConsole(const BYTE *vt52stream, int vt52cnt, char *rawConsole, int rawConsoleSize)
+void ConfigStream::translateVT52rawConsole(const uint8_t *vt52stream, int vt52cnt, char *rawConsole, int rawConsoleSize)
 {
     int i;
 
@@ -1024,8 +1024,8 @@ void ConfigStream::translateVT52rawConsole(const BYTE *vt52stream, int vt52cnt, 
 
 void ConfigStream::onSetCfgValue(void)
 {
-    BYTE buffer[512];
-    BYTE status = SCSI_ST_OK;
+    uint8_t buffer[512];
+    uint8_t status = SCSI_ST_OK;
 
     memset(buffer, 0, sizeof(buffer));
     if(!dataTrans->recvData(buffer, sizeof(buffer))) {
@@ -1037,19 +1037,19 @@ void ConfigStream::onSetCfgValue(void)
     // DATA :
     // 6 bytes "CECFG1" (1 is for version 1)
     // n records :
-    //     1 BYTE : value type
+    //     1 uint8_t : value type
     //     n BYTES (null terminated string) : key
-    //     1 BYTE value length
+    //     1 uint8_t value length
     //     n BYTES value (null terminated if it is a string
     if(memcmp(buffer, "CECFG1", 6) == 0) {
         Settings s;
         unsigned int i = 6;
-        BYTE type;
+        uint8_t type;
         while((type = buffer[i++]) != 0 && i < sizeof(buffer)) {
             TranslatedDisk * translated = TranslatedDisk::getInstance();
             const char * key = (const char *)buffer + i;
             i += strlen(key) + 1;
-            BYTE val_len = buffer[i++];
+            uint8_t val_len = buffer[i++];
             switch(type) {
             case CFGVALUE_TYPE_ST_PATH:
                 if(translated) {

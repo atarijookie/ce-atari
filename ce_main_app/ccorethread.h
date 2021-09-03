@@ -52,8 +52,8 @@ private:
     AcsiIDinfo      acsiIdInfo;
     RetryModule     *retryMod;
 
-    void handleAcsiCommand(BYTE *bufIn);
-    void handleConfigStream(BYTE *cmd);
+    void handleAcsiCommand(uint8_t *bufIn);
+    void handleConfigStream(uint8_t *cmd);
 
     //-----------------------------------
     // handle FW version
@@ -61,7 +61,7 @@ private:
     void handleFwVersion_franz(void);
 
     void saveHwConfig(void);
-    void getIdBits(BYTE &enabledIDbits, BYTE &sdCardAcsiId);
+    void getIdBits(uint8_t &enabledIDbits, uint8_t &sdCardAcsiId);
 
     //-----------------------------------
     // floppy stuff
@@ -79,7 +79,7 @@ private:
     int                 newFloppyImageLed;
     int                 newFloppyImageLedAfterEncode;
 
-    void handleSendTrack(BYTE *inBuf);
+    void handleSendTrack(uint8_t *inBuf);
     void handleSectorWritten(void);
 
     //----------------------------------
@@ -108,8 +108,8 @@ private:
 class LoadTracker {
 public:
     struct {
-        DWORD start;
-        DWORD total;
+        uint32_t start;
+        uint32_t total;
     } cycle;
 
     struct {
@@ -121,8 +121,8 @@ public:
             total += Utils::getCurrentMs() - start;
         }
 
-        DWORD start;
-        DWORD total;
+        uint32_t start;
+        uint32_t total;
     } busy;
 
     int     loadPercents;                               // contains 0 .. 100, meaning percentage of load

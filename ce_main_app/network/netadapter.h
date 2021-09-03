@@ -95,7 +95,7 @@ public:
     int     fd;                     // file descriptor of socket
     int     listenFd;               // fd of listening socket
     struct  sockaddr_in remote_adr; // remote address
-    WORD    localPort;              // local port
+    uint16_t    localPort;              // local port
     int     type;                   // TCP / UDP / ICMP
     int     buff_size;              // for TCP - TX buffer size = maximu packet size that should be sent
 
@@ -106,7 +106,7 @@ public:
     int lastReadCount;          // count of bytes that was read on the last read operation
 
     bool gotPrevLastByte;       // flag that we do have a last byte from the previous transfer
-    BYTE prevLastByte;          // this is the last byte from previous transfer
+    uint8_t prevLastByte;          // this is the last byte from previous transfer
 };
 
 //-------------------------------------
@@ -120,12 +120,12 @@ public:
     void reloadSettings(int type);
     void setAcsiDataTrans(AcsiDataTrans *dt);
 
-    void processCommand(BYTE *command);
+    void processCommand(uint8_t *command);
 	
 private:
-    BYTE            *cmd;
+    uint8_t            *cmd;
     AcsiDataTrans   *dataTrans;
-    BYTE            *dataBuffer;
+    uint8_t            *dataBuffer;
 
     TNetConnection  cons[NET_HANDLES_COUNT];    // for handling of TCP and UDP connections
     IcmpWrapper     icmpWrapper;                // for handling ICMP sending and receiving
@@ -150,9 +150,9 @@ private:
     void resolveStart(void);            // resolve name to ip
     void resolveGetResp(void);          // retrieve the results of resolve
 
-    void conOpen_connect(int slot, bool tcpNotUdp, WORD localPort, DWORD remoteHost, WORD remotePort, WORD tos, WORD buff_size);
-    void conOpen_listen (int slot, bool tcpNotUdp, WORD localPort, DWORD remoteHost, WORD remotePort, WORD tos, WORD buff_size);
-    WORD getLocalPort(int sockFd);
+    void conOpen_connect(int slot, bool tcpNotUdp, uint16_t localPort, uint32_t remoteHost, uint16_t remotePort, uint16_t tos, uint16_t buff_size);
+    void conOpen_listen (int slot, bool tcpNotUdp, uint16_t localPort, uint32_t remoteHost, uint16_t remotePort, uint16_t tos, uint16_t buff_size);
+    uint16_t getLocalPort(int sockFd);
     void setKeepAliveOptions(int fd);
 
     void updateCons_active (int i);
@@ -164,7 +164,7 @@ private:
     int  findEmptyConnectionSlot(void); // get index of empty connection slot, or -1 if nothing is available
     void updateCons(void);
 
-    void logFunctionName(BYTE cmd);
+    void logFunctionName(uint8_t cmd);
     void closeAndCleanAll(void);
 };
 

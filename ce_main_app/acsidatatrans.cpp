@@ -10,8 +10,8 @@
 
 AcsiDataTrans::AcsiDataTrans()
 {
-    buffer          = new BYTE[ACSI_BUFFER_SIZE];        // 1 MB buffer
-    recvBuffer      = new BYTE[ACSI_BUFFER_SIZE];
+    buffer          = new uint8_t[ACSI_BUFFER_SIZE];        // 1 MB buffer
+    recvBuffer      = new uint8_t[ACSI_BUFFER_SIZE];
 
     memset(buffer,      0, ACSI_BUFFER_SIZE);            // init buffers to zero
     memset(recvBuffer,  0, ACSI_BUFFER_SIZE);
@@ -56,19 +56,19 @@ void AcsiDataTrans::clear(bool clearAlsoDataDirection)
     dumpNextData    = false;
 }
 
-void AcsiDataTrans::setStatus(BYTE stat)
+void AcsiDataTrans::setStatus(uint8_t stat)
 {
     status          = stat;
     statusWasSet    = true;
 }
 
-void AcsiDataTrans::addDataByte(BYTE val)
+void AcsiDataTrans::addDataByte(uint8_t val)
 {
     buffer[count] = val;
     count++;
 }
 
-void AcsiDataTrans::addDataDword(DWORD val)
+void AcsiDataTrans::addDataDword(uint32_t val)
 {
     buffer[count    ] = (val >> 24) & 0xff;
     buffer[count + 1] = (val >> 16) & 0xff;
@@ -78,7 +78,7 @@ void AcsiDataTrans::addDataDword(DWORD val)
     count += 4;
 }
 
-void AcsiDataTrans::addDataWord(WORD val)
+void AcsiDataTrans::addDataWord(uint16_t val)
 {
     buffer[count    ] = (val >> 8) & 0xff;
     buffer[count + 1] = (val     ) & 0xff;
@@ -86,7 +86,7 @@ void AcsiDataTrans::addDataWord(WORD val)
     count += 2;
 }
 
-void AcsiDataTrans::addDataBfr(const void *data, DWORD cnt, bool padToMul16)
+void AcsiDataTrans::addDataBfr(const void *data, uint32_t cnt, bool padToMul16)
 {
     memcpy(&buffer[count], data, cnt);
     count += cnt;
@@ -118,7 +118,7 @@ void AcsiDataTrans::padDataToMul16(void)
 }
 
 // get data from Hans
-bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
+bool AcsiDataTrans::recvData(uint8_t *data, uint32_t cnt)
 {
     bool res;
 
@@ -150,7 +150,7 @@ void AcsiDataTrans::sendDataToFd(int fd)
         count       = 1;
     }
     
-    WORD length = count;
+    uint16_t length = count;
     write(fd, &length, 2);      // first word - length of data to be received
     
     write(fd, buffer, count);   // then the data...
@@ -187,9 +187,9 @@ void AcsiDataTrans::sendDataAndStatus(bool fromRetryModule)
     //---------------------------------------
     if(dumpNextData) {
         Debug::out(LOG_DEBUG, "sendDataAndStatus: %d bytes", count);
-        BYTE *src = buffer;
+        uint8_t *src = buffer;
 
-        WORD dumpCnt = 0;
+        uint16_t dumpCnt = 0;
 
         int lines = count / 32;
         if((count % 32) != 0) {
@@ -230,7 +230,7 @@ void AcsiDataTrans::sendDataAndStatus(bool fromRetryModule)
     sendData_transferBlock(buffer, count);    // transfer this block
 }
 
-bool AcsiDataTrans::sendData_start(DWORD totalDataCount, BYTE scsiStatus, bool withStatus)
+bool AcsiDataTrans::sendData_start(uint32_t totalDataCount, uint8_t scsiStatus, bool withStatus)
 {
     if(!com) {
         Debug::out(LOG_ERROR, "AcsiDataTrans::sendData_start -- no communication object, fail");
@@ -240,7 +240,7 @@ bool AcsiDataTrans::sendData_start(DWORD totalDataCount, BYTE scsiStatus, bool w
     return com->hdd_sendData_start(totalDataCount, scsiStatus, withStatus);
 }
 
-bool AcsiDataTrans::sendData_transferBlock(BYTE *pData, DWORD dataCount)
+bool AcsiDataTrans::sendData_transferBlock(uint8_t *pData, uint32_t dataCount)
 {
     bool res = com->hdd_sendData_transferBlock(pData, dataCount);
 
@@ -251,7 +251,7 @@ bool AcsiDataTrans::sendData_transferBlock(BYTE *pData, DWORD dataCount)
     return res;
 }
 
-bool AcsiDataTrans::recvData_start(DWORD totalDataCount)
+bool AcsiDataTrans::recvData_start(uint32_t totalDataCount)
 {
     if(!com) {
         Debug::out(LOG_ERROR, "AcsiDataTrans::recvData_start() -- no communication object, fail!");
@@ -263,7 +263,7 @@ bool AcsiDataTrans::recvData_start(DWORD totalDataCount)
     return com->hdd_recvData_start(recvBuffer, totalDataCount);
 }
 
-bool AcsiDataTrans::recvData_transferBlock(BYTE *pData, DWORD dataCount)
+bool AcsiDataTrans::recvData_transferBlock(uint8_t *pData, uint32_t dataCount)
 {
     bool res = com->hdd_recvData_transferBlock(pData, dataCount);
 
@@ -274,7 +274,7 @@ bool AcsiDataTrans::recvData_transferBlock(BYTE *pData, DWORD dataCount)
     return res;
 }
 
-void AcsiDataTrans::sendStatusToHans(BYTE statusByte)
+void AcsiDataTrans::sendStatusToHans(uint8_t statusByte)
 {
     bool res = com->hdd_sendStatusToHans(statusByte);
 
@@ -283,12 +283,12 @@ void AcsiDataTrans::sendStatusToHans(BYTE statusByte)
     }
 }
 
-DWORD AcsiDataTrans::getCount(void)
+uint32_t AcsiDataTrans::getCount(void)
 {
     return count;
 }
 
-void AcsiDataTrans::addZerosUntilSize(DWORD finalBufferCnt)
+void AcsiDataTrans::addZerosUntilSize(uint32_t finalBufferCnt)
 {
     while(count < finalBufferCnt) {         // add zeros until we don't have enough
         addDataByte(0);

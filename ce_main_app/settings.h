@@ -2,13 +2,13 @@
 #define _SETTINGS_H_
 
 #include <stdio.h>
-#include "datatypes.h"
+#include <stdint.h>
 
 typedef struct {
-    BYTE acsiIDdevType[8];                              // array of device types for each ACSI ID
-    BYTE sdCardAcsiId;                                  // ACSI ID assigned to SD card
+    uint8_t acsiIDdevType[8];                              // array of device types for each ACSI ID
+    uint8_t sdCardAcsiId;                                  // ACSI ID assigned to SD card
 
-    BYTE enabledIDbits;                                 // bit map of which ACSI IDs are enabled
+    uint8_t enabledIDbits;                                 // bit map of which ACSI IDs are enabled
 
     bool gotDevTypeRaw;
     bool gotDevTypeTranslated;
@@ -41,7 +41,7 @@ public:
     void  setString(const char *key, const char *value);
 
     char *getBinaryString(const char *key, int len);
-    void  setBinaryString(const char *key, BYTE *inBfr, int len);
+    void  setBinaryString(const char *key, uint8_t *inBfr, int len);
 
     char getChar(const char *key, char defValue);
     void setChar(const char *key, char value);
@@ -51,8 +51,8 @@ public:
     void loadFloppyConfig(FloppyConfig *fc);
     void saveFloppyConfig(FloppyConfig *fc);
 
-    static void generateLicenseKeyName(BYTE* hwSerial, char *keyName);
-    static void binToHex(BYTE *inBfr, int len, char *outBfr);
+    static void generateLicenseKeyName(uint8_t* hwSerial, char *keyName);
+    static void binToHex(uint8_t *inBfr, int len, char *outBfr);
 
 private:
 

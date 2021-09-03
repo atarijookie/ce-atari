@@ -5,10 +5,10 @@
   or at your option any later version. Read the file gpl.txt for details.
 */
 
-#include "../datatypes.h"
+#include <stdint.h>
 
-#define Uint8   BYTE
-#define Uint16  WORD
+#define Uint8   uint8_t
+#define Uint16  uint16_t
 
 extern bool MSA_FileNameIsMSA(const char *pszFileName, bool bAllowGZ);
 extern Uint8 *MSA_UnCompress(Uint8 *pMSAFile, long *pImageSize);

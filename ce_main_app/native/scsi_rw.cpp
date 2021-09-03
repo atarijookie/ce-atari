@@ -13,8 +13,8 @@
 //---------------------------------------------
 void Scsi::SCSI_ReadWrite6(bool readNotWrite)
 {
-    DWORD startingSector;
-    WORD sectorCount;
+    uint32_t startingSector;
+    uint16_t sectorCount;
 
     startingSector  = cmd[1] & 0x1f;
     startingSector  = startingSector << 8;
@@ -34,8 +34,8 @@ void Scsi::SCSI_ReadWrite6(bool readNotWrite)
 //---------------------------------------------
 void Scsi::SCSI_ReadWrite10(bool readNotWrite)
 {
-    DWORD startingSector;
-    WORD  sectorCount;
+    uint32_t startingSector;
+    uint16_t  sectorCount;
 
     startingSector  = cmd[3];
     startingSector  = startingSector << 8;
@@ -53,9 +53,9 @@ void Scsi::SCSI_ReadWrite10(bool readNotWrite)
 }
 
 //---------------------------------------------
-void Scsi::readWriteGeneric(bool readNotWrite, DWORD startingSector, DWORD sectorCount)
+void Scsi::readWriteGeneric(bool readNotWrite, uint32_t startingSector, uint32_t sectorCount)
 {
-    DWORD totalByteCount = sectorCount * 512;
+    uint32_t totalByteCount = sectorCount * 512;
 
     if(totalByteCount > 0xffffff) {                                     // if trying to send more than 16 MB of data at once, fail
         Debug::out(LOG_ERROR, "Scsi::readWriteGeneric() - tried to transfer more than 16 MB of data of once, fail");
@@ -98,8 +98,8 @@ void Scsi::readWriteGeneric(bool readNotWrite, DWORD startingSector, DWORD secto
 //---------------------------------------------
 void Scsi::SCSI_Verify(void)
 {
-    DWORD startSectorNo;
-    WORD sectorCount;
+    uint32_t startSectorNo;
+    uint16_t sectorCount;
 
     startSectorNo  = cmd[3];                    // get starting sector #
     startSectorNo  = startSectorNo << 8;
@@ -127,11 +127,11 @@ void Scsi::SCSI_Verify(void)
 }
 
 //---------------------------------------------
-bool Scsi::readSectors_small(DWORD startSectorNo, DWORD sectorCount)
+bool Scsi::readSectors_small(uint32_t startSectorNo, uint32_t sectorCount)
 {
     bool res;
 
-    DWORD totalByteCount = sectorCount * 512;
+    uint32_t totalByteCount = sectorCount * 512;
 
     Debug::out(LOG_DEBUG, "Scsi::readSectors_small() - startSectorNo: 0x%x, sectorCount: 0x%x", startSectorNo, sectorCount);
 
@@ -148,7 +148,7 @@ bool Scsi::readSectors_small(DWORD startSectorNo, DWORD sectorCount)
     return true;
 }
 
-bool Scsi::readSectors_big(DWORD startSectorNo, DWORD sectorCount)
+bool Scsi::readSectors_big(uint32_t startSectorNo, uint32_t sectorCount)
 {
     bool res;
 
@@ -156,7 +156,7 @@ bool Scsi::readSectors_big(DWORD startSectorNo, DWORD sectorCount)
 
     sendDataAndStatus_notJustStatus = false;                            // we're handling the _start(), _transferBlock() manually, so later we need to send the status manually
 
-    DWORD totalByteCount = sectorCount * 512;
+    uint32_t totalByteCount = sectorCount * 512;
     res = dataTrans->sendData_start(totalByteCount, SCSI_ST_OK, false); // try to start the read data transfer, without status
 
     if(!res) {
@@ -167,8 +167,8 @@ bool Scsi::readSectors_big(DWORD startSectorNo, DWORD sectorCount)
     // now transfer the data in big chunks of BUFFER_SIZE_SECTORS
     while(sectorCount > 0) {
         // maximum transfer size is defined by the data media, so transfer that much or less
-        DWORD sectorCountNow    = MIN(sectorCount, dataMedia->maxSectorsForSingleReadWrite());
-        DWORD byteCountNow      = sectorCountNow * 512;
+        uint32_t sectorCountNow    = MIN(sectorCount, dataMedia->maxSectorsForSingleReadWrite());
+        uint32_t byteCountNow      = sectorCountNow * 512;
 
         Debug::out(LOG_DEBUG, "Scsi::readSectors() - will read sectorCountNow: 0x%x, sectors to go: 0x%x", sectorCountNow, sectorCount - sectorCountNow);
 
@@ -198,13 +198,13 @@ bool Scsi::readSectors_big(DWORD startSectorNo, DWORD sectorCount)
 }
 
 //---------------------------------------------
-bool Scsi::writeSectors_small(DWORD startSectorNo, DWORD sectorCount)
+bool Scsi::writeSectors_small(uint32_t startSectorNo, uint32_t sectorCount)
 {
     bool res;
 
     Debug::out(LOG_DEBUG, "Scsi::writeSectors_small() - startSectorNo: 0x%x, sectorCount: 0x%x", startSectorNo, sectorCount);
 
-    DWORD totalByteCount = sectorCount * 512;
+    uint32_t totalByteCount = sectorCount * 512;
     res = dataTrans->recvData(dataBuffer, totalByteCount);
 
     if(!res) {
@@ -223,7 +223,7 @@ bool Scsi::writeSectors_small(DWORD startSectorNo, DWORD sectorCount)
     return true;
 }
 
-bool Scsi::writeSectors_big(DWORD startSectorNo, DWORD sectorCount)
+bool Scsi::writeSectors_big(uint32_t startSectorNo, uint32_t sectorCount)
 {
     bool res;
 
@@ -231,7 +231,7 @@ bool Scsi::writeSectors_big(DWORD startSectorNo, DWORD sectorCount)
 
     sendDataAndStatus_notJustStatus = false;                // we're handling the _start(), _transferBlock() manually, so later we need to send the status manually
 
-    DWORD totalByteCount = sectorCount * 512;
+    uint32_t totalByteCount = sectorCount * 512;
     res = dataTrans->recvData_start(totalByteCount);        // try to start the write data transfer
 
     if(!res) {
@@ -242,8 +242,8 @@ bool Scsi::writeSectors_big(DWORD startSectorNo, DWORD sectorCount)
     // now transfer the data in big chunks of BUFFER_SIZE_SECTORS
     while(sectorCount > 0) {
         // maximum transfer size is defined by the data media, so transfer that much or less
-        DWORD sectorCountNow    = MIN(sectorCount, dataMedia->maxSectorsForSingleReadWrite());
-        DWORD byteCountNow      = sectorCountNow * 512;
+        uint32_t sectorCountNow    = MIN(sectorCount, dataMedia->maxSectorsForSingleReadWrite());
+        uint32_t byteCountNow      = sectorCountNow * 512;
 
         Debug::out(LOG_DEBUG, "Scsi::writeSectors() - will write sectorCountNow: 0x%x, sectors to go: 0x%x", sectorCountNow, sectorCount - sectorCountNow);
 
@@ -272,13 +272,13 @@ bool Scsi::writeSectors_big(DWORD startSectorNo, DWORD sectorCount)
 }
 
 //---------------------------------------------
-bool Scsi::compareSectors(DWORD startSectorNo, DWORD sectorCount)
+bool Scsi::compareSectors(uint32_t startSectorNo, uint32_t sectorCount)
 {
     bool res;
 
     Debug::out(LOG_DEBUG, "Scsi::compareSectors() - startSectorNo: %d, sectorCount: %d -- will do %d loops", startSectorNo, sectorCount, (sectorCount / BUFFER_SIZE_SECTORS) + 1);
 
-    DWORD totalByteCount = sectorCount * 512;
+    uint32_t totalByteCount = sectorCount * 512;
     res = dataTrans->recvData_start(totalByteCount);        // try to start the write data transfer
 
     if(!res) {
@@ -289,8 +289,8 @@ bool Scsi::compareSectors(DWORD startSectorNo, DWORD sectorCount)
     // now transfer the data in big chunks of BUFFER_SIZE_SECTORS
     while(sectorCount > 0) {
         // maximum transfer size is defined by the data media, so transfer that much or less
-        DWORD sectorCountNow    = MIN(sectorCount, dataMedia->maxSectorsForSingleReadWrite());
-        DWORD byteCountNow      = sectorCountNow * 512;
+        uint32_t sectorCountNow    = MIN(sectorCount, dataMedia->maxSectorsForSingleReadWrite());
+        uint32_t byteCountNow      = sectorCountNow * 512;
 
         // get data from ST
         res = dataTrans->recvData_transferBlock(dataBuffer, byteCountNow);

@@ -37,8 +37,8 @@ ChipInterfaceNetwork::ChipInterfaceNetwork()
     pipeFromAtariToRPi[0] = pipeFromAtariToRPi[1] = -1;
     pipeFromRPiToAtari[0] = pipeFromRPiToAtari[1] = -1;
 
-    bufOut = new BYTE[MFM_STREAM_SIZE];
-    bufIn = new BYTE[MFM_STREAM_SIZE];
+    bufOut = new uint8_t[MFM_STREAM_SIZE];
+    bufIn = new uint8_t[MFM_STREAM_SIZE];
 
     gotAtnId = 0;
     gotAtnCode = 0;
@@ -249,7 +249,7 @@ void ChipInterfaceNetwork::resetFDD(void)
     // can't reset the chip via network
 }
 
-bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
+bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
 {
     // send current status report every once in a while (could do it on change only, but doing it repeatedly as UDP packet might get lost, even on localhost only)
     if(Utils::getCurrentMs() >= nextReportTime) {
@@ -318,7 +318,7 @@ bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
     return false;
 }
 
-void ChipInterfaceNetwork::getFWversion(bool hardNotFloppy, BYTE *inFwVer)
+void ChipInterfaceNetwork::getFWversion(bool hardNotFloppy, uint8_t *inFwVer)
 {
     if(hardNotFloppy) {     // for HDD
         // fwResponseBfr should be filled with Hans config - by calling setHDDconfig() (and not calling anything else inbetween)
@@ -345,7 +345,7 @@ void ChipInterfaceNetwork::getFWversion(bool hardNotFloppy, BYTE *inFwVer)
     }
 }
 
-bool ChipInterfaceNetwork::hdd_sendData_start(DWORD totalDataCount, BYTE scsiStatus, bool withStatus)
+bool ChipInterfaceNetwork::hdd_sendData_start(uint32_t totalDataCount, uint8_t scsiStatus, bool withStatus)
 {
     if(totalDataCount > 0xffffff) {
         Debug::out(LOG_ERROR, "ChipInterfaceNetwork::hdd_sendData_start -- trying to send more than 16 MB, fail");
@@ -366,7 +366,7 @@ bool ChipInterfaceNetwork::hdd_sendData_start(DWORD totalDataCount, BYTE scsiSta
     return true;
 }
 
-bool ChipInterfaceNetwork::hdd_sendData_transferBlock(BYTE *pData, DWORD dataCount)
+bool ChipInterfaceNetwork::hdd_sendData_transferBlock(uint8_t *pData, uint32_t dataCount)
 {
     bufOut[0] = 0;
     bufOut[1] = CMD_DATA_MARKER;                                  // mark the start of data
@@ -382,11 +382,11 @@ bool ChipInterfaceNetwork::hdd_sendData_transferBlock(BYTE *pData, DWORD dataCou
             return false;
         }
 
-        DWORD cntNow = (dataCount > 512) ? 512 : dataCount;         // max 512 bytes per transfer
+        uint32_t cntNow = (dataCount > 512) ? 512 : dataCount;         // max 512 bytes per transfer
 
         memcpy(bufOut + 2, pData, cntNow);                          // copy the data after the header (2 bytes)
 
-        // transmit this buffer with header + terminating zero (WORD)
+        // transmit this buffer with header + terminating zero (uint16_t)
         sendDataToChip(NET_TAG_HANS_STR, bufOut, cntNow + 4);
 
         pData       += cntNow;                                      // move the data pointer further
@@ -396,7 +396,7 @@ bool ChipInterfaceNetwork::hdd_sendData_transferBlock(BYTE *pData, DWORD dataCou
     return true;
 }
 
-bool ChipInterfaceNetwork::hdd_recvData_start(BYTE *recvBuffer, DWORD totalDataCount)
+bool ChipInterfaceNetwork::hdd_recvData_start(uint8_t *recvBuffer, uint32_t totalDataCount)
 {
     if(totalDataCount > 0xffffff) {
         Debug::out(LOG_ERROR, "ChipInterfaceNetwork::hdd_recvData_start() -- trying to send more than 16 MB, fail");
@@ -418,14 +418,14 @@ bool ChipInterfaceNetwork::hdd_recvData_start(BYTE *recvBuffer, DWORD totalDataC
     return true;
 }
 
-bool ChipInterfaceNetwork::hdd_recvData_transferBlock(BYTE *pData, DWORD dataCount)
+bool ChipInterfaceNetwork::hdd_recvData_transferBlock(uint8_t *pData, uint32_t dataCount)
 {
     memset(bufOut, 0, TX_RX_BUFF_SIZE);                   // nothing to transmit, really...
-    BYTE inBuf[8];
+    uint8_t inBuf[8];
 
     while(dataCount > 0) {
         // request maximum 512 bytes from host
-        DWORD subCount = (dataCount > 512) ? 512 : dataCount;
+        uint32_t subCount = (dataCount > 512) ? 512 : dataCount;
 
         bool good = waitForAtn(NET_ATN_HANS_ID, ATN_WRITE_MORE_DATA, 1000, inBuf);
 
@@ -450,7 +450,7 @@ bool ChipInterfaceNetwork::hdd_recvData_transferBlock(BYTE *pData, DWORD dataCou
     return true;
 }
 
-bool ChipInterfaceNetwork::hdd_sendStatusToHans(BYTE statusByte)
+bool ChipInterfaceNetwork::hdd_sendStatusToHans(uint8_t statusByte)
 {
     bool good = waitForAtn(NET_ATN_HANS_ID, ATN_GET_STATUS, 1000, bufIn);
 
@@ -468,13 +468,13 @@ bool ChipInterfaceNetwork::hdd_sendStatusToHans(BYTE statusByte)
     return true;
 }
 
-void ChipInterfaceNetwork::fdd_sendTrackToChip(int byteCount, BYTE *encodedTrack)
+void ChipInterfaceNetwork::fdd_sendTrackToChip(int byteCount, uint8_t *encodedTrack)
 {
     // send encoded track out, read garbage into bufIn and don't care about it
     sendDataToChip(NET_TAG_FRANZ_STR, encodedTrack, byteCount);
 }
 
-BYTE* ChipInterfaceNetwork::fdd_sectorWritten(int &side, int &track, int &sector, int &byteCount)
+uint8_t* ChipInterfaceNetwork::fdd_sectorWritten(int &side, int &track, int &sector, int &byteCount)
 {
     byteCount = bufReader.getRemainingLength();             // get how many data we still have
 
@@ -524,7 +524,7 @@ void ChipInterfaceNetwork::handleZerosAndIkbd(int atnId)
     bufReader.clear(); 
 }
 
-bool ChipInterfaceNetwork::waitForAtn(int atnIdWant, uint8_t atnCode, DWORD timeoutMs, BYTE *inBuf)
+bool ChipInterfaceNetwork::waitForAtn(int atnIdWant, uint8_t atnCode, uint32_t timeoutMs, uint8_t *inBuf)
 {
     gotAtnId = 0;
     gotAtnCode = 0;

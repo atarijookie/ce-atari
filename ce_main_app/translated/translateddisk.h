@@ -49,10 +49,10 @@ typedef struct {
 
 typedef struct {
     FILE *hostHandle;                       // file handle for all the work with the file on host
-    BYTE atariHandle;                       // file handle used on Atari
+    uint8_t atariHandle;                       // file handle used on Atari
     std::string hostPath;                   // where is the file on host file system
 
-    DWORD lastDataCount;                    // stores the data count that got on the last read / write operation
+    uint32_t lastDataCount;                    // stores the data count that got on the last read / write operation
 } TranslatedFiles;
 
 #define MAX_FILES       40                  // maximum open files count, 40 is the value from EmuTOS
@@ -95,7 +95,7 @@ class ZipDirEntry {
 
     std::string realHostPath;           // real path to ZIP file on host dir struct, e.g. /mnt/shared/normal/archive.zip
     std::string mountPoint;             // contains path, where the ZIP file will be mounted, and where createHostPath() will redirect host path
-    DWORD       lastAccessTime;         // Utils::getCurrentMs() time which is stored on each access to this folder - will be used to unmount oldest ZIP files, so new ZIP files can be mounted / accessed
+    uint32_t       lastAccessTime;         // Utils::getCurrentMs() time which is stored on each access to this folder - will be used to unmount oldest ZIP files, so new ZIP files can be mounted / accessed
 
     int         mountActionStateId;     // this is TMountActionState.id, which you can use to find out if the mount action did already finish
     bool        isMounted;              // if this is set to true, don't have to check mount action state, but just consider this to be mounted
@@ -134,7 +134,7 @@ public:
     void mutexLock(void);
     void mutexUnlock(void);
 
-    void processCommand(BYTE *cmd);
+    void processCommand(uint8_t *cmd);
 
     bool attachToHostPath(std::string hostRootPath, int translatedType, std::string devicePath);
     void detachFromHostPath(std::string hostRootPath);
@@ -173,12 +173,12 @@ private:
     AcsiDataTrans       *dataTrans;
     SettingsReloadProxy *reloadProxy;
 
-    BYTE            *dataBuffer;
-    BYTE            *dataBuffer2;
+    uint8_t            *dataBuffer;
+    uint8_t            *dataBuffer2;
 
     TranslatedConf  conf[MAX_DRIVES];       // 16 possible TOS drives
     char            currentDriveLetter;
-    BYTE            currentDriveIndex;
+    uint8_t            currentDriveIndex;
 
     TranslatedFiles files[MAX_FILES];       // open files
 
@@ -187,7 +187,7 @@ private:
         int shared;
         int confDrive;
 
-        WORD readOnly;
+        uint16_t readOnly;
     } driveLetters;
 
     char asciiAtariToPc[256];
@@ -197,7 +197,7 @@ private:
 
     void loadSettings(void);
 
-    WORD getDrivesBitmap(void);
+    uint16_t getDrivesBitmap(void);
     bool isDriveIndexReadOnly(int driveIndex);
     static void removeDoubleDots(std::string &path);
     static void pathSeparatorHostToAtari(std::string &path);
@@ -210,66 +210,66 @@ private:
     static bool startsWith(std::string what, std::string subStr);
     static bool endsWith(std::string what, std::string subStr);
 
-    void onGetConfig(BYTE *cmd);
-    void getIpAdds(BYTE *bfr);
+    void onGetConfig(uint8_t *cmd);
+    void getIpAdds(uint8_t *bfr);
 
     // path functions
-    void onDsetdrv(BYTE *cmd);
-    void onDgetdrv(BYTE *cmd);
-    void onDsetpath(BYTE *cmd);
-    void onDgetpath(BYTE *cmd);
+    void onDsetdrv(uint8_t *cmd);
+    void onDgetdrv(uint8_t *cmd);
+    void onDsetpath(uint8_t *cmd);
+    void onDgetpath(uint8_t *cmd);
 
     // directory & file search
-//  void onFsetdta(BYTE *cmd);                    // this function needs to be handled on ST only
-//  void onFgetdta(BYTE *cmd);                    // this function needs to be handled on ST only
-    void onFsfirst(BYTE *cmd);
-    void onFsnext(BYTE *cmd);
+//  void onFsetdta(uint8_t *cmd);                    // this function needs to be handled on ST only
+//  void onFgetdta(uint8_t *cmd);                    // this function needs to be handled on ST only
+    void onFsfirst(uint8_t *cmd);
+    void onFsnext(uint8_t *cmd);
 
     // file and directory manipulation
-    void onDfree(BYTE *cmd);
-    void onDcreate(BYTE *cmd);
-    void onDdelete(BYTE *cmd);
-    void onFrename(BYTE *cmd);
-    void onFdelete(BYTE *cmd);
-    void onFattrib(BYTE *cmd);
+    void onDfree(uint8_t *cmd);
+    void onDcreate(uint8_t *cmd);
+    void onDdelete(uint8_t *cmd);
+    void onFrename(uint8_t *cmd);
+    void onFdelete(uint8_t *cmd);
+    void onFattrib(uint8_t *cmd);
 
     // file content functions -- need file handle
-    void onFcreate(BYTE *cmd);
-    void onFopen(BYTE *cmd);
-    void onFclose(BYTE *cmd);
-    void onFdatime(BYTE *cmd);
-    void onFread(BYTE *cmd);
-    void onFwrite(BYTE *cmd);
-    void onFseek(BYTE *cmd);
+    void onFcreate(uint8_t *cmd);
+    void onFopen(uint8_t *cmd);
+    void onFclose(uint8_t *cmd);
+    void onFdatime(uint8_t *cmd);
+    void onFread(uint8_t *cmd);
+    void onFwrite(uint8_t *cmd);
+    void onFseek(uint8_t *cmd);
 
     // Pexec() handling
-    void onPexec(BYTE *cmd);
+    void onPexec(uint8_t *cmd);
 
     // custom functions, which are not translated gemdos functions, but needed to do some other work
     void onInitialize(void);            // this method is called on the startup of CosmosEx translated disk driver
-    void onFtell(BYTE *cmd);            // this is needed after Fseek
-    void onRWDataCount(BYTE *cmd);      // when Fread / Fwrite doesn't process all the data, this returns the count of processed data
-    void onFsnext_last(BYTE *cmd);      // after last Fsnext() call this to release the findStorage
-    void getByteCountToEndOfFile(BYTE *cmd);    // should be used with Fread() to know the exact count of bytes to the end of file, so the memory after the last valid byte won't get corrupted
+    void onFtell(uint8_t *cmd);            // this is needed after Fseek
+    void onRWDataCount(uint8_t *cmd);      // when Fread / Fwrite doesn't process all the data, this returns the count of processed data
+    void onFsnext_last(uint8_t *cmd);      // after last Fsnext() call this to release the findStorage
+    void getByteCountToEndOfFile(uint8_t *cmd);    // should be used with Fread() to know the exact count of bytes to the end of file, so the memory after the last valid byte won't get corrupted
 
     // BIOS functions we need to support
-    void onDrvMap(BYTE *cmd);
-    void onMediach(BYTE *cmd);
-    void onGetbpb(BYTE *cmd);
+    void onDrvMap(uint8_t *cmd);
+    void onMediach(uint8_t *cmd);
+    void onGetbpb(uint8_t *cmd);
 
 	// other functions
-	void onGetMounts(BYTE *cmd);
-    void onUnmountDrive(BYTE *cmd);
-    void onStLog(BYTE *cmd);
-    void onStHttp(BYTE *cmd);
-    void onTestRead(BYTE *cmd);
-    void onTestWrite(BYTE *cmd);
-    void onTestGetACSIids(BYTE *cmd);
+	void onGetMounts(uint8_t *cmd);
+    void onUnmountDrive(uint8_t *cmd);
+    void onStLog(uint8_t *cmd);
+    void onStHttp(uint8_t *cmd);
+    void onTestRead(uint8_t *cmd);
+    void onTestWrite(uint8_t *cmd);
+    void onTestGetACSIids(uint8_t *cmd);
 
-    void onSetACSIids(BYTE *cmd);
+    void onSetACSIids(uint8_t *cmd);
     int  findCurrentIDforDevType(int devType, AcsiIDinfo *aii);
 
-    void getScreenShotConfig(BYTE *cmd);
+    void getScreenShotConfig(uint8_t *cmd);
 
     // helper functions
     int findEmptyFileSlot(void);
@@ -283,13 +283,13 @@ private:
     bool isAlreadyAttached(std::string hostRootPath);
 
     const char *functionCodeToName(int code);
-    void atariFindAttribsToString(BYTE attr, std::string &out);
+    void atariFindAttribsToString(uint8_t attr, std::string &out);
     bool isRootDir(std::string hostPath);
 
     void initAsciiTranslationTable(void);
     void convertAtariASCIItoPc(char *path);
 
-    DWORD getByteCountToEOF(FILE *f);
+    uint32_t getByteCountToEOF(FILE *f);
 
     int  driveLetterToDriveIndex(char pathDriveLetter);
 
@@ -317,34 +317,34 @@ private:
     void destroyFindStorages(void);
 
     int  getEmptyFindStorageIndex(void);
-    int  getFindStorageIndexByDta(DWORD dta);
+    int  getFindStorageIndexByDta(uint32_t dta);
 
     //-----------------------------------
     // helpers for Pexec()
-    void onPexec_createImage(BYTE *cmd);
-    void createImage(std::string &fullAtariPath, FILE *f, int fileSizeBytes, WORD atariTime, WORD atariDate);
-    void createDirEntry(bool isRoot, bool isDir, WORD date, WORD time, DWORD fileSize, const char *dirEntryName, int sectorNoAbs, int sectorNoRel);
-    void storeDirEntry(BYTE *pEntry, const char *dirEntryName, bool isDir, WORD time, WORD date, WORD startingSector, DWORD entrySizeBytes);
-    void storeFatChain(BYTE *pbFat, WORD sectorStart, WORD sectorEnd);
-    void storeIntelWord (BYTE *p,  WORD a);
-    void storeIntelDword(BYTE *p, DWORD a);
+    void onPexec_createImage(uint8_t *cmd);
+    void createImage(std::string &fullAtariPath, FILE *f, int fileSizeBytes, uint16_t atariTime, uint16_t atariDate);
+    void createDirEntry(bool isRoot, bool isDir, uint16_t date, uint16_t time, uint32_t fileSize, const char *dirEntryName, int sectorNoAbs, int sectorNoRel);
+    void storeDirEntry(uint8_t *pEntry, const char *dirEntryName, bool isDir, uint16_t time, uint16_t date, uint16_t startingSector, uint32_t entrySizeBytes);
+    void storeFatChain(uint8_t *pbFat, uint16_t sectorStart, uint16_t sectorEnd);
+    void storeIntelWord (uint8_t *p,  uint16_t a);
+    void storeIntelDword(uint8_t *p, uint32_t a);
 
-    void onPexec_getBpb(BYTE *cmd);
-    void onPexec_readSector(BYTE *cmd);
-    void onPexec_writeSector(BYTE *cmd);
+    void onPexec_getBpb(uint8_t *cmd);
+    void onPexec_readSector(uint8_t *cmd);
+    void onPexec_writeSector(uint8_t *cmd);
 
     bool pexecWholeFileWasRead(void);
 
-    WORD prgSectorStart;
-    WORD prgSectorEnd;
+    uint16_t prgSectorStart;
+    uint16_t prgSectorEnd;
     int  pexecDriveIndex;
 
     std::string pexecPrgPath;
     std::string pexecPrgFilename;
     std::string pexecFakeRootPath;
 
-    BYTE *pexecImage;
-    BYTE *pexecImageReadFlags;
+    uint8_t *pexecImage;
+    uint8_t *pexecImageReadFlags;
     //-----------------------------------
     // other ACSI command helpers
     ConfigService*          configService;

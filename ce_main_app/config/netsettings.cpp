@@ -63,8 +63,8 @@ void NetworkSettings::replaceIPonDhcpIface(void)
         return;
     }
 
-    BYTE ips[10];
-    BYTE masks[10];
+    uint8_t ips[10];
+    uint8_t masks[10];
     Utils::getIpAdds(ips, masks);                           // get real IPs
     
     if(eth0.dhcpNotStatic) {                                // eth0 is DHCP? replace config file values with real values

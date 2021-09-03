@@ -60,7 +60,7 @@ void ikbdLog(const char *format, ...);
                                                 ikbdLog(FORMAT);                \
                                               }
 
-void chipLog(WORD cnt, CyclicBuff *cb);
+void chipLog(uint16_t cnt, CyclicBuff *cb);
 
 extern TInputDevice ikbdDevs[INTYPE_MAX+1];
 
@@ -132,15 +132,15 @@ private:
         int        x,y;
         int        maxX, maxY;
         int        scaleX, scaleY;
-        BYTE    buttons;
+        uint8_t    buttons;
     } absMouse;
 
     struct {
-        BYTE deltaX;
-        BYTE deltaY;
+        uint8_t deltaX;
+        uint8_t deltaY;
     } keycodeMouse;
 
-    DWORD           lastVDevMouseEventTime;
+    uint32_t           lastVDevMouseEventTime;
 
     int             joystickMode;
     TJoystickState  joystick[2];
@@ -150,9 +150,9 @@ private:
     CyclicBuff      cbStCommands;
     CyclicBuff      cbKeyboardData;
 
-    BYTE            specialCodeLen[10];
+    uint8_t            specialCodeLen[10];
 
-    BYTE            stCommandLen[256];
+    uint8_t            stCommandLen[256];
 
     std::bitset<KBD_KEY_COUNT> pressedKeys;
     bool            keyboardExclusiveAccess;
@@ -170,12 +170,12 @@ private:
     void sendJoyButtonsInMouseMode(void);
     void sendJoyState(int joyNumber, int dirTotal);
     void sendBothJoyReport(void);
-    void sendMousePosRelative(BYTE buttons, BYTE xRel, BYTE yRel);
-    void sendMousePosAbsolute(BYTE absButtons);
+    void sendMousePosRelative(uint8_t buttons, uint8_t xRel, uint8_t yRel);
+    void sendMousePosAbsolute(uint8_t absButtons);
     void fixAbsMousePos(void);
 
     void processStCommands(void);
-    void processGetCommand(BYTE getCmd);
+    void processGetCommand(uint8_t getCmd);
     void processKeyboardData(bool skipKeyboardTranslation);
 
     bool gotUsbMouse(void);
@@ -184,11 +184,11 @@ private:
     bool gotUsbJoy2(void);
 
     void handlePcKeyAsKeybJoy(int joyNumber, int pcKey, int eventValue);
-    bool handleStKeyAsKeybJoy(BYTE val);
+    bool handleStKeyAsKeybJoy(uint8_t val);
     void handleKeyAsKeybJoy  (bool pcNotSt, int joyNumber, int pcKey, bool keyDown);
     bool handleHotkeys(int pcKey, bool pressed, bool skipKeyboardTranslation);
 
-    int fdWrite(int fd, BYTE *bfr, int cnt);
+    int fdWrite(int fd, uint8_t *bfr, int cnt);
 
     void toggleKeyboardExclusiveAccess(void);
     void grabExclusiveAccess(int fd);

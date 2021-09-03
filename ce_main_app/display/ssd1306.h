@@ -19,7 +19,7 @@ All text above, and the splash screen must be included in any redistribution
 #ifndef _SSD1306_H_
 #define _SSD1306_H_
 
-#include "../datatypes.h"
+#include <stdint.h>
 #include "i2c2.h"
 
 #define SSD1306_BLACK 0
@@ -91,19 +91,19 @@ public:
   SSD1306();
   ~SSD1306();
 
-  bool begin(BYTE vccstate);
-  void drawPixel(WORD x, WORD y, WORD color);
+  bool begin(uint8_t vccstate);
+  void drawPixel(uint16_t x, uint16_t y, uint16_t color);
   void clearDisplay(void);
   void display(void);
-  int  command(BYTE c);
+  int  command(uint8_t c);
 
-  void invertDisplay(BYTE i);
+  void invertDisplay(uint8_t i);
 
-  void startscrollright(BYTE start, BYTE stop);
-  void startscrollleft(BYTE start, BYTE stop);
+  void startscrollright(uint8_t start, uint8_t stop);
+  void startscrollleft(uint8_t start, uint8_t stop);
 
-  void startscrolldiagright(BYTE start, BYTE stop);
-  void startscrolldiagleft(BYTE start, BYTE stop);
+  void startscrolldiagright(uint8_t start, uint8_t stop);
+  void startscrolldiagleft(uint8_t start, uint8_t stop);
   void stopscroll(void);
 
   void dim(int dim);
@@ -111,8 +111,8 @@ public:
 private:
     i2c2 *i2c;
     
-    BYTE *buffer;
-    BYTE vccstate;
+    uint8_t *buffer;
+    uint8_t vccstate;
 };
 
 #endif /* _SSD1306_H_ */

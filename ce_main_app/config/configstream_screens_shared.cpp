@@ -38,8 +38,8 @@ extern RPiConfig rpiConfig;             // RPi info structure
 
 extern SharedObjects shared;
 
-extern BYTE isUpdateStartingFlag;           // set to 1 to notify ST that the update is starting and it should show 'fake updating progress' screen
-extern volatile DWORD whenCanStartInstall;  // if this DWORD has non-zero value, then it's a time when this app should be terminated for installing update
+extern uint8_t isUpdateStartingFlag;           // set to 1 to notify ST that the update is starting and it should show 'fake updating progress' screen
+extern volatile uint32_t whenCanStartInstall;  // if this uint32_t has non-zero value, then it's a time when this app should be terminated for installing update
 
 void ConfigStream::createScreen_shared(void)
 {

@@ -13,7 +13,7 @@ TranslatedBootMedia::TranslatedBootMedia()
     BCapacity       = TRANSLATEDBOOTMEDIA_SIZE;
     SCapacity       = TRANSLATEDBOOTMEDIA_SIZE / 512;
 
-    imageBuffer     = new BYTE[TRANSLATEDBOOTMEDIA_SIZE];       // allocate and clean the buffer for boot image
+    imageBuffer     = new uint8_t[TRANSLATEDBOOTMEDIA_SIZE];       // allocate and clean the buffer for boot image
     memset(imageBuffer, 0, TRANSLATEDBOOTMEDIA_SIZE);
 
     gotImage        = false;                                    // mark that we don't have the image yet
@@ -117,7 +117,7 @@ bool TranslatedBootMedia::loadDataIntoBuffer(void)
 
 void TranslatedBootMedia::updateBootsectorConfig(void)
 {
-    DWORD tsize, dsize, bsize, totalSize;
+    uint32_t tsize, dsize, bsize, totalSize;
 
     int driverOffset = 1024;
 
@@ -150,10 +150,10 @@ void TranslatedBootMedia::updateBootsectorChecksum(void)
     calculateChecksum(imageBuffer);
 }
 
-void TranslatedBootMedia::calculateChecksum(BYTE *bfr)
+void TranslatedBootMedia::calculateChecksum(uint8_t *bfr)
 {
-    WORD sum = 0, val;
-    WORD *p = (WORD *) bfr;
+    uint16_t sum = 0, val;
+    uint16_t *p = (uint16_t *) bfr;
 
     for(int i=0; i<255; i++) {
         val = *p;
@@ -162,16 +162,16 @@ void TranslatedBootMedia::calculateChecksum(BYTE *bfr)
         p++;
     }
 
-    WORD cs = 0x1234 - sum;
+    uint16_t cs = 0x1234 - sum;
     sum = sum & 0xffff;
 
     bfr[510] = cs >> 8;         // store the check sum
     bfr[511] = cs;
 }
 
-WORD TranslatedBootMedia::swapNibbles(WORD val)
+uint16_t TranslatedBootMedia::swapNibbles(uint16_t val)
 {
-    WORD a,b;
+    uint16_t a,b;
 
     a = val >> 8;           // get upper
     b = val &  0xff;        // get lower
@@ -179,7 +179,7 @@ WORD TranslatedBootMedia::swapNibbles(WORD val)
     return ((b << 8) | a);
 }
 
-void TranslatedBootMedia::updateBootsectorConfigWithACSIid(BYTE acsiId)
+void TranslatedBootMedia::updateBootsectorConfigWithACSIid(uint8_t acsiId)
 {
     lastUsedAcsiId = acsiId;            // store this ACSI ID for future usage
 
@@ -190,7 +190,7 @@ void TranslatedBootMedia::updateBootsectorConfigWithACSIid(BYTE acsiId)
         return;
     }
 
-    BYTE id;
+    uint8_t id;
     if(hwConfig.hddIface == HDD_IF_ACSI) {     // for ACSI - it's the ID (0 .. 7)
         id = acsiId;
 
@@ -217,12 +217,12 @@ int TranslatedBootMedia::getConfigPosition(void)
     return -1;
 }
 
-void TranslatedBootMedia::setDword(BYTE *bfr, DWORD val)
+void TranslatedBootMedia::setDword(uint8_t *bfr, uint32_t val)
 {
-    bfr[0] = (BYTE) (val >> 24);       // get hi
-    bfr[1] = (BYTE) (val >> 16);       // get mid hi
-    bfr[2] = (BYTE) (val >>  8);       // get mid lo
-    bfr[3] = (BYTE) (val      );       // get lo
+    bfr[0] = (uint8_t) (val >> 24);       // get hi
+    bfr[1] = (uint8_t) (val >> 16);       // get mid hi
+    bfr[2] = (uint8_t) (val >>  8);       // get mid lo
+    bfr[3] = (uint8_t) (val      );       // get lo
 }
 
 bool TranslatedBootMedia::iopen(const char *path, bool createIfNotExists)
@@ -256,7 +256,7 @@ void TranslatedBootMedia::getCapacity(int64_t &bytes, int64_t &sectors)
     sectors = SCapacity;
 }
 
-bool TranslatedBootMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
+bool TranslatedBootMedia::readSectors(int64_t sectorNo, uint32_t count, uint8_t *bfr)
 {
     if(!isInit()) {                             // if not initialized, failed
         return false;
@@ -274,20 +274,20 @@ bool TranslatedBootMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
 
     memset(bfr, 0, count * 512);                // clear the buffer
 
-    DWORD sectsRemaining = SCapacity - sectorNo;    // how many sectors we have left, if we start reading from position 'sectorNo'?
+    uint32_t sectsRemaining = SCapacity - sectorNo;    // how many sectors we have left, if we start reading from position 'sectorNo'?
 
     if(count > sectsRemaining) {                // if trying to read more sectors than we have, fix this
         count = sectsRemaining;
     }
 
-    DWORD pos       = sectorNo * 512;           // convert sector # to offset in boot image buffer
-    DWORD byteCount = count * 512;
+    uint32_t pos       = sectorNo * 512;           // convert sector # to offset in boot image buffer
+    uint32_t byteCount = count * 512;
 
     memcpy(bfr, imageBuffer + pos, byteCount);  // copy in the requested bytes
     return true;
 }
 
-bool TranslatedBootMedia::writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
+bool TranslatedBootMedia::writeSectors(int64_t sectorNo, uint32_t count, uint8_t *bfr)
 {
     return false;                               // write not supported
 }

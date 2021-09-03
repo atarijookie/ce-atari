@@ -2,7 +2,7 @@
 #define _DEVICEMEDIA_H
 
 #include <stdio.h>
-#include "../datatypes.h"
+#include <stdint.h>
 #include "imedia.h"
 
 class DeviceMedia: public IMedia
@@ -19,8 +19,8 @@ public:
     virtual void setMediaChanged(bool changed);
     virtual void getCapacity(int64_t &bytes, int64_t &sectors);
 
-    virtual bool readSectors(int64_t sectorNo, DWORD count, BYTE *bfr);
-    virtual bool writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr);
+    virtual bool readSectors(int64_t sectorNo, uint32_t count, uint8_t *bfr);
+    virtual bool writeSectors(int64_t sectorNo, uint32_t count, uint8_t *bfr);
 
 private:
 

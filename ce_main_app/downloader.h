@@ -32,10 +32,10 @@ typedef struct {
     std::string dstDir;         // dest dir, e.g. /mnt/sda1
 
     int downloadType;           // defines what is downloaded - update, floppy image, ...
-    WORD checksum;              // used to verify file integrity after download
+    uint16_t checksum;              // used to verify file integrity after download
 
-    volatile BYTE statusByte;   // this will be used for storing status, even if not read by other thread, for purpose of counting files in queue
-    volatile BYTE *pStatusByte; // if set to non-null, will be updated with the download status DWNSTATUS_*
+    volatile uint8_t statusByte;   // this will be used for storing status, even if not read by other thread, for purpose of counting files in queue
+    volatile uint8_t *pStatusByte; // if set to non-null, will be updated with the download status DWNSTATUS_*
 
     volatile int downPercent;   // defines progress - from 0 to 100
 } TDownloadRequest;
@@ -53,7 +53,7 @@ public:
     static void status(std::string &status, int downloadTypeMask);      // create status report string of pending and running downloads according to mask
     static void statusJson(std::ostringstream &status, int downloadTypeMask);   // same as status(), but returned as json
 
-    static bool verifyChecksum(const char *filename, WORD checksum);
+    static bool verifyChecksum(const char *filename, uint16_t checksum);
     static bool handleZIPedImage(const char *destDirectory, const char *zipFilePath);
 
     static void run(void);
@@ -62,7 +62,7 @@ public:
 private:
     static void formatStatus(TDownloadRequest &tdr, std::string &line);
     static void formatStatusJson(TDownloadRequest &tdr, std::ostringstream &status);
-    static void updateStatusByte(TDownloadRequest &tdr, BYTE newStatus);
+    static void updateStatusByte(TDownloadRequest &tdr, uint8_t newStatus);
 
     static void handleReportVersions(CURL *curl, const char *reportUrl);
     static void handleGetHwLicense(CURL *curl, const char *getLicenseUrl, const char *settingsKeyForLicense);

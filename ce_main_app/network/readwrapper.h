@@ -10,15 +10,15 @@
 class NdbItem
 {
 public:
-     NdbItem(int inSize, BYTE *inData, DWORD fromAddr, WORD fromPort);
+     NdbItem(int inSize, uint8_t *inData, uint32_t fromAddr, uint16_t fromPort);
     ~NdbItem(void);
 
     int   size;
-    BYTE *data;
+    uint8_t *data;
 
     struct {
-        DWORD addr;
-        WORD  port;
+        uint32_t addr;
+        uint16_t  port;
     } from;
 };
 
@@ -33,10 +33,10 @@ public:
 
     int  getCount    (void);                         // get recv data count - for UDP this is merged count through datagrams
 
-    int  getNdb        (BYTE *tmpBuffer);            // for UDP get one datagram, for TCP get a block from stream
+    int  getNdb        (uint8_t *tmpBuffer);            // for UDP get one datagram, for TCP get a block from stream
     int  getNextNdbSize(void);
     
-    int  peekBlock   (BYTE *tmpBuffer, int size);    // for UDP merge buffers, return data without removing from queue
+    int  peekBlock   (uint8_t *tmpBuffer, int size);    // for UDP merge buffers, return data without removing from queue
     void removeBlock (int size);                     // remove from queue
 
 private:
@@ -44,7 +44,7 @@ private:
     int type;           // TCP / UDP / ICMP
     int buff_size;
 
-    BYTE tmpBfr[TMP_BFR_SIZE];
+    uint8_t tmpBfr[TMP_BFR_SIZE];
 
     //----------------------------
     // for UDP

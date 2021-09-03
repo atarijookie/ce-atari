@@ -13,7 +13,7 @@
 #include "debug.h"
 #include "utils.h"
 #include "settings.h"
-#include "datatypes.h"
+#include <stdint.h>
 #include "statusreport.h"
 #include "../periodicthread.h"
 #include "../config/configstream.h"
@@ -314,7 +314,7 @@ void Ikbd::processMouse(input_event *ev)
         statuses.ikbdUsb.aliveTime = Utils::getCurrentMs();
         statuses.ikbdUsb.aliveSign = ALIVE_MOUSEVENT;
 
-        BYTE absButtons = 0;
+        uint8_t absButtons = 0;
 
         switch(ev->code) {
             case BTN_LEFT:
@@ -349,7 +349,7 @@ void Ikbd::processMouse(input_event *ev)
         mouseBtnNow = btnNew;                                    // store new button states
 
         if(mouseAbsBtnAct & MOUSEBTN_REPORT_ACTLIKEKEYS) {      // if should report mouse clicks as keys
-            BYTE bfr;
+            uint8_t bfr;
 
             switch(absButtons) {
                 case MOUSEABS_BTN_LEFT_DOWN:    bfr = 0x74; fdWrite(fdUartWrite, &bfr, 1); break;
@@ -415,7 +415,7 @@ void Ikbd::processMouse(input_event *ev)
 
             ikbdLog("\nEV_REL -> REL_WHEEL: ev->value: %d, stKey: %d", ev->value, stKey);
 
-            BYTE bfr[2];
+            uint8_t bfr[2];
             bfr[0] = stKey;                     // key down
             bfr[1] = stKey | 0x80;              // key up
 
@@ -483,7 +483,7 @@ void Ikbd::processKeyboard(input_event *ev, bool skipKeyboardTranslation)
 
         ikbdLog("\nEV_KEY: code %d, value %d, stKey: %02x", ev->code, ev->value, stKey);
 
-        BYTE bfr;
+        uint8_t bfr;
         bfr = stKey;
 
         res = fdWrite(fdUartWrite, &bfr, 1);
@@ -598,7 +598,7 @@ bool Ikbd::gotUsbMouse(void)
     }
 
     if(ikbdDevs[INTYPE_VDEVMOUSE].fd != -1) {                           // got virtual mouse?
-        DWORD diff = Utils::getCurrentMs() - lastVDevMouseEventTime;    // calculate how much time has passed since last VDevMouse event
+        uint32_t diff = Utils::getCurrentMs() - lastVDevMouseEventTime;    // calculate how much time has passed since last VDevMouse event
 
         if(diff < 10000) {                                              // if virtual mouse moved in the last 10 seconds, we got it (otherwise we don't have it)
             return true;

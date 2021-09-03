@@ -1,7 +1,7 @@
 #ifndef CONSPI_H
 #define CONSPI_H
 
-#include "datatypes.h"
+#include <stdint.h>
 
 #define NO_REMAINING_LENGTH     0xffff
 #define TXRX_COUNT_REST         0xffff
@@ -16,22 +16,22 @@ public:
     CConSpi();
     ~CConSpi();
 
-    bool waitForATN(int whichSpiCs, BYTE atnCode, DWORD timeoutMs, BYTE *inBuf);
-    void txRx(int whichSpiCs, int count, BYTE *sendBuffer, BYTE *receiveBufer);
+    bool waitForATN(int whichSpiCs, uint8_t atnCode, uint32_t timeoutMs, uint8_t *inBuf);
+    void txRx(int whichSpiCs, int count, uint8_t *sendBuffer, uint8_t *receiveBufer);
 
-    WORD getRemainingLength(void);
+    uint16_t getRemainingLength(void);
 
 private:
-    WORD remainingPacketLength;
-    BYTE *paddingBuffer;
+    uint16_t remainingPacketLength;
+    uint8_t *paddingBuffer;
 
-    bool readHeader(int whichSpiCs, BYTE *outBuf, BYTE *inBuf);
-    WORD swapWord(WORD val);
+    bool readHeader(int whichSpiCs, uint8_t *outBuf, uint8_t *inBuf);
+    uint16_t swapWord(uint16_t val);
 
-    void applyTxRxLimits(int whichSpiCs, BYTE *inBuff);
+    void applyTxRxLimits(int whichSpiCs, uint8_t *inBuff);
     void applyNoTxRxLimis(int whichSpiCs);
 
-    void setRemainingTxRxLen(int whichSpiCs, WORD txLen, WORD rxLen);
+    void setRemainingTxRxLen(int whichSpiCs, uint16_t txLen, uint16_t rxLen);
 };
 
 #endif // CONSPI_H

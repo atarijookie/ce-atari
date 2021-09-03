@@ -13,7 +13,7 @@
 CConSpi::CConSpi()
 {
     remainingPacketLength = -1;
-    paddingBuffer = new BYTE[PADDINGBUFFER_SIZE];
+    paddingBuffer = new uint8_t[PADDINGBUFFER_SIZE];
     memset(paddingBuffer, 0, PADDINGBUFFER_SIZE);
 }
 
@@ -29,10 +29,10 @@ void CConSpi::applyNoTxRxLimis(int whichSpiCs)
 #endif
 }
 
-bool CConSpi::waitForATN(int whichSpiCs, BYTE atnCode, DWORD timeoutMs, BYTE *inBuf)
+bool CConSpi::waitForATN(int whichSpiCs, uint8_t atnCode, uint32_t timeoutMs, uint8_t *inBuf)
 {
 #ifndef ONPC
-    BYTE outBuf[8];
+    uint8_t outBuf[8];
 
     memset(outBuf, 0, 8);
     memset(inBuf, 0, 8);
@@ -64,7 +64,7 @@ bool CConSpi::waitForATN(int whichSpiCs, BYTE atnCode, DWORD timeoutMs, BYTE *in
     }
 
     // wait for specific ATN code?
-    DWORD timeOut = Utils::getEndTime(timeoutMs);
+    uint32_t timeOut = Utils::getEndTime(timeoutMs);
 
     while(1) {
         if(Utils::getCurrentMs() >= timeOut) {              // if it takes more than allowed timeout, fail
@@ -99,14 +99,14 @@ bool CConSpi::waitForATN(int whichSpiCs, BYTE atnCode, DWORD timeoutMs, BYTE *in
 #endif
 }
 
-bool CConSpi::readHeader(int whichSpiCs, BYTE *outBuf, BYTE *inBuf)
+bool CConSpi::readHeader(int whichSpiCs, uint8_t *outBuf, uint8_t *inBuf)
 {
 #ifndef ONPC
-    WORD *inWord = (WORD *) inBuf;
-    WORD marker;
-    DWORD loops = 0;
+    uint16_t *inWord = (uint16_t *) inBuf;
+    uint16_t marker;
+    uint32_t loops = 0;
 
-    // read the first WORD, if it's not 0xcafe, then read again to synchronize
+    // read the first uint16_t, if it's not 0xcafe, then read again to synchronize
     while(sigintReceived == 0) {
         txRx(whichSpiCs, 2, outBuf, inBuf);                 // receive: 0, ATN code, txLen, rxLen
         marker = *inWord;
@@ -134,14 +134,14 @@ bool CConSpi::readHeader(int whichSpiCs, BYTE *outBuf, BYTE *inBuf)
     return true;
 }
 
-void CConSpi::applyTxRxLimits(int whichSpiCs, BYTE *inBuff)
+void CConSpi::applyTxRxLimits(int whichSpiCs, uint8_t *inBuff)
 {
 #ifndef ONPC
-    WORD *pwIn = (WORD *) inBuff;
+    uint16_t *pwIn = (uint16_t *) inBuff;
 
     // words 0 and 1 are 0 and ATN code, words 2 and 3 are txLen, rxLen);
-    WORD txLen = swapWord(pwIn[2]);
-    WORD rxLen = swapWord(pwIn[3]);
+    uint16_t txLen = swapWord(pwIn[2]);
+    uint16_t rxLen = swapWord(pwIn[3]);
 
 #ifdef DEBUG_SPI_COMMUNICATION
     Debug::out(LOG_DEBUG, "TX/RX limits: TX %d WORDs, RX %d WORDs", txLen, rxLen);
@@ -164,9 +164,9 @@ void CConSpi::applyTxRxLimits(int whichSpiCs, BYTE *inBuff)
 #endif
 }
 
-WORD CConSpi::swapWord(WORD val)
+uint16_t CConSpi::swapWord(uint16_t val)
 {
-    WORD tmp = 0;
+    uint16_t tmp = 0;
 
     tmp  = val << 8;
     tmp |= val >> 8;
@@ -174,7 +174,7 @@ WORD CConSpi::swapWord(WORD val)
     return tmp;
 }
 
-void CConSpi::setRemainingTxRxLen(int whichSpiCs, WORD txLen, WORD rxLen)
+void CConSpi::setRemainingTxRxLen(int whichSpiCs, uint16_t txLen, uint16_t rxLen)
 {
 #ifndef ONPC
 
@@ -192,7 +192,7 @@ void CConSpi::setRemainingTxRxLen(int whichSpiCs, WORD txLen, WORD rxLen)
             txRx(whichSpiCs, remLen, paddingBuffer, paddingBuffer);
         }
     } else {                    // if setting real limit
-        txLen *= 2;             // convert WORD count to BYTE count
+        txLen *= 2;             // convert uint16_t count to uint8_t count
         rxLen *= 2;
 
         if(txLen >= 8) {        // if we should TX more than 8 bytes, subtract 8 (header length)
@@ -218,16 +218,16 @@ void CConSpi::setRemainingTxRxLen(int whichSpiCs, WORD txLen, WORD rxLen)
 #endif
 }
 
-WORD CConSpi::getRemainingLength(void)
+uint16_t CConSpi::getRemainingLength(void)
 {
     return remainingPacketLength;
 }
 
-void CConSpi::txRx(int whichSpiCs, int count, BYTE *sendBuffer, BYTE *receiveBufer)
+void CConSpi::txRx(int whichSpiCs, int count, uint8_t *sendBuffer, uint8_t *receiveBufer)
 {
 #ifndef ONPC
     if(SWAP_ENDIAN) {       // swap endian on sending if required
-        BYTE tmp;
+        uint8_t tmp;
 
         for(int i=0; i<count; i += 2) {
             tmp             = sendBuffer[i+1];

@@ -39,7 +39,7 @@ bool ImageFileMedia::iopen(const char *path, bool createIfNotExists)
     }
 
     if(imageWasCreated) {               // if the image was just created, create empty image file
-        BYTE bfr[512];
+        uint8_t bfr[512];
         memset(bfr, 0, 512);
 
         Debug::out(LOG_DEBUG, "ImageFileMedia - creating %s, filling with 1MB of 0",path);
@@ -99,7 +99,7 @@ void ImageFileMedia::getCapacity(int64_t &bytes, int64_t &sectors)
     sectors = SCapacity;
 }
 
-bool ImageFileMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
+bool ImageFileMedia::readSectors(int64_t sectorNo, uint32_t count, uint8_t *bfr)
 {
     if(!isInit()) {                             // if not initialized, failed
         return false;
@@ -135,7 +135,7 @@ bool ImageFileMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
     return true;
 }
 
-bool ImageFileMedia::writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
+bool ImageFileMedia::writeSectors(int64_t sectorNo, uint32_t count, uint8_t *bfr)
 {
     if(!isInit()) {                             // if not initialized, failed
         return false;

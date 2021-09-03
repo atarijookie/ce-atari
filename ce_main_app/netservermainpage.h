@@ -1,7 +1,7 @@
 #ifndef _NETSERVERMAINPAGE_H_
 #define _NETSERVERMAINPAGE_H_
 
-#include "datatypes.h"
+#include <stdint.h>
 
 class NetServerMainPage {
 public:

@@ -143,7 +143,7 @@ std::string Version::getUrl(void)
     return url;
 }
 
-WORD Version::getChecksum(void)
+uint16_t Version::getChecksum(void)
 {
     return checksum;
 }

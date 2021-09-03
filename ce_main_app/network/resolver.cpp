@@ -32,7 +32,7 @@ int ResolverRequest::addRequest(const char *hostName)
 {
     int i, emptyIndex = -1;
 
-    DWORD   oldestTime  = 0x7fffffff;
+    uint32_t   oldestTime  = 0x7fffffff;
     int     oldestIndex = -1;
 
     // find usable slot
@@ -79,7 +79,7 @@ int ResolverRequest::addRequest(const char *hostName)
     if(iRes == 4) {         // succeeded to get IP parts
         if(IS_VALID_IP_NUMBER(a) && IS_VALID_IP_NUMBER(b) && IS_VALID_IP_NUMBER(c) && IS_VALID_IP_NUMBER(d)) {
 
-            BYTE *pIps = (BYTE *) r->data;
+            uint8_t *pIps = (uint8_t *) r->data;
             pIps[0]     = a;    // store that IP
             pIps[1]     = b;
             pIps[2]     = c;
@@ -193,9 +193,9 @@ bool ResolverRequest::processSlot(int index)                // process the reque
 
         if(ai_addr->sa_family == AF_INET) {                 // it's IPv4 addres? process it
             sockaddr_in * sa_in = (sockaddr_in *) ai_addr;  // cast to sockaddr_in
-            DWORD ip            = sa_in->sin_addr.s_addr;   // get IP
+            uint32_t ip            = sa_in->sin_addr.s_addr;   // get IP
 
-            DWORD *pip = (DWORD *) r->data;
+            uint32_t *pip = (uint32_t *) r->data;
             bool foundIt = false;
             for(int i = 0; i < r->count; i++) {             // check if we don't have that IP stored already
                 if(pip[i] == ip) {
@@ -239,9 +239,9 @@ void ResolverRequest::showSlot(int index)
     if(r->count > 0) {
         Debug::out(LOG_DEBUG, "[%d] host: %s (%s) resolved to %d IPs:", index, r->hostName, r->canonName, r->count);
 
-        DWORD *pip = (DWORD *) r->data;
+        uint32_t *pip = (uint32_t *) r->data;
         for(int i=0; i < r->count; i++) {
-            BYTE *ipb = (BYTE *) &pip[i];
+            uint8_t *ipb = (uint8_t *) &pip[i];
             Debug::out(LOG_DEBUG, "IP %d: %d.%d.%d.%d", i, ipb[0], ipb[1], ipb[2], ipb[3]);
         }
     } else {

@@ -3,7 +3,7 @@
 #include <string.h>
 
 #include "global.h"
-#include "datatypes.h"
+#include <stdint.h>
 #include "cyclicbuff.h"
 #include "debug.h"
 
@@ -15,7 +15,7 @@ void CyclicBuff::init(void)
     size     = CYCLIC_BUF_SIZE;
 }
 
-void CyclicBuff::add(BYTE val)
+void CyclicBuff::add(uint8_t val)
 {
     if(count >= CYCLIC_BUF_SIZE) {  // buffer full? quit
         return;
@@ -28,14 +28,14 @@ void CyclicBuff::add(BYTE val)
     addPos = addPos & CYCLIC_BUF_MASK;
 }
 
-BYTE CyclicBuff::get(void)
+uint8_t CyclicBuff::get(void)
 {
     if(count == 0) {                // buffer empty? quit
         return 0;
     }
     count--;                        // update count
 
-    BYTE val = buf[getPos];         // get data
+    uint8_t val = buf[getPos];         // get data
 
     getPos++;                       // update 'get' position
     getPos = getPos & CYCLIC_BUF_MASK;
@@ -43,17 +43,17 @@ BYTE CyclicBuff::get(void)
     return val;
 }
 
-BYTE CyclicBuff::peek(void)
+uint8_t CyclicBuff::peek(void)
 {
     if(count == 0) {                // buffer empty? 
         return 0;
     }
 
-    BYTE val = buf[getPos];         // just get the data
+    uint8_t val = buf[getPos];         // just get the data
     return val;
 }
 
-BYTE CyclicBuff::peekWithOffset(int offset)
+uint8_t CyclicBuff::peekWithOffset(int offset)
 {
     if(offset >= count) {                                           // not enough data in buffer? quit
         return 0;
@@ -61,7 +61,7 @@ BYTE CyclicBuff::peekWithOffset(int offset)
 
     int getPosWithOffet = (getPos + offset) & CYCLIC_BUF_MASK;      // calculate get position
 
-    BYTE val = buf[getPosWithOffet];                                // get data
+    uint8_t val = buf[getPosWithOffet];                                // get data
     return val;
 }
 

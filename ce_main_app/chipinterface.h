@@ -1,7 +1,7 @@
 #ifndef CHIPINTERFACE_H
 #define CHIPINTERFACE_H
 
-#include "datatypes.h"
+#include <stdint.h>
 
 // types of chip interface, as returned by 
 #define CHIP_IF_V1_V2   1
@@ -54,7 +54,7 @@
 #define CMD_DRIVE_ENABLED           0xa0
 #define CMD_DRIVE_DISABLED          0xb0
 
-#define MAKEWORD(A, B)  ( (((WORD)A)<<8) | ((WORD)B) )
+#define MAKEWORD(A, B)  ( (((uint16_t)A)<<8) | ((uint16_t)B) )
 
 #define HDD_FW_RESPONSE_LEN     12
 #define FDD_FW_RESPONSE_LEN     8
@@ -96,41 +96,41 @@ public:
 
     //----------------
     // if following function returns true, some command is waiting for action in the inBuf and hardNotFloppy flag distiguishes hard-drive or floppy-drive command
-    virtual bool actionNeeded(bool &hardNotFloppy, BYTE *inBuf) = 0;
+    virtual bool actionNeeded(bool &hardNotFloppy, uint8_t *inBuf) = 0;
 
     // to handle FW version, first call setHDDconfig() / setFDDconfig() to fill config into bufOut, then call getFWversion to get the FW version from chip
-    virtual void getFWversion(bool hardNotFloppy, BYTE *inFwVer) = 0;
-    virtual void setHDDconfig(BYTE hddEnabledIDs, BYTE sdCardId, BYTE fddEnabledSlots, bool setNewFloppyImageLed, BYTE newFloppyImageLed);
+    virtual void getFWversion(bool hardNotFloppy, uint8_t *inFwVer) = 0;
+    virtual void setHDDconfig(uint8_t hddEnabledIDs, uint8_t sdCardId, uint8_t fddEnabledSlots, bool setNewFloppyImageLed, uint8_t newFloppyImageLed);
     virtual void setFDDconfig(bool setFloppyConfig, bool fddEnabled, int id, int writeProtected, bool setDiskChanged, bool diskChanged);
 
     //----------------
     // HDD: READ/WRITE functions for large (>1 MB) block transfers (Scsi::readSectors(), Scsi::writeSectors()) and also by the convenient functions above
 
-    virtual bool hdd_sendData_start(DWORD totalDataCount, BYTE scsiStatus, bool withStatus) = 0;
-    virtual bool hdd_sendData_transferBlock(BYTE *pData, DWORD dataCount) = 0;
+    virtual bool hdd_sendData_start(uint32_t totalDataCount, uint8_t scsiStatus, bool withStatus) = 0;
+    virtual bool hdd_sendData_transferBlock(uint8_t *pData, uint32_t dataCount) = 0;
 
-    virtual bool hdd_recvData_start(BYTE *recvBuffer, DWORD totalDataCount) = 0;
-    virtual bool hdd_recvData_transferBlock(BYTE *pData, DWORD dataCount) = 0;
+    virtual bool hdd_recvData_start(uint8_t *recvBuffer, uint32_t totalDataCount) = 0;
+    virtual bool hdd_recvData_transferBlock(uint8_t *pData, uint32_t dataCount) = 0;
 
-    virtual bool hdd_sendStatusToHans(BYTE statusByte) = 0;
+    virtual bool hdd_sendStatusToHans(uint8_t statusByte) = 0;
 
     //----------------
     // FDD: all you need for handling the floppy interface
-    virtual void fdd_sendTrackToChip(int byteCount, BYTE *encodedTrack) = 0;    // send encodedTrack to chip for MFM streaming
-    virtual BYTE* fdd_sectorWritten(int &side, int &track, int &sector, int &byteCount) = 0;
+    virtual void fdd_sendTrackToChip(int byteCount, uint8_t *encodedTrack) = 0;    // send encodedTrack to chip for MFM streaming
+    virtual uint8_t* fdd_sectorWritten(int &side, int &track, int &sector, int &byteCount) = 0;
 
 protected:
-    BYTE fwResponseBfr[FW_RESPONSE_LEN_BIGGER];
+    uint8_t fwResponseBfr[FW_RESPONSE_LEN_BIGGER];
 
     struct {
         struct {
-            WORD acsi;
-            WORD fdd;
+            uint16_t acsi;
+            uint16_t fdd;
         } current;
 
         struct {
-            WORD acsi;
-            WORD fdd;
+            uint16_t acsi;
+            uint16_t fdd;
         } next;
 
         bool skipNextSet;
@@ -142,10 +142,10 @@ protected:
     } response;
 
     virtual void responseStart(int bufferLengthInBytes);        // use this to start creating response (commands) to Hans or Franz
-    virtual void responseAddWord(BYTE *bfr, WORD value);        // add a WORD to the response (command) to Hans or Franz
-    virtual void responseAddByte(BYTE *bfr, BYTE value);        // add a BYTE to the response (command) to Hans or Franz
+    virtual void responseAddWord(uint8_t *bfr, uint16_t value);        // add a uint16_t to the response (command) to Hans or Franz
+    virtual void responseAddByte(uint8_t *bfr, uint8_t value);        // add a uint8_t to the response (command) to Hans or Franz
 
-    static void convertXilinxInfo(BYTE xilinxInfo);
+    static void convertXilinxInfo(uint8_t xilinxInfo);
 
     int instanceIndex;
 };

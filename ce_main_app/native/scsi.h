@@ -11,7 +11,7 @@
 #include "translatedbootmedia.h"
 #include "sdmedia.h"
 
-#include "../datatypes.h"
+#include <stdint.h>
 #include "../isettingsuser.h"
 
 #define SCSI_ACCESSTYPE_FULL            0
@@ -53,12 +53,12 @@ typedef struct {
 typedef struct {
     int     attachedMediaIndex; // index in attachedMedia[]
 
-    BYTE    accessType;         // SCSI_ACCESSTYPE_FULL || SCSI_ACCESSTYPE_READ_ONLY || SCSI_ACCESSTYPE_NO_DATA
+    uint8_t    accessType;         // SCSI_ACCESSTYPE_FULL || SCSI_ACCESSTYPE_READ_ONLY || SCSI_ACCESSTYPE_NO_DATA
 
-    BYTE    LastStatus;         // last returned SCSI status
-    BYTE    SCSI_ASC;           // additional sense code
-    BYTE    SCSI_ASCQ;          // additional sense code qualifier
-    BYTE    SCSI_SK;            // sense key
+    uint8_t    LastStatus;         // last returned SCSI status
+    uint8_t    SCSI_ASC;           // additional sense code
+    uint8_t    SCSI_ASCQ;          // additional sense code qualifier
+    uint8_t    SCSI_SK;            // sense key
 } TDevInfo;
 
 
@@ -77,7 +77,7 @@ public:
     void detachAll(void);
     void detachAllUsbMedia(void);
 
-    void processCommand(BYTE *command);
+    void processCommand(uint8_t *command);
 
     void updateTranslatedBootMedia(void);
 
@@ -92,7 +92,7 @@ public:
 private:
     AcsiDataTrans   *dataTrans;
 
-    BYTE            acsiId;                 // current acsi ID for the command
+    uint8_t            acsiId;                 // current acsi ID for the command
     IMedia          *dataMedia;             // current data media valid for current ACSI ID
 
     NoMedia             noMedia;
@@ -100,10 +100,10 @@ private:
     TranslatedBootMedia tranBootMedia;
     SdMedia             sdMedia;
 
-    BYTE            *dataBuffer;
-    BYTE            *dataBuffer2;
+    uint8_t            *dataBuffer;
+    uint8_t            *dataBuffer2;
 
-    BYTE            shitHasHappened;
+    uint8_t            shitHasHappened;
 
     bool            sendDataAndStatus_notJustStatus;
 
@@ -112,19 +112,19 @@ private:
 
     AcsiIDinfo      acsiIdInfo;
 
-    BYTE *cmd;
+    uint8_t *cmd;
 
     bool isICDcommand(void);
 
     // for 6-byte long commands - from scsi6
-    void ProcScsi6(BYTE lun, BYTE justCmd);
+    void ProcScsi6(uint8_t lun, uint8_t justCmd);
 
-    void SCSI_RequestSense(BYTE lun);
+    void SCSI_RequestSense(uint8_t lun);
     void SCSI_FormatUnit(void);
 
     void SCSI_ReadWrite6(bool readNotWrite);
 
-    void SCSI_Inquiry(BYTE lun);
+    void SCSI_Inquiry(uint8_t lun);
     void SCSI_ModeSense6(void);
 
     void SendOKstatus(void);
@@ -133,28 +133,28 @@ private:
     void ClearTheUnitAttention(void);
     void returnInvalidCommand(void);
 
-    void SendEmptySecotrs(WORD sectors);
+    void SendEmptySecotrs(uint16_t sectors);
 
     // for commands longer than 6 bytes - from scsiICD
-    void ProcICD(BYTE lun, BYTE justCmd);
+    void ProcICD(uint8_t lun, uint8_t justCmd);
 
     void SCSI_ReadCapacity(void);
     void ICD7_to_SCSI6(void);
     void SCSI_ReadWrite10(bool readNotWrite);
     void SCSI_Verify(void);
 
-    void showCommand(WORD id, WORD length, WORD errCode);
+    void showCommand(uint16_t id, uint16_t length, uint16_t errCode);
 
-    void readWriteGeneric(bool readNotWrite, DWORD startingSector, DWORD sectorCount);
-    void storeSenseAndSendStatus(BYTE status, BYTE senseKey, BYTE additionalSenseCode, BYTE ascq);
+    void readWriteGeneric(bool readNotWrite, uint32_t startingSector, uint32_t sectorCount);
+    void storeSenseAndSendStatus(uint8_t status, uint8_t senseKey, uint8_t additionalSenseCode, uint8_t ascq);
 
-    bool readSectors_small  (DWORD startSectorNo, DWORD sectorCount);
-    bool writeSectors_small (DWORD startSectorNo, DWORD sectorCount);
+    bool readSectors_small  (uint32_t startSectorNo, uint32_t sectorCount);
+    bool writeSectors_small (uint32_t startSectorNo, uint32_t sectorCount);
 
-    bool readSectors_big    (DWORD startSectorNo, DWORD sectorCount);
-    bool writeSectors_big   (DWORD startSectorNo, DWORD sectorCount);
+    bool readSectors_big    (uint32_t startSectorNo, uint32_t sectorCount);
+    bool writeSectors_big   (uint32_t startSectorNo, uint32_t sectorCount);
 
-    bool compareSectors (DWORD startSectorNo, DWORD sectorCount);
+    bool compareSectors (uint32_t startSectorNo, uint32_t sectorCount);
     bool eraseMedia(void);
 
     void loadSettings(void);
@@ -168,7 +168,7 @@ private:
 
     void initializeAttachedMediaVars(int index);
 
-    const char *getCommandName(BYTE cmd);
+    const char *getCommandName(uint8_t cmd);
 };
 
 #endif

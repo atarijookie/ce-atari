@@ -14,7 +14,7 @@ bool FloppyImageMsa::open(const char *fileName)
         return false;
 
     // Read header
-    WORD id, spt, sides, trackStart, trackEnd;
+    uint16_t id, spt, sides, trackStart, trackEnd;
     fread(&id,          2,1,fajl);      Utils::SWAPWORD(id);
     fread(&spt,         2,1,fajl);      Utils::SWAPWORD(spt);
     fread(&sides,       2,1,fajl);      Utils::SWAPWORD(sides);
@@ -54,7 +54,7 @@ bool FloppyImageMsa::loadImageIntoMemory(void)
     }
 
     long imageSize = 0;
-    BYTE *pDiskBuffer = MSA_UnCompress(image.data, &imageSize);
+    uint8_t *pDiskBuffer = MSA_UnCompress(image.data, &imageSize);
 
     free(image.data);                           // free the memory which was used for file reading
 

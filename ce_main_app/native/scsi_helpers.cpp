@@ -20,7 +20,7 @@ bool Scsi::isICDcommand(void)
 }
 
 //----------------------------------------------
-void Scsi::storeSenseAndSendStatus(BYTE status, BYTE senseKey, BYTE additionalSenseCode, BYTE ascq)
+void Scsi::storeSenseAndSendStatus(uint8_t status, uint8_t senseKey, uint8_t additionalSenseCode, uint8_t ascq)
 {
     // store sense for REQUEST SENSE command
     devInfo[acsiId].LastStatus  = status;
@@ -70,14 +70,14 @@ void Scsi::ClearTheUnitAttention(void)
 }
 
 //----------------------------------------------
-void Scsi::showCommand(WORD id, WORD length, WORD errCode)
+void Scsi::showCommand(uint16_t id, uint16_t length, uint16_t errCode)
 {
     char tmp[64];
 
     memset(tmp, 0, 64);
     sprintf(tmp, "%d - ", id);
 
-    WORD i;
+    uint16_t i;
 
     for(i=0; i<length; i++) {
         sprintf(tmp + 4 + i*3, "%02x ", cmd[i]);
@@ -111,7 +111,7 @@ const char * Scsi::SourceTypeStr(int sourceType)
     }
 }
 
-const char * Scsi::getCommandName(BYTE cmd)
+const char * Scsi::getCommandName(uint8_t cmd)
 {
     switch(cmd) {
         case SCSI_C_WRITE6:             return "WRITE(6)";

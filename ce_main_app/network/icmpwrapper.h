@@ -21,7 +21,7 @@ class TNetConnection;
 class TStingDgram {
 public:
     TStingDgram() {
-        data = new BYTE[STING_DGRAM_MAXSIZE];
+        data = new uint8_t[STING_DGRAM_MAXSIZE];
         clear();
     }
 
@@ -39,9 +39,9 @@ public:
         return (count == 0);
     }
 
-    BYTE  *data;
-    WORD  count;
-    DWORD time;
+    uint8_t  *data;
+    uint16_t  count;
+    uint32_t time;
 };
 
 //-------------------------------------
@@ -49,18 +49,18 @@ public:
 class TRawSocks{
 public:
     TRawSocks() {
-        packet      = (char*) new BYTE[ sizeof(struct iphdr) + sizeof(struct icmphdr) + CON_BFR_SIZE];
+        packet      = (char*) new uint8_t[ sizeof(struct iphdr) + sizeof(struct icmphdr) + CON_BFR_SIZE];
 
         ip          = (struct iphdr*)    packet;                                                    // pointer to IP   header (start of packet)
         icmp        = (struct icmphdr*) (packet + sizeof(struct iphdr));                            // pointer to ICMP header (that is just beyond IP header)
-        data        = (BYTE *)          (packet + sizeof(struct iphdr) + sizeof(struct icmphdr));   // pointer to ICMP data   (located beyond ICMP header)
+        data        = (uint8_t *)          (packet + sizeof(struct iphdr) + sizeof(struct icmphdr));   // pointer to ICMP data   (located beyond ICMP header)
     }
 
     ~TRawSocks() {
         delete []packet;
     }
 
-    void setIpHeader(DWORD src_addr, DWORD dst_addr, WORD dataLength) {
+    void setIpHeader(uint32_t src_addr, uint32_t dst_addr, uint16_t dataLength) {
         ip->ihl         = 5;
         ip->version     = 4;        // IPv4
         ip->tos         = 0;
@@ -72,7 +72,7 @@ public:
         ip->daddr       = htonl(dst_addr);
 
         ip->check       = 0;                                                // first set checksum to zero
-        ip->check       = checksum((WORD *) ip, sizeof(struct iphdr));      // then calculate real checksum and store it
+        ip->check       = checksum((uint16_t *) ip, sizeof(struct iphdr));      // then calculate real checksum and store it
     }
 
     void setIcmpHeader(int type, int code, int id, int sequence) {
@@ -82,15 +82,15 @@ public:
         icmp->un.echo.sequence  = htons(sequence);
 
         icmp->checksum = 0;                                                 // first set checksum to zero
-        icmp->checksum = checksum((WORD *) icmp, sizeof(struct icmphdr));   // then calculate real checksum and store it
+        icmp->checksum = checksum((uint16_t *) icmp, sizeof(struct icmphdr));   // then calculate real checksum and store it
 
         echoId = id;
     }
 
-    static WORD checksum(WORD *addr, int len) {
+    static uint16_t checksum(uint16_t *addr, int len) {
         int sum         = 0;
-        WORD answer  = 0;
-        WORD *w      = addr;
+        uint16_t answer  = 0;
+        uint16_t *w      = addr;
         int nleft       = len;
 
         while (nleft > 1) {     // sum WORDs in a loop
@@ -114,9 +114,9 @@ public:
     char*           packet;
     struct iphdr*   ip;
     struct icmphdr* icmp;
-    BYTE*           data;
+    uint8_t*           data;
 
-    WORD            echoId;
+    uint16_t            echoId;
 };
 
 //-------------------------------------
@@ -130,19 +130,19 @@ public:
     ~IcmpWrapper (void);
 
     void  receiveAll   (void);
-    BYTE  send         (DWORD destinIP, int icmpType, int icmpCode, WORD length, BYTE *data);
+    uint8_t  send         (uint32_t destinIP, int icmpType, int icmpCode, uint16_t length, uint8_t *data);
 
     void  closeAndClean(void);
 
-    DWORD calcDataByteCountTotal(void);
+    uint32_t calcDataByteCountTotal(void);
     int   calcHowManyDatagramsFitIntoBuffer(int bufferSizeBytes);
 
     int   getNonEmptyIndex(void);
     TStingDgram      dgrams[MAX_STING_DGRAMS];
 
 private:
-    BYTE            *recvBfr;
-    DWORD            icmpDataCount;
+    uint8_t            *recvBfr;
+    uint32_t            icmpDataCount;
 
     TRawSocks        rawSockHeads;      // this holds the headers for RAW socket
     TNetConnection  *rawSock;           // this is info about RAW socket - used for ICMP

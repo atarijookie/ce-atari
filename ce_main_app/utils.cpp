@@ -35,7 +35,7 @@
 #include "mounter.h"
 #include "settings.h"
 
-DWORD Utils::getCurrentMs(void)
+uint32_t Utils::getCurrentMs(void)
 {
     struct timespec tp;
     int res;
@@ -46,20 +46,20 @@ DWORD Utils::getCurrentMs(void)
         return 0;
     }
 
-    DWORD val = (tp.tv_sec * 1000) + (tp.tv_nsec / 1000000);    // convert to milli seconds
+    uint32_t val = (tp.tv_sec * 1000) + (tp.tv_nsec / 1000000);    // convert to milli seconds
     return val;
 }
 
-DWORD Utils::getEndTime(DWORD offsetFromNow)
+uint32_t Utils::getEndTime(uint32_t offsetFromNow)
 {
-    DWORD val;
+    uint32_t val;
 
     val = getCurrentMs() + offsetFromNow;
 
     return val;
 }
 
-void Utils::attributesHostToAtari(bool isReadOnly, bool isDir, BYTE &attrAtari)
+void Utils::attributesHostToAtari(bool isReadOnly, bool isDir, uint8_t &attrAtari)
 {
     attrAtari = 0;
 
@@ -86,9 +86,9 @@ void Utils::attributesHostToAtari(bool isReadOnly, bool isDir, BYTE &attrAtari)
 */
 }
 
-WORD Utils::fileTimeToAtariDate(struct tm *ptm)
+uint16_t Utils::fileTimeToAtariDate(struct tm *ptm)
 {
-    WORD atariDate = 0;
+    uint16_t atariDate = 0;
 
     if(ptm == NULL) {
         return 0;
@@ -101,9 +101,9 @@ WORD Utils::fileTimeToAtariDate(struct tm *ptm)
     return atariDate;
 }
 
-WORD Utils::fileTimeToAtariTime(struct tm *ptm)
+uint16_t Utils::fileTimeToAtariTime(struct tm *ptm)
 {
-    WORD atariTime = 0;
+    uint16_t atariTime = 0;
 
     if(ptm == NULL) {
         return 0;
@@ -116,10 +116,10 @@ WORD Utils::fileTimeToAtariTime(struct tm *ptm)
     return atariTime;
 }
 
-void Utils::fileDateTimeToHostTime(WORD atariDate, WORD atariTime, struct tm *ptm)
+void Utils::fileDateTimeToHostTime(uint16_t atariDate, uint16_t atariTime, struct tm *ptm)
 {
-    WORD year, month, day;
-    WORD hours, minutes, seconds;
+    uint16_t year, month, day;
+    uint16_t hours, minutes, seconds;
 
     year    = (atariDate >> 9)   + 1980; // 0-119 with 0=1980
     month   = (atariDate >> 5)   & 0x0f; // 1-12
@@ -195,9 +195,9 @@ void Utils::splitFilenameFromExt(const std::string &filenameAndExt, std::string 
     }
 }
 
-void Utils::sleepMs(DWORD ms)
+void Utils::sleepMs(uint32_t ms)
 {
-    DWORD us = ms * 1000;
+    uint32_t us = ms * 1000;
 
     usleep(us);
 }
@@ -250,7 +250,7 @@ bool Utils::copyFile(FILE *from, std::string &dst)
 
 bool Utils::copyFileByHandles(FILE *from, FILE *to)
 {
-    BYTE bfr64k[64 * 1024];
+    uint8_t bfr64k[64 * 1024];
 
     while(1) {                                              // copy the file in loop 
         size_t read = fread(bfr64k, 1, 64 * 1024, from);
@@ -269,9 +269,9 @@ bool Utils::copyFileByHandles(FILE *from, FILE *to)
     return true;
 }
 
-void Utils::SWAPWORD(WORD &w)
+void Utils::SWAPWORD(uint16_t &w)
 {
-    WORD a,b;
+    uint16_t a,b;
 
     a = w >> 8;         // get top
     b = w  & 0xff;      // get bottom
@@ -279,9 +279,9 @@ void Utils::SWAPWORD(WORD &w)
     w = (b << 8) | a;   // store swapped
 }
 
-WORD Utils::SWAPWORD2(WORD w)
+uint16_t Utils::SWAPWORD2(uint16_t w)
 {
-    WORD a,b;
+    uint16_t a,b;
 
     a = w >> 8;         // get top
     b = w  & 0xff;      // get bottom
@@ -290,7 +290,7 @@ WORD Utils::SWAPWORD2(WORD w)
     return w;
 }
 
-void Utils::getIpAdds(BYTE *bfrIPs, BYTE *bfrMasks)
+void Utils::getIpAdds(uint8_t *bfrIPs, uint8_t *bfrMasks)
 {
     struct ifaddrs *ifaddr, *ifa;
     int family, n;
@@ -319,11 +319,11 @@ void Utils::getIpAdds(BYTE *bfrIPs, BYTE *bfrMasks)
         sockaddr_in *saiIp  = (sockaddr_in *) ifa->ifa_addr;
         sockaddr_in *saiMsk = (sockaddr_in *) ifa->ifa_netmask;
 
-        DWORD ip            = saiIp->sin_addr.s_addr;
-        DWORD mask          = saiMsk->sin_addr.s_addr;
+        uint32_t ip            = saiIp->sin_addr.s_addr;
+        uint32_t mask          = saiMsk->sin_addr.s_addr;
 
-        BYTE *pIp   = NULL;
-        BYTE *pMsk  = NULL;
+        uint8_t *pIp   = NULL;
+        uint8_t *pMsk  = NULL;
 
         if(strcmp(ifa->ifa_name,"eth0")==0) {                   // for eth0 - store at offset 0
             pIp = bfrIPs;
@@ -346,17 +346,17 @@ void Utils::getIpAdds(BYTE *bfrIPs, BYTE *bfrMasks)
         }
 
         pIp[0] = 1;                                             // enabled?
-        pIp[1] = (BYTE)  ip;                                    // store the ip
-        pIp[2] = (BYTE) (ip >>  8);
-        pIp[3] = (BYTE) (ip >> 16);
-        pIp[4] = (BYTE) (ip >> 24);
+        pIp[1] = (uint8_t)  ip;                                    // store the ip
+        pIp[2] = (uint8_t) (ip >>  8);
+        pIp[3] = (uint8_t) (ip >> 16);
+        pIp[4] = (uint8_t) (ip >> 24);
 
         if(pMsk) {
             pMsk[0] = 1;                                        // enabled?
-            pMsk[1] = (BYTE)  mask;                             // store the mask
-            pMsk[2] = (BYTE) (mask >>  8);
-            pMsk[3] = (BYTE) (mask >> 16);
-            pMsk[4] = (BYTE) (mask >> 24);
+            pMsk[1] = (uint8_t)  mask;                             // store the mask
+            pMsk[2] = (uint8_t) (mask >>  8);
+            pMsk[3] = (uint8_t) (mask >> 16);
+            pMsk[4] = (uint8_t) (mask >> 24);
         }
     }
 
@@ -370,9 +370,9 @@ void Utils::forceSync(void)
     Mounter::add(tmr);
 }
 
-WORD Utils::getWord(BYTE *bfr)
+uint16_t Utils::getWord(uint8_t *bfr)
 {
-    WORD val = 0;
+    uint16_t val = 0;
 
     val = bfr[0];       // get hi
     val = val << 8;
@@ -382,9 +382,9 @@ WORD Utils::getWord(BYTE *bfr)
     return val;
 }
 
-DWORD Utils::getDword(BYTE *bfr)
+uint32_t Utils::getDword(uint8_t *bfr)
 {
-    DWORD val = 0;
+    uint32_t val = 0;
 
     val = bfr[0];       // get hi
     val = val << 8;
@@ -400,9 +400,9 @@ DWORD Utils::getDword(BYTE *bfr)
     return val;
 }
 
-DWORD Utils::get24bits(BYTE *bfr)
+uint32_t Utils::get24bits(uint8_t *bfr)
 {
-    DWORD val = 0;
+    uint32_t val = 0;
 
     val  = bfr[0];       // get hi
     val  = val << 8;
@@ -415,13 +415,13 @@ DWORD Utils::get24bits(BYTE *bfr)
     return val;
 }
 
-void Utils::storeWord(BYTE *bfr, WORD val)
+void Utils::storeWord(uint8_t *bfr, uint16_t val)
 {
     bfr[0] = val >> 8;  // store hi
     bfr[1] = val;       // store lo
 }
 
-void Utils::storeDword(BYTE *bfr, DWORD val)
+void Utils::storeDword(uint8_t *bfr, uint32_t val)
 {
     bfr[0] = val >> 24; // store hi
     bfr[1] = val >> 16; // store mid hi

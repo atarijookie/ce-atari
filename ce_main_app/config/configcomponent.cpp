@@ -11,7 +11,7 @@
 #define HEARTBEATSTATECHAR_COUNT    4
 char heartBeatStateChar[HEARTBEATSTATECHAR_COUNT] = {'|', '/', '-', '\\'};
 
-extern DWORD lastUpdateCheck;
+extern uint32_t lastUpdateCheck;
 
 ConfigComponent::ConfigComponent(ConfigStream *parent, ComponentType type, std::string text, unsigned int maxLen, int x, int y, int gotoOffset)
 {
@@ -53,10 +53,10 @@ ConfigComponent::ConfigComponent(ConfigStream *parent, ComponentType type, std::
     textOptions = TEXT_OPTION_ALLOW_ALL;    // no restrictions on chars
 }
 
-void ConfigComponent::getStream(bool fullNotChange, BYTE *bfr, int &len)
+void ConfigComponent::getStream(bool fullNotChange, uint8_t *bfr, int &len)
 {
     len = 0;
-    BYTE *bfrStart = bfr;
+    uint8_t *bfrStart = bfr;
 
     if(!fullNotChange && !changed) {                // if we're displaying only a change and change didn't occur, quit
         return;
@@ -192,7 +192,7 @@ void ConfigComponent::getStream(bool fullNotChange, BYTE *bfr, int &len)
                 }
             }
         } else{                                         // if failed to open the file
-            DWORD now = Utils::getCurrentMs();
+            uint32_t now = Utils::getCurrentMs();
 
             if((now - lastUpdateCheck) < FAILED_UPDATE_CHECK_TIME) {    // if within valid time for checking for update
                 len = strlen("unknown");
@@ -302,7 +302,7 @@ bool ConfigComponent::isChecked(void)
     return checked;
 }
 
-void ConfigComponent::onKeyPressed(BYTE key)
+void ConfigComponent::onKeyPressed(uint8_t key)
 {
     if(type == label || type == heartBeat || type == updateStatus) {    // do nothing on key pressed for these components
         return;
@@ -332,7 +332,7 @@ void ConfigComponent::onKeyPressed(BYTE key)
     }
 }
 
-void ConfigComponent::handleEditLineKeyPress(BYTE key)
+void ConfigComponent::handleEditLineKeyPress(uint8_t key)
 {
     if(key == KEY_LEFT) {           // arrow left?
         if(cursorPos > 0) {
@@ -444,7 +444,7 @@ void ConfigComponent::setLimitedShowSize(unsigned int newShowSize)
     isLimitedShowSize   = true;
 }
 
-BYTE ConfigComponent::filterTextKey(BYTE key)
+uint8_t ConfigComponent::filterTextKey(uint8_t key)
 {
     // if any of these controll keys were pressed, filter them out - they are not a valid TEXT keys
     if( (key >= KEY_UP      && key <= KEY_RIGHT)    ||
@@ -481,7 +481,7 @@ BYTE ConfigComponent::filterTextKey(BYTE key)
     return 0;
 }
 
-bool ConfigComponent::textOptionSet(WORD textOption)
+bool ConfigComponent::textOptionSet(uint16_t textOption)
 {
     if((textOptions & textOption) == textOption) {
         return true;
@@ -490,7 +490,7 @@ bool ConfigComponent::textOptionSet(WORD textOption)
     return false;
 }
 
-bool ConfigComponent::isLetter(BYTE key)
+bool ConfigComponent::isLetter(uint8_t key)
 {
     if(key >= 'A' && key <= 'Z') {
         return true;
@@ -503,7 +503,7 @@ bool ConfigComponent::isLetter(BYTE key)
     return false;
 }
 
-bool ConfigComponent::isSmallLetter(BYTE key)
+bool ConfigComponent::isSmallLetter(uint8_t key)
 {
     if(key >= 'a' && key <= 'z') {
         return true;
@@ -513,7 +513,7 @@ bool ConfigComponent::isSmallLetter(BYTE key)
 }
 
 
-bool ConfigComponent::isOther(BYTE key)
+bool ConfigComponent::isOther(uint8_t key)
 {
     if(isLetter(key)) {
         return false;
@@ -526,7 +526,7 @@ bool ConfigComponent::isOther(BYTE key)
     return true;
 }
 
-bool ConfigComponent::isNumber(BYTE key)
+bool ConfigComponent::isNumber(uint8_t key)
 {
     if(key >= '0' && key <= '9') {
         return true;
@@ -563,7 +563,7 @@ bool ConfigComponent::canFocus(void)
     return (type != label && type != heartBeat && type != updateStatus);        // can focus if not one of these components
 }
 
-BYTE *ConfigComponent::terminal_addGoto(BYTE *bfr, int x, int y)
+uint8_t *ConfigComponent::terminal_addGoto(uint8_t *bfr, int x, int y)
 {
     bfr[0] = 27;
     bfr[1] = 'Y';
@@ -573,7 +573,7 @@ BYTE *ConfigComponent::terminal_addGoto(BYTE *bfr, int x, int y)
     return (bfr + 4);
 }
 
-BYTE *ConfigComponent::terminal_addReverse(BYTE *bfr, bool onNotOff)
+uint8_t *ConfigComponent::terminal_addReverse(uint8_t *bfr, bool onNotOff)
 {
     bfr[0] = 27;
 
@@ -586,7 +586,7 @@ BYTE *ConfigComponent::terminal_addReverse(BYTE *bfr, bool onNotOff)
     return (bfr + 2);
 }
 
-BYTE *ConfigComponent::terminal_addCursorOn(BYTE *bfr, bool on)
+uint8_t *ConfigComponent::terminal_addCursorOn(uint8_t *bfr, bool on)
 {
     bfr[0] = 27;
 
@@ -599,7 +599,7 @@ BYTE *ConfigComponent::terminal_addCursorOn(BYTE *bfr, bool on)
     return (bfr + 2);
 }
 
-BYTE *ConfigComponent::terminal_addGotoCurrentCursor(BYTE *bfr, int &cnt)
+uint8_t *ConfigComponent::terminal_addGotoCurrentCursor(uint8_t *bfr, int &cnt)
 {
     cnt = 0;
 

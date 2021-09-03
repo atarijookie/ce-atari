@@ -17,10 +17,10 @@ class DateAcsiCommand
 public:
   DateAcsiCommand(AcsiDataTrans *dt, ConfigService *ds);
   ~DateAcsiCommand();
-  void processCommand(BYTE *command);
+  void processCommand(uint8_t *command);
 private:
   AcsiDataTrans       *dataTrans;
   ConfigService   *pxDateService;
-  BYTE    *cmd;
+  uint8_t    *cmd;
 };
 #endif

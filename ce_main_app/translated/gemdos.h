@@ -6,7 +6,7 @@
 /* ACSI/SCSI command arguments :
  * arg1 = drive index
  * returns a buffer with :
- * offset 0  WORD drive bitmap (bitmap of enabled drives from A to P)
+ * offset 0  uint16_t drive bitmap (bitmap of enabled drives from A to P)
  * returns E_OK or E_NOTHANDLED */
 #define GEMDOS_Dgetdrv      0x19
 /* No argument
@@ -30,16 +30,16 @@
 #define GEMDOS_Fsfirst      0x4e
 /* ACSI/SCSI command arguments :
  * data buffer containing :
- * offset 0  DWORD dta address on ST used as identifier
- * offset 4  BYTE find attributes FA_READONLY, FA_HIDDEN, FA_SYSTEM, FA_DIR, FA_ARCHIVE
+ * offset 0  uint32_t dta address on ST used as identifier
+ * offset 4  uint8_t find attributes FA_READONLY, FA_HIDDEN, FA_SYSTEM, FA_DIR, FA_ARCHIVE
  * offset 5  character string of the search string (C:\PATH\*.*)
  * returns E_OK or E_NOTHANDLED / EINTRN / E_WAITING_FOR_MOUNT / EFILNF */
 #define GEMDOS_Fsnext       0x4f
 /* ACSI/SCSI command arguments :
- * arg1,arg2,arg3,arg4 = DWORD dta address on ST used as identifier
- * arg5,arg6 = WORD index of first item to send to ST
+ * arg1,arg2,arg3,arg4 = uint32_t dta address on ST used as identifier
+ * arg5,arg6 = uint16_t index of first item to send to ST
  * returns a buffer with :
- * offset 0   WORD count of DTA transfered
+ * offset 0   uint16_t count of DTA transfered
  * offset 2   n * DTA structures, 23bytes each (see DTAshort below)
  * returns E_OK or EINTRN / EIHNDL / ENMFIL */
 
@@ -48,10 +48,10 @@
 /* ACSI/SCSI command arguments :
  * arg1 = drive index
  * returns a buffer with :
- * offset 0   DWORD free cluster count
- * offset 4   DWORD total cluster count
- * offset 8   DWORD sector size (512)
- * offset 12  DWORD sector count per cluster
+ * offset 0   uint32_t free cluster count
+ * offset 4   uint32_t total cluster count
+ * offset 8   uint32_t sector size (512)
+ * offset 12  uint32_t sector count per cluster
  * returns E_OK or E_NOTHANDLED */
 #define GEMDOS_Dcreate      0x39
 /* ACSI/SCSI command arguments :
@@ -74,7 +74,7 @@
  * arg2,arg3 = time
  * arg4,arg5 = date
  * return a data buffer
- *  offset 0 : WORD time
+ *  offset 0 : uint16_t time
  *  offset 2 : DORD date
  * returns E_OK or E_NOTHANDLED / EINTRN */
 #define GEMDOS_Fdelete      0x41
@@ -136,7 +136,7 @@
  * arg1 = subcommand : PEXEC_CREATE_IMAGE / PEXEC_GET_BPB / PEXEC_READ_SECTOR / PEXEC_WRITE_SECTOR
  * - PEXEC_CREATE_IMAGE :
  *   512 byte data buffer :
- *   offset 0  WORD mode (ignored ?)
+ *   offset 0  uint16_t mode (ignored ?)
  *   offset 2  char string of program path
  *   returns E_NOTHANDLED / E_WAITING_FOR_MOUNT / EFILNF / EACCDN / EINTRN / E_OK
  * - PEXEC_GET_BPB :
@@ -147,13 +147,13 @@
  *   offset 384 PRG path
  *   returns E_OK
  * - PEXEC_READ_SECTOR :
- *   arg2,arg3 : WORD starting sector
- *   arg4,arg5 : WORD sector count
+ *   arg2,arg3 : uint16_t starting sector
+ *   arg4,arg5 : uint16_t sector count
  *   returns a byte buffer with the requested sector data
  *   returns E_OK or EINTRN
  * - PEXEC_WRITE_SECTOR :
- *   arg2,arg3 : WORD starting sector
- *   arg4,arg5 : WORD sector count
+ *   arg2,arg3 : uint16_t starting sector
+ *   arg4,arg5 : uint16_t sector count
  *   + a data buffer for sector data
  *   returns E_OK or EINTRN
  */
@@ -172,56 +172,56 @@
 /* called on the startup of CosmosEx translated disk driver
  * ACSI/SCSI command arguments :
  * 512 byte data buffer :
- * offset 0  WORD TOS Version
- * offset 2  WORD current resolution
+ * offset 0  uint16_t TOS Version
+ * offset 2  uint16_t current resolution
  * offset 4  drives bitmap
  * returns E_OK or EINTRN */
 #define GD_CUSTOM_getConfig     0x61
 /* no argument
  * returns a buffer :
- * offset 0  WORD drive bitmap
- * offset 2  BYTE first translated drive
- * offset 3  BYTE shared drive
- * offset 4  BYTE config drive
- * offset 5  BYTE set date time flag
- * offset 6  BYTE UTC offset (in hours * 10)
- * offset 7  WORD (unaligned !) year
- * offset 9  BYTE month
- * offset 10 BYTE day
- * offset 11 BYTE hours
- * offset 12 BYTE minutes
- * offset 13 BYTE seconds
- * offset 14 BYTE eth0 enabled flag
- * offset 15 DWORD (unaligned) eth0 IP address
- * offset 19 BYTE wlan0 enabled flag
- * offset 20 DWORD wlan0 IP address
- * offset 24 BYTE frame skip for screencast
- * offset 25 WORD (unaligned) TRANSLATEDDISK_VERSION
- * offset 27 BYTE screen shot vbl enabled
- * offset 28 BYTE take screenshot ?
+ * offset 0  uint16_t drive bitmap
+ * offset 2  uint8_t first translated drive
+ * offset 3  uint8_t shared drive
+ * offset 4  uint8_t config drive
+ * offset 5  uint8_t set date time flag
+ * offset 6  uint8_t UTC offset (in hours * 10)
+ * offset 7  uint16_t (unaligned !) year
+ * offset 9  uint8_t month
+ * offset 10 uint8_t day
+ * offset 11 uint8_t hours
+ * offset 12 uint8_t minutes
+ * offset 13 uint8_t seconds
+ * offset 14 uint8_t eth0 enabled flag
+ * offset 15 uint32_t (unaligned) eth0 IP address
+ * offset 19 uint8_t wlan0 enabled flag
+ * offset 20 uint32_t wlan0 IP address
+ * offset 24 uint8_t frame skip for screencast
+ * offset 25 uint16_t (unaligned) TRANSLATEDDISK_VERSION
+ * offset 27 uint8_t screen shot vbl enabled
+ * offset 28 uint8_t take screenshot ?
  * returns E_OK */
 #define GD_CUSTOM_ftell         0x62
 /* ACSI/SCSI command arguments :
  * arg1 = file handle
  * returns a data buffer :
- * offset 0 DWORD position
+ * offset 0 uint32_t position
  * returns E_NOTHANDLED / EINTRN / E_OK */
 #define GD_CUSTOM_getRWdataCnt  0x63
 /* ACSI/SCSI command arguments :
  * arg1 = file handle
  * returns a data buffer :
- * offset 0 DWORD last data count
+ * offset 0 uint32_t last data count
  * returns E_NOTHANDLED / EINTRN / E_OK */
 #define GD_CUSTOM_Fsnext_last   0x64
 /* ACSI/SCSI command arguments :
- * arg1,arg2,arg3,arg4 = DWORD dta address on ST used as identifier
+ * arg1,arg2,arg3,arg4 = uint32_t dta address on ST used as identifier
  * clear the structures used by Fsfirst/Fsnext
  * returns E_OK or EIHNDL */
 #define GD_CUSTOM_getBytesToEOF 0x65
 /* ACSI/SCSI command arguments :
  * arg1 = file handle
  * returns a data buffer :
- * offset 0 DWORD byte count to end of file
+ * offset 0 uint32_t byte count to end of file
  * returns E_NOTHANDLED / EINTRN / E_OK */
 
 // BIOS functions we need to support
@@ -257,10 +257,10 @@
 // now the struct has 23 bytes total, so a buffer of 512 bytes should contain 22 of these + 6 spare bytes
 typedef struct
 {
-    BYTE    d_attrib;       // GEMDOS File Attributes
-    WORD    d_time;         // GEMDOS Time
-    WORD    d_date;         // GEMDOS Date
-    DWORD   d_length;       // File Length
+    uint8_t    d_attrib;       // GEMDOS File Attributes
+    uint16_t    d_time;         // GEMDOS Time
+    uint16_t    d_date;         // GEMDOS Date
+    uint32_t   d_length;       // File Length
     char    d_fname[14];    // Filename
 } DTAshort;
 

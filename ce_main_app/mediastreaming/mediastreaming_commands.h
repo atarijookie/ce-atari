@@ -28,8 +28,8 @@
 #define MEDIASTREAMING_CMD_CLOSESTREAM	4
 
 /* parameters for MEDIASTREAMING_CMD_OPENSTREAM */
-#define MEDIAPARAM_AUDIORATE	0x0001		// WORD value : 50066, 25033, etc.
-#define MEDIAPARAM_FORCEMONO	0x0002		// WORD value : 1 for true / 0 false
+#define MEDIAPARAM_AUDIORATE	0x0001		// uint16_t value : 50066, 25033, etc.
+#define MEDIAPARAM_FORCEMONO	0x0002		// uint16_t value : 1 for true / 0 false
 
 #define MEDIAPARAM_PATH			0x00ff		// null terminated ascii string
 

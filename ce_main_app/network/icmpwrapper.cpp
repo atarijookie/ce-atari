@@ -26,11 +26,11 @@
 #include "sting.h"
 #include "icmpwrapper.h"
 
-extern   DWORD localIp;
+extern   uint32_t localIp;
 
 IcmpWrapper::IcmpWrapper(void)
 {
-    recvBfr = new BYTE[RECV_BFR_SIZE];
+    recvBfr = new uint8_t[RECV_BFR_SIZE];
     rawSock = new TNetConnection();
 }
 
@@ -51,14 +51,14 @@ void IcmpWrapper::closeAndClean(void)
 
 void IcmpWrapper::clearOld(void) 
 {
-    DWORD now = Utils::getCurrentMs();
+    uint32_t now = Utils::getCurrentMs();
     
     for(int i=0; i<MAX_STING_DGRAMS; i++) {     // find non-empty slot, and if it's old, clear it
         if(dgrams[i].isEmpty()) {               // found empty? skip it
             continue;
         }
         
-        DWORD diff = now - dgrams[i].time;      // calculate how old is this dgram
+        uint32_t diff = now - dgrams[i].time;      // calculate how old is this dgram
         if(diff < 10000) {                      // dgram is younger than 10 seconds? skip it
             continue;
         }
@@ -70,7 +70,7 @@ void IcmpWrapper::clearOld(void)
 
 int IcmpWrapper::getEmptyIndex(void) {
     int i; 
-    DWORD oldestTime    = 0xffffffff;
+    uint32_t oldestTime    = 0xffffffff;
     int   oldestIndex   = 0;
     
     for(i=0; i<MAX_STING_DGRAMS; i++) {     // try to find empty slot
@@ -102,9 +102,9 @@ int IcmpWrapper::getNonEmptyIndex(void) {
     return -1;
 }
 
-DWORD IcmpWrapper::calcDataByteCountTotal(void) 
+uint32_t IcmpWrapper::calcDataByteCountTotal(void) 
 {
-    DWORD sum = 0;
+    uint32_t sum = 0;
     int i; 
 
     for(i=0; i<MAX_STING_DGRAMS; i++) {     // go through received DGRAMs
@@ -129,7 +129,7 @@ int IcmpWrapper::calcHowManyDatagramsFitIntoBuffer(int bufferSizeBytes)
             }
 
             gotCount++;                                                 // will fit into requested sectors, add it
-            gotBytes += 2 + dgrams[i].count;                            // size of a datagram + WORD for its size
+            gotBytes += 2 + dgrams[i].count;                            // size of a datagram + uint16_t for its size
         }
     }
 
@@ -199,7 +199,7 @@ bool IcmpWrapper::receive(void)
     Utils::storeDword(d->data + 12, ntohl(src_addr.sin_addr.s_addr));     // data[12 .. 15] - source IP
     Utils::storeDword(d->data + 16, localIp);                           // data[16 .. 19] - destination IP 
 
-    WORD checksum = TRawSocks::checksum((WORD *) d->data, 20);
+    uint16_t checksum = TRawSocks::checksum((uint16_t *) d->data, 20);
     Utils::storeWord(d->data + 10, checksum);                           // calculate chekcsum, store to data[10 .. 11]
     //-------------
     // fill IP_DGRAM header
@@ -223,7 +223,7 @@ bool IcmpWrapper::receive(void)
     return true;
 }
 
-BYTE IcmpWrapper::send(DWORD destinIP, int icmpType, int icmpCode, WORD length, BYTE *data)
+uint8_t IcmpWrapper::send(uint32_t destinIP, int icmpType, int icmpCode, uint16_t length, uint8_t *data)
 {
     if(rawSock->isClosed()) {                                       // we don't have RAW socket yet? create it
         // grant right to open (AF_INET, SOCK_DGRAM, IPPROTO_ICMP) sockets
@@ -251,12 +251,12 @@ BYTE IcmpWrapper::send(DWORD destinIP, int icmpType, int icmpCode, WORD length, 
         rawSock->fd = rawFd;                                        // RAW socket created
     }
 
-    WORD id         = Utils::getWord(data);                         // get ID 
-    WORD sequence   = Utils::getWord(data + 2);                     // get sequence
+    uint16_t id         = Utils::getWord(data);                         // get ID 
+    uint16_t sequence   = Utils::getWord(data + 2);                     // get sequence
 
     length = (length >= 4) ? (length - 4) : 0;                      // as 4 bytes have been already used, subtract 4 if possible, otherwise set to 0
 
-    BYTE a,b,c,d;
+    uint8_t a,b,c,d;
     a = destinIP >> 24;
     b = destinIP >> 16;
     c = destinIP >>  8;

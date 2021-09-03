@@ -22,7 +22,7 @@
 
 extern int linuxConsole_fdMaster;                                       // file descriptor for linux console master
 
-void ConfigStream::linuxConsole_KeyDown(BYTE atariKey)
+void ConfigStream::linuxConsole_KeyDown(uint8_t atariKey)
 {
     if(linuxConsole_fdMaster <= 0) {                                    // if don't have the handle, quit
         return;
@@ -39,7 +39,7 @@ void ConfigStream::linuxConsole_KeyDown(BYTE atariKey)
     }
 }
 
-int ConfigStream::linuxConsole_getStream(BYTE *bfr, int maxLen)
+int ConfigStream::linuxConsole_getStream(uint8_t *bfr, int maxLen)
 {
     int totalCnt = 0;
     memset(bfr, 0, maxLen);                                                // clear the buffer
@@ -142,7 +142,7 @@ int ConfigStream::filterVT100(char *bfr, int cnt)
     return j;
 }
 
-void ConfigStream::atariKeyToConsoleKey(BYTE atariKey, char *bfr, int &cnt)
+void ConfigStream::atariKeyToConsoleKey(uint8_t atariKey, char *bfr, int &cnt)
 {
     // TODO : translate to ASCII ? (vt52 behaviour)
     // DELETE = 0x7F  BACKSPACE = Ctrl+H = 0x08

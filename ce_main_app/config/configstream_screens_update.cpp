@@ -38,15 +38,15 @@ extern RPiConfig rpiConfig;             // RPi info structure
 
 extern SharedObjects shared;
 
-extern BYTE isUpdateStartingFlag;           // set to 1 to notify ST that the update is starting and it should show 'fake updating progress' screen
-extern volatile DWORD whenCanStartInstall;  // if this DWORD has non-zero value, then it's a time when this app should be terminated for installing update
+extern uint8_t isUpdateStartingFlag;           // set to 1 to notify ST that the update is starting and it should show 'fake updating progress' screen
+extern volatile uint32_t whenCanStartInstall;  // if this uint32_t has non-zero value, then it's a time when this app should be terminated for installing update
 
 #define MIN_CHECK_PAUSE             (15 * 1000)
-DWORD lastUpdateCheck = 0;          // this holds the ime when we've last checked for update
+uint32_t lastUpdateCheck = 0;          // this holds the ime when we've last checked for update
 
 void ConfigStream::createScreen_update(void)
 {
-    DWORD now;
+    uint32_t now;
     now = Utils::getCurrentMs();
 
     if((now - lastUpdateCheck) >= MIN_CHECK_PAUSE) { // check for update, but not too often
@@ -236,7 +236,7 @@ void ConfigStream::updateOnline(void)
     if(Utils::fileExists("/tmp/UPDATE_PENDING_YES")) {  // check_for_update.sh returned that there is update pending
         updateStart();                                  // start the update
     } else {                                            // check_for_update.sh not returned anything yet
-        DWORD now = Utils::getCurrentMs();
+        uint32_t now = Utils::getCurrentMs();
 
         if((now - lastUpdateCheck) < FAILED_UPDATE_CHECK_TIME) {    // if within valid time for checking for update
             showMessageScreen("Online Update", "Still checking for update.\n\rPlease try again in a while.\n\r");

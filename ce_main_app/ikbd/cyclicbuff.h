@@ -6,17 +6,17 @@
 
 class CyclicBuff {
 public:
-    BYTE buf[CYCLIC_BUF_SIZE];
+    uint8_t buf[CYCLIC_BUF_SIZE];
     int  count;
     int  addPos;
     int  getPos;
     int  size;
 
     void init           (void);
-    void add            (BYTE val);
-    BYTE get            (void);
-    BYTE peek           (void);
-    BYTE peekWithOffset (int offset);
+    void add            (uint8_t val);
+    uint8_t get            (void);
+    uint8_t peek           (void);
+    uint8_t peekWithOffset (int offset);
 };
 
 #endif

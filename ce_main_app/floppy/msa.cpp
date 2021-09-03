@@ -114,9 +114,9 @@ typedef struct
 #define MSA_WORKSPACE_SIZE  (1024*1024)  /* Size of workspace to use when saving MSA files */
 
 
-static WORD do_get_mem_word(void *a)
+static uint16_t do_get_mem_word(void *a)
 {
-	return Utils::SWAPWORD2(*((WORD *)a));
+	return Utils::SWAPWORD2(*((uint16_t *)a));
 }
 
 /*-----------------------------------------------------------------------*/
@@ -156,7 +156,7 @@ Uint8 *MSA_UnCompress(Uint8 *pMSAFile, long *pImageSize)
 		pMSAHeader->EndingTrack     = Utils::SWAPWORD2(pMSAHeader->EndingTrack);
 
 		/* Create buffer */
-		pBuffer = (BYTE *) malloc(  (pMSAHeader->EndingTrack - pMSAHeader->StartingTrack + 1)
+		pBuffer = (uint8_t *) malloc(  (pMSAHeader->EndingTrack - pMSAHeader->StartingTrack + 1)
 		                            * pMSAHeader->SectorsPerTrack * (pMSAHeader->Sides + 1)
 		                            * NUMBYTESPERSECTOR);
 		if (!pBuffer)

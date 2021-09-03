@@ -26,7 +26,7 @@
 
 #define NTP_PORT 123
 #define TIMESYNC_URL_WEB    "http://joo.kie.sk/cosmosex/time.php"
-volatile BYTE timeSyncStatusByte;
+volatile uint8_t timeSyncStatusByte;
 volatile bool do_timeSync = false; //TODO !
 
 TimeSync::TimeSync() : eState(INIT), s(-1)

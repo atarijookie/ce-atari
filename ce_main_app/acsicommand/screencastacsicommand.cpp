@@ -10,7 +10,7 @@
 
 ScreencastAcsiCommand::ScreencastAcsiCommand(AcsiDataTrans *dt, ScreencastService *scs):dataTrans(dt),screencastService(scs)
 {
-    dataBuffer  = new BYTE[SCREENCAST_BUFFER_SIZE];
+    dataBuffer  = new uint8_t[SCREENCAST_BUFFER_SIZE];
 }
 
 ScreencastAcsiCommand::~ScreencastAcsiCommand() 
@@ -18,7 +18,7 @@ ScreencastAcsiCommand::~ScreencastAcsiCommand()
 	delete []dataBuffer;
 }
  
-void ScreencastAcsiCommand::processCommand(BYTE *command)
+void ScreencastAcsiCommand::processCommand(uint8_t *command)
 {
     cmd = command;
 
@@ -44,9 +44,9 @@ void ScreencastAcsiCommand::processCommand(BYTE *command)
     Debug::out(LOG_DEBUG, "ScreencastAcsiCommand done.");
 }
 
-DWORD ScreencastAcsiCommand::get24bits(BYTE *bfr)
+uint32_t ScreencastAcsiCommand::get24bits(uint8_t *bfr)
 {
-    DWORD val = 0;
+    uint32_t val = 0;
 
     val  = bfr[0];       // get hi
     val  = val << 8;
@@ -62,10 +62,10 @@ DWORD ScreencastAcsiCommand::get24bits(BYTE *bfr)
 void ScreencastAcsiCommand::readScreen()
 {
     Debug::out(LOG_DEBUG, "ScreencastAcsiCommand::processCommand TRAN_CMD_SENDSCREENCAST");
-    BYTE iScreenmode         = cmd[5];
+    uint8_t iScreenmode         = cmd[5];
     Debug::out(LOG_DEBUG, "ScreencastAcsiCommand::processCommand screenmode %d",iScreenmode);
     
-    DWORD byteCount         = get24bits(cmd + 6);
+    uint32_t byteCount         = get24bits(cmd + 6);
     Debug::out(LOG_DEBUG, "ScreencastAcsiCommand::processCommand bytes %d",byteCount);
     
     if(iScreenmode<0 || iScreenmode>2) {                       // unknown screenmode?
@@ -87,7 +87,7 @@ void ScreencastAcsiCommand::readScreen()
         pad = 16 - mod;             // how many we need to add to make count % 16 equal to 0?
     }
     
-    DWORD transferSizeBytes = byteCount + pad;
+    uint32_t transferSizeBytes = byteCount + pad;
     
     bool res;
     res = dataTrans->recvData(dataBuffer, transferSizeBytes);   // get data from Hans
@@ -106,10 +106,10 @@ void ScreencastAcsiCommand::readScreen()
 void ScreencastAcsiCommand::readPalette()
 {
     Debug::out(LOG_DEBUG, "ScreencastAcsiCommand::processCommand TRAN_CMD_SENDSCREENCAST");
-    BYTE iScreenmode         = cmd[5];
+    uint8_t iScreenmode         = cmd[5];
     Debug::out(LOG_DEBUG, "ScreencastAcsiCommand::processCommand screenmode %d",iScreenmode);
     
-    DWORD byteCount         = get24bits(cmd + 6);
+    uint32_t byteCount         = get24bits(cmd + 6);
     Debug::out(LOG_DEBUG, "ScreencastAcsiCommand::processCommand bytes %d",byteCount);
     
     if(iScreenmode<0 || iScreenmode>2) {                       // unknown screenmode?
@@ -131,7 +131,7 @@ void ScreencastAcsiCommand::readPalette()
         pad = 16 - mod;             // how many we need to add to make count % 16 equal to 0?
     }
     
-    DWORD transferSizeBytes = byteCount + pad;
+    uint32_t transferSizeBytes = byteCount + pad;
     
     bool res;
     res = dataTrans->recvData(dataBuffer, transferSizeBytes);   // get data from Hans

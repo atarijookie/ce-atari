@@ -35,11 +35,11 @@ bool ImageStorage::doWeHaveStorage(void)                         // returns true
 
 bool ImageStorage::getStoragePath(std::string &storagePath)             // returns where the images are now stored
 {
-    static DWORD lastStorageCheck = 0;
+    static uint32_t lastStorageCheck = 0;
     static bool  lastGotStorage = false;
     static std::string lastStoragePath;
 
-    DWORD now = Utils::getCurrentMs();      // get current time
+    uint32_t now = Utils::getCurrentMs();      // get current time
 
     if((now - lastStorageCheck) < 3000) {   // if last check was done less then 3 seconds ago, just reuse last results
         storagePath = lastStoragePath;      // return last storage path

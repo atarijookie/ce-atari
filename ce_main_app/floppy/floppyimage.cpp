@@ -78,7 +78,7 @@ bool FloppyImage::gotUnsavedChanges(void)
     return (sectorsWritten > 0);    // if something written and not saved, return true
 }
 
-bool FloppyImage::readNotWriteSector(bool readNotWrite, int track, int side, int sectorNo, BYTE *buffer)
+bool FloppyImage::readNotWriteSector(bool readNotWrite, int track, int side, int sectorNo, uint8_t *buffer)
 {
     if(!loadedFlag) {   // not loaded?
         Debug::out(LOG_DEBUG, "FloppyImage::readNotWriteSector -- not loadedFlag");
@@ -108,19 +108,19 @@ bool FloppyImage::readNotWriteSector(bool readNotWrite, int track, int side, int
     return true;
 }
 
-DWORD FloppyImage::getLastWriteTime(void)
+uint32_t FloppyImage::getLastWriteTime(void)
 {
     return lastWriteTime;
 }
 
 // convenience function for reading sector
-bool FloppyImage::readSector(int track, int side, int sectorNo, BYTE *buffer)
+bool FloppyImage::readSector(int track, int side, int sectorNo, uint8_t *buffer)
 {
     return readNotWriteSector(true, track, side, sectorNo, buffer);
 }
 
 // convenience function for writing sector
-bool FloppyImage::writeSector(int track, int side, int sectorNo, BYTE *buffer)
+bool FloppyImage::writeSector(int track, int side, int sectorNo, uint8_t *buffer)
 {
     return readNotWriteSector(false, track, side, sectorNo, buffer);
 }
@@ -155,7 +155,7 @@ bool FloppyImage::loadImageIntoMemory(void)
     int cnt = ftell(fajl);              // get the file size
     fseek(fajl, 0, SEEK_SET);           // move to the start of file
 
-    image.data = (BYTE *)malloc(cnt);
+    image.data = (uint8_t *)malloc(cnt);
     int res = fread(image.data, 1, cnt, fajl);
     image.size = cnt;
 

@@ -32,14 +32,14 @@
 
 //--------------------------------------------------------
 
-DWORD localIp;
+uint32_t localIp;
 
 //--------------------------------------------------------
 
 NetAdapter::NetAdapter(void)
 {
     dataTrans       = 0;
-    dataBuffer      = new BYTE[NET_BUFFER_SIZE];
+    dataBuffer      = new uint8_t[NET_BUFFER_SIZE];
     localIp         = 0;
 
     loadSettings();
@@ -70,7 +70,7 @@ void NetAdapter::loadSettings(void)
 
 }
 
-void NetAdapter::processCommand(BYTE *command)
+void NetAdapter::processCommand(uint8_t *command)
 {
     cmd = command;
 
@@ -81,8 +81,8 @@ void NetAdapter::processCommand(BYTE *command)
 
     dataTrans->clear();                 // clean data transporter before handling
 
-    BYTE *pCmd;
-    BYTE isIcd = false;
+    uint8_t *pCmd;
+    uint8_t isIcd = false;
 
     isIcd   = ((command[0] & 0x1f) == 0x1f);            // it's an ICD command, if lowest 5 bits are all set in the cmd[0]
     pCmd    = (!isIcd) ? command : (command + 1);       // get the pointer to where the command starts
@@ -148,13 +148,13 @@ void NetAdapter::identify(void)
     //--------
     dataTrans->addDataBfr("CosmosEx network module", 24, false);   // add 24 bytes which are the identification string
 
-    BYTE bfr[10];
+    uint8_t bfr[10];
     memset(bfr, 0, 8);
     dataTrans->addDataBfr(bfr, 8, false);                                   // add 8 bytes of padding, so the config data would be at offset 32
 
     //---------
     // now comes the config, starting at offset 32
-    dataTrans->addDataWord(REQUIRED_NETADAPTER_VERSION);                    // add WORD - protocol version
+    dataTrans->addDataWord(REQUIRED_NETADAPTER_VERSION);                    // add uint16_t - protocol version
 
     Utils::getIpAdds(bfr);                          // get IP address for eth0 and wlan0
 
@@ -222,18 +222,18 @@ void NetAdapter::conOpen(void)
     }
 
     // get connection parameters
-    DWORD remoteHost        = Utils::getDword(dataBuffer);
-    WORD  remotePort        = Utils::getWord (dataBuffer + 4);
+    uint32_t remoteHost        = Utils::getDword(dataBuffer);
+    uint16_t  remotePort        = Utils::getWord (dataBuffer + 4);
     bool  connectNotListen  = (remoteHost != 0);
 
     // type of service (tos) is not used for now, buff_size is used for faking packet size in CNget_NDB()
-    WORD  tos           = Utils::getWord (dataBuffer + 6);
-    WORD  buff_size     = Utils::getWord (dataBuffer + 8);
+    uint16_t  tos           = Utils::getWord (dataBuffer + 6);
+    uint16_t  buff_size     = Utils::getWord (dataBuffer + 8);
 
     // local port, useful mainly for pasive (listening) connections
-    WORD  localPort     = Utils::getWord (dataBuffer + 14);
+    uint16_t  localPort     = Utils::getWord (dataBuffer + 14);
 
-    Debug::out(LOG_DEBUG, "NetAdapter::conOpen() -- remoteHost: %d.%d.%d.%d, remotePort: %d, buff_size: %d, localPort: %d", (BYTE) (remoteHost >> 24), (BYTE) (remoteHost >> 16), (BYTE) (remoteHost >> 8), (BYTE) (remoteHost), remotePort, buff_size, localPort);
+    Debug::out(LOG_DEBUG, "NetAdapter::conOpen() -- remoteHost: %d.%d.%d.%d, remotePort: %d, buff_size: %d, localPort: %d", (uint8_t) (remoteHost >> 24), (uint8_t) (remoteHost >> 16), (uint8_t) (remoteHost >> 8), (uint8_t) (remoteHost), remotePort, buff_size, localPort);
     Debug::out(LOG_DEBUG, "NetAdapter::conOpen() -- will %s", (connectNotListen ? "connect to host" : "listen for connection"));
 
     if(connectNotListen) {      // connect to remote host (active connection)
@@ -243,7 +243,7 @@ void NetAdapter::conOpen(void)
     }
 }
 
-void NetAdapter::conOpen_listen(int slot, bool tcpNotUdp, WORD localPort, DWORD remoteHost, WORD remotePort, WORD tos, WORD buff_size)
+void NetAdapter::conOpen_listen(int slot, bool tcpNotUdp, uint16_t localPort, uint32_t remoteHost, uint16_t remotePort, uint16_t tos, uint16_t buff_size)
 {
     int ires;
     int fd;
@@ -317,14 +317,14 @@ void NetAdapter::conOpen_listen(int slot, bool tcpNotUdp, WORD localPort, DWORD 
     nc->buff_size        = buff_size;
 
     // return the handle
-    BYTE connectionHandle = network_slotToHandle(slot);
+    uint8_t connectionHandle = network_slotToHandle(slot);
     Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen() - returning %d as handle for slot %d", (int) connectionHandle, slot);
     dataTrans->setStatus(connectionHandle);
 }
 
-WORD NetAdapter::getLocalPort(int sockFd)
+uint16_t NetAdapter::getLocalPort(int sockFd)
 {
-    WORD localPort = 0;
+    uint16_t localPort = 0;
 
     struct sockaddr_in real_addr;
     memset(&real_addr, '0', sizeof(sockaddr_in));
@@ -343,7 +343,7 @@ WORD NetAdapter::getLocalPort(int sockFd)
     return localPort;
 }
 
-void NetAdapter::conOpen_connect(int slot, bool tcpNotUdp, WORD localPort, DWORD remoteHost, WORD remotePort, WORD tos, WORD buff_size)
+void NetAdapter::conOpen_connect(int slot, bool tcpNotUdp, uint16_t localPort, uint32_t remoteHost, uint16_t remotePort, uint16_t tos, uint16_t buff_size)
 {
     int ires;
     int fd;
@@ -417,7 +417,7 @@ void NetAdapter::conOpen_connect(int slot, bool tcpNotUdp, WORD localPort, DWORD
     nc->readWrapper.init(fd, nc->type, buff_size);
 
     // return the handle
-    BYTE connectionHandle = network_slotToHandle(slot);
+    uint8_t connectionHandle = network_slotToHandle(slot);
     Debug::out(LOG_DEBUG, "NetAdapter::conOpen_connect() - returning %d as handle for slot %d", (int) connectionHandle, slot);
     dataTrans->setStatus(connectionHandle);
 }
@@ -459,7 +459,7 @@ void NetAdapter::conSend(void)
     int  handle     = cmd[5];                           // connection handle
     int  length     = Utils::getWord(cmd + 6);          // get data length
     bool isOdd      = cmd[8];                           // if the data was send from odd address, this will be non-zero...
-    BYTE oddByte    = cmd[9];                           // ...and this will contain the 0th byte
+    uint8_t oddByte    = cmd[9];                           // ...and this will contain the 0th byte
 
     if(!network_handleIsValid(handle)) {                // handle out of range? fail
         Debug::out(LOG_DEBUG, "NetAdapter::conSend() -- bad handle: %d", handle);
@@ -493,7 +493,7 @@ void NetAdapter::conSend(void)
         lenRoundUp = ((length / 512) + 1) * 512;        // get sector count, then increment it by 1, and convert back to bytes - this will round the length to next multiple of 512
     }
 
-    BYTE *pData;
+    uint8_t *pData;
     if(isOdd) {                                         // if we're transfering from odd ST address
         dataBuffer[0]   = oddByte;                      // then this is the 0th byte
         pData           = dataBuffer + 1;               // and the rest of data will be transfered here
@@ -574,7 +574,7 @@ void NetAdapter::conUpdateInfo(void)
     }
 
     icmpWrapper.receiveAll();
-    DWORD imcpCnt = icmpWrapper.calcDataByteCountTotal();
+    uint32_t imcpCnt = icmpWrapper.calcDataByteCountTotal();
     dataTrans->addDataDword(imcpCnt);                       // fill the data to be read from ICMP sock
 
     Debug::out(LOG_DEBUG, "NetAdapter::conUpdateInfo - imcpCnt: %d", imcpCnt);
@@ -597,10 +597,10 @@ void NetAdapter::icmpSend(void)
         return;
     }
 
-    DWORD destinIP  = Utils::getDword(cmd + 5);                     // get destination IP address
+    uint32_t destinIP  = Utils::getDword(cmd + 5);                     // get destination IP address
     int   icmpType  = cmd[9] >> 3;                                  // get ICMP type
     int   icmpCode  = cmd[9] & 0x07;                                // get ICMP code
-    WORD  length    = Utils::getWord(cmd + 10);                     // get length of data to be sent
+    uint16_t  length    = Utils::getWord(cmd + 10);                     // get length of data to be sent
 
     bool res = dataTrans->recvData(dataBuffer, length);             // get data from Hans
 
@@ -610,12 +610,12 @@ void NetAdapter::icmpSend(void)
         return;
     }
 
-    BYTE *pData = dataBuffer;                                       // pointer to where data starts
+    uint8_t *pData = dataBuffer;                                       // pointer to where data starts
     if(!evenNotOdd) {                                               // if data is odd, it starts one byte further
         pData++;
     }
 
-    BYTE result;
+    uint8_t result;
     result = icmpWrapper.send(destinIP, icmpType, icmpCode, length, pData);
     dataTrans->setStatus(result);
 }
@@ -625,7 +625,7 @@ void NetAdapter::icmpGetDgrams(void)
     //pthread_mutex_lock(&networkThreadMutex);
 
     icmpWrapper.receiveAll();
-    DWORD icmpByteCount = icmpWrapper.calcDataByteCountTotal();
+    uint32_t icmpByteCount = icmpWrapper.calcDataByteCountTotal();
 
     if(icmpByteCount <= 0) {                                        // nothing to read? quit, no data
         //pthread_mutex_unlock(&networkThreadMutex);
@@ -732,7 +732,7 @@ void NetAdapter::resolveGetResp(void)
     Tresolv *r = &resolver.requests[index];
 
     // if resolve did finish
-    BYTE empty[256];
+    uint8_t empty[256];
     memset(empty, 0, 256);
 
     int domLen = strlen(r->canonName);                                      // length of real domain name
@@ -1083,7 +1083,7 @@ void NetAdapter::conGetString(void)
 
     int handle      = cmd[5];                       // cmd[6]      - handle
     int maxLength   = Utils::getWord(cmd + 6);      // cmd[7 .. 8] - max length
-    BYTE delim      = cmd[8];                       // cmd[9]      - string delimiter / terminator
+    uint8_t delim      = cmd[8];                       // cmd[9]      - string delimiter / terminator
 
     if(!network_handleIsValid(handle)) {                // handle out of range? fail
         Debug::out(LOG_DEBUG, "NetAdapter::conGetString() -- bad handle: %d", handle);
@@ -1134,7 +1134,7 @@ void NetAdapter::conGetString(void)
 }
 
 //----------------------------------------------
-void NetAdapter::logFunctionName(BYTE cmd)
+void NetAdapter::logFunctionName(uint8_t cmd)
 {
     switch(cmd){
         case NET_CMD_IDENTIFY:

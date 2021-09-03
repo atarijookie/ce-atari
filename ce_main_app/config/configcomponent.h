@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <string>
 
-#include "../datatypes.h"
+#include <stdint.h>
 
 #define TEXT_OPTION_ALLOW_ALL                   7
 #define TEXT_OPTION_ALLOW_LETTERS               1
@@ -30,11 +30,11 @@ public:
     void setOnEnterFunctionCode(int onEnter);
     void setOnChBEnterFunctionCode(int onChBEnter);
 
-    void getStream(bool fullNotChange, BYTE *bfr, int &len);
+    void getStream(bool fullNotChange, uint8_t *bfr, int &len);
     void setFocus(bool hasFocus);
     void setReverse(bool isReverse);
     void setIsChecked(bool isChecked);
-    void onKeyPressed(BYTE key);
+    void onKeyPressed(uint8_t key);
 
     void setText(std::string text);
     void getText(std::string &text);
@@ -50,7 +50,7 @@ public:
     
     int getComponentType(void);
 
-    BYTE *terminal_addGotoCurrentCursor(BYTE *bfr, int &cnt);    // then add +cnt to bfr (might be 0 or 4)
+    uint8_t *terminal_addGotoCurrentCursor(uint8_t *bfr, int &cnt);    // then add +cnt to bfr (might be 0 or 4)
 
 private:
     ConfigStream    *confStream;
@@ -88,18 +88,18 @@ private:
     int onEnter;
     int onChBEnter;
 
-    BYTE *terminal_addGoto(BYTE *bfr, int x, int y);
-    BYTE *terminal_addReverse(BYTE *bfr, bool onNotOff);
-    BYTE *terminal_addCursorOn(BYTE *bfr, bool on);
+    uint8_t *terminal_addGoto(uint8_t *bfr, int x, int y);
+    uint8_t *terminal_addReverse(uint8_t *bfr, bool onNotOff);
+    uint8_t *terminal_addCursorOn(uint8_t *bfr, bool on);
 
-    void handleEditLineKeyPress(BYTE key);
+    void handleEditLineKeyPress(uint8_t key);
 
-    BYTE filterTextKey(BYTE key);
-    bool textOptionSet(WORD textOption);
-    bool isLetter(BYTE key);
-    bool isSmallLetter(BYTE key);
-    bool isNumber(BYTE key);
-    bool isOther(BYTE key);
+    uint8_t filterTextKey(uint8_t key);
+    bool textOptionSet(uint16_t textOption);
+    bool isLetter(uint8_t key);
+    bool isSmallLetter(uint8_t key);
+    bool isNumber(uint8_t key);
+    bool isOther(uint8_t key);
     
     void updateShownWindowPositionAccordingToCursor(void);
 };

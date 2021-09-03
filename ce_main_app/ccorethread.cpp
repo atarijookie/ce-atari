@@ -195,7 +195,7 @@ void CCoreThread::sharedObjects_destroy(void)
 void CCoreThread::run(void)
 {
     // inBuff might contain whole written floppy sector + header size
-    BYTE inBuff[INBUF_SIZE], outBuf[INBUF_SIZE];
+    uint8_t inBuff[INBUF_SIZE], outBuf[INBUF_SIZE];
 
     memset(outBuf, 0, INBUF_SIZE);
     memset(inBuff, 0, INBUF_SIZE);
@@ -205,7 +205,7 @@ void CCoreThread::run(void)
     //------------------------------
     // stuff related to checking of Franz and Hans being alive and then possibly flashing them
     bool    shouldCheckHansFranzAlive   = true;                         // when true and the 15 second timeout since start passed, check for Hans and Franz being alive
-    DWORD   hansFranzAliveCheckTime     = Utils::getEndTime(15000);     // get the time when we should check if Hans and Franz are alive
+    uint32_t   hansFranzAliveCheckTime     = Utils::getEndTime(15000);     // get the time when we should check if Hans and Franz are alive
 
     flags.gotHansFwVersion  = false;
     flags.gotFranzFwVersion = false;
@@ -223,15 +223,15 @@ void CCoreThread::run(void)
     Debug::out(LOG_DEBUG, "Will check for Hans and Franz alive: %s", (shouldCheckHansFranzAlive ? "yes" : "no") );
     //------------------------------
 
-    DWORD getHwInfoTimeout      = Utils::getEndTime(3000);                  // create a time when we already should have info about HW, and if we don't have that by that time, then fail
+    uint32_t getHwInfoTimeout      = Utils::getEndTime(3000);                  // create a time when we already should have info about HW, and if we don't have that by that time, then fail
 
     struct {
-        DWORD hans;
-        DWORD franz;
-        DWORD nextDisplay;
+        uint32_t hans;
+        uint32_t franz;
+        uint32_t nextDisplay;
 
-        DWORD hansResetTime;
-        DWORD franzResetTime;
+        uint32_t hansResetTime;
+        uint32_t franzResetTime;
 
         int     progress;
     } lastFwInfoTime;
@@ -248,7 +248,7 @@ void CCoreThread::run(void)
     bool needsAction;
     bool hardNotFloppy;
 
-    DWORD nextFloppyEncodingCheck   = Utils::getEndTime(1000);
+    uint32_t nextFloppyEncodingCheck   = Utils::getEndTime(1000);
     //bool prevFloppyEncodingRunning  = false;
 
     LoadTracker load;
@@ -262,7 +262,7 @@ void CCoreThread::run(void)
             sigintReceived = 1;                                         // quit
         }
 
-        DWORD now = Utils::getCurrentMs();
+        uint32_t now = Utils::getCurrentMs();
         if(now >= lastFwInfoTime.nextDisplay) {
             lastFwInfoTime.nextDisplay  = Utils::getEndTime(1000);
 
@@ -438,19 +438,19 @@ void CCoreThread::run(void)
     }
 }
 
-void CCoreThread::handleAcsiCommand(BYTE *bufIn)
+void CCoreThread::handleAcsiCommand(uint8_t *bufIn)
 {
     Debug::out(LOG_DEBUG, "\n");
 
     dbgVars.prevAcsiCmdTime = dbgVars.thisAcsiCmdTime;
     dbgVars.thisAcsiCmdTime = Utils::getCurrentMs();
 
-    BYTE justCmd, tag1, tag2, module;
-    BYTE *pCmd;
-    BYTE isIcd = false;
-    BYTE wasHandled = false;
+    uint8_t justCmd, tag1, tag2, module;
+    uint8_t *pCmd;
+    uint8_t isIcd = false;
+    uint8_t wasHandled = false;
 
-    BYTE acsiId = bufIn[0] >> 5;                            // get just ACSI ID
+    uint8_t acsiId = bufIn[0] >> 5;                            // get just ACSI ID
     if(acsiIdInfo.acsiIDdevType[acsiId] == DEVTYPE_OFF) {    // if this ACSI ID is off, reply with error and quit
         dataTrans->setStatus(SCSI_ST_CHECK_CONDITION);
         dataTrans->sendDataAndStatus();
@@ -676,10 +676,10 @@ void CCoreThread::loadSettings(void)
 
 void CCoreThread::handleFwVersion_hans(void)
 {
-    BYTE fwVer[16];
+    uint8_t fwVer[16];
     memset(fwVer, 0, 16);
 
-    BYTE enabledIDbits, sdCardAcsiId;
+    uint8_t enabledIDbits, sdCardAcsiId;
     getIdBits(enabledIDbits, sdCardAcsiId);     // get the enabled IDs
 
     chipInterface->setHDDconfig(enabledIDbits, sdCardAcsiId, shared.imageSilo->getSlotBitmap(), setNewFloppyImageLed, newFloppyImageLed);
@@ -768,7 +768,7 @@ void CCoreThread::handleFwVersion_hans(void)
 
 void CCoreThread::handleFwVersion_franz(void)
 {
-    BYTE fwVer[14];
+    uint8_t fwVer[14];
     memset(fwVer,   0, 14);
 
     chipInterface->setFDDconfig(setFloppyConfig, floppyConfig.enabled, floppyConfig.id, floppyConfig.writeProtected, setDiskChanged, diskChanged);
@@ -800,7 +800,7 @@ void CCoreThread::handleFwVersion_franz(void)
     }
 }
 
-void CCoreThread::getIdBits(BYTE &enabledIDbits, BYTE &sdCardAcsiId)
+void CCoreThread::getIdBits(uint8_t &enabledIDbits, uint8_t &sdCardAcsiId)
 {
     // get the bits from struct
     enabledIDbits  = acsiIdInfo.enabledIDbits;
@@ -900,7 +900,7 @@ void CCoreThread::showHwVersion(void)
 void CCoreThread::setFloppyImageLed(int ledNo)
 {
     if(ledNo >=0 && ledNo < 3) {                    // if the LED # is within expected range
-        BYTE enabledImgs = shared.imageSilo->getSlotBitmap();
+        uint8_t enabledImgs = shared.imageSilo->getSlotBitmap();
 
         if(enabledImgs & (1 << ledNo)) {            // if the required LED # is enabled, set it
             Debug::out(LOG_DEBUG, "Setting new floppy image LED to %d", ledNo);
@@ -916,7 +916,7 @@ void CCoreThread::setFloppyImageLed(int ledNo)
     }
 }
 
-void CCoreThread::handleSendTrack(BYTE *inBuf)
+void CCoreThread::handleSendTrack(uint8_t *inBuf)
 {
     static int prevTrack = 0;
 
@@ -926,7 +926,7 @@ void CCoreThread::handleSendTrack(BYTE *inBuf)
     int tr, si, spt;
     shared.imageSilo->getParams(tr, si, spt);      // read the floppy image params
 
-    BYTE *encodedTrack;
+    uint8_t *encodedTrack;
     int countInTrack;
 
     if(side < 0 || side > 1 || track < 0 || track >= tr) {      // side / track out of range? use empty track
@@ -953,7 +953,7 @@ void CCoreThread::handleSendTrack(BYTE *inBuf)
 void CCoreThread::handleSectorWritten(void)
 {
     int side, track, sector, byteCount;
-    BYTE *writtenSector = chipInterface->fdd_sectorWritten(side, track, sector, byteCount); // get side + track + sector number, byte count, and pointer to buffer where the written data is
+    uint8_t *writtenSector = chipInterface->fdd_sectorWritten(side, track, sector, byteCount); // get side + track + sector number, byte count, and pointer to buffer where the written data is
 
     if(!floppyConfig.writeProtected) {  // not write protected? write
         Debug::out(LOG_DEBUG, "handleSectorWritten -- track %d, side %d, sector %d", track, side, sector);

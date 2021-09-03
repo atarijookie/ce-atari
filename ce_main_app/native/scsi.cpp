@@ -15,8 +15,8 @@ Scsi::Scsi(void)
 
     dataTrans = 0;
 
-    dataBuffer  = new BYTE[SCSI_BUFFER_SIZE];
-    dataBuffer2 = new BYTE[SCSI_BUFFER_SIZE];
+    dataBuffer  = new uint8_t[SCSI_BUFFER_SIZE];
+    dataBuffer2 = new uint8_t[SCSI_BUFFER_SIZE];
 
     for(i=0; i<8; i++) {
         devInfo[i].attachedMediaIndex   = -1;
@@ -389,7 +389,7 @@ void Scsi::loadSettings(void)
     }
 }
 
-void Scsi::processCommand(BYTE *command)
+void Scsi::processCommand(uint8_t *command)
 {
     cmd     = command;
     acsiId  = cmd[0] >> 5;
@@ -417,8 +417,8 @@ void Scsi::processCommand(BYTE *command)
     }
 
     bool isIcd      = isICDcommand();                           // check if it's ICD command or SCSI(6) command
-    BYTE lun        = isIcd ? (cmd[2] >> 5) : (cmd[1] >>   5);  // get LUN from command
-    BYTE justCmd    = isIcd ? (cmd[1]     ) : (cmd[0] & 0x1f);  // get just the command (remove ACSI ID)
+    uint8_t lun        = isIcd ? (cmd[2] >> 5) : (cmd[1] >>   5);  // get LUN from command
+    uint8_t justCmd    = isIcd ? (cmd[1]     ) : (cmd[0] & 0x1f);  // get just the command (remove ACSI ID)
 
     Debug::out(LOG_DEBUG, "Scsi::processCommand -- isIcd: %d, ACSI ID: %d, LUN: %d, CMD: 0x%02x - %s", isIcd, acsiId, lun, justCmd, getCommandName(justCmd));
 
@@ -451,7 +451,7 @@ void Scsi::processCommand(BYTE *command)
     }
 }
 
-void Scsi::ProcScsi6(BYTE lun, BYTE justCmd)
+void Scsi::ProcScsi6(uint8_t lun, uint8_t justCmd)
 {
     shitHasHappened = 0;
 
@@ -515,7 +515,7 @@ void Scsi::ProcScsi6(BYTE lun, BYTE justCmd)
 //----------------------------------------------
 void Scsi::SCSI_FormatUnit(void)
 {
-    BYTE res = 0;
+    uint8_t res = 0;
 
     res = eraseMedia();
     //---------------
@@ -526,7 +526,7 @@ void Scsi::SCSI_FormatUnit(void)
     }
 }
 //----------------------------------------------
-void Scsi::SCSI_Inquiry(BYTE lun)
+void Scsi::SCSI_Inquiry(uint8_t lun)
 {
     int inquiryLength;
 
@@ -590,11 +590,11 @@ void Scsi::SCSI_Inquiry(BYTE lun)
 //----------------------------------------------
 void Scsi::SCSI_ModeSense6(void)
 {
-    WORD length, i, len;
-    BYTE PageCode, val;
+    uint16_t length, i, len;
+    uint8_t PageCode, val;
     //-----------------
-    BYTE page_control[]    = {0x0a, 0x06, 0, 0, 0, 0, 0, 0};
-    BYTE page_medium[]    = {0x0b, 0x06, 0, 0, 0, 0, 0, 0};
+    uint8_t page_control[]    = {0x0a, 0x06, 0, 0, 0, 0, 0, 0};
+    uint8_t page_medium[]    = {0x0b, 0x06, 0, 0, 0, 0, 0, 0};
     //-----------------
     PageCode    = cmd[2] & 0x3f;    // get only page code
     length        = cmd[4];                  // how many bytes should be sent
@@ -652,7 +652,7 @@ void Scsi::SCSI_ModeSense6(void)
 }
 //----------------------------------------------
 // return the last error that occured
-void Scsi::SCSI_RequestSense(BYTE lun)
+void Scsi::SCSI_RequestSense(uint8_t lun)
 {
     char i,xx;
     unsigned char val;
@@ -692,9 +692,9 @@ void Scsi::SCSI_RequestSense(BYTE lun)
     SendOKstatus();
 }
 //----------------------------------------------
-void Scsi::SendEmptySecotrs(WORD sectors)
+void Scsi::SendEmptySecotrs(uint16_t sectors)
 {
-    WORD i,j;
+    uint16_t i,j;
 
     for(j=0; j<sectors; j++)
     {
@@ -705,7 +705,7 @@ void Scsi::SendEmptySecotrs(WORD sectors)
     }
 }
 //----------------------------------------------
-void Scsi::ProcICD(BYTE lun, BYTE justCmd)
+void Scsi::ProcICD(uint8_t lun, uint8_t justCmd)
 {
     shitHasHappened = 0;
 
@@ -778,8 +778,8 @@ void Scsi::ProcICD(BYTE lun, BYTE justCmd)
 //---------------------------------------------
 void Scsi::SCSI_ReadCapacity(void)
 {     // return disk capacity and sector size
-    DWORD cap;
-    BYTE hi,midlo, midhi, lo;
+    uint32_t cap;
+    uint8_t hi,midlo, midhi, lo;
 
     int64_t scap, bcap;
     dataMedia->getCapacity(bcap, scap);

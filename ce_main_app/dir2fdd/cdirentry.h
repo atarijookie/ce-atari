@@ -4,7 +4,7 @@
 #define _MAX_PATH   256
 #define _MAX_FNAME  256
 
-#include "../datatypes.h"
+#include <stdint.h>
 
 class CDirectory;                   // forward declaration
 
@@ -50,9 +50,9 @@ public:
     char    sName[16];
     char    sExt[16];
 
-    WORD    atariTime;
-    WORD    atariDate;
-    DWORD   fileSize;
+    uint16_t    atariTime;
+    uint16_t    atariDate;
+    uint32_t   fileSize;
 
     bool    isDir;
 };

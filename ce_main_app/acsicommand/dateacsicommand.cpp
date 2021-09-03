@@ -10,7 +10,7 @@ DateAcsiCommand::~DateAcsiCommand()
 {
 }
 
-void DateAcsiCommand::processCommand(BYTE *command)
+void DateAcsiCommand::processCommand(uint8_t *command)
 {
     cmd = command;
 
@@ -33,7 +33,7 @@ void DateAcsiCommand::processCommand(BYTE *command)
             time_t timeraw=(time_t)pxDateService->getTime();
             struct tm * timeinfo;
             timeinfo=localtime( &timeraw );
-            BYTE bfr[512];
+            uint8_t bfr[512];
             bfr[0]='R';
             bfr[1]='T';
             bfr[2]='C';

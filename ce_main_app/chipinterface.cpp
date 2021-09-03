@@ -1,6 +1,5 @@
 #include <string.h>
 
-#include "datatypes.h"
 #include "chipinterface.h"
 #include "global.h"
 #include "debug.h"
@@ -13,7 +12,7 @@ ChipInterface::ChipInterface()
     instanceIndex = -1;
 }
 
-void ChipInterface::convertXilinxInfo(BYTE xilinxInfo)
+void ChipInterface::convertXilinxInfo(uint8_t xilinxInfo)
 {
     THwConfig hwConfigOld = hwConfig;
 
@@ -80,18 +79,18 @@ void ChipInterface::responseStart(int bufferLengthInBytes)        // use this to
     response.currentLength      = 0;
 }
 
-void ChipInterface::responseAddWord(BYTE *bfr, WORD value)        // add a WORD to the response (command) to Hans or Franz
+void ChipInterface::responseAddWord(uint8_t *bfr, uint16_t value)        // add a uint16_t to the response (command) to Hans or Franz
 {
     if(response.currentLength >= response.bfrLengthInBytes) {
         return;
     }
 
-    bfr[response.currentLength + 0] = (BYTE) (value >> 8);
-    bfr[response.currentLength + 1] = (BYTE) (value & 0xff);
+    bfr[response.currentLength + 0] = (uint8_t) (value >> 8);
+    bfr[response.currentLength + 1] = (uint8_t) (value & 0xff);
     response.currentLength += 2;
 }
 
-void ChipInterface::responseAddByte(BYTE *bfr, BYTE value)        // add a BYTE to the response (command) to Hans or Franz
+void ChipInterface::responseAddByte(uint8_t *bfr, uint8_t value)        // add a uint8_t to the response (command) to Hans or Franz
 {
     if(response.currentLength >= response.bfrLengthInBytes) {
         return;
@@ -101,11 +100,11 @@ void ChipInterface::responseAddByte(BYTE *bfr, BYTE value)        // add a BYTE 
     response.currentLength++;
 }
 
-void ChipInterface::setHDDconfig(BYTE hddEnabledIDs, BYTE sdCardId, BYTE fddEnabledSlots, bool setNewFloppyImageLed, BYTE newFloppyImageLed)
+void ChipInterface::setHDDconfig(uint8_t hddEnabledIDs, uint8_t sdCardId, uint8_t fddEnabledSlots, bool setNewFloppyImageLed, uint8_t newFloppyImageLed)
 {
     memset(fwResponseBfr, 0, HDD_FW_RESPONSE_LEN);
 
-    // WORD sent (bytes shown): 01 23 45 67
+    // uint16_t sent (bytes shown): 01 23 45 67
 
     responseStart(HDD_FW_RESPONSE_LEN);                         // init the response struct
 

@@ -46,22 +46,22 @@ void SdMedia::getCapacity(int64_t &bytes, int64_t &sectors)
     sectors = 0;
 }
 
-DWORD SdMedia::maxSectorsForSmallReadWrite(void)
+uint32_t SdMedia::maxSectorsForSmallReadWrite(void)
 {
     return 1;   // only for 1 sector transfers do a single transfer from / to SD and single transfer from / to ST, otherwise go with the larger tranfer mode, which will interleave SD and ST transfers
 }
 
-DWORD SdMedia::maxSectorsForSingleReadWrite(void)
+uint32_t SdMedia::maxSectorsForSingleReadWrite(void)
 {
     return 1;   // while one sector is being transfered from / to ST, another one is being transfered from / to SD to RPi
 }
 
-bool SdMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
+bool SdMedia::readSectors(int64_t sectorNo, uint32_t count, uint8_t *bfr)
 {
     return false;
 }
 
-bool SdMedia::writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
+bool SdMedia::writeSectors(int64_t sectorNo, uint32_t count, uint8_t *bfr)
 {
     return false;
 }

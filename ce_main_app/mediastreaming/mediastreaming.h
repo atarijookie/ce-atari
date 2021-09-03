@@ -2,7 +2,7 @@
 #ifndef MEDIASTREAMING_H
 #define MEDIASTREAMING_H
 
-#include "datatypes.h"
+#include <stdint.h>
 
 class TranslatedDisk;
 class AcsiDataTrans;
@@ -21,8 +21,8 @@ public:
     ~MediaStream();
     bool isFree(void);
     bool open(const char * filename, const MediaParams * params);
-    int getInfos(BYTE * buffer, int bufferlen);
-    int read(BYTE * buffer, int bufferlen);
+    int getInfos(uint8_t * buffer, int bufferlen);
+    int read(uint8_t * buffer, int bufferlen);
     void close(void);
 private:
     FILE * f;
@@ -39,13 +39,13 @@ public:
     static MediaStreaming * getInstance(void);
     static void deleteInstance(void);
 
-    void processCommand(BYTE *command, AcsiDataTrans *dataTrans);
+    void processCommand(uint8_t *command, AcsiDataTrans *dataTrans);
 
 private:
     void openStream(AcsiDataTrans *dataTrans);
-    void getStreamInfo(BYTE streamHandle, AcsiDataTrans *dataTrans);
-    void readStream(BYTE arg, AcsiDataTrans *dataTrans);
-    void closeStream(BYTE streamHandle, AcsiDataTrans *dataTrans);
+    void getStreamInfo(uint8_t streamHandle, AcsiDataTrans *dataTrans);
+    void readStream(uint8_t arg, AcsiDataTrans *dataTrans);
+    void closeStream(uint8_t streamHandle, AcsiDataTrans *dataTrans);
 
 // properties
     MediaStream streams[MEDIASTREAMING_MAXSTREAMS];

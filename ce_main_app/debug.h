@@ -1,7 +1,7 @@
 #ifndef _DEBUG_H_
 #define _DEBUG_H_
 
-#include "datatypes.h"
+#include <stdint.h>
 
 #define LOG_OFF         0
 #define LOG_INFO        1       // info         - info which can be displayed when running at user's place
@@ -9,16 +9,16 @@
 #define LOG_DEBUG       3       // debug info   - useful only to developers
 
 typedef struct {
-    BYTE    isInHandleAcsiCommand;
-    DWORD   prevAcsiCmdTime;
-    DWORD   thisAcsiCmdTime;   
+    uint8_t    isInHandleAcsiCommand;
+    uint32_t   prevAcsiCmdTime;
+    uint32_t   thisAcsiCmdTime;   
 } DebugVars;
 
 class Debug
 {
 public:
     static void out(int logLevel, const char *format, ...);
-    static void outBfr(BYTE *bfr, int count);
+    static void outBfr(uint8_t *bfr, int count);
 
     static void printfLogLevelString(void);
     

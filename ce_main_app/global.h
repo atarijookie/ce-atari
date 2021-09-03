@@ -1,13 +1,13 @@
 #ifndef GLOBAL_H
 #define GLOBAL_H
 
-#include "datatypes.h"
+#include <stdint.h>
 
 // commands sent from host to device
 #define CMD_CURRENT_SECTOR          0x50                                // followed by sector #
 #define CMD_GET_FW_VERSION          0x60
 #define CMD_CURRENT_TRACK           0x90                                // followed by track #
-#define CMD_MARK_READ               0xF000                              // this is not sent from host, but just a mark that this WORD has been read and you shouldn't continue to read further
+#define CMD_MARK_READ               0xF000                              // this is not sent from host, but just a mark that this uint16_t has been read and you shouldn't continue to read further
 
 #define MFM_4US     1
 #define MFM_6US     2
@@ -66,7 +66,7 @@ typedef struct {
     char revision[8];
     char model   [40];
 
-    DWORD revisionInt;
+    uint32_t revisionInt;
 } RPiConfig;
 
 typedef struct {
@@ -75,7 +75,7 @@ typedef struct {
     int  scsiMachine;           // when HwHddIface is HDD_IF_SCSI, this specifies what machine (TT or Falcon) is using this device
     bool fwMismatch;            // when HW and FW types don't match (e.g. SCSI HW + ACSI FW, or ACSI HW + SCSI FW)
 
-    BYTE hwSerial[13];          // contains HW serial number, if HW version is 3 and device is running for few seconds
+    uint8_t hwSerial[13];          // contains HW serial number, if HW version is 3 and device is running for few seconds
     bool hwLicenseValid;        // if true, then HW has a valid license and we don't need to show HW lincese screen in config
 
     bool changed;               // true if the value has changes recently
@@ -107,7 +107,7 @@ typedef struct {
 } TFlags;
 
 typedef struct {
-    volatile BYTE insertSpecialFloppyImageId;
+    volatile uint8_t insertSpecialFloppyImageId;
 
     volatile bool screenShotVblEnabled;
     volatile bool doScreenShot;

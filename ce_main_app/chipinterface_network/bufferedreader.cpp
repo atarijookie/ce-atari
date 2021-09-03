@@ -4,7 +4,7 @@
 #include <unistd.h>
 
 #include "../utils.h"
-#include "../datatypes.h"
+#include <stdint.h>
 #include "bufferedreader.h"
 
 BufferedReader::BufferedReader()
@@ -26,7 +26,7 @@ void BufferedReader::setFd(int inFd)
     fd = inFd;
 }
 
-int BufferedReader::waitForATN(BYTE atnCode, DWORD timeoutMs, BYTE *inBuf)
+int BufferedReader::waitForATN(uint8_t atnCode, uint32_t timeoutMs, uint8_t *inBuf)
 {
     if(fd <= 0) {                   //  no fd, no ATN
         return NET_ATN_NONE_ID;
@@ -182,7 +182,7 @@ int BufferedReader::readHeaderFromBuffer(uint8_t atnCodeWant)
     txLen = Utils::getWord(&buffer[8]);
     rxLen = Utils::getWord(&buffer[10]);
 
-    // WORD count to BYTE count
+    // uint16_t count to uint8_t count
     txLen *= 2;
     rxLen *= 2;
 

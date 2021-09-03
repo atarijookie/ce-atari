@@ -27,12 +27,12 @@
 extern SharedObjects shared;
 
 #define INBFR_SIZE  (10 * 1024)
-BYTE *inBfr;
-BYTE *tmpBfr;
+uint8_t *inBfr;
+uint8_t *tmpBfr;
 
 extern bool otherInstanceIsRunning(void);
 
-int translateVT52toVT100(BYTE *bfr, BYTE *tmp, int cnt)
+int translateVT52toVT100(uint8_t *bfr, uint8_t *tmp, int cnt)
 {
     int i, t = 0;
 
@@ -112,10 +112,10 @@ int translateVT52toVT100(BYTE *bfr, BYTE *tmp, int cnt)
 static int termFd1;
 static int termFd2;
 
-static void emptyFd(int fd, BYTE *bfr);
-static bool receiveStream(int byteCount, BYTE *data, int fd);
+static void emptyFd(int fd, uint8_t *bfr);
+static bool receiveStream(int byteCount, uint8_t *data, int fd);
 
-bool sendCmd(BYTE cmd, BYTE param, int fd1, int fd2, BYTE *dataBuffer, BYTE *tempBuffer, int &vt100byteCount)
+bool sendCmd(uint8_t cmd, uint8_t param, int fd1, int fd2, uint8_t *dataBuffer, uint8_t *tempBuffer, int &vt100byteCount)
 {
     char bfr[3];
     int  res;
@@ -135,9 +135,9 @@ bool sendCmd(BYTE cmd, BYTE param, int fd1, int fd2, BYTE *dataBuffer, BYTE *tem
         return false;
     }
 
-    WORD howManyBytes;
+    uint16_t howManyBytes;
 
-    bool bRes = receiveStream(2, (BYTE *) &howManyBytes, fd2);  // first receive byte count that we should read
+    bool bRes = receiveStream(2, (uint8_t *) &howManyBytes, fd2);  // first receive byte count that we should read
 
     if(!bRes) {                                                 // didn't receive available byte count?
         bRes = otherInstanceIsRunning();                        // is the main app running?
@@ -175,7 +175,7 @@ bool sendCmd(BYTE cmd, BYTE param, int fd1, int fd2, BYTE *dataBuffer, BYTE *tem
     return bRes;
 }
 
-static void emptyFd(int fd, BYTE *bfr)
+static void emptyFd(int fd, uint8_t *bfr)
 {
     while(1) {
         int bytesAvailable;
@@ -190,17 +190,17 @@ static void emptyFd(int fd, BYTE *bfr)
     }
 }
 
-static bool receiveStream(int byteCount, BYTE *data, int fd)
+static bool receiveStream(int byteCount, uint8_t *data, int fd)
 {
     ssize_t n;
     fd_set readfds;
     struct timeval timeout;
-    DWORD timeOutTime = Utils::getEndTime(1000);
+    uint32_t timeOutTime = Utils::getEndTime(1000);
 
     int recvCount = 0;          // how many VT52  chars we already got
 
     while(recvCount < byteCount) {                                          // receive all the data, wait up to 1 second to receive it
-        DWORD now = Utils::getCurrentMs();
+        uint32_t now = Utils::getCurrentMs();
         if(now >= timeOutTime) {                          // time out happened, nothing received within specified timeout? fail
             Debug::out(LOG_DEBUG, "receiveStream - fail, wanted %d and got only %d bytes", byteCount, recvCount);
             return false;
@@ -246,7 +246,7 @@ static int safe_getchar(int *count) {
     }
 }
 
-static BYTE getKey(int count)
+static uint8_t getKey(int count)
 {
     int c = safe_getchar(&count);
 
@@ -351,8 +351,8 @@ void ce_conf_mainLoop(void)
 {
     bool configNotLinuxConsole = true;
 
-    inBfr   = new BYTE[INBFR_SIZE];
-    tmpBfr  = new BYTE[INBFR_SIZE];
+    inBfr   = new uint8_t[INBFR_SIZE];
+    tmpBfr  = new uint8_t[INBFR_SIZE];
 
     termFd1 = open(FIFO_TERM_PATH1, O_RDWR);             // will be used for writing only
     termFd2 = open(FIFO_TERM_PATH2, O_RDWR);             // will be used for reading only
@@ -383,8 +383,8 @@ void ce_conf_mainLoop(void)
     new_tio_out.c_lflag &= (~ICANON);               // disable canonical mode (buffered i/o)
     tcsetattr(STDOUT_FILENO,TCSANOW, &new_tio_out); // set the new settings immediately
 
-    DWORD lastUpdate = 0;
-    DWORD now;
+    uint32_t lastUpdate = 0;
+    uint32_t now;
 
     while(sigintReceived == 0) {
         fd_set readfds;
@@ -414,7 +414,7 @@ void ce_conf_mainLoop(void)
             int res = ioctl(STDIN_FILENO, FIONREAD, &bytesAvailable);   // how many bytes we can read from keyboard?
 
             if(res != -1 && bytesAvailable > 0) {
-                BYTE key = getKey(bytesAvailable);                      // get the key in format valid for config components
+                uint8_t key = getKey(bytesAvailable);                      // get the key in format valid for config components
 
                 if(key == KEY_F10) {                                    // should quit? do it
                     break;

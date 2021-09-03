@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include "../datatypes.h"
+#include <stdint.h>
 #include "translateddisk.h"
 
 #define TOSVER100   0x0100
@@ -17,18 +17,18 @@
 #define TOSVER400   0x0400
 
 typedef struct {
-    WORD tosVersion;
-    WORD currentResolution;     // ST video resolution -- what ST says it currently has
-    WORD settingsResolution;    // ST video resolution -- what is in the user settings
+    uint16_t tosVersion;
+    uint16_t currentResolution;     // ST video resolution -- what ST says it currently has
+    uint16_t settingsResolution;    // ST video resolution -- what is in the user settings
 
-    DWORD drivesAll;            // bitmap of all drives available
-    DWORD translatedDrives;     // bitmap of drives which are translated
-    BYTE  configDrive;          // index of config drive
-    BYTE  sharedDrive;          // index of shared drive
+    uint32_t drivesAll;            // bitmap of all drives available
+    uint32_t translatedDrives;     // bitmap of drives which are translated
+    uint8_t  configDrive;          // index of config drive
+    uint8_t  sharedDrive;          // index of shared drive
     std::string label[MAX_DRIVES];
     
     bool  sdNoobEnabled;        // is SD NOOB enabled for this session?
-    DWORD sdNoobSizeSectors;    // size of SD NOOB partition
+    uint32_t sdNoobSizeSectors;    // size of SD NOOB partition
     int   sdNoobDriveNumber;    // TOS drive # for SD NOOB
 } DesktopConfig;
 

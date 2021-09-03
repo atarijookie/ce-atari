@@ -17,7 +17,7 @@ bcm2835_gpio_write doesn't influence SPI CS pins, they are controlled by SPI par
 
 //------------------------------------------------------------------------------------------------------------------------
 
-void spi_tx_rx(int whichSpiCS, int count, BYTE *txBuf, BYTE *rxBuf)
+void spi_tx_rx(int whichSpiCS, int count, uint8_t *txBuf, uint8_t *rxBuf)
 {
 #ifndef ONPC
     bcm2835_spi_chipSelect(whichSpiCS);
@@ -28,7 +28,7 @@ void spi_tx_rx(int whichSpiCS, int count, BYTE *txBuf, BYTE *rxBuf)
 bool spi_atn(int whichSpiAtn)
 {
 #ifndef ONPC
-    BYTE val = bcm2835_gpio_lev(whichSpiAtn);
+    uint8_t val = bcm2835_gpio_lev(whichSpiAtn);
     return (val == HIGH);                   // returns true if pin is high, returns false if pin is low
 #else
     return false;

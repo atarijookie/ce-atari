@@ -9,10 +9,10 @@
 #include "utils.h"
 
 #define LOG_FILE        "/var/log/ce.log"
-DWORD prevLogOut;
+uint32_t prevLogOut;
 
 extern TFlags   flags;
-       BYTE     g_outToConsole;
+       uint8_t     g_outToConsole;
 
 DebugVars dbgVars;
 
@@ -72,8 +72,8 @@ void Debug::out(int logLevel, const char *format, ...)
         return;
     }
 
-    DWORD now = Utils::getCurrentMs();
-    DWORD diff = now - prevLogOut;
+    uint32_t now = Utils::getCurrentMs();
+    uint32_t diff = now - prevLogOut;
     prevLogOut = now;
 
     char humanTime[128];
@@ -101,7 +101,7 @@ void Debug::out(int logLevel, const char *format, ...)
     va_end(args);
 }
 
-void Debug::outBfr(BYTE *bfr, int count)
+void Debug::outBfr(uint8_t *bfr, int count)
 {
     if(flags.logLevel < LOG_DEBUG) {            // if we're not in debug log level, don't do this
         return;

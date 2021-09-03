@@ -1,7 +1,7 @@
 #ifndef _BUFFEREDREADER_H_
 #define _BUFFEREDREADER_H_
 
-#include "../datatypes.h"
+#include <stdint.h>
 #include "../chipinterface.h"
 
 #define NET_ATN_HANS_STR    "ATHA"

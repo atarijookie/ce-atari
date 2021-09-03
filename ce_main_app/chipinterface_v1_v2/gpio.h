@@ -1,7 +1,7 @@
 #ifndef _GPIO_H_
 #define _GPIO_H_
 
-#include "datatypes.h"
+#include <stdint.h>
 
 #ifndef ONPC
 // if compiling for RPi
@@ -43,7 +43,7 @@
 bool gpio_open(void);
 void gpio_close(void);
 bool spi_atn(int whichSpiAtn);
-void spi_tx_rx(int whichSpiCS, int count, BYTE *txBuf, BYTE *rxBuf);
+void spi_tx_rx(int whichSpiCS, int count, uint8_t *txBuf, uint8_t *rxBuf);
 
 #endif      // end of ONPC
 #endif      // end of _GPIO_H_

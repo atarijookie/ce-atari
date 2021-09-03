@@ -92,11 +92,11 @@ void MediaStream::close(void)
 	}
 }
 
-int MediaStream::getInfos(BYTE * buffer, int bufferlen)
+int MediaStream::getInfos(uint8_t * buffer, int bufferlen)
 {
 	/* read .AU header */
 	size_t n;
-	DWORD header_len;
+	uint32_t header_len;
 
 	if(bufferlen < 24) return -1;
 	rewind(f);
@@ -114,7 +114,7 @@ int MediaStream::getInfos(BYTE * buffer, int bufferlen)
 	return n + 24;
 }
 
-int MediaStream::read(BYTE * buffer, int bufferlen)
+int MediaStream::read(uint8_t * buffer, int bufferlen)
 {
 	size_t n;
 	n = fread(buffer, 1, bufferlen, f);
@@ -145,10 +145,10 @@ void MediaStreaming::deleteInstance(void)
     instance = NULL;
 }
 
-void MediaStreaming::processCommand(BYTE *command, AcsiDataTrans *dataTrans)
+void MediaStreaming::processCommand(uint8_t *command, AcsiDataTrans *dataTrans)
 {
-	BYTE cmd = command[4];
-	BYTE arg = command[5];
+	uint8_t cmd = command[4];
+	uint8_t arg = command[5];
 	Debug::out(LOG_DEBUG, "MediaStreaming::processCommand cmd=0x%02x arg=0x%02x",
 	           cmd, arg);
 	dataTrans->clear();
@@ -174,7 +174,7 @@ void MediaStreaming::processCommand(BYTE *command, AcsiDataTrans *dataTrans)
 void MediaStreaming::openStream(AcsiDataTrans *dataTrans)
 {
     TranslatedDisk * translated = TranslatedDisk::getInstance();
-	BYTE buffer[512];
+	uint8_t buffer[512];
 	MediaParams params;
 	const char * path_or_url;
 	std::string hostPath;
@@ -208,7 +208,7 @@ void MediaStreaming::openStream(AcsiDataTrans *dataTrans)
 		unsigned int i = 4;
 		// path is always the last param
 		while((i < sizeof(buffer)) && (path == NULL)) {
-			WORD id = buffer[i] << 8 | buffer[i+1];
+			uint16_t id = buffer[i] << 8 | buffer[i+1];
 			i += 2;
 			switch(id) {
 			case MEDIAPARAM_AUDIORATE:
@@ -290,7 +290,7 @@ void MediaStreaming::openStream(AcsiDataTrans *dataTrans)
 	dataTrans->setStatus(i + 1);
 }
 
-void MediaStreaming::closeStream(BYTE streamHandle, AcsiDataTrans *dataTrans)
+void MediaStreaming::closeStream(uint8_t streamHandle, AcsiDataTrans *dataTrans)
 {
 	int index = streamHandle - 1;
 	if(index >= MEDIASTREAMING_MAXSTREAMS || streams[index].isFree()) {
@@ -303,9 +303,9 @@ void MediaStreaming::closeStream(BYTE streamHandle, AcsiDataTrans *dataTrans)
 	dataTrans->setStatus(MEDIASTREAMING_OK);
 }
 
-void MediaStreaming::readStream(BYTE arg, AcsiDataTrans *dataTrans)
+void MediaStreaming::readStream(uint8_t arg, AcsiDataTrans *dataTrans)
 {
-	BYTE streamHandle = arg & 0x1f;
+	uint8_t streamHandle = arg & 0x1f;
 	int index = streamHandle - 1;
 	if(index >= MEDIASTREAMING_MAXSTREAMS || streams[index].isFree()) {
 		Debug::out(LOG_ERROR, "MediaStreaming::%s streamHandle=0x%02x invalid",
@@ -314,7 +314,7 @@ void MediaStreaming::readStream(BYTE arg, AcsiDataTrans *dataTrans)
 		return;
 	}
 #define BUFFER_SIZE (65536)
-	BYTE buffer[BUFFER_SIZE];
+	uint8_t buffer[BUFFER_SIZE];
 	unsigned int asked = 512 << (arg >> 5);
 	int len = streams[index].read(buffer, asked);
 	if(len < 0) {
@@ -334,7 +334,7 @@ void MediaStreaming::readStream(BYTE arg, AcsiDataTrans *dataTrans)
 	}
 }
 
-void MediaStreaming::getStreamInfo(BYTE streamHandle, AcsiDataTrans *dataTrans)
+void MediaStreaming::getStreamInfo(uint8_t streamHandle, AcsiDataTrans *dataTrans)
 {
 	int index = streamHandle - 1;
 	if(index >= MEDIASTREAMING_MAXSTREAMS || streams[index].isFree()) {
@@ -343,7 +343,7 @@ void MediaStreaming::getStreamInfo(BYTE streamHandle, AcsiDataTrans *dataTrans)
 		dataTrans->setStatus(MEDIASTREAMING_ERR_INVALIDHANDLE);
 		return;
 	}
-	BYTE buffer[512];
+	uint8_t buffer[512];
 	int len = streams[index].getInfos(buffer, sizeof(buffer));
 	if(len < 0) {
 		Debug::out(LOG_ERROR, "MediaStreaming::%s stream->getInfos() failed",

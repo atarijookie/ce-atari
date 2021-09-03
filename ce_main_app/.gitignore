@@ -1,2 +1,9 @@
 bash_scripts/newscripts.zip
 newscripts_zip.h
+.vscode/
+cosmosex_onpc
+lib/*.a
+webroot/css/combined.css.gz
+webroot/js/jquery-combined.js.gz
+webroot/js/log.js.gz
+webroot/js/zepto-combined.js.gz

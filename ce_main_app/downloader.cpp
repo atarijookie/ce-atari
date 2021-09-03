@@ -207,7 +207,7 @@ int Downloader::count(int downloadTypeMask)
     return typeCnt;
 }
 
-bool Downloader::verifyChecksum(const char *filename, WORD checksum)
+bool Downloader::verifyChecksum(const char *filename, uint16_t checksum)
 {
     if(checksum == 0) {                 // special case - when checksum is 0, don't check it buy say that it's OK
         Debug::out(LOG_DEBUG, "Downloader::verifyChecksum - file %s -- supplied 0 as checksum, so not doing checksum and returning that checksum is OK", filename);
@@ -221,15 +221,15 @@ bool Downloader::verifyChecksum(const char *filename, WORD checksum)
         return false;
     }
 
-    WORD cs = 0;
-    WORD val, val2;
+    uint16_t cs = 0;
+    uint16_t val, val2;
 
     while(!feof(f)) {                       // for whole file
-        val = (BYTE) fgetc(f);              // get upper byte
+        val = (uint8_t) fgetc(f);              // get upper byte
         val = val << 8;
 
         if(!feof(f)) {                      // if not end of file
-            val2 = (BYTE) fgetc(f);         // read lowe byte from file
+            val2 = (uint8_t) fgetc(f);         // read lowe byte from file
         } else {
             val2 = 0;                       // if end of file, put a 0 there
         }
@@ -347,7 +347,7 @@ int Downloader::my_progress_func(void *clientp, double downTotal, double downNow
     return abortTransfer;                                       // return 0 to continue transfer, or non-0 to abort transfer
 }
 
-void Downloader::updateStatusByte(TDownloadRequest &tdr, BYTE newStatus)
+void Downloader::updateStatusByte(TDownloadRequest &tdr, uint8_t newStatus)
 {
     tdr.statusByte = newStatus;                 // update the local status byte
 

@@ -23,8 +23,8 @@
 #include "../../../ce_conf_on_rpi.h"
 #include "../../../statusreport.h"
 
-extern int translateVT52toVT100(BYTE *bfr, BYTE *tmp, int cnt);
-extern bool sendCmd(BYTE cmd, BYTE param, int fd1, int fd2, BYTE *dataBuffer, BYTE *tempBuffer, int &vt100byteCount);
+extern int translateVT52toVT100(uint8_t *bfr, uint8_t *tmp, int cnt);
+extern bool sendCmd(uint8_t cmd, uint8_t param, int fd1, int fd2, uint8_t *dataBuffer, uint8_t *tempBuffer, int &vt100byteCount);
 
 #define INBFR_SIZE  (100 * 1024)
 
@@ -35,8 +35,8 @@ extern TFlags flags;
 
 ConfigResource::ConfigResource()  
 {
-    in_bfr  = new BYTE[INBFR_SIZE];
-    tmp_bfr = new BYTE[INBFR_SIZE];
+    in_bfr  = new uint8_t[INBFR_SIZE];
+    tmp_bfr = new uint8_t[INBFR_SIZE];
     
     webFd1  = -1;
     webFd2  = -1;

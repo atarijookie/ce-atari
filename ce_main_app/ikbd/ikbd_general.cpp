@@ -19,7 +19,7 @@
 #include "debug.h"
 #include "utils.h"
 #include "settings.h"
-#include "datatypes.h"
+#include <stdint.h>
 #include "periodicthread.h"
 #include "config/configstream.h"
 #include "chipinterface.h"
@@ -286,7 +286,7 @@ void Ikbd::resetInternalIkbdVars(void)
     waitingForHotkeyRelease = false;
 }
 
-int Ikbd::fdWrite(int fd, BYTE *bfr, int cnt)
+int Ikbd::fdWrite(int fd, uint8_t *bfr, int cnt)
 {
 #if !defined(IKBDSPY)
     if(flags.ikbdLogs) {
@@ -319,7 +319,7 @@ void ikbdLog(const char *format, ...)
         return;
     }
 
-    static DWORD prevLogOutIkbd = 0;
+    static uint32_t prevLogOutIkbd = 0;
 
     va_list args;
     va_start(args, format);
@@ -337,8 +337,8 @@ void ikbdLog(const char *format, ...)
         return;
     }
 
-    DWORD now = Utils::getCurrentMs();
-    DWORD diff = now - prevLogOutIkbd;
+    uint32_t now = Utils::getCurrentMs();
+    uint32_t diff = now - prevLogOutIkbd;
     prevLogOutIkbd = now;
 
     fprintf(f, "%08d\t%08d\t ", now, diff);
@@ -351,13 +351,13 @@ void ikbdLog(const char *format, ...)
 
 // chipLog() will receive incomplete lines stored in cb, terminated by '\n'.
 // It should write only complete lines to file, so it will try to gather chars until '\n' char and do write to file then.
-void chipLog(WORD cnt, CyclicBuff *cb)
+void chipLog(uint16_t cnt, CyclicBuff *cb)
 {
     static std::string oneLine;
-    static DWORD prevLogOutChips = 0;
+    static uint32_t prevLogOutChips = 0;
 
-    DWORD now = Utils::getCurrentMs();
-    DWORD diff = now - prevLogOutChips;
+    uint32_t now = Utils::getCurrentMs();
+    uint32_t diff = now - prevLogOutChips;
     prevLogOutChips = now;
 
     char val = 0;

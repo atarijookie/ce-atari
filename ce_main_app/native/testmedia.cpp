@@ -44,10 +44,10 @@ void TestMedia::getCapacity(int64_t &bytes, int64_t &sectors)
     sectors = 1;
 }
 
-bool TestMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
+bool TestMedia::readSectors(int64_t sectorNo, uint32_t count, uint8_t *bfr)
 {
-    DWORD i;
-    DWORD byteCount = count * 512;
+    uint32_t i;
+    uint32_t byteCount = count * 512;
 
     for(i=0; i<byteCount; i++) {                // fill buffer with counter
         bfr[i] = i;
@@ -56,7 +56,7 @@ bool TestMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
     return true;
 }
 
-bool TestMedia::writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
+bool TestMedia::writeSectors(int64_t sectorNo, uint32_t count, uint8_t *bfr)
 {
 
     return true;

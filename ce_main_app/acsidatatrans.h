@@ -2,7 +2,6 @@
 #define ACSIDATATRANS_H
 
 #include "chipinterface.h"
-#include "datatypes.h"
 
 // data direction after command processing
 #define DATA_DIRECTION_UNKNOWN      0
@@ -31,22 +30,22 @@ public:
 
     void clear(bool clearAlsoDataDirection=true);
 
-    void setStatus(BYTE stat);
+    void setStatus(uint8_t stat);
 
-    void addDataByte(BYTE val);
-    void addDataWord(WORD val);
-    void addDataDword(DWORD val);
+    void addDataByte(uint8_t val);
+    void addDataWord(uint16_t val);
+    void addDataDword(uint32_t val);
     
-    void addZerosUntilSize(DWORD finalBufferCnt);
+    void addZerosUntilSize(uint32_t finalBufferCnt);
 
-    void addDataBfr(const void *data, DWORD cnt, bool padToMul16);
+    void addDataBfr(const void *data, uint32_t cnt, bool padToMul16);
 
     void addDataCString(const char *data, bool padToMul16); // including null terminator
     void padDataToMul16(void);
 
     void dumpDataOnce(void);
 
-    DWORD getCount(void);
+    uint32_t getCount(void);
 
     //----------------
     // for sending data from config stream
@@ -54,24 +53,24 @@ public:
 
     //----------------
     // READ/WRITE functions for smaller data
-    bool recvData(BYTE *data, DWORD cnt);
+    bool recvData(uint8_t *data, uint32_t cnt);
     void sendDataAndStatus(bool fromRetryModule = false);       // by default it's not a retry
 
     //----------------
     // following functions are used for large (>1 MB) block transfers (Scsi::readSectors(), Scsi::writeSectors()) and also by the convenient functions above
     
-    bool sendData_start         (DWORD totalDataCount, BYTE scsiStatus, bool withStatus);
-    bool sendData_transferBlock (BYTE *pData, DWORD dataCount);
+    bool sendData_start         (uint32_t totalDataCount, uint8_t scsiStatus, bool withStatus);
+    bool sendData_transferBlock (uint8_t *pData, uint32_t dataCount);
 
-    bool recvData_start         (DWORD totalDataCount);
-    bool recvData_transferBlock (BYTE *pData, DWORD dataCount);
+    bool recvData_start         (uint32_t totalDataCount);
+    bool recvData_transferBlock (uint8_t *pData, uint32_t dataCount);
 
-    void sendStatusToHans       (BYTE statusByte);
+    void sendStatusToHans       (uint8_t statusByte);
 
 private:
-    BYTE    *buffer;
-    DWORD   count;
-    BYTE    status;
+    uint8_t    *buffer;
+    uint32_t   count;
+    uint8_t    status;
 
     bool    statusWasSet;
     int     dataDirection;
@@ -79,7 +78,7 @@ private:
     ChipInterface *com;
     RetryModule *retryMod;
 
-    BYTE    *recvBuffer;
+    uint8_t    *recvBuffer;
 
     bool    dumpNextData;
 };

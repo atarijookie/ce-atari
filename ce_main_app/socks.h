@@ -2,11 +2,11 @@
 #define _SOCKS_H_
 
 #if defined(ONPC_HIGHLEVEL)
-    extern BYTE     *bufferRead;
-    extern BYTE     *bufferWrite;
-    extern DWORD    sockByteCount;
-    extern BYTE     sockReadNotWrite;
-    extern BYTE     header[16];
+    extern uint8_t     *bufferRead;
+    extern uint8_t     *bufferWrite;
+    extern uint32_t    sockByteCount;
+    extern uint8_t     sockReadNotWrite;
+    extern uint8_t     header[16];
 #endif
 
 int  clientSocket_createConnection(void);
@@ -19,7 +19,7 @@ void serverSocket_setParams(int serverPort);                        // set conne
 int  serverSocket_write(unsigned char *bfr, int len);               // params: pointer to buffer, length of data to send. Returns length of sent data.
 int  serverSocket_read(unsigned char *bfr, int len);                // params: pointer to buffer, maximum received length. Returns length of read data.
 
-WORD dataChecksum(BYTE *data, int byteCount);
+uint16_t dataChecksum(uint8_t *data, int byteCount);
 bool gotCmd(void);
 
 #endif

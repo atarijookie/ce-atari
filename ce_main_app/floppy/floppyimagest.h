@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include "floppyimage.h"
 
-#include "../datatypes.h"
+#include <stdint.h>
 
 class FloppyImageSt: public FloppyImage
 {

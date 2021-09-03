@@ -18,7 +18,7 @@
 #include "imagestorage.h"
 #include "floppysetup_commands.h"
 
-volatile BYTE currentImageDownloadStatus;
+volatile uint8_t currentImageDownloadStatus;
 extern SharedObjects shared;
 
 FloppySetup::FloppySetup()
@@ -49,7 +49,7 @@ void FloppySetup::setAcsiDataTrans(AcsiDataTrans *dt)
     dataTrans = dt;
 }
 
-void FloppySetup::processCommand(BYTE *command)
+void FloppySetup::processCommand(uint8_t *command)
 {
     cmd = command;
 
@@ -69,7 +69,7 @@ void FloppySetup::processCommand(BYTE *command)
             break;
 
         case FDD_CMD_GETSILOCONTENT:                    // return the filenames and contents of current floppy images in silo
-            BYTE bfr[512];
+            uint8_t bfr[512];
             shared.imageSilo->dumpStringsToBuffer(bfr);
 
             dataTrans->addDataBfr(bfr, 512, true);
@@ -154,8 +154,8 @@ void FloppySetup::searchResult(void)
     int realPage    = pageStart / pageSize;         // calculate the real page number
     int totalPages  = (results   / pageSize) + 1;   // calculate the count of pages we have
 
-    dataTrans->addDataWord((WORD) realPage);        // byte 0, 1: real page
-    dataTrans->addDataWord((WORD) totalPages);      // byte 2, 3: total pages
+    dataTrans->addDataWord((uint16_t) realPage);        // byte 0, 1: real page
+    dataTrans->addDataWord((uint16_t) totalPages);      // byte 2, 3: total pages
 
     memset(bfr64k, 0, 1024);
 
@@ -460,8 +460,8 @@ void FloppySetup::uploadBlock(void)
 {
     dataTrans->recvData(bfr64k, 64 * 1024);                 // get 64kB of data from ST
 
-    BYTE slotIndex  = cmd[5] >> 6;                          // get slot # to which the upload should go
-    //BYTE blockNo    = cmd[5] & 0x3f;
+    uint8_t slotIndex  = cmd[5] >> 6;                          // get slot # to which the upload should go
+    //uint8_t blockNo    = cmd[5] & 0x3f;
 
     if(slotIndex != currentUpload.slotIndex) {              // got open one slot, but trying to upload to another? fail!
         dataTrans->setStatus(FDD_ERROR);
@@ -470,13 +470,13 @@ void FloppySetup::uploadBlock(void)
 
     // determine how much data should we write to file
     size_t blockSize = 0;
-    BYTE *ptr = NULL;
+    uint8_t *ptr = NULL;
 
     if(cmd[4] == FDD_CMD_UPLOADIMGBLOCK_FULL) {             // get full block? transfer 64kB
         blockSize   = 64 * 1024;
         ptr         = bfr64k;
     } else if(cmd[4] == FDD_CMD_UPLOADIMGBLOCK_PART) {      // get partial block? Get block size as the 1st word in block
-        blockSize   = (((WORD) bfr64k[0]) << 8) | ((WORD) bfr64k[1]);
+        blockSize   = (((uint16_t) bfr64k[0]) << 8) | ((uint16_t) bfr64k[1]);
         ptr         = bfr64k + 2;
     } else {                                                // this should never happen
         dataTrans->setStatus(FDD_ERROR);
@@ -560,10 +560,10 @@ bool FloppySetup::createNewImage(std::string pathAndFile)
     }
 
     // create default boot sector (copied from blank .st image created in Steem)
-    BYTE sect0start[]   = {0xeb, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc8, 0x82, 0x75, 0x00, 0x02, 0x02, 0x01, 0x00, 0x02, 0x70, 0x00, 0xa0, 0x05, 0xf9, 0x05, 0x00, 0x09, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00};
-    BYTE sect0end[]     = {0x00, 0x97, 0xc7};
+    uint8_t sect0start[]   = {0xeb, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc8, 0x82, 0x75, 0x00, 0x02, 0x02, 0x01, 0x00, 0x02, 0x70, 0x00, 0xa0, 0x05, 0xf9, 0x05, 0x00, 0x09, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00};
+    uint8_t sect0end[]     = {0x00, 0x97, 0xc7};
 
-    BYTE bfr[512];
+    uint8_t bfr[512];
     memset(bfr, 0, 512);
 
     memcpy(bfr, sect0start, sizeof(sect0start));                        // copy the start of default boot sector to start of buffer
@@ -677,7 +677,7 @@ void FloppySetup::downloadGetBlock(void)
         res = 0;
     }
 
-    dataTrans->addDataWord((WORD) res);                         // first add the count of data that was read
+    dataTrans->addDataWord((uint16_t) res);                         // first add the count of data that was read
     dataTrans->addDataBfr(bfr64k, DOWNLOAD_BLOCK_SIZE, true);   // then add the actual data
     dataTrans->setStatus(FDD_OK);                               // and return the good status
 }
@@ -712,7 +712,7 @@ void FloppySetup::searchRefreshList(void)
 
 void FloppySetup::getCurrentSlot(void)
 {
-    BYTE currentSlot = shared.imageSilo->getCurrentSlot();     // get the current slot
+    uint8_t currentSlot = shared.imageSilo->getCurrentSlot();     // get the current slot
 
     dataTrans->addDataByte(currentSlot);
     dataTrans->padDataToMul16();
@@ -788,7 +788,7 @@ void FloppySetup::getImageEncodingRunning(void)
     dataTrans->setStatus(FDD_OK);
 }
 
-void FloppySetup::logCmdName(BYTE cmdCode)
+void FloppySetup::logCmdName(uint8_t cmdCode)
 {
     switch(cmdCode) {
         case FDD_CMD_IDENTIFY:                  Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_IDENTIFY"); break;

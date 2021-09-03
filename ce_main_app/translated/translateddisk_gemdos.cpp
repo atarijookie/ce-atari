@@ -29,7 +29,7 @@
 
 extern TFlags flags;
 
-void TranslatedDisk::onDsetdrv(BYTE *cmd)
+void TranslatedDisk::onDsetdrv(uint8_t *cmd)
 {
     // Dsetdrv() sets the current GEMDOS drive and returns a bitmap of mounted drives.
 
@@ -61,7 +61,7 @@ void TranslatedDisk::onDsetdrv(BYTE *cmd)
         currentDriveLetter  = 'A' + newDrive;       // store the current drive
         currentDriveIndex   = newDrive;
 
-        WORD drives = getDrivesBitmap();
+        uint16_t drives = getDrivesBitmap();
         dataTrans->addDataWord(drives);             // return the drives in data
         dataTrans->padDataToMul16();                // and pad to 16 bytes for DMA chip
 
@@ -75,7 +75,7 @@ void TranslatedDisk::onDsetdrv(BYTE *cmd)
     dataTrans->setStatus(E_NOTHANDLED);             // in other cases - not handled
 }
 
-void TranslatedDisk::onDgetdrv(BYTE *cmd)
+void TranslatedDisk::onDgetdrv(uint8_t *cmd)
 {
     // Dgetdrv() returns the current GEMDOS drive code. Drive A: is represented by
     // a return value of 0, B: by a return value of 1, and so on.
@@ -92,7 +92,7 @@ void TranslatedDisk::onDgetdrv(BYTE *cmd)
     dataTrans->setStatus(E_NOTHANDLED);             // if we don't have this, not handled
 }
 
-void TranslatedDisk::onDsetpath(BYTE *cmd)
+void TranslatedDisk::onDsetpath(uint8_t *cmd)
 {
     bool res;
 
@@ -157,7 +157,7 @@ void TranslatedDisk::onDsetpath(BYTE *cmd)
     dataTrans->setStatus(E_OK);
 }
 
-void TranslatedDisk::onDgetpath(BYTE *cmd)
+void TranslatedDisk::onDgetpath(uint8_t *cmd)
 {
     // Note! whichDrive 0 is the default drive, so drive numbers are +1
     int whichDrive = cmd[5];
@@ -185,7 +185,7 @@ void TranslatedDisk::onDgetpath(BYTE *cmd)
     dataTrans->setStatus(E_OK);
 }
 
-void TranslatedDisk::onFsfirst(BYTE *cmd)
+void TranslatedDisk::onFsfirst(uint8_t *cmd)
 {
     bool res;
 
@@ -203,9 +203,9 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
 
     std::string atariSearchString, hostSearchString;
 
-    DWORD dta           = Utils::getDword(dataBuffer);  // bytes 0 to 3 contain address of DTA used on ST with this Fsfirst() - will be used as identifier for Fsfirst() / Fsnext()
+    uint32_t dta           = Utils::getDword(dataBuffer);  // bytes 0 to 3 contain address of DTA used on ST with this Fsfirst() - will be used as identifier for Fsfirst() / Fsnext()
 
-    BYTE findAttribs    = dataBuffer[4];                // get find attribs (dirs | hidden | ...)
+    uint8_t findAttribs    = dataBuffer[4];                // get find attribs (dirs | hidden | ...)
 
     convertAtariASCIItoPc((char *) (dataBuffer + 5));   // try to fix the path with only allowed chars
     atariSearchString   = (char *) (dataBuffer + 5);    // get search string, e.g.: C:\\*.*
@@ -300,9 +300,9 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
     dataTrans->setStatus(E_OK);                                     // OK!
 }
 
-void TranslatedDisk::onFsnext(BYTE *cmd)
+void TranslatedDisk::onFsnext(uint8_t *cmd)
 {
-    DWORD dta       = Utils::getDword(cmd + 5);                 // bytes 5 to 8   contain address of DTA used on ST with Fsfirst() - will be used as identifier for Fsfirst() / Fsnext()
+    uint32_t dta       = Utils::getDword(cmd + 5);                 // bytes 5 to 8   contain address of DTA used on ST with Fsfirst() - will be used as identifier for Fsfirst() / Fsnext()
     int   dirIndex  = Utils::getWord(cmd + 9);                  // bytes 9 and 10 contain the index of the item from which we should start sending data to ST
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::onFsnext -- DTA: %08x, dirIndex: %d", dta, dirIndex);
@@ -316,7 +316,7 @@ void TranslatedDisk::onFsnext(BYTE *cmd)
 
     TFindStorage *fs = findStorages[index];                     // this is the findStorage with which we will work
 
-    int byteCount   = 512 - 2;                                  // how many bytes we have on the transfered sectors? -2 because 1st WORD is count of DTAs transfered
+    int byteCount   = 512 - 2;                                  // how many bytes we have on the transfered sectors? -2 because 1st uint16_t is count of DTAs transfered
     int dtaSpace    = byteCount / 23;                           // how many DTAs we can fit in there?
 
     int dtaRemaining = fs->count - dirIndex;                    // calculate how many we have until the end
@@ -335,17 +335,17 @@ void TranslatedDisk::onFsnext(BYTE *cmd)
 
     dataTrans->addDataWord(dtaToSend);                          // first word: how many DTAs we're sending
 
-    DWORD addr  = dirIndex * 23;                                // calculate offset from which we will start sending stuff
-    BYTE *buf   = &fs->buffer[addr];                            // and get pointer to this location
+    uint32_t addr  = dirIndex * 23;                                // calculate offset from which we will start sending stuff
+    uint8_t *buf   = &fs->buffer[addr];                            // and get pointer to this location
 
     dataTrans->addDataBfr(buf, dtaToSend * 23, true);           // now add the data to buffer
 
     dataTrans->setStatus(E_OK);
 }
 
-void TranslatedDisk::onFsnext_last(BYTE *cmd)                   // after last Fsnext() call this to release the findStorage
+void TranslatedDisk::onFsnext_last(uint8_t *cmd)                   // after last Fsnext() call this to release the findStorage
 {
-    DWORD dta = Utils::getDword(cmd + 5);                       // bytes 5 to 8 contain address of DTA used on ST with Fsfirst() - will be used as identifier for Fsfirst() / Fsnext()
+    uint32_t dta = Utils::getDword(cmd + 5);                       // bytes 5 to 8 contain address of DTA used on ST with Fsfirst() - will be used as identifier for Fsfirst() / Fsnext()
 
     int index = getFindStorageIndexByDta(dta);                  // now see if we have findStorage for this DTA
     if(index == -1) {                                           // not found?
@@ -358,7 +358,7 @@ void TranslatedDisk::onFsnext_last(BYTE *cmd)                   // after last Fs
     dataTrans->setStatus(E_OK);
 }
 
-void TranslatedDisk::onDfree(BYTE *cmd)
+void TranslatedDisk::onDfree(uint8_t *cmd)
 {
     int whichDrive = cmd[5];
 
@@ -373,9 +373,9 @@ void TranslatedDisk::onDfree(BYTE *cmd)
         return;
     }
 
-    DWORD clustersTotal     = 0;
-    DWORD clustersFree      = 0;
-    DWORD sectorsPerCluster = 0;
+    uint32_t clustersTotal     = 0;
+    uint32_t clustersFree      = 0;
+    uint32_t sectorsPerCluster = 0;
 
     struct statvfs *svfs;
     svfs = (struct statvfs *) malloc( sizeof(struct statvfs) );
@@ -413,7 +413,7 @@ void TranslatedDisk::onDfree(BYTE *cmd)
     dataTrans->setStatus(E_OK);                     // everything OK
 }
 
-void TranslatedDisk::onDcreate(BYTE *cmd)
+void TranslatedDisk::onDcreate(uint8_t *cmd)
 {
     bool res;
 
@@ -519,7 +519,7 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
     dataTrans->setStatus(EINTRN);                   // some other error
 }
 
-void TranslatedDisk::onDdelete(BYTE *cmd)
+void TranslatedDisk::onDdelete(uint8_t *cmd)
 {
     bool res;
 
@@ -568,7 +568,7 @@ void TranslatedDisk::onDdelete(BYTE *cmd)
     dataTrans->setStatus(ires);
 }
 
-void TranslatedDisk::onFrename(BYTE *cmd)
+void TranslatedDisk::onFrename(uint8_t *cmd)
 {
     bool res, res2;
 
@@ -632,7 +632,7 @@ void TranslatedDisk::onFrename(BYTE *cmd)
     }
 }
 
-void TranslatedDisk::onFdelete(BYTE *cmd)
+void TranslatedDisk::onFdelete(uint8_t *cmd)
 {
     bool res;
 
@@ -727,7 +727,7 @@ void TranslatedDisk::onFdelete(BYTE *cmd)
     dataTrans->setStatus(EINTRN);                   // some other error
 }
 
-void TranslatedDisk::onFattrib(BYTE *cmd)
+void TranslatedDisk::onFattrib(uint8_t *cmd)
 {
     bool res;
 
@@ -741,7 +741,7 @@ void TranslatedDisk::onFattrib(BYTE *cmd)
     std::string atariName, hostName;
 
     bool setNotInquire  = dataBuffer[0];
-    BYTE attrAtariNew   = dataBuffer[1];
+    uint8_t attrAtariNew   = dataBuffer[1];
 
     convertAtariASCIItoPc((char *) (dataBuffer + 2));   // try to fix the path with only allowed chars
     atariName =           (char *) (dataBuffer + 2);    // get file name
@@ -763,7 +763,7 @@ void TranslatedDisk::onFattrib(BYTE *cmd)
         return;
     }
 
-    BYTE    oldAttrAtari;
+    uint8_t    oldAttrAtari;
 
     // first read the attributes
     struct stat attr;
@@ -841,7 +841,7 @@ void TranslatedDisk::onFattrib(BYTE *cmd)
 // Calling fdup eats some handles, so then the 1st handle starts at higher number, but still ends up on 45
 // On the atari side we could convert CosmosEx handles from 0-40 to 100-140 (or similar) to identify CosmosEx handles
 
-void TranslatedDisk::onFcreate(BYTE *cmd)
+void TranslatedDisk::onFcreate(uint8_t *cmd)
 {
     bool res;
 
@@ -857,7 +857,7 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
         return;
     }
 
-    BYTE attribs = dataBuffer[0];
+    uint8_t attribs = dataBuffer[0];
 
     std::string atariName, hostName;
 
@@ -944,7 +944,7 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
 
 
 /*
-    DWORD attrHost;
+    uint32_t attrHost;
     attributesAtariToHost(attribs, attrHost);
 
     res = SetFileAttributesA(hostName.c_str(), attrHost);
@@ -975,7 +975,7 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
     dataTrans->setStatus(files[index].atariHandle);                 // return the handle
 }
 
-void TranslatedDisk::onFopen(BYTE *cmd)
+void TranslatedDisk::onFopen(uint8_t *cmd)
 {
     bool res;
 
@@ -986,7 +986,7 @@ void TranslatedDisk::onFopen(BYTE *cmd)
         return;
     }
 
-    BYTE mode = dataBuffer[0];
+    uint8_t mode = dataBuffer[0];
 
     std::string atariName, hostName;
 
@@ -1075,7 +1075,7 @@ void TranslatedDisk::onFopen(BYTE *cmd)
     dataTrans->setStatus(files[index].atariHandle);                 // return the handle
 }
 
-void TranslatedDisk::onFclose(BYTE *cmd)
+void TranslatedDisk::onFclose(uint8_t *cmd)
 {
     int handle = cmd[5];
 
@@ -1107,13 +1107,13 @@ void TranslatedDisk::onFclose(BYTE *cmd)
     dataTrans->setStatus(E_OK);                                     // ok!
 }
 
-void TranslatedDisk::onFdatime(BYTE *cmd)
+void TranslatedDisk::onFdatime(uint8_t *cmd)
 {
     int param       = cmd[5];
     int handle      = param & 0x7f;             // lowest 7 bits
     int setNotGet   = param >> 7;               // highest bit
 
-    WORD atariTime = 0, atariDate = 0;
+    uint16_t atariTime = 0, atariDate = 0;
 
     atariTime       = Utils::getWord(cmd + 6);         // retrieve the time and date from command from ST
     atariDate       = Utils::getWord(cmd + 8);
@@ -1159,8 +1159,8 @@ void TranslatedDisk::onFdatime(BYTE *cmd)
 
         tm *time = localtime(&attr.st_mtime);                       // convert time_t to tm structure
 
-        WORD atariTime = Utils::fileTimeToAtariTime(time);
-        WORD atariDate = Utils::fileTimeToAtariDate(time);
+        uint16_t atariTime = Utils::fileTimeToAtariTime(time);
+        uint16_t atariDate = Utils::fileTimeToAtariDate(time);
 
         dataTrans->addDataWord(atariTime);
         dataTrans->addDataWord(atariDate);
@@ -1170,10 +1170,10 @@ void TranslatedDisk::onFdatime(BYTE *cmd)
     dataTrans->setStatus(E_OK);                                // ok!
 }
 
-void TranslatedDisk::onFread(BYTE *cmd)
+void TranslatedDisk::onFread(uint8_t *cmd)
 {
     int atariHandle         = cmd[5];
-    DWORD byteCount         = Utils::get24bits(cmd + 6);
+    uint32_t byteCount         = Utils::get24bits(cmd + 6);
     int seekOffset          = (signed char) cmd[9];
 
     int index = findFileHandleSlot(atariHandle);
@@ -1212,9 +1212,9 @@ void TranslatedDisk::onFread(BYTE *cmd)
         pad = 16 - mod;             // how many we need to add to make count % 16 equal to 0?
     }
 
-    DWORD transferSizeBytes = byteCount + pad;
+    uint32_t transferSizeBytes = byteCount + pad;
 
-    DWORD cnt = fread (dataBuffer, 1, transferSizeBytes, files[index].hostHandle);
+    uint32_t cnt = fread (dataBuffer, 1, transferSizeBytes, files[index].hostHandle);
     dataTrans->addDataBfr(dataBuffer, cnt, false);  // then store the data
     dataTrans->padDataToMul16();
 
@@ -1232,10 +1232,10 @@ void TranslatedDisk::onFread(BYTE *cmd)
     dataTrans->setStatus(RW_PARTIAL_TRANSFER);
 }
 
-void TranslatedDisk::onFwrite(BYTE *cmd)
+void TranslatedDisk::onFwrite(uint8_t *cmd)
 {
     int atariHandle         = cmd[5];
-    DWORD byteCount         = Utils::get24bits(cmd + 6);
+    uint32_t byteCount         = Utils::get24bits(cmd + 6);
 
     int index = findFileHandleSlot(atariHandle);
 
@@ -1260,7 +1260,7 @@ void TranslatedDisk::onFwrite(BYTE *cmd)
         pad = 16 - mod;             // how many we need to add to make count % 16 equal to 0?
     }
 
-    DWORD transferSizeBytes = byteCount + pad;
+    uint32_t transferSizeBytes = byteCount + pad;
 
     bool res;
     res = dataTrans->recvData(dataBuffer, transferSizeBytes);   // get data from Hans
@@ -1272,7 +1272,7 @@ void TranslatedDisk::onFwrite(BYTE *cmd)
         return;
     }
 
-    DWORD bWritten = fwrite(dataBuffer, 1, byteCount, files[index].hostHandle);    // write the data
+    uint32_t bWritten = fwrite(dataBuffer, 1, byteCount, files[index].hostHandle);    // write the data
 
     files[index].lastDataCount = bWritten;                      // store data written count
 
@@ -1287,7 +1287,7 @@ void TranslatedDisk::onFwrite(BYTE *cmd)
     dataTrans->setStatus(RW_ALL_TRANSFERED);                    // when all the data was written
 }
 
-void TranslatedDisk::onRWDataCount(BYTE *cmd)                   // when Fread / Fwrite doesn't process all the data, this returns the count of processed data
+void TranslatedDisk::onRWDataCount(uint8_t *cmd)                   // when Fread / Fwrite doesn't process all the data, this returns the count of processed data
 {
     int atariHandle = cmd[5];
     int index       = findFileHandleSlot(atariHandle);
@@ -1303,12 +1303,12 @@ void TranslatedDisk::onRWDataCount(BYTE *cmd)                   // when Fread / 
     dataTrans->setStatus(E_OK);
 }
 
-void TranslatedDisk::onFseek(BYTE *cmd)
+void TranslatedDisk::onFseek(uint8_t *cmd)
 {
     // get seek params
-    DWORD   offset      = Utils::getDword(cmd + 5);
-    BYTE    atariHandle = cmd[9];
-    BYTE    seekMode    = cmd[10];
+    uint32_t   offset      = Utils::getDword(cmd + 5);
+    uint8_t    atariHandle = cmd[9];
+    uint8_t    seekMode    = cmd[10];
 
     int index = findFileHandleSlot(atariHandle);
 
@@ -1347,7 +1347,7 @@ void TranslatedDisk::onFseek(BYTE *cmd)
         return;
     }
 
-    DWORD bytesToEnd = getByteCountToEOF(files[index].hostHandle);  // get count of bytes to EOF
+    uint32_t bytesToEnd = getByteCountToEOF(files[index].hostHandle);  // get count of bytes to EOF
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::onFseek - ok, current position is %d, and we got %d bytes to end of file", pos, (int) bytesToEnd);
 
@@ -1358,7 +1358,7 @@ void TranslatedDisk::onFseek(BYTE *cmd)
     dataTrans->setStatus(E_OK);                                     // OK!
 }
 
-void TranslatedDisk::onFtell(BYTE *cmd)
+void TranslatedDisk::onFtell(uint8_t *cmd)
 {
     int handle = cmd[5];
 
@@ -1405,9 +1405,9 @@ int TranslatedDisk::findFileHandleSlot(int atariHandle)
 }
 
 // BIOS functions we need to support
-void TranslatedDisk::onDrvMap(BYTE *cmd)
+void TranslatedDisk::onDrvMap(uint8_t *cmd)
 {
-    WORD drives = getDrivesBitmap();
+    uint16_t drives = getDrivesBitmap();
 
     if(flags.logLevel >= LOG_DEBUG) {
         char tmp2[3];
@@ -1426,16 +1426,16 @@ void TranslatedDisk::onDrvMap(BYTE *cmd)
     }
 
     dataTrans->addDataWord(drives);         // drive bits
-    dataTrans->addDataWord(0);              // add empty WORD - for future extension to 32 drives
+    dataTrans->addDataWord(0);              // add empty uint16_t - for future extension to 32 drives
 
     dataTrans->padDataToMul16();            // pad to multiple of 16
 
     dataTrans->setStatus(E_OK);
 }
 
-void TranslatedDisk::onMediach(BYTE *cmd)
+void TranslatedDisk::onMediach(uint8_t *cmd)
 {
-    WORD mediach = 0;
+    uint16_t mediach = 0;
     int chgCount = 0;
 
     for(int i=2; i<MAX_DRIVES; i++) {       // create media changed bits
@@ -1455,9 +1455,9 @@ void TranslatedDisk::onMediach(BYTE *cmd)
     dataTrans->setStatus(E_OK);
 }
 
-void TranslatedDisk::onGetbpb(BYTE *cmd)
+void TranslatedDisk::onGetbpb(uint8_t *cmd)
 {
-    WORD drive = cmd[5];
+    uint16_t drive = cmd[5];
 
     if(drive >= MAX_DRIVES || !conf[drive].enabled) {   // index would be out of range, or drive not enabled?
         dataTrans->setStatus(E_NOTHANDLED);
@@ -1468,7 +1468,7 @@ void TranslatedDisk::onGetbpb(BYTE *cmd)
     onPexec_getBpb(cmd);                                // let just always use Pexec() RAW drive BPB
 }
 
-void TranslatedDisk::atariFindAttribsToString(BYTE attr, std::string &out)
+void TranslatedDisk::atariFindAttribsToString(uint8_t attr, std::string &out)
 {
     out = "";
 
@@ -1484,7 +1484,7 @@ void TranslatedDisk::atariFindAttribsToString(BYTE attr, std::string &out)
     }
 }
 
-void TranslatedDisk::getByteCountToEndOfFile(BYTE *cmd)
+void TranslatedDisk::getByteCountToEndOfFile(uint8_t *cmd)
 {
     int atariHandle = cmd[5];
 
@@ -1499,7 +1499,7 @@ void TranslatedDisk::getByteCountToEndOfFile(BYTE *cmd)
 
     FILE *f = files[index].hostHandle;              // store the handle to 'f'
 
-    DWORD bytesToEnd = getByteCountToEOF(f);
+    uint32_t bytesToEnd = getByteCountToEOF(f);
 
     //-----------
     // now send it to ST
@@ -1511,14 +1511,14 @@ void TranslatedDisk::getByteCountToEndOfFile(BYTE *cmd)
     dataTrans->setStatus(E_OK);
 }
 
-DWORD TranslatedDisk::getByteCountToEOF(FILE *f)
+uint32_t TranslatedDisk::getByteCountToEOF(FILE *f)
 {
     if(!f) {
         return 0;
     }
 
     // find out and calculate, how many bytes there are until the end of file from current position
-    DWORD posCurrent, posEnd, bytesToEnd;
+    uint32_t posCurrent, posEnd, bytesToEnd;
 
     posCurrent = ftell(f);                          // store current position from start
     fseek(f, 0, SEEK_END);                          // move to the end of file
@@ -1530,22 +1530,22 @@ DWORD TranslatedDisk::getByteCountToEOF(FILE *f)
     return bytesToEnd;
 }
 
-void TranslatedDisk::onTestRead(BYTE *cmd)
+void TranslatedDisk::onTestRead(uint8_t *cmd)
 {
     int     byteCount   = Utils::get24bits(cmd + 5);    // 5,6,7 -- byte count
-    WORD    xorVal      = Utils::getWord(cmd + 8);      // 8,9   -- xor value
+    uint16_t    xorVal      = Utils::getWord(cmd + 8);      // 8,9   -- xor value
 
     byteCount = (byteCount < ACSI_MAX_TRANSFER_SIZE_BYTES) ? byteCount : ACSI_MAX_TRANSFER_SIZE_BYTES;      // if would try to send too much data (that would cause a crash), limit it
 
     int i;
-    WORD counter = 0;
+    uint16_t counter = 0;
     for(i=0; i<byteCount; i += 2) {
         dataTrans->addDataWord(counter ^ xorVal);       // store word
         counter++;
     }
 
     if(byteCount & 1) {                                 // odd number of bytes? add last byte
-        BYTE lastByte = (counter ^ xorVal) >> 8;
+        uint8_t lastByte = (counter ^ xorVal) >> 8;
         dataTrans->addDataByte(lastByte);
     }
 
@@ -1553,10 +1553,10 @@ void TranslatedDisk::onTestRead(BYTE *cmd)
     dataTrans->setStatus(E_OK);
 }
 
-void TranslatedDisk::onTestWrite(BYTE *cmd)
+void TranslatedDisk::onTestWrite(uint8_t *cmd)
 {
     int     byteCount   = Utils::get24bits(cmd + 5);    // 5,6,7 -- byte count
-    WORD    xorVal      = Utils::getWord(cmd + 8);      // 8,9   -- xor value
+    uint16_t    xorVal      = Utils::getWord(cmd + 8);      // 8,9   -- xor value
 
     byteCount = (byteCount < ACSI_MAX_TRANSFER_SIZE_BYTES) ? byteCount : ACSI_MAX_TRANSFER_SIZE_BYTES;      // if would try to send too much data (that would cause a crash), limit it
 
@@ -1569,11 +1569,11 @@ void TranslatedDisk::onTestWrite(BYTE *cmd)
     }
 
     int i;
-    WORD counter = 0;
+    uint16_t counter = 0;
     for(i=0; i<byteCount; i += 2) {                     // verify all data words
-        WORD valSt  = Utils::getWord(dataBuffer + i);
+        uint16_t valSt  = Utils::getWord(dataBuffer + i);
 
-        WORD valGen = counter ^ xorVal;
+        uint16_t valGen = counter ^ xorVal;
         counter++;
 
         if(valSt != valGen) {                           // data mismatch? fail
@@ -1582,8 +1582,8 @@ void TranslatedDisk::onTestWrite(BYTE *cmd)
             int iFail = i;
             int start = MAX(i - 6, 0);                  // go 6 bytes back before error, if it would be bellow index 0, just use 0
 
-            for(i=start; i<(start + 12); i += 2) {      // put 6 WORD values into log to see them
-                WORD valSt  = Utils::getWord(dataBuffer + i);
+            for(i=start; i<(start + 12); i += 2) {      // put 6 uint16_t values into log to see them
+                uint16_t valSt  = Utils::getWord(dataBuffer + i);
                 Debug::out(LOG_DEBUG, "  [%d] %04X %s", i, valSt, (i == iFail) ? "<--- BAD" : "");
             }
 
@@ -1593,8 +1593,8 @@ void TranslatedDisk::onTestWrite(BYTE *cmd)
     }
 
     if(byteCount & 1) {                                 // odd number of bytes? verify last byte
-        BYTE lastByteGen = (counter ^ xorVal) >> 8;
-        BYTE lastByteSt  = dataBuffer[i];
+        uint8_t lastByteGen = (counter ^ xorVal) >> 8;
+        uint8_t lastByteSt  = dataBuffer[i];
 
         if(lastByteSt != lastByteGen) {                 // data mismatch? fail
             dataTrans->setStatus(E_CRC);
@@ -1605,7 +1605,7 @@ void TranslatedDisk::onTestWrite(BYTE *cmd)
     dataTrans->setStatus(E_OK);
 }
 
-void TranslatedDisk::onTestGetACSIids(BYTE *cmd)
+void TranslatedDisk::onTestGetACSIids(uint8_t *cmd)
 {
     AcsiIDinfo  acsiIdInfo;
     Settings    s;
@@ -1634,7 +1634,7 @@ int TranslatedDisk::findCurrentIDforDevType(int devType, AcsiIDinfo *aii)
     return -1;
 }
 
-void TranslatedDisk::onSetACSIids(BYTE *cmd)
+void TranslatedDisk::onSetACSIids(uint8_t *cmd)
 {
     bool res = dataTrans->recvData(dataBuffer, 16);         // get data from Hans
 

@@ -41,7 +41,7 @@ bool DeviceMedia::iopen(const char *path, bool createIfNotExists)
 	}
 
 
-	DWORD size;
+	uint32_t size;
 	int res = ioctl(fdes, BLKGETSIZE, &size);	// try to get device capacity in sectors
 
 	if(res < 0) {								// failed to get capacity?
@@ -96,7 +96,7 @@ void DeviceMedia::getCapacity(int64_t &bytes, int64_t &sectors)
     sectors = SCapacity;
 }
 
-bool DeviceMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
+bool DeviceMedia::readSectors(int64_t sectorNo, uint32_t count, uint8_t *bfr)
 {
     if(!isInit()) {                             // if not initialized, failed
         Debug::out(LOG_DEBUG, "DeviceMedia::readSectors - not init");
@@ -133,7 +133,7 @@ bool DeviceMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
     return true;
 }
 
-bool DeviceMedia::writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
+bool DeviceMedia::writeSectors(int64_t sectorNo, uint32_t count, uint8_t *bfr)
 {
     if(!isInit()) {                             // if not initialized, failed
         Debug::out(LOG_DEBUG, "DeviceMedia::writeSectors - not init");

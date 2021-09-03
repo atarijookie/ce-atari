@@ -26,9 +26,9 @@
 #include "readwrapper.h"
 
 //---------------------------------------------
-NdbItem::NdbItem(int inSize, BYTE *inData, DWORD fromAddr, WORD fromPort)
+NdbItem::NdbItem(int inSize, uint8_t *inData, uint32_t fromAddr, uint16_t fromPort)
 {
-    data = new BYTE[inSize];                // allocate RAM
+    data = new uint8_t[inSize];                // allocate RAM
     memcpy(data, inData, inSize);           // copy in data
 
     size = inSize;
@@ -112,7 +112,7 @@ int ReadWrapper::getCount(void)                         // get recv data count -
     return 0;
 }
 
-int ReadWrapper::getNdb(BYTE *tmpBuffer)                // for UDP get one datagram, for TCP get a block from stream
+int ReadWrapper::getNdb(uint8_t *tmpBuffer)                // for UDP get one datagram, for TCP get a block from stream
 {
     int res;
     int size = getNextNdbSize();                        // find out how much we should get
@@ -199,7 +199,7 @@ int ReadWrapper::getNextNdbSize(void)
 }
 
 
-int ReadWrapper::peekBlock(BYTE *tmpBuffer, int size)   // for UDP merge buffers, return data without removing from queue
+int ReadWrapper::peekBlock(uint8_t *tmpBuffer, int size)   // for UDP merge buffers, return data without removing from queue
 {
     int totalCount, res;
 
@@ -234,7 +234,7 @@ int ReadWrapper::peekBlock(BYTE *tmpBuffer, int size)   // for UDP merge buffers
             return 0;
         }
         
-        BYTE *p       = tmpBuffer;
+        uint8_t *p       = tmpBuffer;
         int itemsCnt  = items.size();                   // how many items we have? 
         int remaining = size;                           // how many bytes we still have to receive
         int ndbUsed   = 0;        
@@ -399,7 +399,7 @@ void ReadWrapper::udpTryReceive(void)
         Debug::out(LOG_DEBUG, "ReadWrapper::udpTryReceive() - readCount: %d, addr: %08x, port: %d", readCount, ntohl(si_other.sin_addr.s_addr), ntohs(si_other.sin_port));
         
         // put it in the deque
-        NdbItem *newItem = new NdbItem(readCount, tmpBfr, (DWORD) si_other.sin_addr.s_addr, (WORD) si_other.sin_port);
+        NdbItem *newItem = new NdbItem(readCount, tmpBfr, (uint32_t) si_other.sin_addr.s_addr, (uint16_t) si_other.sin_port);
         items.push_back(newItem);
     }
 

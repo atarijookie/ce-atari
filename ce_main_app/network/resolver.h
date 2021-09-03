@@ -5,20 +5,20 @@
 #include <netdb.h>
 #include <string>
 
-#include "../datatypes.h"
+#include <stdint.h>
 
 #define RESOLV_COUNT    10
 struct Tresolv {
-             DWORD          startTime;
-    volatile BYTE           getaddrinfoHasFinished;
-    volatile BYTE           processed;
+             uint32_t          startTime;
+    volatile uint8_t           getaddrinfoHasFinished;
+    volatile uint8_t           processed;
              int            error;
 
              char           hostName[256];
              char           canonName[256];
 
              int            count;
-             BYTE           data[128];
+             uint8_t           data[128];
              std::string    h_name;
 
              gaicb          req;

@@ -6,8 +6,8 @@
 
 #include "mfmcachedimage.h"
 
-#define LOBYTE(w)   ((BYTE)(w))
-#define HIBYTE(w)   ((BYTE)(((WORD)(w)>>8)&0xFF))
+#define LOBYTE(w)   ((uint8_t)(w))
+#define HIBYTE(w)   ((uint8_t)(((uint16_t)(w)>>8)&0xFF))
 
 extern pthread_mutex_t floppyEncoderMutex;
 extern THwConfig    hwConfig;
@@ -16,7 +16,7 @@ extern THwConfig    hwConfig;
 #define ID_MARK     0xfe
 
 // crc16-ccitt generated table for fast CRC calculation
-const WORD crcTable[256] = {
+const uint16_t crcTable[256] = {
     0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50A5, 0x60C6, 0x70E7,
     0x8108, 0x9129, 0xA14A, 0xB16B, 0xC18C, 0xD1AD, 0xE1CE, 0xF1EF,
     0x1231, 0x0210, 0x3273, 0x2252, 0x52B5, 0x4294, 0x72F7, 0x62D6,
@@ -57,7 +57,7 @@ MfmCachedImage::MfmCachedImage()
 
     // allocate tracks
     for(int i=0; i<MAX_TRACKS; i++) {
-        tracks[i].mfmStream = new BYTE[MFM_STREAM_SIZE];  // allocate memory -- we're transfering 15'000 bytes, so allocate this much
+        tracks[i].mfmStream = new uint8_t[MFM_STREAM_SIZE];  // allocate memory -- we're transfering 15'000 bytes, so allocate this much
     }
 
     // clear tracks
@@ -247,7 +247,7 @@ bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, 
 
     if(hwConfig.version == 1 || hwConfig.version == 2) {    // HW v1 and v2 need byte swap, HW v3 needs bytes in the original order
         for(int i=0; i<MFM_STREAM_SIZE; i += 2) {           // swap bytes - Franz has other endiannes
-            BYTE tmp                        = tracks[index].mfmStream[i + 0];
+            uint8_t tmp                        = tracks[index].mfmStream[i + 0];
             tracks[index].mfmStream[i + 0]  = tracks[index].mfmStream[i + 1];
             tracks[index].mfmStream[i + 1]  = tmp;
         }
@@ -362,7 +362,7 @@ bool MfmCachedImage::encodedTrackIsReady(int track, int side)
     return tracks[index].isReady;   // return if ready
 }
 
-BYTE *MfmCachedImage::getEncodedTrack(int track, int side, int &bytesInBuffer)
+uint8_t *MfmCachedImage::getEncodedTrack(int track, int side, int &bytesInBuffer)
 {
     if(!gotImage) {                                             // if don't have the cached stuff yet
         bytesInBuffer = 0;
@@ -390,7 +390,7 @@ bool MfmCachedImage::encodeSingleSector(FloppyImage *img, int side, int track, i
 {
     bool res;
 
-    BYTE data[512];
+    uint8_t data[512];
     res = img->readSector(track, side, sector, data);     // read data into 'data'
 
     if(!res) {
@@ -447,16 +447,16 @@ bool MfmCachedImage::encodeSingleSector(FloppyImage *img, int side, int track, i
 }
 
 // new implementation which generates time from bit triplets (threeBits)
-void MfmCachedImage::appendByteToStream(BYTE val, bool doCalcCrc)
+void MfmCachedImage::appendByteToStream(uint8_t val, bool doCalcCrc)
 {
     if(doCalcCrc) {
         updateCrcFast(val);
     }
 
-    BYTE time;
+    uint8_t time;
 
     for(int i=0; i<8; i++) {                        // for all bits
-        BYTE bit = (val & 0x80) >> 7;               // get highest bit (stored in lowest bit now as 0 or 1)
+        uint8_t bit = (val & 0x80) >> 7;               // get highest bit (stored in lowest bit now as 0 or 1)
         encoder.threeBits = ((encoder.threeBits << 1) | bit) & 7;   // construct new 3 bits -- two old, 1 current bit (old-old-new)
 
         val = val << 1;                             // shift bits in input value up
@@ -508,7 +508,7 @@ void MfmCachedImage::appendByteToStream(BYTE val, bool doCalcCrc)
 }
 
 // appendTime() used in new implementation by appendA1MarkToStream(), otherwise it's integrated for speed in appendByteToStream()
-void MfmCachedImage::appendTime(BYTE time)
+void MfmCachedImage::appendTime(uint8_t time)
 {
     encoder.times = encoder.times << 2;     // shift 2 up
     encoder.times = encoder.times | time;   // add lowest 2 bits
@@ -556,14 +556,14 @@ void MfmCachedImage::appendCurrentSectorCommand(int track, int side, int sector)
     appendRawByte(sector);
 }
 
-void MfmCachedImage::setRawWordAtIndex(int index, WORD val)
+void MfmCachedImage::setRawWordAtIndex(int index, uint16_t val)
 {
-    WORD *pWord = (WORD *) currentStreamStart;  // get word pointer to start of current stream
+    uint16_t *pWord = (uint16_t *) currentStreamStart;  // get word pointer to start of current stream
     pWord += index;                             // move pointer to the wanted offset (at index)
     *pWord = val;                               // store the value
 }
 
-void MfmCachedImage::appendRawByte(BYTE val)
+void MfmCachedImage::appendRawByte(uint8_t val)
 {
     if(bytesInBfr < MFM_STREAM_SIZE) {  // still have some space in buffer? store value
         bytesInBfr++;
@@ -574,7 +574,7 @@ void MfmCachedImage::appendRawByte(BYTE val)
 }
 
 // taken from Steem Engine emulator
-void MfmCachedImage::updateCrcSlow(BYTE data)
+void MfmCachedImage::updateCrcSlow(uint8_t data)
 {
     for (int i=0;i<8;i++){
         crc = ((crc << 1) ^ ((((crc >> 8) ^ (data << i)) & 0x0080) ? 0x1021 : 0));
@@ -582,9 +582,9 @@ void MfmCachedImage::updateCrcSlow(BYTE data)
 }
 
 // taken from internet (stack overflow?)
-void MfmCachedImage::updateCrcFast(BYTE data)
+void MfmCachedImage::updateCrcFast(uint8_t data)
 {
-    crc = crcTable[data ^ (BYTE)(crc >> (16 - 8))] ^ (crc << 8);
+    crc = crcTable[data ^ (uint8_t)(crc >> (16 - 8))] ^ (crc << 8);
 }
 
 bool MfmCachedImage::getParams(int &tracks, int &sides, int &sectorsPerTrack)
@@ -596,7 +596,7 @@ bool MfmCachedImage::getParams(int &tracks, int &sides, int &sectorsPerTrack)
     return true;
 }
 
-BYTE MfmCachedImage::getMfmTime(void)
+uint8_t MfmCachedImage::getMfmTime(void)
 {
     if(decoder.usedTimesFromByte >= 4) {    // if used all 4 MFM times from byte
         decoder.usedTimesFromByte = 0;      // reset uset times counter
@@ -608,21 +608,21 @@ BYTE MfmCachedImage::getMfmTime(void)
         }
     }
 
-    BYTE val = ((*decoder.pBfr) >> 6) & 0x03;   // get highest 2 bits
+    uint8_t val = ((*decoder.pBfr) >> 6) & 0x03;   // get highest 2 bits
     *decoder.pBfr = (*decoder.pBfr) << 2;       // shift other bits up
     decoder.usedTimesFromByte++;                // increment how many times we used
 
     return val;                                 // return highest 2 bits
 }
 
-void MfmCachedImage::addOneBit(BYTE bit, bool newRemainder)
+void MfmCachedImage::addOneBit(uint8_t bit, bool newRemainder)
 {
     decoder.dByte = (decoder.dByte << 1) | bit;
     decoder.bCount++;
     decoder.remainder = newRemainder;
 }
 
-void MfmCachedImage::addTwoBits(BYTE bits, bool newRemainder)
+void MfmCachedImage::addTwoBits(uint8_t bits, bool newRemainder)
 {
     if(decoder.bCount < 7) {    // if we got 6 or less bits, we can add both bits immediatelly
         decoder.dByte = (decoder.dByte << 2) | bits;
@@ -668,11 +668,11 @@ void MfmCachedImage::handleDecodedByte(void)
 
     if(decoder.byteOffset == 513) {     // position of CRC HI? store calced crc and upper part of received crc
         decoder.calcedCrc = crc;
-        decoder.recvedCrc = ((WORD) decoder.dByte) << 8;
+        decoder.recvedCrc = ((uint16_t) decoder.dByte) << 8;
     }
 
     if(decoder.byteOffset == 514) {     // position of CRC LO? store lower part of received crc and compare to calced crc
-        decoder.recvedCrc |= (WORD) decoder.dByte;
+        decoder.recvedCrc |= (uint16_t) decoder.dByte;
 
         decoder.done = true;            // received CRC? nothing more to be done
         decoder.good = (decoder.calcedCrc == decoder.recvedCrc);    // everything good when received and calced crc are th same
@@ -701,7 +701,7 @@ bool MfmCachedImage::lastBufferWasFormatTrack(void)
     return decoder.isFormatTrack;   // return last state of this flag to tell called if it was sector write or track format
 }
 
-bool MfmCachedImage::decodeMfmBuffer(BYTE *inBfr, int inCnt, BYTE *outBfr)
+bool MfmCachedImage::decodeMfmBuffer(uint8_t *inBfr, int inCnt, uint8_t *outBfr)
 {
     // initialize decoder
     decoder.mfmData = inBfr;        // where the mfm data start
@@ -714,8 +714,8 @@ bool MfmCachedImage::decodeMfmBuffer(BYTE *inBfr, int inCnt, BYTE *outBfr)
     decoder.isFormatTrack = false;  // this will be set if the decoded data seem to be format track stream
 
     // first loop - find 3x A1 sync symbols
-    BYTE time;
-    DWORD sync = 0;
+    uint8_t time;
+    uint32_t sync = 0;
     bool syncFound = false;
     while(decoder.count >= 0) {     // while there is something in buffer
         time = getMfmTime();

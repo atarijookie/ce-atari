@@ -81,7 +81,7 @@ public:
     ~ConfigStream();
 
     // functions which are called from the main loop
-    void processCommand(BYTE *cmd, int writeToFd=-1);
+    void processCommand(uint8_t *cmd, int writeToFd=-1);
     void setAcsiDataTrans(AcsiDataTrans *dt);
     void setSettingsReloadProxy(SettingsReloadProxy *rp);
 
@@ -124,13 +124,13 @@ public:
     bool getFloatByComponentId(int componentId, float &value);
 
     void focusByComponentId(int componentId);
-    bool focusNextCheckboxGroup(BYTE key, int groupid, int chbid);
+    bool focusNextCheckboxGroup(uint8_t key, int groupid, int chbid);
 
     void onCheckboxGroupEnter(int groupId, int checkboxId);
 
     void enterKeyHandlerLater(int event);
 
-    DWORD getLastCmdTimestamp() const {
+    uint32_t getLastCmdTimestamp() const {
         return lastCmdTime;
     }
 private:
@@ -149,14 +149,14 @@ private:
     SettingsReloadProxy *reloadProxy;
 
     // private methods
-    void onKeyDown(BYTE key);
-    int  getStream(bool homeScreen, BYTE *bfr, int maxLen);
+    void onKeyDown(uint8_t key);
+    int  getStream(bool homeScreen, uint8_t *bfr, int maxLen);
 
     bool showingHomeScreen;
     bool showingMessage;
     bool screenChanged;
 
-    DWORD lastCmdTime;
+    uint32_t lastCmdTime;
 
     void enterKeyHandler(int event);
 
@@ -173,7 +173,7 @@ private:
     void updateOnline(void);
     void updateFromFile(void);
     void updateStart(void);
-    BYTE isUpdateScreen(void);
+    uint8_t isUpdateScreen(void);
     void datesToStrings(Version &v1, std::string &str);
     void createScreen_update_download(void);
     void getProgressLine(int index, std::string &lines, std::string &line);
@@ -196,15 +196,15 @@ private:
 
     void replaceNewLineWithGoto(std::string &line, int startX, int startY);
     
-    void translateVT52rawConsole(const BYTE *vt52stream, int vt52cnt, char *rawConsole, int rawConsoleSize);
+    void translateVT52rawConsole(const uint8_t *vt52stream, int vt52cnt, char *rawConsole, int rawConsoleSize);
     void dumpScreenToFile(FILE *f);
     //-------------
     // remote console stuff
-    void linuxConsole_KeyDown(BYTE atariKey);
-    int  linuxConsole_getStream(BYTE *bfr, int maxLen);
+    void linuxConsole_KeyDown(uint8_t atariKey);
+    int  linuxConsole_getStream(uint8_t *bfr, int maxLen);
     
     int  filterVT100(char *bfr, int cnt);
-    void atariKeyToConsoleKey(BYTE atariKey, char *bfr, int &cnt);
+    void atariKeyToConsoleKey(uint8_t atariKey, char *bfr, int &cnt);
     // Set values
     void onSetCfgValue(void);
 };

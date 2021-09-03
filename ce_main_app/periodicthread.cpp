@@ -42,7 +42,7 @@ extern DebugVars    dbgVars;
 
 extern SharedObjects shared;
 
-extern volatile BYTE updateListDownloadStatus;
+extern volatile uint8_t updateListDownloadStatus;
 
 #define DEV_CHECK_TIME_MS           3000
 #define UPDATE_CHECK_TIME           1000
@@ -55,7 +55,7 @@ extern volatile BYTE updateListDownloadStatus;
 static void handleConfigStreams(ConfigStream *cs, ConfigPipes &cp);
 static void fillNetworkDisplayLines(void);
 
-volatile DWORD whenCanStartInstall;         // if this DWORD has non-zero value, then it's a time when this app should be terminated for installing update
+volatile uint32_t whenCanStartInstall;         // if this uint32_t has non-zero value, then it's a time when this app should be terminated for installing update
 
 void *periodicThreadCode(void *ptr)
 {
@@ -67,7 +67,7 @@ void *periodicThreadCode(void *ptr)
     int wd = -1;
     ssize_t res;
     unsigned long wait;
-    DWORD now;
+    uint32_t now;
 
     Debug::out(LOG_DEBUG, "Periodic thread starting...");
 
@@ -245,7 +245,7 @@ static void handleConfigStreams(ConfigStream *cs, ConfigPipes &cp)
     int ires = ioctl(cp.fd1, FIONREAD, &bytesAvailable);       // how many bytes we can read?
 
     if(ires != -1 && bytesAvailable >= 3) {                 // if there are at least 3 bytes waiting
-        BYTE cmd[6] = {0, 'C', 'E', 0, 0, 0};
+        uint8_t cmd[6] = {0, 'C', 'E', 0, 0, 0};
         ires = read(cp.fd1, cmd + 3, 3);                       // read the byte triplet
 
         Debug::out(LOG_DEBUG, "confStream - through FIFO: %02x %02x %02x (ires = %d)", cmd[3], cmd[4], cmd[5], ires);
@@ -258,7 +258,7 @@ static void handleConfigStreams(ConfigStream *cs, ConfigPipes &cp)
 
 static void fillNetworkDisplayLines(void)
 {
-    BYTE bfr[10];
+    uint8_t bfr[10];
     Utils::getIpAdds(bfr);
 
     char tmp[64];

@@ -75,7 +75,7 @@ static int findEmptyWrittenSector(void)
     for(i=0; i<WRITTENMFMSECTOR_COUNT; i++) {           // go through the written sector storage
         if(!writtenSectors[i].hasData) {                // this one doesn't have data? use it
             if(writtenSectors[i].data == NULL) {        // buffer not allocated? allocate!
-                writtenSectors[i].data = (BYTE *) malloc(WRITTENMFMSECTOR_SIZE);
+                writtenSectors[i].data = (uint8_t *) malloc(WRITTENMFMSECTOR_SIZE);
             }
 
             memset(writtenSectors[i].data, 0, WRITTENMFMSECTOR_SIZE);
@@ -110,7 +110,7 @@ static void freeWrittenSectorStorage(void)
     }
 }
 
-void floppyEncoder_decodeMfmWrittenSector(int track, int side, int sector, BYTE *data, DWORD size)
+void floppyEncoder_decodeMfmWrittenSector(int track, int side, int sector, uint8_t *data, uint32_t size)
 {
     if(currentSlot == EMPTY_IMAGE_SLOT) {           // if this is the empty image slot (used when no slot is selected), don't write
         Debug::out(LOG_DEBUG, "floppyEncoder_decodeMfmWrittenSector - NOT writing to empty image slot");
@@ -199,7 +199,7 @@ static void floppyEncoder_handleLoadFiles(void)
 
 static void floppyEncoder_handleSaveFiles(void)
 {
-    DWORD now = Utils::getCurrentMs();              // current time
+    uint32_t now = Utils::getCurrentMs();              // current time
 
     for(int i=0; i<SLOT_COUNT; i++) {
         if(slots[i].image == NULL) {                // if image in this slot not present, skip it
@@ -210,7 +210,7 @@ static void floppyEncoder_handleSaveFiles(void)
             continue;
         }
 
-        DWORD timeSinceLastWrite = now - slots[i].image->getLastWriteTime();
+        uint32_t timeSinceLastWrite = now - slots[i].image->getLastWriteTime();
 
         if(timeSinceLastWrite < 5000) {             // if last write happened too recently, wait with the write
             continue;
@@ -265,7 +265,7 @@ void *floppyEncodeThreadCode(void *ptr)
     // the following code should encode all the slots, but one track at the time, so when there are multiple not encoded images,
     // the one which is selected for streaming, will be encoded first, and then the rest. This should also act fine if you switch
     // current slot in the middle of encoding image (to prioritize the selected one)
-    DWORD after50ms = Utils::getEndTime(50);        // this will help to add pauses at least every 50 ms to allow other threads to do stuff
+    uint32_t after50ms = Utils::getEndTime(50);        // this will help to add pauses at least every 50 ms to allow other threads to do stuff
 
     while(true) {
         floppyEncoder_handleSaveFiles();            // save all those images which need to be saved
@@ -317,7 +317,7 @@ void *floppyEncodeThreadCode(void *ptr)
             WrittenMfmSector *ws = &writtenSectors[writtenIdx];     // get pointer to written sector
             SiloSlot *ss = &slots[ws->slotNo];                      // get pointer to slot where the sector should be stored
 
-            BYTE sectorData[512];
+            uint8_t sectorData[512];
             bool good;
             good = ss->encImage.decodeMfmBuffer(ws->data, ws->size, sectorData);   // decode written sector data
 

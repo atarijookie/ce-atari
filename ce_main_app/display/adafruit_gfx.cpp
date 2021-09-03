@@ -33,7 +33,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include <stdio.h>
 
-#include "../datatypes.h"
+#include <stdint.h>
 #include "lcdfont.h"
 #include "adafruit_gfx.h"
 #include "ssd1306.h"
@@ -52,24 +52,24 @@ WIDTH(w), HEIGHT(h)
 void Adafruit_GFX::drawString(int x, int y, const char *text)
 {
     while(*text != 0) {                 // while it's not the end of string
-        drawChar(x, y, (BYTE) *text);   // draw one char
+        drawChar(x, y, (uint8_t) *text);   // draw one char
         text++;                         // move to next char
         x += CHAR_W;
     }
 }
 
 // draws a single character at specified coordinates
-void Adafruit_GFX::drawChar(int x, int y, BYTE c)
+void Adafruit_GFX::drawChar(int x, int y, uint8_t c)
 {
     if((x >= _width) || (y >= _height) || ((x + 5) < 0) || ((y + 7) < 0)) {
         return;
     }
 
-    BYTE color;
+    uint8_t color;
 
     for(int i=0; i<5; i++ ) { // Char bitmap = 5 columns
-        const BYTE *pColumn = &font[c * 5 + i];         // get addr of column representing bit for char c
-        BYTE columnBits = *pColumn;                     // get value from that addr
+        const uint8_t *pColumn = &font[c * 5 + i];         // get addr of column representing bit for char c
+        uint8_t columnBits = *pColumn;                     // get value from that addr
 
         for(int j=0; j<8; j++, columnBits >>= 1) {
             color = (columnBits & 1) ? SSD1306_WHITE : SSD1306_BLACK;   // select color based on bit set or not
@@ -79,7 +79,7 @@ void Adafruit_GFX::drawChar(int x, int y, BYTE c)
 }
 
 // this writes at current cursor position and moves the cursor
-void Adafruit_GFX::write(BYTE c)
+void Adafruit_GFX::write(uint8_t c)
 {
     if(c != '\r') {                         // Ignore carriage returns
         return;

@@ -30,11 +30,11 @@ extern InterProcessEvents events;
 /* Pexec() related sub commands:
     - create image for Pexec()          - WRITE
     - GetBpb()                          - READ
-    - read sector                       - READ  (WORD sectorStart, WORD sectorCount)
-    - write sector (for debugging only) - WRITE (WORD sectorStart, WORD sectorCount)
+    - read sector                       - READ  (uint16_t sectorStart, uint16_t sectorCount)
+    - write sector (for debugging only) - WRITE (uint16_t sectorStart, uint16_t sectorCount)
 */
 
-void TranslatedDisk::onPexec(BYTE *cmd)
+void TranslatedDisk::onPexec(uint8_t *cmd)
 {
     switch(cmd[5]) {
         case PEXEC_CREATE_IMAGE:    onPexec_createImage(cmd);   return;
@@ -47,7 +47,7 @@ void TranslatedDisk::onPexec(BYTE *cmd)
     dataTrans->setStatus(E_NOTHANDLED);
 }
 
-void TranslatedDisk::onPexec_createImage(BYTE *cmd)
+void TranslatedDisk::onPexec_createImage(uint8_t *cmd)
 {
     bool res = dataTrans->recvData(dataBuffer, 512);    // get data from Hans
 
@@ -57,7 +57,7 @@ void TranslatedDisk::onPexec_createImage(BYTE *cmd)
         return;
     }
 
-    WORD mode = Utils::getWord(dataBuffer);
+    uint16_t mode = Utils::getWord(dataBuffer);
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_createImage() - mode: %04x, path: %s", mode, (char *) dataBuffer + 2);
 
@@ -144,8 +144,8 @@ void TranslatedDisk::onPexec_createImage(BYTE *cmd)
 
 	timestr = localtime(&attr.st_mtime);			    	        // convert time_t to tm structure
 
-    WORD atariTime = Utils::fileTimeToAtariTime(timestr);
-    WORD atariDate = Utils::fileTimeToAtariDate(timestr);
+    uint16_t atariTime = Utils::fileTimeToAtariTime(timestr);
+    uint16_t atariDate = Utils::fileTimeToAtariDate(timestr);
     //----------
 
     fseek(f, 0, SEEK_END);                                          // move to the end of file
@@ -166,7 +166,7 @@ void TranslatedDisk::onPexec_createImage(BYTE *cmd)
     dataTrans->setStatus(E_OK);                                     // ok!
 }
 
-void TranslatedDisk::createImage(std::string &fullAtariPath, FILE *f, int fileSizeBytes, WORD atariTime, WORD atariDate)
+void TranslatedDisk::createImage(std::string &fullAtariPath, FILE *f, int fileSizeBytes, uint16_t atariTime, uint16_t atariDate)
 {
     int fileSizeSectors = (fileSizeBytes / 512) + (((fileSizeBytes % 512) == 0) ? 0 : 1); // calculate how many sector the file takes
 
@@ -175,11 +175,11 @@ void TranslatedDisk::createImage(std::string &fullAtariPath, FILE *f, int fileSi
     prgSectorStart  = 0;
     prgSectorEnd    = PEXEC_DRIVE_SIZE_SECTORS;
 
-    DWORD fat1startingSector = 4;
-    DWORD fat2startingSector = fat1startingSector + PEXEC_FAT_SECTORS_NEEDED;
+    uint32_t fat1startingSector = 4;
+    uint32_t fat2startingSector = fat1startingSector + PEXEC_FAT_SECTORS_NEEDED;
 
-    DWORD dataSectorAbsolute = fat2startingSector + PEXEC_FAT_SECTORS_NEEDED;   // absolute sector - from the start of the image (something like sector #84)
-    DWORD dataSectorRelative = 1;                                               // relative sector - relative sector numbering from the start of data area (probably #2)
+    uint32_t dataSectorAbsolute = fat2startingSector + PEXEC_FAT_SECTORS_NEEDED;   // absolute sector - from the start of the image (something like sector #84)
+    uint32_t dataSectorRelative = 1;                                               // relative sector - relative sector numbering from the start of data area (probably #2)
 
     //memset(pexecImage,        0, PEXEC_DRIVE_SIZE_BYTES);                                     // clear the whole image
     memset(pexecImage,          0, (fat1startingSector + 2*PEXEC_FAT_SECTORS_NEEDED) * 512);    // clear just the FAT section of image (to speed this up)
@@ -187,8 +187,8 @@ void TranslatedDisk::createImage(std::string &fullAtariPath, FILE *f, int fileSi
     memset(pexecImageReadFlags, 0, PEXEC_DRIVE_SIZE_SECTORS);                   // clear all the READ flags
 
     //--------------
-    BYTE *pFat1 = pexecImage + (fat1startingSector * 512);  // pointer to FAT1
-    BYTE *pFat2 = pexecImage + (fat2startingSector * 512);  // pointer to FAT2
+    uint8_t *pFat1 = pexecImage + (fat1startingSector * 512);  // pointer to FAT1
+    uint8_t *pFat2 = pexecImage + (fat2startingSector * 512);  // pointer to FAT2
 
     int curSectorAbs = dataSectorAbsolute;                  // start at root dir
     int curSectorRel = dataSectorRelative;
@@ -283,7 +283,7 @@ void TranslatedDisk::createImage(std::string &fullAtariPath, FILE *f, int fileSi
     prgSectorEnd    = curSectorRel + fileSizeSectors - 1;   // last sector  - where the PRG ends
     Debug::out(LOG_DEBUG, "TranslatedDisk::createImage() - storing PRG on relative sectors %d - %d (absolute starting sector: %d)", prgSectorStart, prgSectorEnd, curSectorAbs);
 
-    BYTE *pFileInImage = pexecImage + (curSectorAbs * 512); // get pointer to file in image
+    uint8_t *pFileInImage = pexecImage + (curSectorAbs * 512); // get pointer to file in image
     fread(pFileInImage, 1, fileSizeBytes, f);
 
     storeFatChain (pFat1, prgSectorStart, prgSectorEnd);    // mark PRG location in FAT chain
@@ -292,9 +292,9 @@ void TranslatedDisk::createImage(std::string &fullAtariPath, FILE *f, int fileSi
     memcpy(pFat2, pFat1, PEXEC_FAT_BYTES_NEEDED);
 }
 
-void TranslatedDisk::storeFatChain(BYTE *pbFat, WORD sectorStart, WORD sectorEnd)
+void TranslatedDisk::storeFatChain(uint8_t *pbFat, uint16_t sectorStart, uint16_t sectorEnd)
 {
-    WORD *pwFat = (WORD *) pbFat;
+    uint16_t *pwFat = (uint16_t *) pbFat;
 
     sectorStart = (sectorStart  < PEXEC_DRIVE_SIZE_SECTORS) ? sectorStart   : (PEXEC_DRIVE_SIZE_SECTORS - 1);
     sectorEnd   = (sectorEnd    < PEXEC_DRIVE_SIZE_SECTORS) ? sectorEnd     : (PEXEC_DRIVE_SIZE_SECTORS - 1);
@@ -308,9 +308,9 @@ void TranslatedDisk::storeFatChain(BYTE *pbFat, WORD sectorStart, WORD sectorEnd
     pwFat[sectorEnd] = 0xffff;                  // ending sector = last sector in chain marker
 }
 
-void TranslatedDisk::createDirEntry(bool isRoot, bool isDir, WORD date, WORD time, DWORD fileSize, const char *dirEntryName, int sectorNoAbs, int sectorNoRel)
+void TranslatedDisk::createDirEntry(bool isRoot, bool isDir, uint16_t date, uint16_t time, uint32_t fileSize, const char *dirEntryName, int sectorNoAbs, int sectorNoRel)
 {
-    BYTE *pSector = pexecImage + (sectorNoAbs * 512);   // get pointer to this sector
+    uint8_t *pSector = pexecImage + (sectorNoAbs * 512);   // get pointer to this sector
 
     if(!isRoot) {
         storeDirEntry(pSector +  0, ".          ", true, time, date, sectorNoRel,  0); // pointer to this dir
@@ -333,7 +333,7 @@ void TranslatedDisk::createDirEntry(bool isRoot, bool isDir, WORD date, WORD tim
     storeDirEntry(pSector + offset, deNameExtended, isDir, time, date, sectorNoRel + 1, fileSize);  // pointer to next dir entries or this file content
 }
 
-void TranslatedDisk::storeDirEntry(BYTE *pEntry, const char *dirEntryName, bool isDir, WORD time, WORD date, WORD startingSector, DWORD entrySizeBytes)
+void TranslatedDisk::storeDirEntry(uint8_t *pEntry, const char *dirEntryName, bool isDir, uint16_t time, uint16_t date, uint16_t startingSector, uint32_t entrySizeBytes)
 {
     memcpy(pEntry + 0, dirEntryName, 11);          // filename
     pEntry[11] = isDir ? 0x10 : 0x00;              // DIR / File flag
@@ -344,7 +344,7 @@ void TranslatedDisk::storeDirEntry(BYTE *pEntry, const char *dirEntryName, bool 
     storeIntelDword(pEntry + 28, entrySizeBytes);  // file size, little endian
 }
 
-void TranslatedDisk::onPexec_getBpb(BYTE *cmd)
+void TranslatedDisk::onPexec_getBpb(uint8_t *cmd)
 {
     Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_getBpb() - PEXEC_FAT_SECTORS_NEEDED: %d, PEXEC_DRIVE_SIZE_SECTORS: %d", PEXEC_FAT_SECTORS_NEEDED, PEXEC_DRIVE_SIZE_SECTORS);
 
@@ -388,11 +388,11 @@ void TranslatedDisk::onPexec_getBpb(BYTE *cmd)
     dataTrans->dumpDataOnce();
 }
 
-void TranslatedDisk::onPexec_readSector(BYTE *cmd)
+void TranslatedDisk::onPexec_readSector(uint8_t *cmd)
 {
-    WORD  startingSector    = Utils::getWord(cmd + 6);
-    WORD  sectorCount       = Utils::getWord(cmd + 8);
-    DWORD byteCount         = sectorCount * 512;
+    uint16_t  startingSector    = Utils::getWord(cmd + 6);
+    uint16_t  sectorCount       = Utils::getWord(cmd + 8);
+    uint32_t byteCount         = sectorCount * 512;
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_readSector() - startingSector: %d, sectorCount: %d", startingSector, sectorCount);
 
@@ -403,7 +403,7 @@ void TranslatedDisk::onPexec_readSector(BYTE *cmd)
         return;
     }
 
-    BYTE *pSector = pexecImage + (startingSector * 512);                // get pointer to start of the sector
+    uint8_t *pSector = pexecImage + (startingSector * 512);                // get pointer to start of the sector
     dataTrans->addDataBfr(pSector, byteCount, true);                    // add that data to dataTrans
 
     for(int i=0; i<sectorCount; i++) {                                  // now mark those read sectors as already read
@@ -413,11 +413,11 @@ void TranslatedDisk::onPexec_readSector(BYTE *cmd)
     dataTrans->setStatus(E_OK);                                         // everything OK
 }
 
-void TranslatedDisk::onPexec_writeSector(BYTE *cmd)
+void TranslatedDisk::onPexec_writeSector(uint8_t *cmd)
 {
-    WORD  startingSector    = Utils::getWord(cmd + 6);
-    WORD  sectorCount       = Utils::getWord(cmd + 8);
-    DWORD byteCount         = sectorCount * 512;
+    uint16_t  startingSector    = Utils::getWord(cmd + 6);
+    uint16_t  sectorCount       = Utils::getWord(cmd + 8);
+    uint32_t byteCount         = sectorCount * 512;
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_writeSector() - startingSector: %d, sectorCount: %d", startingSector, sectorCount);
 
@@ -436,7 +436,7 @@ void TranslatedDisk::onPexec_writeSector(BYTE *cmd)
         return;
     }
 
-    BYTE *pSector = pexecImage + (startingSector * 512);                // get pointer to start of the sector
+    uint8_t *pSector = pexecImage + (startingSector * 512);                // get pointer to start of the sector
     memcpy(pSector, dataBuffer, byteCount);
 
     dataTrans->setStatus(E_OK);                                         // everything OK
@@ -456,16 +456,16 @@ bool TranslatedDisk::pexecWholeFileWasRead(void)
     return true;                                // we didn't find a sector which wasn't read, so the whole file was read
 }
 
-void TranslatedDisk::storeIntelWord(BYTE *p, WORD a)
+void TranslatedDisk::storeIntelWord(uint8_t *p, uint16_t a)
 {
-    p[0] = (BYTE) (a     );
-    p[1] = (BYTE) (a >> 8);
+    p[0] = (uint8_t) (a     );
+    p[1] = (uint8_t) (a >> 8);
 }
 
-void TranslatedDisk::storeIntelDword(BYTE *p, DWORD a)
+void TranslatedDisk::storeIntelDword(uint8_t *p, uint32_t a)
 {
-    p[0] = (BYTE) (a      );
-    p[1] = (BYTE) (a >>  8);
-    p[2] = (BYTE) (a >> 16);
-    p[3] = (BYTE) (a >> 24);
+    p[0] = (uint8_t) (a      );
+    p[1] = (uint8_t) (a >>  8);
+    p[2] = (uint8_t) (a >> 16);
+    p[3] = (uint8_t) (a >> 24);
 }

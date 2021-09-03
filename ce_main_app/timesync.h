@@ -13,7 +13,7 @@ public:
     bool waitingForDataOnFd(void);
     int getFd(void) { return s; };
     void process(bool dataToRead);
-    DWORD nextProcessTime;
+    uint32_t nextProcessTime;
 
 private:
     void sendNtpPacket(void);

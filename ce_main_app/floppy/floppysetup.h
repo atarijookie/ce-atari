@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 #include "../settingsreloadproxy.h"
-#include "../datatypes.h"
+#include <stdint.h>
 #include "../translated/translateddisk.h"
 #include "../settingsreloadproxy.h"
 
@@ -27,7 +27,7 @@ public:
     FloppySetup();
     ~FloppySetup();
 
-    void processCommand(BYTE *command);
+    void processCommand(uint8_t *command);
 
     void setAcsiDataTrans(AcsiDataTrans *dt);
     void setSettingsReloadProxy(SettingsReloadProxy *rp);
@@ -40,9 +40,9 @@ private:
     SettingsReloadProxy *reloadProxy;
 
     FILE    *up;
-    BYTE    *cmd;
+    uint8_t    *cmd;
 
-    BYTE    bfr64k[64 * 1024 + 4];
+    uint8_t    bfr64k[64 * 1024 + 4];
 
     //int         imgDnStatus;
     std::string inetDnFilePath;
@@ -90,7 +90,7 @@ private:
     void setCurrentSlot(void);
     void getImageEncodingRunning(void);
 
-    void logCmdName(BYTE cmdCode);
+    void logCmdName(uint8_t cmdCode);
 };
 
 #endif

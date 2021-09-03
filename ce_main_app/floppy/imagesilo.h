@@ -7,7 +7,7 @@
 #include <string>
 #include <queue>
 
-#include "../datatypes.h"
+#include <stdint.h>
 #include "../settingsreloadproxy.h"
 
 #include "floppyimagefactory.h"
@@ -38,8 +38,8 @@ typedef struct
                                     // or where uploaded disk where is stored: /tmp/bla.st
 
     volatile bool   openRequested;  // set to true when doing open file request, set to false after successful open
-    volatile DWORD  openRequestTime; // timestamp when other thread requested opening of image
-    volatile DWORD  openActionTime; // timestamp when encoder did really open the file
+    volatile uint32_t  openRequestTime; // timestamp when other thread requested opening of image
+    volatile uint32_t  openActionTime; // timestamp when encoder did really open the file
     std::string     imageFileName;  // file name of image to open next
     FloppyImage     *image;         // this holds object with the loaded floppy image (in normal data form)
 
@@ -59,12 +59,12 @@ public:
     void saveSettings(void);
     void setSettingsReloadProxy(SettingsReloadProxy *rp);
 
-    BYTE getSlotBitmap(void);
+    uint8_t getSlotBitmap(void);
     void setCurrentSlot(int index);
     int  getCurrentSlot(void);
-    BYTE *getEncodedTrack(int track, int side, int &bytesInBuffer);
+    uint8_t *getEncodedTrack(int track, int side, int &bytesInBuffer);
     bool getParams(int &tracks, int &sides, int &sectorsPerTrack);
-    BYTE *getEmptyTrack(void);
+    uint8_t *getEmptyTrack(void);
 
     void add(int positionIndex, std::string &filename, std::string &hostPath, std::string &atariSrcPath, bool saveToSettings);
     void swap(int index);
@@ -75,7 +75,7 @@ public:
     void removeByFileName(std::string &filenameWExt);
     bool currentSlotHasNewContent(void);
 
-    void dumpStringsToBuffer(BYTE *bfr);
+    void dumpStringsToBuffer(uint8_t *bfr);
 
     SiloSlot *getSiloSlot(int index);
 
@@ -88,7 +88,7 @@ private:
 
     SettingsReloadProxy     *reloadProxy;
 
-    BYTE                    *emptyTrack;
+    uint8_t                    *emptyTrack;
 
     static SiloSlotSimple floppyImages[3];
     static int floppyImageSelected;

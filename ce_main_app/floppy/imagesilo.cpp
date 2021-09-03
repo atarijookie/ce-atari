@@ -43,10 +43,10 @@ ImageSilo::ImageSilo()
 {
     //-----------
     // create empty track, which can be used when the equested track is out of range (or image doesn't exist)
-    emptyTrack = new BYTE[MFM_STREAM_SIZE];
+    emptyTrack = new uint8_t[MFM_STREAM_SIZE];
     memset(emptyTrack, 0, MFM_STREAM_SIZE);
 
-    BYTE *p = emptyTrack;
+    uint8_t *p = emptyTrack;
     for(int i=0; i<(MFM_STREAM_SIZE/3); i++) {        // fill the empty track with 0x4e sync bytes
         *p++ = 0xa9;
         *p++ = 0x6a;
@@ -83,7 +83,7 @@ ImageSilo::~ImageSilo()
     delete []emptyTrack;
 }
 
-BYTE *ImageSilo::getEmptyTrack(void)
+uint8_t *ImageSilo::getEmptyTrack(void)
 {
     return emptyTrack;
 }
@@ -239,7 +239,7 @@ void ImageSilo::remove(int index)                   // remove image at specified
     saveSettings();
 }
 
-void ImageSilo::dumpStringsToBuffer(BYTE *bfr)      // copy the strings to buffer
+void ImageSilo::dumpStringsToBuffer(uint8_t *bfr)      // copy the strings to buffer
 {
     memset(bfr, 0, 512);
 
@@ -260,9 +260,9 @@ void ImageSilo::clearSlot(int index)
     }
 }
 
-BYTE ImageSilo::getSlotBitmap(void)
+uint8_t ImageSilo::getSlotBitmap(void)
 {
-    BYTE bmp = 0;
+    uint8_t bmp = 0;
 
     for(int i=0; i<3; i++) {
         if(!slots[i].imageFile.empty()) {        // if slot is used, set the bit
@@ -305,18 +305,18 @@ int ImageSilo::getCurrentSlot(void)
     return currentSlot;
 }
 
-BYTE *ImageSilo::getEncodedTrack(int track, int side, int &bytesInBuffer)
+uint8_t *ImageSilo::getEncodedTrack(int track, int side, int &bytesInBuffer)
 {
-    BYTE *pTrack;
+    uint8_t *pTrack;
 
     //Debug::out(LOG_DEBUG, "ImageSilo::getEncodedTrack - track: %d, side: %d, currentSlot: %d, isReady: %d", track, side, currentSlot, slots[currentSlot].encImage.encodedTrackIsReady(track, side));
-    //DWORD start = Utils::getCurrentMs();
+    //uint32_t start = Utils::getCurrentMs();
 
     if(!slots[currentSlot].encImage.encodedTrackIsReady(track, side)) { // track not ready?
         floppyEncoder_addReencodeTrackRequest(track, side);             // ask for reencoding
 
         // wait short while to see if the image gets encoded
-        DWORD endTime = Utils::getEndTime(500);
+        uint32_t endTime = Utils::getEndTime(500);
         bool isReady = false;
 
         while(Utils::getCurrentMs() < endTime) {    // still should wait?

@@ -20,8 +20,8 @@ Versions Update::versions;
 
 extern THwConfig hwConfig;
 
-volatile BYTE packageDownloadStatus     = DWNSTATUS_WAITING;
-volatile BYTE updateListDownloadStatus  = DWNSTATUS_WAITING;
+volatile uint8_t packageDownloadStatus     = DWNSTATUS_WAITING;
+volatile uint8_t updateListDownloadStatus  = DWNSTATUS_WAITING;
 
 void Update::initialize(void)
 {
@@ -173,10 +173,10 @@ void Update::createFloppyTestImage(void)
     }
 
     // first fill the write buffer with simple counter
-    BYTE writeBfr[512];
+    uint8_t writeBfr[512];
     int i;
     for(i=0; i<512; i++) {
-        writeBfr[i] = (BYTE) i;
+        writeBfr[i] = (uint8_t) i;
     }
 
     // write one sector after another...

@@ -13,7 +13,7 @@
 RetryModule::RetryModule(void)
 {
     memset(fullCmd, 0, ACSI_CMD_SIZE);
-    buffer = new BYTE[ACSI_BUFFER_SIZE];
+    buffer = new uint8_t[ACSI_BUFFER_SIZE];
     
     dataDirection   = DATA_DIRECTION_UNKNOWN;
     count           = 0;
@@ -26,7 +26,7 @@ RetryModule::~RetryModule(void)
     delete []buffer;
 }
 
-bool RetryModule::gotThisCmd(BYTE *fullCmd, BYTE isIcd) 
+bool RetryModule::gotThisCmd(uint8_t *fullCmd, uint8_t isIcd) 
 {
     int cmdMismatch, commandLength;
     
@@ -45,7 +45,7 @@ bool RetryModule::gotThisCmd(BYTE *fullCmd, BYTE isIcd)
     return false;               // commands mismatch, we don't have this
 }
 
-void RetryModule::makeCmdCopy(BYTE *fullCmd, BYTE isIcd, BYTE justCmd, BYTE tag1, BYTE tag2, BYTE module)
+void RetryModule::makeCmdCopy(uint8_t *fullCmd, uint8_t isIcd, uint8_t justCmd, uint8_t tag1, uint8_t tag2, uint8_t module)
 {
     // make copy of every input param
     memcpy(this->fullCmd, fullCmd, ACSI_CMD_SIZE);
@@ -56,7 +56,7 @@ void RetryModule::makeCmdCopy(BYTE *fullCmd, BYTE isIcd, BYTE justCmd, BYTE tag1
     this->module  = module;
 }
 
-void RetryModule::restoreCmdFromCopy(BYTE *fullCmd, BYTE &isIcd, BYTE &justCmd, BYTE &tag1, BYTE &tag2, BYTE &module)
+void RetryModule::restoreCmdFromCopy(uint8_t *fullCmd, uint8_t &isIcd, uint8_t &justCmd, uint8_t &tag1, uint8_t &tag2, uint8_t &module)
 {
     // restore the input params using stored values
     memcpy(fullCmd, this->fullCmd, ACSI_CMD_SIZE);
@@ -67,7 +67,7 @@ void RetryModule::restoreCmdFromCopy(BYTE *fullCmd, BYTE &isIcd, BYTE &justCmd, 
     module     = this->module;
 }
 
-void RetryModule::copyDataAndStatus(int dataDirection, DWORD count, BYTE *buffer, bool statusWasSet, BYTE status)
+void RetryModule::copyDataAndStatus(int dataDirection, uint32_t count, uint8_t *buffer, bool statusWasSet, uint8_t status)
 {
     this->dataDirection   = dataDirection;
     this->count           = count;
@@ -75,12 +75,12 @@ void RetryModule::copyDataAndStatus(int dataDirection, DWORD count, BYTE *buffer
     this->status          = status;
 
     if(dataDirection == DATA_DIRECTION_READ) {      // if it's READ operation, copy also data
-        DWORD copySize = (count < ACSI_BUFFER_SIZE) ? count : ACSI_BUFFER_SIZE;
+        uint32_t copySize = (count < ACSI_BUFFER_SIZE) ? count : ACSI_BUFFER_SIZE;
         memcpy(this->buffer, buffer, copySize);
     }
 }
 
-void RetryModule::restoreDataAndStatus(int &dataDirection, DWORD &count, BYTE *buffer, bool &statusWasSet, BYTE &status)
+void RetryModule::restoreDataAndStatus(int &dataDirection, uint32_t &count, uint8_t *buffer, bool &statusWasSet, uint8_t &status)
 {
     dataDirection   = this->dataDirection;
     count           = this->count;
@@ -88,7 +88,7 @@ void RetryModule::restoreDataAndStatus(int &dataDirection, DWORD &count, BYTE *b
     status          = this->status;
 
     if(dataDirection == DATA_DIRECTION_READ) {      // if it's READ operation, copy also data
-        DWORD copySize = (count < ACSI_BUFFER_SIZE) ? count : ACSI_BUFFER_SIZE;
+        uint32_t copySize = (count < ACSI_BUFFER_SIZE) ? count : ACSI_BUFFER_SIZE;
         memcpy(buffer, this->buffer, copySize);
     }
 }

@@ -27,7 +27,7 @@ extern SharedObjects shared;
 
 volatile TStatuses statuses;
 
-static const char * netIfStatus(const BYTE * p)
+static const char * netIfStatus(const uint8_t * p)
 {
     static char str[64];
     if(p[0] == 0 || (p[1] == 0 && p[2] == 0 && p[3] == 0 && p[4] == 0)) {
@@ -47,7 +47,7 @@ void StatusReport::createReport(std::string &report, int reportFormat)
     // general section
     startSection(report, "general status", reportFormat);
 
-    BYTE ipaddrs[10];
+    uint8_t ipaddrs[10];
     Utils::getIpAdds(ipaddrs);
 
     dumpPair(report, "HDD interface type",      (hwConfig.hddIface == HDD_IF_ACSI) ? "ACSI" : "SCSI", reportFormat);
@@ -218,7 +218,7 @@ void StatusReport::putStatusHeader(std::string &report, int reportFormat)
 
 void StatusReport::dumpStatus(std::string &report, const char *desciprion, volatile TStatus &status, int reportFormat)
 {
-    DWORD now       = Utils::getCurrentMs();
+    uint32_t now       = Utils::getCurrentMs();
     int   aliveAgo;
     char  aliveAgoString[64];
     bool  good;
@@ -228,7 +228,7 @@ void StatusReport::dumpStatus(std::string &report, const char *desciprion, volat
         good        = false;
         strcpy(aliveAgoString, "never");
     } else {
-        DWORD diffMs    = now - status.aliveTime;       // calculate how many ms have passed since last alive sign
+        uint32_t diffMs    = now - status.aliveTime;       // calculate how many ms have passed since last alive sign
         aliveAgo        = diffMs / 1000;                // convert ms to s
         good            = true;
 

@@ -68,13 +68,13 @@ TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt, ConfigService *cs, ScreencastS
 
     reloadProxy = NULL;
 
-    dataBuffer  = new BYTE[ACSI_BUFFER_SIZE];
-    dataBuffer2 = new BYTE[ACSI_BUFFER_SIZE];
+    dataBuffer  = new uint8_t[ACSI_BUFFER_SIZE];
+    dataBuffer2 = new uint8_t[ACSI_BUFFER_SIZE];
 
-    pexecImage  = new BYTE[PEXEC_DRIVE_SIZE_BYTES];
+    pexecImage  = new uint8_t[PEXEC_DRIVE_SIZE_BYTES];
     memset(pexecImage, 0, PEXEC_DRIVE_SIZE_BYTES);
 
-    pexecImageReadFlags = new BYTE[PEXEC_DRIVE_SIZE_SECTORS];
+    pexecImageReadFlags = new uint8_t[PEXEC_DRIVE_SIZE_SECTORS];
     memset(pexecImageReadFlags, 0, PEXEC_DRIVE_SIZE_SECTORS);
 
     prgSectorStart  = 0;
@@ -453,7 +453,7 @@ void TranslatedDisk::detachFromHostPath(std::string hostRootPath)
     }
 }
 
-void TranslatedDisk::processCommand(BYTE *cmd)
+void TranslatedDisk::processCommand(uint8_t *cmd)
 {
     if(dataTrans == 0 ) {
         Debug::out(LOG_ERROR, "processCommand was called without valid dataTrans!");
@@ -553,7 +553,7 @@ void TranslatedDisk::processCommand(BYTE *cmd)
     dataTrans->sendDataAndStatus();     // send all the stuff after handling, if we got any
 }
 
-void TranslatedDisk::onUnmountDrive(BYTE *cmd)
+void TranslatedDisk::onUnmountDrive(uint8_t *cmd)
 {
     int drive = cmd[5];
 
@@ -581,7 +581,7 @@ void TranslatedDisk::onUnmountDrive(BYTE *cmd)
     dataTrans->setStatus(E_OK);
 }
 
-void TranslatedDisk::onGetMounts(BYTE *cmd)
+void TranslatedDisk::onGetMounts(uint8_t *cmd)
 {
     char tmp[256];
     std::string mounts;
@@ -611,9 +611,9 @@ void TranslatedDisk::onGetMounts(BYTE *cmd)
     dataTrans->setStatus(E_OK);
 }
 
-WORD TranslatedDisk::getDrivesBitmap(void)
+uint16_t TranslatedDisk::getDrivesBitmap(void)
 {
-    WORD drives = 0;
+    uint16_t drives = 0;
 
     for(int i=0; i<MAX_DRIVES; i++) {       // create enabled drive bits
         if(i == 0 || i == 1) {              // A and B enabled by default
@@ -662,7 +662,7 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
     tempFindStorage.clear();
     clearFindStorages();
 
-    DWORD res;
+    uint32_t res;
     res = dataTrans->recvData(dataBuffer, 512);     // get data from Hans
 
     if(!res) {                                      // failed to get data? internal error!
@@ -672,7 +672,7 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
     }
 
     // get the current machine info and generate DESKTOP.INF file
-    WORD tosVersion, curRes, drives;
+    uint16_t tosVersion, curRes, drives;
 
     tosVersion  = Utils::getWord(dataBuffer + 0);           // 0, 1: TOS version
     curRes      = Utils::getWord(dataBuffer + 2);           // 2, 3: current screen resolution
@@ -681,7 +681,7 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
     Debug::out(LOG_DEBUG, "tosVersion: %x, drives: %04x", tosVersion, drives);
 
     bool  sdNoobEnabled;
-    DWORD sdNoobSizeSectors;    // sdCardSizeSectors;
+    uint32_t sdNoobSizeSectors;    // sdCardSizeSectors;
 
     sdNoobEnabled       = dataBuffer[6];                    //     6: is SD NOOB present and enabled?
     sdNoobSizeSectors   = Utils::getDword(dataBuffer +  7); //  7-10: size of SD NOOB partition in sectors
@@ -691,7 +691,7 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
 
     //------------------------------------
     // depending on TOS major version determine the machine, on which this SCSI device is used, and limit the available SCSI IDs depending on that
-    BYTE tosVersionMajor = tosVersion >> 8;
+    uint8_t tosVersionMajor = tosVersion >> 8;
 
     int oldHwScsiMachine = hwConfig.scsiMachine;                // store the old value
 
@@ -711,7 +711,7 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
     }
     //------------------------------------
 
-    WORD translatedDrives = getDrivesBitmap();          // get bitmap of all translated drives we got
+    uint16_t translatedDrives = getDrivesBitmap();          // get bitmap of all translated drives we got
 
     DesktopConfig dc;
     dc.tosVersion        = tosVersion;                   // TOS version as reported in TOS
@@ -743,10 +743,10 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
     dataTrans->setStatus(E_OK);
 }
 
-void TranslatedDisk::onGetConfig(BYTE *cmd)
+void TranslatedDisk::onGetConfig(uint8_t *cmd)
 {
-    // 1st WORD (bytes 0, 1) - bitmap of CosmosEx translated drives
-    WORD drives = getDrivesBitmap();
+    // 1st uint16_t (bytes 0, 1) - bitmap of CosmosEx translated drives
+    uint16_t drives = getDrivesBitmap();
     dataTrans->addDataWord(drives);                             // drive bits first
 
     // bytes 2,3,4 -- drive letters assignment
@@ -786,7 +786,7 @@ void TranslatedDisk::onGetConfig(BYTE *cmd)
     Debug::out(LOG_DEBUG, "onGetConfig - setDateTime %d, utcOffset %d, %04d-%02d-%02d %02d:%02d:%02d", setDateTime, utcOffset, loctime.tm_year + 1900, loctime.tm_mon + 1, loctime.tm_mday, loctime.tm_hour, loctime.tm_min, loctime.tm_sec);
     //------------------
     // now get and send the IP addresses of eth0 and wlan0 (at +0 is eth0, at +5 is wlan)
-    BYTE tmp[10];
+    uint8_t tmp[10];
     Utils::getIpAdds(tmp);
 
     dataTrans->addDataBfr(tmp, 10, false);                      // store it to buffer - bytes 14 to 23 (byte 14 is eth0_enabled, byte 19 is wlan0_enabled)
@@ -1025,7 +1025,7 @@ bool TranslatedDisk::isDriveIndexReadOnly(int driveIndex)
         return false;
     }
 
-    WORD mask = (1 << driveIndex);
+    uint16_t mask = (1 << driveIndex);
 
     if((driveLetters.readOnly & mask) != 0) {               // if the bit representing the drive is set, it's read only
         Debug::out(LOG_DEBUG, "TranslatedDisk::isDriveIndexReadOnly -- drive index: %d -> is READ ONLY ", driveIndex);
@@ -1269,7 +1269,7 @@ int TranslatedDisk::getEmptyFindStorageIndex(void)
     return -1;                                                  // not found, return -1
 }
 
-int TranslatedDisk::getFindStorageIndexByDta(DWORD dta)         // find the findStorage with the specified DTA
+int TranslatedDisk::getFindStorageIndexByDta(uint32_t dta)         // find the findStorage with the specified DTA
 {
     for(int i=0; i<MAX_FIND_STORAGES; i++) {
         if(findStorages[i] == NULL) {                           // skip not allocated findStorages
@@ -1284,9 +1284,9 @@ int TranslatedDisk::getFindStorageIndexByDta(DWORD dta)         // find the find
     return -1;                                                  // not found, return -1
 }
 
-void TranslatedDisk::onStLog(BYTE *cmd)
+void TranslatedDisk::onStLog(uint8_t *cmd)
 {
-    DWORD res;
+    uint32_t res;
     res = dataTrans->recvData(dataBuffer, 512);     // get data from Hans
 
     if(!res) {                                      // failed to get data? internal error!
@@ -1301,9 +1301,9 @@ void TranslatedDisk::onStLog(BYTE *cmd)
 
 //do a simple HTTP GET request - for logging from ST to Http
 //ignore result
-void TranslatedDisk::onStHttp(BYTE *cmd)
+void TranslatedDisk::onStHttp(uint8_t *cmd)
 {
-    DWORD res;
+    uint32_t res;
     res = dataTrans->recvData(dataBuffer, 512);     // get data from Hans
 
     if(!res) {                                      // failed to get data? internal error!
@@ -1514,7 +1514,7 @@ void TranslatedDisk::convertAtariASCIItoPc(char *path)
     }
 }
 
-void TranslatedDisk::getScreenShotConfig(BYTE *cmd)
+void TranslatedDisk::getScreenShotConfig(uint8_t *cmd)
 {
     dataTrans->addDataByte(events.screenShotVblEnabled);
 
@@ -1527,7 +1527,7 @@ void TranslatedDisk::getScreenShotConfig(BYTE *cmd)
 
 bool TranslatedDisk::zipDirAlreadyMounted(const char *zipFile, int &zipDirIndex)
 {
-    DWORD minAccessTime     = 0xffffffff;
+    uint32_t minAccessTime     = 0xffffffff;
     int   minAccessIndex    = 0;
 
     for(int i=0; i<MAX_ZIP_DIRS; i++) {                         // find the mount point

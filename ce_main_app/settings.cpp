@@ -224,7 +224,7 @@ char *Settings::getBinaryString(const char *key, int len)
     return buffer;
 }
 //-------------------------
-void Settings::binToHex(BYTE *inBfr, int len, char *outBfr)
+void Settings::binToHex(uint8_t *inBfr, int len, char *outBfr)
 {
     outBfr[0] = 0;                          // put string terminator at the supplied pointer to output buffer, to start output here
     char tmp[16];
@@ -235,13 +235,13 @@ void Settings::binToHex(BYTE *inBfr, int len, char *outBfr)
     }
 }
 //-------------------------
-void Settings::generateLicenseKeyName(BYTE* hwSerial, char *keyName)
+void Settings::generateLicenseKeyName(uint8_t* hwSerial, char *keyName)
 {
     strcpy(keyName, "HW_LICENSE_");                             // start with "HW_LICENSE_"
     Settings::binToHex(hwSerial, 13, keyName + 11);    // take hwSerial and convert it from binary to hex string and append it to key name
 }
 //-------------------------
-void Settings::setBinaryString(const char *key, BYTE *inBfr, int len)
+void Settings::setBinaryString(const char *key, uint8_t *inBfr, int len)
 {
     char tmp[512];
     memset(tmp, 0, 512);

@@ -7,7 +7,7 @@
 #include <string>
 #include <queue>
 
-#include "../datatypes.h"
+#include <stdint.h>
 #include "../settingsreloadproxy.h"
 
 #include "floppyimagefactory.h"
@@ -26,8 +26,8 @@ typedef struct {
     int side;
     int sector;
 
-    BYTE *data;
-    DWORD size;
+    uint8_t *data;
+    uint32_t size;
 } WrittenMfmSector;
 
 void *floppyEncodeThreadCode(void *ptr);
@@ -35,6 +35,6 @@ void *floppyEncodeThreadCode(void *ptr);
 void floppyEncoder_stop(void);
 void floppyEncoder_addEncodeWholeImageRequest(int slotNo, const char *imageFileName);
 void floppyEncoder_addReencodeTrackRequest(int track, int side);
-void floppyEncoder_decodeMfmWrittenSector(int track, int side, int sector, BYTE *data, DWORD size);
+void floppyEncoder_decodeMfmWrittenSector(int track, int side, int sector, uint8_t *data, uint32_t size);
 
 #endif

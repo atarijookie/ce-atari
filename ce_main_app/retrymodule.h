@@ -30,30 +30,30 @@ public:
     RetryModule(void);
     ~RetryModule(void);
     
-    bool gotThisCmd(BYTE *fullCmd, BYTE isIcd);
+    bool gotThisCmd(uint8_t *fullCmd, uint8_t isIcd);
     
-    void makeCmdCopy            (BYTE *fullCmd, BYTE  isIcd, BYTE  justCmd, BYTE  tag1, BYTE  tag2, BYTE  module);
-    void restoreCmdFromCopy     (BYTE *fullCmd, BYTE &isIcd, BYTE &justCmd, BYTE &tag1, BYTE &tag2, BYTE &module);
+    void makeCmdCopy            (uint8_t *fullCmd, uint8_t  isIcd, uint8_t  justCmd, uint8_t  tag1, uint8_t  tag2, uint8_t  module);
+    void restoreCmdFromCopy     (uint8_t *fullCmd, uint8_t &isIcd, uint8_t &justCmd, uint8_t &tag1, uint8_t &tag2, uint8_t &module);
 
-    void copyDataAndStatus      (int dataDirection,  DWORD  count, BYTE *buffer, bool  statusWasSet, BYTE  status);
-    void restoreDataAndStatus   (int &dataDirection, DWORD &count, BYTE *buffer, bool &statusWasSet, BYTE &status);
+    void copyDataAndStatus      (int dataDirection,  uint32_t  count, uint8_t *buffer, bool  statusWasSet, uint8_t  status);
+    void restoreDataAndStatus   (int &dataDirection, uint32_t &count, uint8_t *buffer, bool &statusWasSet, uint8_t &status);
     
     int getDataDirection(void);
     
 private:
     // from CCoreThread -- part of copied data which are available right after receiving command
-    BYTE fullCmd[ACSI_CMD_SIZE];
-    BYTE isIcd;
-    BYTE justCmd;
-    BYTE tag1, tag2;
-    BYTE module;
+    uint8_t fullCmd[ACSI_CMD_SIZE];
+    uint8_t isIcd;
+    uint8_t justCmd;
+    uint8_t tag1, tag2;
+    uint8_t module;
 
     // from AcsiDataTrans -- part of copied data which are available after successfull READ operation
     int     dataDirection;
-    DWORD   count;
-    BYTE *  buffer;
+    uint32_t   count;
+    uint8_t *  buffer;
     bool    statusWasSet;
-    BYTE    status;
+    uint8_t    status;
 };
 
 #endif

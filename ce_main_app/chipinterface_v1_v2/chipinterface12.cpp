@@ -32,8 +32,8 @@ ChipInterface12::ChipInterface12()
     ikbdReadFd = -1;
     ikbdWriteFd = -1;
 
-    bufOut = new BYTE[MFM_STREAM_SIZE];
-    bufIn = new BYTE[MFM_STREAM_SIZE];
+    bufOut = new uint8_t[MFM_STREAM_SIZE];
+    bufIn = new uint8_t[MFM_STREAM_SIZE];
 
     memset(&hansConfigWords, 0, sizeof(hansConfigWords));
 }
@@ -192,7 +192,7 @@ void ChipInterface12::resetFDD(void)
 #endif
 }
 
-bool ChipInterface12::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
+bool ChipInterface12::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
 {
 #ifndef ONPC
     // if waitForATN() succeeds, it fills 8 bytes of data in buffer
@@ -201,7 +201,7 @@ bool ChipInterface12::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
     int moreData = 0;
 
     // check for any ATN code waiting from Hans
-    bool res = conSpi->waitForATN(SPI_CS_HANS, (BYTE) ATN_ANY, 0, inBuf);
+    bool res = conSpi->waitForATN(SPI_CS_HANS, (uint8_t) ATN_ANY, 0, inBuf);
 
     if(res) {    // HANS is signaling attention?
         if(inBuf[3] == ATN_ACSI_COMMAND) {
@@ -217,7 +217,7 @@ bool ChipInterface12::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
     }
 
     // check for any ATN code waiting from Franz
-    res = conSpi->waitForATN(SPI_CS_FRANZ, (BYTE) ATN_ANY, 0, inBuf);
+    res = conSpi->waitForATN(SPI_CS_FRANZ, (uint8_t) ATN_ANY, 0, inBuf);
 
     if(res) {    // FRANZ is signaling attention?
         if(inBuf[3] == ATN_SEND_TRACK) {
@@ -237,7 +237,7 @@ bool ChipInterface12::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
     return false;
 }
 
-void ChipInterface12::getFWversion(bool hardNotFloppy, BYTE *inFwVer)
+void ChipInterface12::getFWversion(bool hardNotFloppy, uint8_t *inFwVer)
 {
 #ifndef ONPC
     if(hardNotFloppy) {     // for HDD
@@ -261,7 +261,7 @@ void ChipInterface12::getFWversion(bool hardNotFloppy, BYTE *inFwVer)
 #endif
 }
 
-bool ChipInterface12::hdd_sendData_start(DWORD totalDataCount, BYTE scsiStatus, bool withStatus)
+bool ChipInterface12::hdd_sendData_start(uint32_t totalDataCount, uint8_t scsiStatus, bool withStatus)
 {
 #ifndef ONPC
     if(totalDataCount > 0xffffff) {
@@ -283,7 +283,7 @@ bool ChipInterface12::hdd_sendData_start(DWORD totalDataCount, BYTE scsiStatus, 
     return true;
 }
 
-bool ChipInterface12::hdd_sendData_transferBlock(BYTE *pData, DWORD dataCount)
+bool ChipInterface12::hdd_sendData_transferBlock(uint8_t *pData, uint32_t dataCount)
 {
 #ifndef ONPC
     bufOut[0] = 0;
@@ -300,10 +300,10 @@ bool ChipInterface12::hdd_sendData_transferBlock(BYTE *pData, DWORD dataCount)
             return false;
         }
 
-        DWORD cntNow = (dataCount > 512) ? 512 : dataCount;         // max 512 bytes per transfer
+        uint32_t cntNow = (dataCount > 512) ? 512 : dataCount;         // max 512 bytes per transfer
 
         memcpy(bufOut + 2, pData, cntNow);                          // copy the data after the header (2 bytes)
-        conSpi->txRx(SPI_CS_HANS, cntNow + 4, bufOut, bufIn);          // transmit this buffer with header + terminating zero (WORD)
+        conSpi->txRx(SPI_CS_HANS, cntNow + 4, bufOut, bufIn);          // transmit this buffer with header + terminating zero (uint16_t)
 
         pData       += cntNow;                                      // move the data pointer further
         dataCount   -= cntNow;
@@ -313,7 +313,7 @@ bool ChipInterface12::hdd_sendData_transferBlock(BYTE *pData, DWORD dataCount)
     return true;
 }
 
-bool ChipInterface12::hdd_recvData_start(BYTE *recvBuffer, DWORD totalDataCount)
+bool ChipInterface12::hdd_recvData_start(uint8_t *recvBuffer, uint32_t totalDataCount)
 {
 #ifndef ONPC
     if(totalDataCount > 0xffffff) {
@@ -335,15 +335,15 @@ bool ChipInterface12::hdd_recvData_start(BYTE *recvBuffer, DWORD totalDataCount)
     return true;
 }
 
-bool ChipInterface12::hdd_recvData_transferBlock(BYTE *pData, DWORD dataCount)
+bool ChipInterface12::hdd_recvData_transferBlock(uint8_t *pData, uint32_t dataCount)
 {
 #ifndef ONPC
     memset(bufOut, 0, TX_RX_BUFF_SIZE);                   // nothing to transmit, really...
-    BYTE inBuf[8];
+    uint8_t inBuf[8];
 
     while(dataCount > 0) {
         // request maximum 512 bytes from host
-        DWORD subCount = (dataCount > 512) ? 512 : dataCount;
+        uint32_t subCount = (dataCount > 512) ? 512 : dataCount;
 
         bool res = conSpi->waitForATN(SPI_CS_HANS, ATN_WRITE_MORE_DATA, 1000, inBuf); // wait for ATN_WRITE_MORE_DATA
 
@@ -362,7 +362,7 @@ bool ChipInterface12::hdd_recvData_transferBlock(BYTE *pData, DWORD dataCount)
     return true;
 }
 
-bool ChipInterface12::hdd_sendStatusToHans(BYTE statusByte)
+bool ChipInterface12::hdd_sendStatusToHans(uint8_t statusByte)
 {
 #ifndef ONPC
     bool res = conSpi->waitForATN(SPI_CS_HANS, ATN_GET_STATUS, 1000, bufIn);   // wait for ATN_GET_STATUS
@@ -381,7 +381,7 @@ bool ChipInterface12::hdd_sendStatusToHans(BYTE statusByte)
     return true;
 }
 
-void ChipInterface12::fdd_sendTrackToChip(int byteCount, BYTE *encodedTrack)
+void ChipInterface12::fdd_sendTrackToChip(int byteCount, uint8_t *encodedTrack)
 {
 #ifndef ONPC
     // send encoded track out, read garbage into bufIn and don't care about it
@@ -389,7 +389,7 @@ void ChipInterface12::fdd_sendTrackToChip(int byteCount, BYTE *encodedTrack)
 #endif
 }
 
-BYTE* ChipInterface12::fdd_sectorWritten(int &side, int &track, int &sector, int &byteCount)
+uint8_t* ChipInterface12::fdd_sectorWritten(int &side, int &track, int &sector, int &byteCount)
 {
 #ifndef ONPC
     byteCount = conSpi->getRemainingLength();               // get how many data we still have

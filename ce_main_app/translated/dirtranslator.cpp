@@ -189,7 +189,7 @@ FilenameShortener *DirTranslator::createShortener(const std::string &path)
     return fs;
 }
 
-bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hostSearchPathAndWildcards, BYTE findAttribs, bool isRootDir, bool useZipdirNotFile)
+bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hostSearchPathAndWildcards, uint8_t findAttribs, bool isRootDir, bool useZipdirNotFile)
 {
     std::string hostPath, searchString;
 
@@ -286,7 +286,7 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
     return true;
 }
 
-void DirTranslator::appendFoundToFindStorage(std::string &hostPath, const char *searchString, TFindStorage *fs, struct dirent *de, BYTE findAttribs)
+void DirTranslator::appendFoundToFindStorage(std::string &hostPath, const char *searchString, TFindStorage *fs, struct dirent *de, uint8_t findAttribs)
 {
     // TODO: verify on ST that the find attributes work like this
 
@@ -315,7 +315,7 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, const char *
     appendFoundToFindStorage(hostPath, searchString, fs, de->d_name, isDir, findAttribs);
 }
 
-void DirTranslator::appendFoundToFindStorage(std::string &hostPath, const char *searchString, TFindStorage *fs, const char *name, bool isDir, BYTE findAttribs)
+void DirTranslator::appendFoundToFindStorage(std::string &hostPath, const char *searchString, TFindStorage *fs, const char *name, bool isDir, uint8_t findAttribs)
 {
     // TODO: do support for checking the READ ONLY flag on linux
     bool isReadOnly = false;
@@ -323,10 +323,10 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, const char *
     // add this file
     TFindStorage *fsPart = isDir ? &fsDirs : &fsFiles;          // get the pointer to partial find storage to separate dirs from files when searching
 
-    DWORD addr  = fsPart->count * 23;                           // calculate offset
-    BYTE *buf   = &(fsPart->buffer[addr]);                      // and get pointer to this location
+    uint32_t addr  = fsPart->count * 23;                           // calculate offset
+    uint8_t *buf   = &(fsPart->buffer[addr]);                      // and get pointer to this location
 
-    BYTE atariAttribs;                                          // convert host to atari attribs
+    uint8_t atariAttribs;                                          // convert host to atari attribs
     Utils::attributesHostToAtari(isReadOnly, isDir, atariAttribs);
 
     if(name[0] == '.') atariAttribs |= FA_HIDDEN;       // enforce Mac/Unix convention of hidding files startings with '.'
@@ -354,8 +354,8 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, const char *
         return;
     }
 
-    WORD atariTime = Utils::fileTimeToAtariTime(timestr);
-    WORD atariDate = Utils::fileTimeToAtariDate(timestr);
+    uint16_t atariTime = Utils::fileTimeToAtariTime(timestr);
+    uint16_t atariDate = Utils::fileTimeToAtariDate(timestr);
 
     // now convert the short 'FILE.C' to 'FILE    .C  '
     //char shortFnameExtended[14];
@@ -399,11 +399,11 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, const char *
     buf[4] = atariDate &  0xff;
 
     // File Length
-    DWORD size;
+    uint32_t size;
     if(attr.st_size > GEMDOS_FILE_MAXSIZE) {
         size = GEMDOS_FILE_MAXSIZE;
     } else {
-        size = (DWORD)attr.st_size;
+        size = (uint32_t)attr.st_size;
     }
     buf[5] = (size >>  24) & 0xff;
     buf[6] = (size >>  16) & 0xff;
@@ -419,15 +419,15 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, const char *
     fs->count++;                                                    // increase total count
 }
 
-void DirTranslator::appendFoundToFindStorage_dirUpDirCurr(std::string &hostPath, const char *searchString, TFindStorage *fs, struct dirent *de, BYTE findAttribs)
+void DirTranslator::appendFoundToFindStorage_dirUpDirCurr(std::string &hostPath, const char *searchString, TFindStorage *fs, struct dirent *de, uint8_t findAttribs)
 {
     TFindStorage *fsPart = &fsDirs;                     // get the pointer to partial find storage to separate dirs from files when searching
 
     // add this file
-    DWORD addr  = fsPart->count * 23;                   // calculate offset
-    BYTE *buf   = &(fsPart->buffer[addr]);              // and get pointer to this location
+    uint32_t addr  = fsPart->count * 23;                   // calculate offset
+    uint8_t *buf   = &(fsPart->buffer[addr]);              // and get pointer to this location
 
-    BYTE atariAttribs;                                  // convert host to atari attribs
+    uint8_t atariAttribs;                                  // convert host to atari attribs
     Utils::attributesHostToAtari(false, true, atariAttribs);
 
     std::string fullEntryPath   = hostPath;
@@ -448,8 +448,8 @@ void DirTranslator::appendFoundToFindStorage_dirUpDirCurr(std::string &hostPath,
 
     timestr = localtime(&attr.st_mtime);                        // convert time_t to tm structure
 
-    WORD atariTime = Utils::fileTimeToAtariTime(timestr);
-    WORD atariDate = Utils::fileTimeToAtariDate(timestr);
+    uint16_t atariTime = Utils::fileTimeToAtariTime(timestr);
+    uint16_t atariDate = Utils::fileTimeToAtariDate(timestr);
 
     // check the current name against searchString using fnmatch
     int ires = compareSearchStringAndFilename(searchString, shortFname.c_str());
@@ -521,7 +521,7 @@ int DirTranslator::compareSearchStringAndFilename(const char *searchString, cons
 
 TFindStorage::TFindStorage()
 {
-    buffer = new BYTE[getSize()];
+    buffer = new uint8_t[getSize()];
     clear();
 }
 

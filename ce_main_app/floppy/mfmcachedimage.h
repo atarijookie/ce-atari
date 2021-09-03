@@ -16,13 +16,13 @@
 typedef struct {
     volatile bool isReady;    // set to false if this track can't be streamed yet (e.g. not encoded yet or encoding at that moment)
 
-    volatile DWORD  encodeRequestTime;  // timestamp when other thread requested encoding of this track
-    volatile DWORD  encodeActionTime;   // timestamp when encoder did start to encode the track. If at the end of encoding requestTime > actionTime, another request was placed and encode needs to repeat
+    volatile uint32_t  encodeRequestTime;  // timestamp when other thread requested encoding of this track
+    volatile uint32_t  encodeActionTime;   // timestamp when encoder did start to encode the track. If at the end of encoding requestTime > actionTime, another request was placed and encode needs to repeat
 
     int     track;
     int     side;
 
-    BYTE    *mfmStream;
+    uint8_t    *mfmStream;
     int     bytesInStream;
 
     int     symbolsInStream;            // how many symbols are the result of encoding this single track
@@ -43,10 +43,10 @@ public:
     bool findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, int &side);    // find a single track and encode it, or fail to find it and return false
 
     bool encodedTrackIsReady(int track, int side);
-    BYTE *getEncodedTrack(int track, int side, int &bytesInBuffer);
+    uint8_t *getEncodedTrack(int track, int side, int &bytesInBuffer);
     bool getParams(int &tracks, int &sides, int &sectorsPerTrack);
 
-    bool decodeMfmBuffer(BYTE *inBfr, int inCnt, BYTE *outBfr);     // decode single MFM encoded sector
+    bool decodeMfmBuffer(uint8_t *inBfr, int inCnt, uint8_t *outBfr);     // decode single MFM encoded sector
     bool lastBufferWasFormatTrack(void);    // get if last decodeMfmBuffer() was sector write or format track
 
     bool newContent;
@@ -68,29 +68,29 @@ private:
     int tracksToBeEncoded;  // holds how many tracks we still need to process
 
     struct {
-        BYTE threeBits;
-        BYTE times;
-        BYTE timesCnt;
+        uint8_t threeBits;
+        uint8_t times;
+        uint8_t timesCnt;
 
         int symbolsInStream;            // how many symbols are the result of encoding this single track
         int totalSymbolsTime;           // sum of symbols time in this track
     } encoder;
 
     struct {
-        BYTE *mfmData;
+        uint8_t *mfmData;
         int   count;
 
-        BYTE *pBfr;
+        uint8_t *pBfr;
         int  usedTimesFromByte;
 
         int  byteOffset;            // offset of decoded byte after 3x A1 mark
         int  bCount;                // how many bits we have now decoded in current byte
         bool remainder;             // if we got some reminder from previous decoded time
-        BYTE dByte;
-        BYTE *oBfr;                 // where the output data will be stored
+        uint8_t dByte;
+        uint8_t *oBfr;                 // where the output data will be stored
 
-        WORD calcedCrc;
-        WORD recvedCrc;
+        uint16_t calcedCrc;
+        uint16_t recvedCrc;
 
         bool done;                  // set to true when received did finish this sector
         bool good;                  // status of sector decoding, which should be returned to caller
@@ -99,31 +99,31 @@ private:
 
     int maxTotalSymbolsTime;        // holds the maximum total symbols time found in this image, so we won't show all the tracks symbols time in log
     TCachedTrack tracks[MAX_TRACKS];
-    WORD crc;       // current value of CRC calculator
-    BYTE *bfr;      // pointer to where we are storing data in the buffer
-    BYTE *currentStreamStart;
+    uint16_t crc;       // current value of CRC calculator
+    uint8_t *bfr;      // pointer to where we are storing data in the buffer
+    uint8_t *currentStreamStart;
     int  bytesInBfr;    // how many bytes we already stored in buffer
 
     int  getNextIndexToEncode(void);
     void encodeSingleTrack(FloppyImage *img, int side, int track, int sectorsPerTrack);
 
     void appendCurrentSectorCommand(int track, int side, int sector);
-    void appendRawByte(BYTE val);
-    void setRawWordAtIndex(int index, WORD val);
+    void appendRawByte(uint8_t val);
+    void setRawWordAtIndex(int index, uint16_t val);
     void appendA1MarkToStream(void);
-    void appendTime(BYTE time);
-    void appendByteToStream(BYTE val, bool doCalcCrc=true);
-    void appendChange(const BYTE chg);
+    void appendTime(uint8_t time);
+    void appendByteToStream(uint8_t val, bool doCalcCrc=true);
+    void appendChange(const uint8_t chg);
     bool encodeSingleSector(FloppyImage *img, int side, int track, int sector);
 
-    void updateCrcSlow(BYTE data);
-    void updateCrcFast(BYTE data);
+    void updateCrcSlow(uint8_t data);
+    void updateCrcFast(uint8_t data);
 
     //-------------------
     // methods used for mfm decoding of written sector
-    inline BYTE getMfmTime(void);
-    inline void addOneBit(BYTE bit, bool newRemainder);
-    inline void addTwoBits(BYTE bits, bool newRemainder);
+    inline uint8_t getMfmTime(void);
+    inline void addOneBit(uint8_t bit, bool newRemainder);
+    inline void addTwoBits(uint8_t bits, bool newRemainder);
     inline void handleDecodedByte(void);
     //-------------------
 

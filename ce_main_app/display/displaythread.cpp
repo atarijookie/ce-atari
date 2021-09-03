@@ -93,7 +93,7 @@ static char *get_displayLinePtr(int displayLineId);
 void *displayThreadCode(void *ptr)
 {
     bool  btnDownPrev = false;
-    DWORD btnDownStart = 0;
+    uint32_t btnDownStart = 0;
     int   btnDownTime = 0, btnDownTimePrev = 0;
     bool  powerOffIs = false;
     bool  powerOffWas = false;
@@ -130,7 +130,7 @@ void *displayThreadCode(void *ptr)
     int max_fd = (displayPipeFd[0] > beeperPipeFd[0]) ? displayPipeFd[0] : beeperPipeFd[0];
     struct timeval timeout;
 
-    DWORD nextScreenTime = Utils::getEndTime(NEXT_SCREEN_INTERVAL);
+    uint32_t nextScreenTime = Utils::getEndTime(NEXT_SCREEN_INTERVAL);
 
     while(sigintReceived == 0) {
         // set timeout - might be changed by select(), so set every time before select()
@@ -149,7 +149,7 @@ void *displayThreadCode(void *ptr)
             continue;
         }
 
-        DWORD now = Utils::getCurrentMs();
+        uint32_t now = Utils::getCurrentMs();
         bool redrawDisplay = false;
 
         if(res == 0) {                  // on select timeout?
@@ -171,7 +171,7 @@ void *displayThreadCode(void *ptr)
                         btnDownStart = now;                     // store button down time
                     }
 
-                    DWORD btnDownTimeMs = (now - btnDownStart); // calculate how long the button is down in ms
+                    uint32_t btnDownTimeMs = (now - btnDownStart); // calculate how long the button is down in ms
 
                     //-------------
                     // it's the power off interval, if button down time is between this MIN and MAX time
@@ -289,7 +289,7 @@ void display_deinit(void)
 
 static void display_ce_logo(void)
 {
-    const static BYTE logo[128] =
+    const static uint8_t logo[128] =
     { 0x00,0x00,0x00,0x00, 0x0f,0x80,0x01,0xf0, 0x0f,0x80,0x01,0xf0, 0x1c,0x07,0xe0,0x38, 0x18,0x38,0x1c,0x18, 0x38,0xc1,0x83,0x1c,
       0x31,0x03,0xc0,0x8c, 0x32,0x07,0xe0,0x4c, 0x02,0x01,0x80,0x40, 0x04,0x01,0x80,0x20, 0x0b,0xc1,0x83,0xd0, 0x0b,0x81,0x81,0xd0,
       0x0b,0xc1,0x83,0xd0, 0x12,0xf1,0x8f,0x48, 0x10,0x3d,0xbc,0x08, 0x10,0x0f,0xf0,0x08, 0x10,0x03,0xc0,0x08, 0x10,0x07,0xe0,0x08,
@@ -298,7 +298,7 @@ static void display_ce_logo(void)
       0x0f,0x80,0x01,0xf0, 0x00,0x00,0x00,0x00};
 
     int x,y, idx = 0, whichBit = 7;
-    BYTE byte, bit;
+    uint8_t byte, bit;
     for(y=0; y<32; y++) {
         for(x=0; x<32; x++) {
             if(whichBit == 7) {                             // need to get another byte?
@@ -309,7 +309,7 @@ static void display_ce_logo(void)
             bit = byte & (1 << whichBit);                   // get the right bit
             whichBit = (whichBit > 0) ? (whichBit - 1) : 7; // move to next bit
 
-            WORD color = bit ? SSD1306_WHITE : SSD1306_BLACK;
+            uint16_t color = bit ? SSD1306_WHITE : SSD1306_BLACK;
             display->drawPixel(x, y, color);                // draw it
         }
     }
