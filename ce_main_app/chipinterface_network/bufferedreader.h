@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "../chipinterface.h"
 
+// ATN tags which define who is sending the data (Hans, Franz, IKBD, or zero padding)
 #define NET_ATN_HANS_STR    "ATHA"
 #define NET_ATN_FRANZ_STR   "ATFR"
 #define NET_ATN_IKBD_STR    "ATIK"

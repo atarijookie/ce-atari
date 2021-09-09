@@ -128,7 +128,7 @@ void BufferedReader::popFirst(void)
 
 int BufferedReader::readHeaderFromBuffer(uint8_t atnCodeWant)
 {
-    // the buffer should contain: 
+    // The buffer should contain:
     //  0...3: ATN tag (4 bytes)
     //  4...5: 0xcafe (2 bytes)
     //  6...7: ATN code/command (2 bytes)
@@ -160,6 +160,19 @@ int BufferedReader::readHeaderFromBuffer(uint8_t atnCodeWant)
 
     if(atnId == NET_ATN_NONE_ID) {      // no valid ATN STR tag found? quit
         return NET_ATN_NONE_ID;
+    }
+
+    // if it's IKDB data or ZEROS padding, data format is slightly different
+    if(atnId == NET_ATN_IKBD_ID || atnId == NET_ATN_ZEROS_ID) {
+        txLen = Utils::getWord(&buffer[8]);     // this is length in bytes, not words
+
+        if(txLen >= 8) {                        // if byte count is at least 8, subtract 8 because we got this header in already (and 4 bytes of TAG is not included)
+            txLen -= 8;
+        }
+
+        remainingPacketLength = txLen;
+        rxLen = 0;                              // no data to be RXed
+        return atnId;                           // we're done here prematurely
     }
 
     uint16_t syncWord = Utils::getWord(&buffer[4]);
