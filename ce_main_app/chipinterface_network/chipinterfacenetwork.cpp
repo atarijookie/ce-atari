@@ -43,6 +43,8 @@ ChipInterfaceNetwork::ChipInterfaceNetwork()
     gotAtnId = 0;
     gotAtnCode = 0;
 
+    lastTimeRecv = Utils::getCurrentMs();
+
     memset(&hansConfigWords, 0, sizeof(hansConfigWords));
 }
 
@@ -113,6 +115,11 @@ void ChipInterfaceNetwork::acceptSocketIfNeededAndPossible(void)
         return;
     }
 
+    struct timeval tv;
+    tv.tv_sec = 0;
+    tv.tv_usec = 500000;    // 500 ms timeout on blocking reads
+    setsockopt(newSock, SOL_SOCKET, SO_RCVTIMEO, (const char*) &tv, sizeof(tv));
+
     // got the new client socket now
     fdClient = newSock;
     bufReader.setFd(newSock);
@@ -127,7 +134,7 @@ void ChipInterfaceNetwork::closeClientSocket(void)
     closeFdIfOpen(fdClient);            // close socket
     sendReportToMainServerSocket();     // let main server process know that we're free now
 
-    Debug::out(LOG_DEBUG, "acceptSocketIfNeededAndPossible() - client disconnected");
+    Debug::out(LOG_DEBUG, "closeClientSocket() - client disconnected");
 }
 
 void ChipInterfaceNetwork::createServerReportSocket(void)
@@ -260,16 +267,31 @@ bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
     acceptSocketIfNeededAndPossible();  // if don't have client connected, try to accept connection from client
 
     if(fdClient <= 0) {                 // (still) no client connected? no action needed
+        //Debug::out(LOG_DEBUG, "actionNeeded() - client not connected yet");
         return false;
     }
 
     int bytesAvailable;
     int rv = ioctl(fdClient, FIONREAD, &bytesAvailable);    // how many bytes we can read?
 
-    if(rv <= 0 || bytesAvailable <= 0) {                    // ioctl fail or nothing to read? no action needed
-        sendIkbdDataToAtari();                              // but send IKBD data to Atari
+    if(rv < 0 || bytesAvailable <= 0) {                     // ioctl fail or nothing to read? no action needed
+        //Debug::out(LOG_DEBUG, "actionNeeded() - nothing comming from fdClient");
+
+        if(rv == 0 && bytesAvailable == 0) {    // ioctl() succeeded, but can't read anything
+            uint32_t now = Utils::getCurrentMs();
+            uint32_t diff = now - lastTimeRecv;
+
+            if(diff > 3000) {                   // if some time passed since we got some data from client, try to read anyway, to detect client disconnect
+                uint8_t buf[2];
+                recvFromClient(buf, 2);         // if this read fails with 0, it will automatically close socket
+            }
+        }
+
+        sendIkbdDataToAtari();                  // but send IKBD data to Atari
         return false;
     }
+
+    lastTimeRecv = Utils::getCurrentMs();       // last time we've something received - now
 
     // if waitForATN() succeeds, it fills 8 bytes of data in buffer
     // ...but then we might need some little more, so let's determine what it was
@@ -284,13 +306,11 @@ bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
             break;
         }
 
+        Debug::out(LOG_DEBUG, "actionNeeded() - got ATN %d", gotAtnCode);
+
         if(gotAtnId == NET_ATN_HANS_ID) {                   // for Hans
             if(gotAtnCode == ATN_ACSI_COMMAND) {            // for this command read all ACSI command bytes
-                rv = recv(fdClient, inBuf + 8, 14, 0);
-
-                if(rv == 0) {                               // if recv() returned 0, client has disconnected
-                    closeClientSocket();
-                }
+                recvFromClient(inBuf + 8, 14);
             }
 
             hardNotFloppy = true;
@@ -299,11 +319,7 @@ bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
 
         if(gotAtnId == NET_ATN_FRANZ_ID) {                  // for Franz
             if(gotAtnCode == ATN_SEND_TRACK) {              // for this command read 2 more bytes: side + track
-                rv = recv(fdClient, inBuf + 8, 2, 0);
-
-                if(rv == 0) {                               // if recv() returned 0, client has disconnected
-                    closeClientSocket();
-                }
+                recvFromClient(inBuf + 8, 2);
             }
 
             hardNotFloppy = false;
@@ -434,10 +450,10 @@ bool ChipInterfaceNetwork::hdd_recvData_transferBlock(uint8_t *pData, uint32_t d
         }
 
         // transmit data (size = subCount) + header and footer (size = 8) - already received 4 bytes
-        ssize_t rv = recv(fdClient, bufIn, subCount + 8 - 4, 0);
+        int wantCount = subCount + 8 - 4;
+        int gotCount = recvFromClient(bufIn, wantCount);
 
-        if(rv == 0) {                                       // if recv() returned 0, client has disconnected
-            closeClientSocket();
+        if(gotCount < wantCount) {                          // if not all data was received
             return false;
         }
 
@@ -479,11 +495,7 @@ uint8_t* ChipInterfaceNetwork::fdd_sectorWritten(int &side, int &track, int &sec
     byteCount = bufReader.getRemainingLength();             // get how many data we still have
 
     // get all the remaining data
-    size_t rv = recv(fdClient, bufIn, byteCount, 0);
-
-    if(rv == 0) {                                           // if recv() returned 0, client has disconnected
-        closeClientSocket();
-    }
+    recvFromClient(bufIn, byteCount);
 
     // get the written sector, side, track number
     sector  = bufIn[1];
@@ -495,20 +507,16 @@ uint8_t* ChipInterfaceNetwork::fdd_sectorWritten(int &side, int &track, int &sec
 
 void ChipInterfaceNetwork::handleZerosAndIkbd(int atnId)
 {
-    ssize_t cntWant = bufReader.getRemainingLength();   // get how much we should get to receive whole packet
+    int cntWant = bufReader.getRemainingLength();   // get how much we should get to receive whole packet
     cntWant = MIN(cntWant, MFM_STREAM_SIZE);            // limit the received lenght to buffer size
 
-    ssize_t cntGot = recv(fdClient, bufIn, cntWant, 0); // read data
+    int cntGot = recvFromClient(bufIn, cntWant);    // read data
 
     if(cntGot < cntWant) {                              // not enough data read? 
         Debug::out(LOG_DEBUG, "handleZerosAndIkbd: got %d bytes, but wanted %d bytes (%d < %d)", cntGot, cntWant, cntGot, cntWant);
     }
 
     if(cntGot <= 0) {                                   // on error, nothing more to do
-        if(cntGot == 0) {                               // if recv() returned 0, client has disconnected
-            closeClientSocket();
-        }
-
         return;
     }
 
@@ -536,12 +544,16 @@ bool ChipInterfaceNetwork::waitForAtn(int atnIdWant, uint8_t atnCode, uint32_t t
         uint8_t atnCode = bufReader.getAtnCode();                           // what command does this chip wants us to handle?
 
         if(atnIdGot == NET_ATN_DISCONNECTED) {         // if buffered reader detected client disconnect, close it and quit
+            Debug::out(LOG_DEBUG, "waitForAtn() - DISCONNECTED!");
+
             closeClientSocket();
             return false;
         }
 
         // if ZEROS or IKBD packed was found, process it and then try looking for Franz or Hans packet again
         if(atnIdGot == NET_ATN_ZEROS_ID || atnIdGot == NET_ATN_IKBD_ID) {
+            Debug::out(LOG_DEBUG, "waitForAtn() - got ZEROS or IKDB");
+
             handleZerosAndIkbd(atnIdGot);
             continue;
         }
@@ -609,4 +621,23 @@ void ChipInterfaceNetwork::sendDataToChip(const char* tag, uint8_t* data, uint16
 
     write(fdClient, head, 6);               // send header
     write(fdClient, data, len);             // send data
+}
+
+int ChipInterfaceNetwork::recvFromClient(uint8_t* buf, int len)
+{
+    int received = 0;                       // total received count
+
+    int bytes = recv(fdClient, buf, len, 0);    // try to receive whole buffer
+    received += bytes;
+
+    if(bytes > 0 && bytes < len) {              // if something was received, but it was less than wanted count, only part of data was received - we might either receive rest of data, or zero on client disconnected
+        bytes = recv(fdClient, buf + bytes, len - bytes, 0);    // try to receive rest of data. If client disconnected, this is return 0
+        received += bytes;
+    }
+
+    if(bytes == 0) {                            // if recv() returned 0, client has disconnected
+        closeClientSocket();
+    }
+
+    return received;                            // return total bytes received
 }

@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include "../utils.h"
+#include "../debug.h"
 #include <stdint.h>
 #include "bufferedreader.h"
 
@@ -41,6 +42,7 @@ int BufferedReader::waitForATN(uint8_t atnCode, uint32_t timeoutMs, uint8_t *inB
             int atnId = readHeaderFromBuffer(atnCode);
 
             if(atnId != NET_ATN_NONE_ID) {                  // if valid ATN ID found and header seems to be OK, return that ATN ID
+                Debug::out(LOG_DEBUG, "waitForATN() - found valid atnId: %d", atnId);
                 return atnId;
             }
 
@@ -74,6 +76,7 @@ int BufferedReader::waitForATN(uint8_t atnCode, uint32_t timeoutMs, uint8_t *inB
             }
 
             if(timeLeftUs <= 0) {                       // no time left? quit loop, return NONE ATN
+                //Debug::out(LOG_DEBUG, "waitForATN() - timeLeftUs <= 0");
                 break;
             }
 
@@ -98,6 +101,7 @@ int BufferedReader::waitForATN(uint8_t atnCode, uint32_t timeoutMs, uint8_t *inB
         ssize_t recvCnt = recv(fd, &buffer[gotBytes], needCnt, 0);
 
         if(recvCnt == 0) {                              // if recv() returned 0, then client disconnected
+            Debug::out(LOG_DEBUG, "waitForATN() - recvCount=0, returning NET_ATN_DISCONNECTED");
             return NET_ATN_DISCONNECTED;
         }
 
@@ -109,6 +113,7 @@ int BufferedReader::waitForATN(uint8_t atnCode, uint32_t timeoutMs, uint8_t *inB
         // on failed to get data code continues here, try the loop again
     }
 
+    //Debug::out(LOG_DEBUG, "waitForATN() - quitting, returning NET_ATN_NONE_ID");
     return NET_ATN_NONE_ID;     // nothing usable found
 }
 
@@ -159,6 +164,7 @@ int BufferedReader::readHeaderFromBuffer(uint8_t atnCodeWant)
     }
 
     if(atnId == NET_ATN_NONE_ID) {      // no valid ATN STR tag found? quit
+        //Debug::out(LOG_DEBUG, "readHeaderFromBuffer() - no valid atnId found");
         return NET_ATN_NONE_ID;
     }
 
@@ -170,6 +176,8 @@ int BufferedReader::readHeaderFromBuffer(uint8_t atnCodeWant)
             txLen -= 8;
         }
 
+        Debug::out(LOG_DEBUG, "readHeaderFromBuffer() - got IKBD or ZEROS of txLen: %d", txLen);
+
         remainingPacketLength = txLen;
         rxLen = 0;                              // no data to be RXed
         return atnId;                           // we're done here prematurely
@@ -177,7 +185,8 @@ int BufferedReader::readHeaderFromBuffer(uint8_t atnCodeWant)
 
     uint16_t syncWord = Utils::getWord(&buffer[4]);
 
-    if(syncWord != 0xcafe) {            // sync word is not 0xcafe
+    if(syncWord != 0xfeca) {                    // if sync word is not 0xfeca (0xcafe with reversed order)
+        Debug::out(LOG_DEBUG, "readHeaderFromBuffer() - invalid syncWord: %04X", syncWord);
         return NET_ATN_NONE_ID;
     }
 
@@ -186,14 +195,15 @@ int BufferedReader::readHeaderFromBuffer(uint8_t atnCodeWant)
             uint8_t atnCodeGot = getAtnCode();
 
             if(atnCodeGot != atnCodeWant) {                         // the ATN code (command) is wrong, fail
+                Debug::out(LOG_DEBUG, "readHeaderFromBuffer() - wanted atnCodeWant: %d, but got atnCodeGod: %d", atnCodeWant, atnCodeGot);
                 return NET_ATN_NONE_ID;
             }
         }
     }
 
     // read TX and RX length in words
-    txLen = Utils::getWord(&buffer[8]);
-    rxLen = Utils::getWord(&buffer[10]);
+    txLen = Utils::SWAPWORD2(Utils::getWord(&buffer[ 8]));
+    rxLen = Utils::SWAPWORD2(Utils::getWord(&buffer[10]));
 
     // uint16_t count to uint8_t count
     txLen *= 2;
@@ -204,6 +214,8 @@ int BufferedReader::readHeaderFromBuffer(uint8_t atnCodeWant)
     rxLen = (rxLen >= 8) ? (rxLen - 8) : 0;
 
     remainingPacketLength = MAX(txLen, rxLen);  // the remaining length is the bigger one out of TX and RX length
+
+    Debug::out(LOG_DEBUG, "readHeaderFromBuffer() - got some ATN, txLen=%d, rxLen=%d", txLen, rxLen);
 
     // value other than NET_ATN_NONE_ID means success
     return atnId;

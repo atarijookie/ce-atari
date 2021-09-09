@@ -62,6 +62,7 @@ public:
 
     //----------------
 private:
+    uint32_t lastTimeRecv;
     int serverIndex;    // on which server index we're running
 
     int fdListen;       // socket for listen()
@@ -92,6 +93,7 @@ private:
     void createListeningSocket(void);
     void acceptSocketIfNeededAndPossible(void);
     void closeClientSocket(void);
+    int  recvFromClient(uint8_t* buf, int len);
     void closeFdIfOpen(int& sock);
     void createServerReportSocket(void);
     void sendReportToMainServerSocket(void);
