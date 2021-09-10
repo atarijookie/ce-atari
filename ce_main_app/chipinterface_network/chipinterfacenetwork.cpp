@@ -306,7 +306,7 @@ bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
             break;
         }
 
-        Debug::out(LOG_DEBUG, "actionNeeded() - got ATN %d", gotAtnCode);
+        //Debug::out(LOG_DEBUG, "actionNeeded() - gotAtnId=%d, gotAtnCode=%d", gotAtnId, gotAtnCode);
 
         if(gotAtnId == NET_ATN_HANS_ID) {                   // for Hans
             if(gotAtnCode == ATN_ACSI_COMMAND) {            // for this command read all ACSI command bytes
@@ -327,6 +327,7 @@ bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
         }
 
         // if came here, probably weird situation, quit
+        Debug::out(LOG_DEBUG, "actionNeeded() - weird situation?");
         break;
     }
 
@@ -540,7 +541,7 @@ bool ChipInterfaceNetwork::waitForAtn(int atnIdWant, uint8_t atnCode, uint32_t t
     // we might need to wait for ATN multiple times, as there might be ZEROS packet or IKBD packet before we read wanted Hans or Franz packet
     while(sigintReceived == 0) {
         // check for any ATN code waiting from Hans
-        int atnIdGot = bufReader.waitForATN(atnCode, timeoutMs, inBuf);     // which chip wants to communicate? (which chip's stream we should process?)
+        int atnIdGot = bufReader.waitForATN(atnCode, timeoutMs);            // which chip wants to communicate? (which chip's stream we should process?)
         uint8_t atnCode = bufReader.getAtnCode();                           // what command does this chip wants us to handle?
 
         if(atnIdGot == NET_ATN_DISCONNECTED) {         // if buffered reader detected client disconnect, close it and quit
@@ -563,9 +564,14 @@ bool ChipInterfaceNetwork::waitForAtn(int atnIdWant, uint8_t atnCode, uint32_t t
             return false;
         }
 
+        //Debug::out(LOG_DEBUG, "waitForAtn() - atnIdGot=%d, atnCode=%d", atnIdGot, atnCode);
+
         // if we got here, it'z not ZEROS, IKDB or NONE, so it's FRANZ or HANS
         memcpy(inBuf, bufReader.getHeaderPointer(), 8); // copy in the header to start of buffer
+        byteSwapBfr(inBuf, 8);
         bufReader.clear();                              // clear buffered reader after reading data
+
+        //Debug::out(LOG_DEBUG, "waitForAtn() - %02X %02X %02X %02X %02X %02X %02X %02X", inBuf[0], inBuf[1], inBuf[2], inBuf[3], inBuf[4], inBuf[5], inBuf[6], inBuf[7]);
 
         // store which chip wants which command to be handled
         gotAtnId = atnIdGot;
@@ -640,4 +646,13 @@ int ChipInterfaceNetwork::recvFromClient(uint8_t* buf, int len)
     }
 
     return received;                            // return total bytes received
+}
+
+void ChipInterfaceNetwork::byteSwapBfr(uint8_t* buf, int len)
+{
+    for(int i=0; i<len; i += 2) {
+        uint8_t tmp = buf[i];
+        buf[i] = buf[i+1];
+        buf[i+1] = tmp;
+    }
 }

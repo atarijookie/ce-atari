@@ -17,7 +17,7 @@ public:
     ChipInterfaceNetwork();
     virtual ~ChipInterfaceNetwork();
 
-    // this return CHIP_IF_V1_V2 or CHIP_IF_V3
+    // this return CHIP_IF_V1_V2 or some other
     int chipInterfaceType(void);
 
     //----------------
@@ -105,6 +105,7 @@ private:
     void sendIkbdDataToAtari(void);
 
     void sendDataToChip(const char* tag, uint8_t* data, uint16_t len);    // send data to chip with specified tag
+    void byteSwapBfr(uint8_t* buf, int len);
 };
 
 #endif // __CHIPINTERFACENETWORK_H__

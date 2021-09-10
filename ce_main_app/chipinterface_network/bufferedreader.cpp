@@ -27,7 +27,7 @@ void BufferedReader::setFd(int inFd)
     fd = inFd;
 }
 
-int BufferedReader::waitForATN(uint8_t atnCode, uint32_t timeoutMs, uint8_t *inBuf)
+int BufferedReader::waitForATN(uint8_t atnCode, uint32_t timeoutMs)
 {
     if(fd <= 0) {                   //  no fd, no ATN
         return NET_ATN_NONE_ID;
@@ -42,7 +42,7 @@ int BufferedReader::waitForATN(uint8_t atnCode, uint32_t timeoutMs, uint8_t *inB
             int atnId = readHeaderFromBuffer(atnCode);
 
             if(atnId != NET_ATN_NONE_ID) {                  // if valid ATN ID found and header seems to be OK, return that ATN ID
-                Debug::out(LOG_DEBUG, "waitForATN() - found valid atnId: %d", atnId);
+                //Debug::out(LOG_DEBUG, "waitForATN() - found valid atnId: %d", atnId);
                 return atnId;
             }
 
@@ -215,7 +215,7 @@ int BufferedReader::readHeaderFromBuffer(uint8_t atnCodeWant)
 
     remainingPacketLength = MAX(txLen, rxLen);  // the remaining length is the bigger one out of TX and RX length
 
-    Debug::out(LOG_DEBUG, "readHeaderFromBuffer() - got some ATN, txLen=%d, rxLen=%d", txLen, rxLen);
+    //Debug::out(LOG_DEBUG, "readHeaderFromBuffer() - got AtnCode=%d, txLen=%d, rxLen=%d", getAtnCode(), txLen, rxLen);
 
     // value other than NET_ATN_NONE_ID means success
     return atnId;
@@ -224,7 +224,7 @@ int BufferedReader::readHeaderFromBuffer(uint8_t atnCodeWant)
 // from the current buffer gets and returns the ATN code found in header
 uint8_t BufferedReader::getAtnCode(void)
 {
-    return buffer[7];
+    return buffer[6];
 }
 
 uint16_t BufferedReader::getRemainingLength(void)

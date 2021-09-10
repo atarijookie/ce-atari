@@ -31,7 +31,7 @@ public:
     void clear(void);
 
     // reads (and waits for) data from socket and if valid header found, returns one of the NET_ATN_*_ID codes or NET_ATN_NONE_ID if header not received
-    int waitForATN(uint8_t atnCode, uint32_t timeoutMs, uint8_t* inBuf);
+    int waitForATN(uint8_t atnCode, uint32_t timeoutMs);
 
     // from the current buffer gets and returns the ATN code found in header
     uint8_t getAtnCode(void);

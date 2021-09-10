@@ -5,7 +5,6 @@
 
 // types of chip interface, as returned by 
 #define CHIP_IF_V1_V2   1
-#define CHIP_IF_V3      3
 #define CHIP_IF_NETWORK 9
 
 // The following commands are sent from device to host on chip interface v1 and v2, 
@@ -71,7 +70,7 @@ public:
     ChipInterface();
     virtual ~ChipInterface() {};
 
-    // this return CHIP_IF_V1_V2 or CHIP_IF_V3
+    // this return CHIP_IF_V1_V2 or some other
     virtual int chipInterfaceType(void) = 0;
 
     void setInstanceIndex(int index);

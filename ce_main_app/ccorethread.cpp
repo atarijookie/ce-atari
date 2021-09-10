@@ -710,7 +710,7 @@ void CCoreThread::handleFwVersion_hans(void)
 
     //----------------------------------
     // do the following only for chip interface v1 v2
-    if(chipIfType == CHIP_IF_V1_V2) {
+    if(chipIfType == CHIP_IF_V1_V2 || chipIfType == CHIP_IF_NETWORK) {
         int currentLed = fwVer[4];
 
         char recoveryLevel = fwVer[9];
@@ -795,7 +795,7 @@ void CCoreThread::handleFwVersion_franz(void)
 
     int chipIfType = chipInterface->chipInterfaceType();
 
-    if(chipIfType == CHIP_IF_V1_V2) {                   // only on IF v1 v2 show info about Franz
+    if(chipIfType == CHIP_IF_V1_V2 || chipIfType == CHIP_IF_NETWORK) {  // only on IF v1 v2 show info about Franz
         Debug::out(LOG_DEBUG, "FW: Franz, %d-%02d-%02d", Update::versions.franz.getYear(), Update::versions.franz.getMonth(), Update::versions.franz.getDay());
     }
 }

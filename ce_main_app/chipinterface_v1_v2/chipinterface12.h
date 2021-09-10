@@ -14,7 +14,7 @@ public:
     ChipInterface12();
     virtual ~ChipInterface12();
 
-    // this return CHIP_IF_V1_V2 or CHIP_IF_V3
+    // this return CHIP_IF_V1_V2 or some other
     int chipInterfaceType(void);
 
     //----------------
