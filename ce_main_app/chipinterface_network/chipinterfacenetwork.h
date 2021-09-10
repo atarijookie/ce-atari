@@ -93,7 +93,7 @@ private:
     void createListeningSocket(void);
     void acceptSocketIfNeededAndPossible(void);
     void closeClientSocket(void);
-    int  recvFromClient(uint8_t* buf, int len);
+    int  recvFromClient(uint8_t* buf, int len, bool byteSwap=true);
     void closeFdIfOpen(int& sock);
     void createServerReportSocket(void);
     void sendReportToMainServerSocket(void);

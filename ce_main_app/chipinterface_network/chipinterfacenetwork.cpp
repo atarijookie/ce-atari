@@ -337,11 +337,13 @@ bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
 
 void ChipInterfaceNetwork::getFWversion(bool hardNotFloppy, uint8_t *inFwVer)
 {
+    // Debug::out(LOG_DEBUG, "getFWversion(): hardNotFloppy=%d", hardNotFloppy);
+
     if(hardNotFloppy) {     // for HDD
         // fwResponseBfr should be filled with Hans config - by calling setHDDconfig() (and not calling anything else inbetween)
         sendDataToChip(NET_TAG_HANS_STR, fwResponseBfr, HDD_FW_RESPONSE_LEN);
 
-        read (fdClient, inFwVer,        HDD_FW_RESPONSE_LEN);
+        recvFromClient(inFwVer, HDD_FW_RESPONSE_LEN);
 
         ChipInterface::convertXilinxInfo(inFwVer[5]);  // convert xilinx info into hwInfo struct
 
@@ -352,10 +354,9 @@ void ChipInterfaceNetwork::getFWversion(bool hardNotFloppy, uint8_t *inFwVer)
         Update::versions.hans.fromInts(year, Utils::bcdToInt(inFwVer[2]), Utils::bcdToInt(inFwVer[3]));       // store found FW version of Hans
     } else {                // for FDD
         // fwResponseBfr should be filled with Franz config - by calling setFDDconfig() (and not calling anything else inbetween)
-
         sendDataToChip(NET_TAG_FRANZ_STR, fwResponseBfr, FDD_FW_RESPONSE_LEN);
 
-        read (fdClient, inFwVer,        FDD_FW_RESPONSE_LEN);
+        recvFromClient(inFwVer, FDD_FW_RESPONSE_LEN);
 
         int year = Utils::bcdToInt(inFwVer[1]) + 2000;
         Update::versions.franz.fromInts(year, Utils::bcdToInt(inFwVer[2]), Utils::bcdToInt(inFwVer[3]));              // store found FW version of Franz
@@ -629,7 +630,7 @@ void ChipInterfaceNetwork::sendDataToChip(const char* tag, uint8_t* data, uint16
     write(fdClient, data, len);             // send data
 }
 
-int ChipInterfaceNetwork::recvFromClient(uint8_t* buf, int len)
+int ChipInterfaceNetwork::recvFromClient(uint8_t* buf, int len, bool byteSwap)
 {
     int received = 0;                       // total received count
 
@@ -644,6 +645,15 @@ int ChipInterfaceNetwork::recvFromClient(uint8_t* buf, int len)
     if(bytes == 0) {                            // if recv() returned 0, client has disconnected
         closeClientSocket();
     }
+
+    if(byteSwap) {                              // if should byteswap data
+        byteSwapBfr(buf, len);
+    }
+
+    // if(received > 0) {
+    //     Debug::out(LOG_DEBUG, "recvFromClient(): %d bytes", received);
+    //     Debug::outBfr(buf, received);
+    // }
 
     return received;                            // return total bytes received
 }

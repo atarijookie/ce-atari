@@ -261,6 +261,7 @@ void forkCEliteServer(int serverIndex)
         Debug::setLogFile(logPath);     // new network server will use different log file than the main thread
 
         runCore(serverIndex, false);    // run network (not local) device server with this serverIndex
+        exit(0);                        // terminate child here, don't continue anywhere
         return;
     }
 
