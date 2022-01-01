@@ -1,3 +1,4 @@
+import sys
 import os
 import re
 import threading, queue
@@ -23,9 +24,13 @@ list_of_items_filtered = []     # filtered list of items (based on search string
 pile_current_page = None        # urwid pile containing buttons for current page
 search_phrase = ""
 
+main_loop = None        # main loop of the urwid library
 text_pages = None       # widget holding the text showing current and total pages
 page_current = 1        # currently shown page
-items_per_page = 20     # how many items per page we should show
+text_status = None      # widget holding status text
+main_list_pile = None   # the main pile containing buttons with images
+last_focus_path = None  # holds last focus path to widget which had focus before going to widget subpage
+items_per_page = 19     # how many items per page we should show
 screen_width = 80       # should be 40 for ST low, 80 for ST mid
 
 should_run = True
@@ -148,14 +153,43 @@ def download_lists():
     """ download lists from internet to local storage """
     global list_of_lists
 
+    down_count = 0
+    fail_count = 0
+
     for item in list_of_lists:      # go through lists, check if should download, do download if needed
         should_download = should_download_list(item['filename'])        # check if should download this file
 
         if should_download:
             try:
-                download_list(item['url'], item['filename'])
+                update_status("Downloading {}".format(item['url']))
+                download_list(item['url'], item['filename'])        # start download of list
+                down_count += 1                                     # no exception? one more list downloaded
             except Exception as ex:
-                print("Failed downloading {} : {}".format(item['url'], str(ex)))
+                fail_count += 1
+                update_status("Failed downloading {} : {}".format(item['url'], str(ex)))
+
+    if down_count > 0:      # if something was downloaded
+        update_status("Downloaded {} lists.".format(down_count))
+    elif fail_count > 0:    # nothing downloaded, just failed?
+        update_status("Failed to download {} lists.".format(fail_count))
+    else:                   # nothing downloaded, nothing failed?
+        update_status("Lists are up to date.")
+
+
+def alarm_callback(loop=None, data=None):
+    """ this gets called on alarm """
+    pass
+
+
+def update_status(new_status):
+    """ call this method to update status bar on screen """
+    global text_status, main_loop
+
+    if text_status:     # got status widget? show status
+        text_status.set_text(new_status)
+
+    if main_loop:       # if got main loop, trigger alarm to redraw widgets
+        main_loop.set_alarm_in(1, alarm_callback)
 
 
 def download_worker():
@@ -179,6 +213,8 @@ def download_worker():
         local_path = os.path.join(storage_path, item['filename'])   # create local path
 
         try:
+            update_status("Status: downloading {}".format(item['filename']))
+
             # open url
             http = urllib3.PoolManager()
             r = http.request('GET', item['url'], preload_content=False)
@@ -193,8 +229,10 @@ def download_worker():
                     out.write(data)                 # write data to file
 
             r.release_conn()
+            update_status("Status: idle")
+
         except Exception as ex:
-            pass
+            update_status("Status: {}".format(str(ex)))
 
         queue_download.task_done()
 
@@ -245,7 +283,7 @@ def get_list_for_current_page():
 # ----------------------
 
 def create_main_menu():
-    global list_of_lists
+    global list_of_lists, text_status
 
     body = []
     body.append(urwid.Text('>>> CosmosEx Downloader <<<', align='center'))
@@ -256,6 +294,13 @@ def create_main_menu():
         button = urwid.Button(item['name'])
         urwid.connect_signal(button, 'click', on_show_selected_list, index)
         body.append(urwid.AttrMap(button, None, focus_map='reversed'))
+
+    body.append(urwid.Divider())
+
+    if not text_status:
+        text_status = urwid.Text("Status: idle")        # text showing status
+
+    body.append(text_status)            # add status widget
 
     return urwid.ListBox(urwid.SimpleFocusListWalker(body))
 
@@ -294,7 +339,9 @@ def get_current_page_buttons(as_tuple):
 
     buttons = []
 
-    for item in sublist:                        # from the items create buttons
+    focused_index = None
+
+    for index, item in enumerate(sublist):      # from the items create buttons
         btn_text = get_item_btn_text(item)
         btn = urwid.Button(btn_text)            # button with text
         urwid.connect_signal(btn, 'click', on_image_button_clicked, item)   # attach handler on clicked
@@ -308,7 +355,7 @@ def get_current_page_buttons(as_tuple):
         one = (urwid.Divider(), (WEIGHT, 1)) if as_tuple else urwid.Divider()
         buttons.append(one)
 
-    return buttons
+    return buttons, focused_index
 
 
 def update_pile_with_current_buttons():
@@ -316,16 +363,23 @@ def update_pile_with_current_buttons():
         in that case we need to update the .contents attribude with tuples """
     global pile_current_page
 
-    current_page_buttons = get_current_page_buttons(as_tuple=(pile_current_page is not None))
+    current_page_buttons, focused_index = get_current_page_buttons(as_tuple=(pile_current_page is not None))
 
     if pile_current_page is None:       # no current pile? create pile from current page buttons
         pile_current_page = urwid.Pile(current_page_buttons)
     else:                               # we got the pile? update pile content with current page buttons
         pile_current_page.contents = current_page_buttons
 
+    if focused_index is not None:       # got focused position? focus there
+        pile_current_page.focus_position = focused_index
+
 
 def on_image_button_clicked(button, item):
     """ when user clicks on image button """
+    global last_focus_path, main_list_pile
+
+    if main_list_pile is not None:
+        last_focus_path = main_list_pile.get_focus_path()
 
     storage_path = get_storage_path()           # check if got storage path
 
@@ -350,7 +404,7 @@ def on_image_button_clicked(button, item):
     if os.path.exists(path):                    # if exists, show insert options
         for i in range(3):
             slot = i + 1
-            btn = urwid.Button("Insert to slot " + slot)
+            btn = urwid.Button("Insert to slot {}".format(slot))
             urwid.connect_signal(btn, 'click', insert_image, (item, slot))
             body.append(urwid.AttrMap(btn, None, focus_map='reversed'))
     else:                                       # if doesn't exist, show download option
@@ -394,7 +448,7 @@ def show_no_storage():
     
 
 def on_show_selected_list(button, choice):
-    global list_index, list_of_lists, page_current, search_phrase
+    global list_index, list_of_lists, page_current, search_phrase, last_focus_path
     global text_pages
     list_index = choice     # store the chosen list index
 
@@ -407,6 +461,7 @@ def on_show_selected_list(button, choice):
 
     page_current = 1        # start from page 1
     search_phrase = ""      # no search string first
+    last_focus_path = None
 
     # try to load the list into memory
     error = None
@@ -432,8 +487,14 @@ def on_show_selected_list(button, choice):
 
 
 def show_current_page(button):
-    """ show current images page """
-    global text_pages, search_phrase
+    """ show current images page
+
+    This gets called when:
+        - first showing list
+        - returning back from image submenu
+    """
+    global text_pages, search_phrase, text_status
+    global last_focus_path, main_list_pile
 
     body = []
     body.append(urwid.Text(list_of_lists[list_index]['name'], align='center'))
@@ -467,14 +528,23 @@ def show_current_page(button):
     update_pile_with_current_buttons()  # first update pile with current buttons
     body.append(pile_current_page)      # then add the pile with current page to body
 
+    if not text_status:
+        text_status = urwid.Text("Status: idle")        # text showing status
+
+    body.append(text_status)
+
     show_page_text()                    # show the new page text
 
-    main.original_widget = urwid.Filler(urwid.Pile(body))
+    main_list_pile = urwid.Pile(body)
+    main.original_widget = urwid.Filler(main_list_pile)
+
+    if last_focus_path is not None:
+        main_list_pile.set_focus_path(last_focus_path)
 
 
 def search_changed(widget, search_string):
     """ this gets called when search string changes """
-    global list_of_items, list_of_items_filtered, page_current, search_phrase
+    global list_of_items, list_of_items_filtered, page_current, search_phrase, last_focus_path
 
     list_of_items_filtered = []
     search_phrase = search_string
@@ -488,6 +558,7 @@ def search_changed(widget, search_string):
 
     # now set the 1st page and show page text
     page_current = 1
+    last_focus_path = None
     show_page_text()                    # show the new page text
     update_pile_with_current_buttons()  # show the new buttons
 
@@ -526,12 +597,18 @@ def on_page_change(change_direction):
 
 def btn_prev_clicked(button):
     """ on prev page clicked """
+    global last_focus_path
+    last_focus_path = None
+
     on_page_change(-1)
     update_pile_with_current_buttons()
 
 
 def btn_next_clicked(button):
     """ on next page clicked """
+    global last_focus_path
+    last_focus_path = None
+
     on_page_change(+1)
     update_pile_with_current_buttons()
 
@@ -601,6 +678,13 @@ def back_to_main_menu(button):
 def exit_program(button):
     raise urwid.ExitMainLoop()
 
+
+def alarm_start_threads(loop=None, data=None):
+    global thr_download_lists, thr_download_images
+
+    thr_download_lists.start()
+    thr_download_images.start()
+
 # ----------------------
 
 # start by getting list of lists
@@ -616,13 +700,6 @@ while True:
 # read list of lists into memory
 read_list_of_lists()
 
-# update other lists in threads
-thr_download_lists = threading.Thread(target=download_lists)
-thr_download_lists.start()
-
-thr_download_images = threading.Thread(target=download_worker)
-thr_download_images.start()
-
 main = urwid.Padding(create_main_menu(), left=2, right=2)
 
 top = urwid.Overlay(main, urwid.SolidFill(),
@@ -630,8 +707,14 @@ top = urwid.Overlay(main, urwid.SolidFill(),
     valign='middle', height=('relative', 100),
     min_width=20, min_height=9)
 
+# threads for updating lists
+thr_download_lists = threading.Thread(target=download_lists)
+thr_download_images = threading.Thread(target=download_worker)
+
 try:
-    urwid.MainLoop(top, palette=[('reversed', 'standout', '')]).run()
+    main_loop = urwid.MainLoop(top, palette=[('reversed', 'standout', '')])
+    main_loop.set_alarm_in(0.5, alarm_start_threads)
+    main_loop.run()
 except KeyboardInterrupt:
     print("Terminated by keyboard...")
 
