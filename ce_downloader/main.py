@@ -1,11 +1,13 @@
 import os
 import re
-import threading
+import threading, queue
 import time
 import math
 import urllib3
+import codecs
 import urwid
 from setproctitle import setproctitle
+import subprocess
 
 PATH_TO_LISTS = "/ce/lists/"                                    # where the lists are stored locally
 BASE_URL = "http://joo.kie.sk/cosmosex/update/"                 # base url where the lists will be stored online
@@ -25,6 +27,9 @@ text_pages = None       # widget holding the text showing current and total page
 page_current = 1        # currently shown page
 items_per_page = 20     # how many items per page we should show
 screen_width = 80       # should be 40 for ST low, 80 for ST mid
+
+should_run = True
+queue_download = queue.Queue()      # queue that holds things to download
 
 # ----------------------
 
@@ -139,7 +144,8 @@ def download_list(list_url, list_filename):
 
 # ----------------------
 
-def download_lists(name):
+def download_lists():
+    """ download lists from internet to local storage """
     global list_of_lists
 
     for item in list_of_lists:      # go through lists, check if should download, do download if needed
@@ -150,6 +156,47 @@ def download_lists(name):
                 download_list(item['url'], item['filename'])
             except Exception as ex:
                 print("Failed downloading {} : {}".format(item['url'], str(ex)))
+
+
+def download_worker():
+    """ download any / all selected images to local storage """
+    global queue_download, should_run
+
+    while should_run:
+        item = None
+
+        try:
+            item = queue_download.get(timeout=0.1)  # get one item to download
+        except Exception as ex:                 # we're expecting exception on no item to download
+            continue
+
+        storage_path = get_storage_path()       # check if got storage and get path
+
+        if not storage_path:                    # no storage? skip item
+            queue_download.task_done()
+            continue
+
+        local_path = os.path.join(storage_path, item['filename'])   # create local path
+
+        try:
+            # open url
+            http = urllib3.PoolManager()
+            r = http.request('GET', item['url'], preload_content=False)
+
+            with open(local_path, 'wb') as out:     # open local path
+                while True:
+                    data = r.read(4096)
+                    
+                    if not data:
+                        break
+
+                    out.write(data)                 # write data to file
+
+            r.release_conn()
+        except Exception as ex:
+            pass
+
+        queue_download.task_done()
 
 # ----------------------
 
@@ -234,6 +281,7 @@ def get_item_btn_text(item):
     btn_text = "{:13} {}".format(item['filename'], item_content)    # format string as filename + content
     return btn_text
 
+
 def get_current_page_buttons(as_tuple):
     """ create buttons for the current page number as a list
     as_tuple = False - for new pile, just list of buttons
@@ -248,8 +296,10 @@ def get_current_page_buttons(as_tuple):
 
     for item in sublist:                        # from the items create buttons
         btn_text = get_item_btn_text(item)
-        btn = urwid.AttrMap(urwid.Button(btn_text), None, focus_map='reversed')
-        btn = (btn, (WEIGHT, 1)) if as_tuple else btn
+        btn = urwid.Button(btn_text)            # button with text
+        urwid.connect_signal(btn, 'click', on_image_button_clicked, item)   # attach handler on clicked
+        btn = urwid.AttrMap(btn, None, focus_map='reversed')        # set button attributes
+        btn = (btn, (WEIGHT, 1)) if as_tuple else btn               # tuple or just the button
         buttons.append(btn)
 
     padding_cnt = items_per_page - len(sublist) # calculate how much padding at the bottom we need
@@ -274,18 +324,122 @@ def update_pile_with_current_buttons():
         pile_current_page.contents = current_page_buttons
 
 
+def on_image_button_clicked(button, item):
+    """ when user clicks on image button """
+
+    storage_path = get_storage_path()           # check if got storage path
+
+    if not storage_path:                        # no storage path?
+        show_no_storage()
+        return
+
+    path = os.path.join(storage_path, item['filename'])     # check if got this file
+
+    body = []
+
+    body.append(urwid.Text("file: " + item['filename'], align='center'))   # show filename
+
+    body.append(urwid.Text("content: "))
+    contents = item['content'].split(',')       # split csv content to list
+
+    for content in contents:                    # show individual content items as rows
+        body.append(urwid.Text("   " + content))
+
+    body.append(urwid.Divider())
+
+    if os.path.exists(path):                    # if exists, show insert options
+        for i in range(3):
+            slot = i + 1
+            btn = urwid.Button("Insert to slot " + slot)
+            urwid.connect_signal(btn, 'click', insert_image, (item, slot))
+            body.append(urwid.AttrMap(btn, None, focus_map='reversed'))
+    else:                                       # if doesn't exist, show download option
+        btn = urwid.Button("Download")
+        urwid.connect_signal(btn, 'click', download_image, item)
+        body.append(urwid.AttrMap(btn, None, focus_map='reversed'))
+
+    # add Back button
+    btn = urwid.Button("Back")
+    urwid.connect_signal(btn, 'click', show_current_page)
+    body.append(urwid.AttrMap(btn, None, focus_map='reversed'))
+
+    main.original_widget = urwid.Filler(urwid.Pile(body))
+
+
+def download_image(button, item):
+    """ when image has been selected for download """
+    queue_download.put(item)        # enqueue image
+    show_current_page(None)         # show current list page
+
+
+def insert_image(button, item_slot):
+    """ when image should be inserted to slot """
+    pass
+
+
+def show_no_storage():
+    """ show warning message that no storage is found """
+    body = []
+
+    body.append(urwid.Text("Failed to get storage path."))
+    body.append(urwid.Divider())
+    body.append(urwid.Text("Attach USB drive or shared network drive and try again."))
+    body.append(urwid.Divider())
+
+    btn = urwid.Button("Back")
+    urwid.connect_signal(btn, 'click', back_to_main_menu)
+    body.append(urwid.AttrMap(btn, None, focus_map='reversed'))
+
+    main.original_widget = urwid.Filler(urwid.Pile(body))
+    
+
 def on_show_selected_list(button, choice):
-    global list_index, list_of_lists
+    global list_index, list_of_lists, page_current, search_phrase
     global text_pages
     list_index = choice     # store the chosen list index
 
+    # find out if we got storage path
+    storage_path = get_storage_path()
+
+    if not storage_path:    # no storage path?
+        show_no_storage()
+        return
+
     page_current = 1        # start from page 1
+    search_phrase = ""      # no search string first
+
+    # try to load the list into memory
+    error = None
+    try:
+        load_list_from_csv(list_of_lists[list_index]['filename'])
+    except Exception as ex:
+        error = str(ex)
+
+    # if failed to load, show error
+    if error:
+        body = []
+        body.append(urwid.Text("Failed to load list!"))
+        body.append(urwid.Text(error))
+
+        btn = urwid.Button("Back")
+        urwid.connect_signal(btn, 'click', back_to_main_menu)
+        body.append(urwid.AttrMap(btn, None, focus_map='reversed'))
+
+        main.original_widget = urwid.Filler(urwid.Pile(body))
+        return
+
+    show_current_page(None)
+
+
+def show_current_page(button):
+    """ show current images page """
+    global text_pages, search_phrase
 
     body = []
     body.append(urwid.Text(list_of_lists[list_index]['name'], align='center'))
     
     # add search edit line
-    widget_search = urwid.Edit("Search: ")
+    widget_search = urwid.Edit("Search: ", edit_text=search_phrase)
     urwid.connect_signal(widget_search, 'change', search_changed)
     body.append(urwid.AttrMap(widget_search, None, focus_map='reversed'))
 
@@ -309,27 +463,7 @@ def on_show_selected_list(button, choice):
 
     body.append(urwid.Columns(pages_row))
 
-    # try to load the list into memory
-    error = None
-    try:
-        load_list_from_csv(list_of_lists[list_index]['filename'])
-    except Exception as ex:
-        error = str(ex)
-
-    # if failed to load, show error
-    if error is not None:
-        body.append(urwid.Text("Failed to load list!"))
-        body.append(urwid.Text(error))
-
-        btn = urwid.Button("Back")
-        urwid.connect_signal(btn, 'click', back_to_main_menu)
-        body.append(urwid.AttrMap(btn, None, focus_map='reversed'))
-
-        main.original_widget = urwid.Filler(urwid.Pile(body))
-        return
-
-    global pile_current_page, search_phrase
-    search_phrase = ""                  # no search phrase yet
+    global pile_current_page
     update_pile_with_current_buttons()  # first update pile with current buttons
     body.append(pile_current_page)      # then add the pile with current page to body
 
@@ -343,12 +477,13 @@ def search_changed(widget, search_string):
     global list_of_items, list_of_items_filtered, page_current, search_phrase
 
     list_of_items_filtered = []
-    search_phrase = search_string.lower()           # search string to lower case before search
+    search_phrase = search_string
+    search_phrase_lc = search_string.lower()        # search string to lower case before search
 
     for item in list_of_items:                      # go through all items in list
         content = item['content'].lower()           # content to lower case
 
-        if search_phrase in content:                # if search string in content found
+        if search_phrase_lc in content:             # if search string in content found
             list_of_items_filtered.append(item)     # append item
 
     # now set the 1st page and show page text
@@ -400,6 +535,64 @@ def btn_next_clicked(button):
     on_page_change(+1)
     update_pile_with_current_buttons()
 
+# ----------------------
+last_storage_path = None
+
+def get_storage_path():
+    global last_storage_path
+
+    last_storage_exists = last_storage_path is not None and os.path.exists(last_storage_path)     # path still valid? 
+
+    if last_storage_exists:             # while the last storage exists, keep returning it
+        return last_storage_path
+   
+    # last returned path doesn't exist, check current mounts
+    result = subprocess.run(['mount'], stdout=subprocess.PIPE)
+    result = codecs.decode(result.stdout)
+    mounts = result.split("\n")
+
+    storages = []
+    storage_shared = None               # holds path to shared drive
+    storage_drive = None                # holds path to first USB storage drive
+
+    for mount in mounts:                # go through the mount lines
+        if '/mnt/' not in mount:        # if this whole line does not contain /mnt/ , skip it
+            continue
+
+        mount_parts = mount.split(' ')  # split line into parts
+
+        for part in mount_parts:        # find the part that contains the '/mnt/' part
+            if '/mnt/' not in part:     # if this is NOT the /mnt/ part, skip it
+                continue
+
+            part = os.path.join(part, "floppy_images")  # add floppy images dir to path part (might not exist yet)
+            storages.append(part)
+
+            if '/mnt/shared' in part:   # is this a shared mount? remember this path
+                storage_shared = part
+            else:                       # this is a USB drive mount
+                if not storage_drive:   # don't have first drive yet? remember this path
+                    storage_drive = part
+
+    if not storages:                    # no storage found? fail here
+        last_storage_path = None
+        return None
+
+    # if we got here, we definitelly have some storages, but we might not have the required subdir
+    # so first check if any of the found storages has the subdir already, and if it does, then use it
+    for storage in storages:            # go through the storages and check if the floppy_images subdir exists
+        if os.path.exists(storage):     # found storage with existing subdir, use it
+            last_storage_path = storage
+            return storage
+
+    # if we got here, we got some storages, but none of them has floppy_images subdir, so create one and return path
+    storage_use = storage_drive if storage_drive else storage_shared    # use USB drive first if available, otherwise use shared drive    
+
+    subprocess.run(['mkdir', '-p', storage_use])    # create the subdir
+    last_storage_path = storage_use                 # remember what we've returned
+    return storage_use                              # return it
+
+# ----------------------
 
 def back_to_main_menu(button):
     """ when we should return back to main menu """
@@ -424,8 +617,11 @@ while True:
 read_list_of_lists()
 
 # update other lists in threads
-thr_download = threading.Thread(target=download_lists, args=(1,))
-thr_download.start()
+thr_download_lists = threading.Thread(target=download_lists)
+thr_download_lists.start()
+
+thr_download_images = threading.Thread(target=download_worker)
+thr_download_images.start()
 
 main = urwid.Padding(create_main_menu(), left=2, right=2)
 
@@ -438,3 +634,5 @@ try:
     urwid.MainLoop(top, palette=[('reversed', 'standout', '')]).run()
 except KeyboardInterrupt:
     print("Terminated by keyboard...")
+
+should_run = False
