@@ -9,6 +9,8 @@ import codecs
 import urwid
 from setproctitle import setproctitle
 import subprocess
+import logging
+from logging.handlers import RotatingFileHandler
 
 PATH_TO_LISTS = "/ce/lists/"                                    # where the lists are stored locally
 BASE_URL = "http://joo.kie.sk/cosmosex/update/"                 # base url where the lists will be stored online
@@ -36,6 +38,18 @@ items_per_page = terminal_rows - 4
 
 should_run = True
 queue_download = queue.Queue()      # queue that holds things to download
+
+# ----------------------
+
+log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
+
+my_handler = RotatingFileHandler("/var/log/ce_downloader.log", mode='a', maxBytes=1024*1024, backupCount=1, encoding=None, delay=0)
+my_handler.setFormatter(log_formatter)
+my_handler.setLevel(logging.DEBUG)
+
+app_log = logging.getLogger('root')
+app_log.setLevel(logging.DEBUG)
+app_log.addHandler(my_handler)
 
 # ----------------------
 
@@ -214,7 +228,9 @@ def download_worker():
         local_path = os.path.join(storage_path, item['filename'])   # create local path
 
         try:
-            update_status("Status: downloading {}".format(item['filename']))
+            status = "Status: downloading {}".format(item['filename'])
+            app_log.debug(status)
+            update_status(status)
 
             # open url
             http = urllib3.PoolManager()
@@ -231,8 +247,10 @@ def download_worker():
 
             r.release_conn()
             update_status("Status: idle")
+            app_log.debug("download of {} finished".format(item['filename']))
 
         except Exception as ex:
+            app_log.debug("failed to download {} - ".format(item['filename'], str(ex)))
             update_status("Status: {}".format(str(ex)))
 
         queue_download.task_done()
@@ -457,13 +475,15 @@ def on_image_button_clicked(button, item):
 
 def download_image(button, item):
     """ when image has been selected for download """
+    app_log.debug("download image {}".format(item['filename']))
     queue_download.put(item)        # enqueue image
     show_current_page(None)         # show current list page
 
 
 def insert_image(button, item_slot):
     """ when image should be inserted to slot """
-    pass
+    item, slot = item_slot
+    app_log.debug("insert image {} to slot {}".format(item['filename'], slot))
 
 
 def show_no_storage():
@@ -763,6 +783,14 @@ def on_unhandled_keys(key):
     if pile_current_page is None:               # no pile yet? quit
         return
 
+    if key == 'left':           # left = prev
+        btn_prev_clicked(None)
+        return
+
+    if key == 'right':          # right = next
+        btn_next_clicked(None)
+        return
+
     widget = pile_current_page.focus            # get which image button has focus
 
     if not hasattr(widget, 'user_data'):        # no user data? unhandled key not on image button
@@ -795,8 +823,11 @@ def on_unhandled_keys(key):
     if is_insert:                               # should insert?
         slot = int(key)
         insert_image(None, (user_data, slot))
-    else:                                       # should download?
+        return
+
+    if is_download:                             # should download?
         queue_download.put(user_data)
+        return
 
 
 def alarm_start_threads(loop=None, data=None):
@@ -806,8 +837,6 @@ def alarm_start_threads(loop=None, data=None):
     thr_download_images.start()
 
 # ----------------------
-
-os.system('clear')
 
 terminal_cols, terminal_rows = urwid.raw_display.Screen().get_cols_rows()
 items_per_page = terminal_rows - 4
