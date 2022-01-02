@@ -30,8 +30,9 @@ page_current = 1        # currently shown page
 text_status = None      # widget holding status text
 main_list_pile = None   # the main pile containing buttons with images
 last_focus_path = None  # holds last focus path to widget which had focus before going to widget subpage
-items_per_page = 19     # how many items per page we should show
-screen_width = 80       # should be 40 for ST low, 80 for ST mid
+terminal_cols = 80      # should be 40 for ST low, 80 for ST mid
+terminal_rows = 23
+items_per_page = terminal_rows - 4
 
 should_run = True
 queue_download = queue.Queue()      # queue that holds things to download
@@ -282,6 +283,42 @@ def get_list_for_current_page():
 
 # ----------------------
 
+class ButtonLabel(urwid.SelectableIcon):
+    """ to hide curson on button, move cursor position outside of button 
+    """
+    def set_text(self, label):
+        self.__super.set_text(label)
+        self._cursor_position = len(label) + 1      # move cursor position outside of button 
+
+class MyButton(urwid.Button):
+    button_left = "["
+    button_right = "]"
+
+    def __init__(self, label, on_press=None, user_data=None):
+        self._label = ButtonLabel("")
+        self.user_data = user_data
+
+        cols = urwid.Columns([
+            ('fixed', len(self.button_left), urwid.Text(self.button_left)),
+            self._label,
+            ('fixed', len(self.button_right), urwid.Text(self.button_right))],
+            dividechars=1)
+        super(urwid.Button, self).__init__(cols)
+
+        if on_press:
+            urwid.connect_signal(self, 'click', on_press, user_data)
+
+        self.set_label(label)
+
+
+def create_my_button(text, on_clicked_fn, on_clicked_data=None):
+    button = MyButton(text, on_clicked_fn, on_clicked_data)
+    attrmap = urwid.AttrMap(button, None, focus_map='reversed')     # reversed on button focused
+    attrmap.user_data = on_clicked_data
+    return attrmap
+
+# --------------------------------
+
 def create_main_menu():
     global list_of_lists, text_status
 
@@ -291,9 +328,8 @@ def create_main_menu():
     body.append(urwid.Divider())
 
     for index, item in enumerate(list_of_lists):           # go through the list of lists, extract names, put them in the buttons
-        button = urwid.Button(item['name'])
-        urwid.connect_signal(button, 'click', on_show_selected_list, index)
-        body.append(urwid.AttrMap(button, None, focus_map='reversed'))
+        button = create_my_button(item['name'], on_show_selected_list, index)
+        body.append(button)
 
     body.append(urwid.Divider())
 
@@ -307,7 +343,7 @@ def create_main_menu():
 
 def get_item_btn_text(item):
     """ for a specified item retrieve full or partial content """
-    global search_phrase, screen_width
+    global search_phrase, terminal_cols
 
     item_content = item['content']          # start with whole content
 
@@ -320,7 +356,7 @@ def get_item_btn_text(item):
             if search_phrase in part_lc:    # if phrase found in lowercase part, use original part
                 item_content = part
 
-    content_len = screen_width - 4 - 14     # how long the content can be, when button sides and filename take some space
+    content_len = terminal_cols - 25        # how long the content can be, when button sides and filename take some space
     item_content = item_content[:content_len]   # get only part of the content
 
     btn_text = "{:13} {}".format(item['filename'], item_content)    # format string as filename + content
@@ -343,9 +379,7 @@ def get_current_page_buttons(as_tuple):
 
     for index, item in enumerate(sublist):      # from the items create buttons
         btn_text = get_item_btn_text(item)
-        btn = urwid.Button(btn_text)            # button with text
-        urwid.connect_signal(btn, 'click', on_image_button_clicked, item)   # attach handler on clicked
-        btn = urwid.AttrMap(btn, None, focus_map='reversed')        # set button attributes
+        btn = create_my_button(btn_text, on_image_button_clicked, item)   # attach handler on clicked
         btn = (btn, (WEIGHT, 1)) if as_tuple else btn               # tuple or just the button
         buttons.append(btn)
 
@@ -387,6 +421,10 @@ def on_image_button_clicked(button, item):
         show_no_storage()
         return
 
+    if not can_write_to_storage(storage_path):
+        show_storage_read_only()
+        return
+
     path = os.path.join(storage_path, item['filename'])     # check if got this file
 
     body = []
@@ -404,18 +442,15 @@ def on_image_button_clicked(button, item):
     if os.path.exists(path):                    # if exists, show insert options
         for i in range(3):
             slot = i + 1
-            btn = urwid.Button("Insert to slot {}".format(slot))
-            urwid.connect_signal(btn, 'click', insert_image, (item, slot))
-            body.append(urwid.AttrMap(btn, None, focus_map='reversed'))
+            btn = create_my_button("Insert to slot {}".format(slot), insert_image, (item, slot))
+            body.append(btn)
     else:                                       # if doesn't exist, show download option
-        btn = urwid.Button("Download")
-        urwid.connect_signal(btn, 'click', download_image, item)
-        body.append(urwid.AttrMap(btn, None, focus_map='reversed'))
+        btn = create_my_button("Download", download_image, item)
+        body.append(btn)
 
     # add Back button
-    btn = urwid.Button("Back")
-    urwid.connect_signal(btn, 'click', show_current_page)
-    body.append(urwid.AttrMap(btn, None, focus_map='reversed'))
+    btn = create_my_button("Back", show_current_page)
+    body.append(btn)
 
     main.original_widget = urwid.Filler(urwid.Pile(body))
 
@@ -440,9 +475,8 @@ def show_no_storage():
     body.append(urwid.Text("Attach USB drive or shared network drive and try again."))
     body.append(urwid.Divider())
 
-    btn = urwid.Button("Back")
-    urwid.connect_signal(btn, 'click', back_to_main_menu)
-    body.append(urwid.AttrMap(btn, None, focus_map='reversed'))
+    btn = create_my_button("Back", back_to_main_menu)
+    body.append(btn)
 
     main.original_widget = urwid.Filler(urwid.Pile(body))
     
@@ -458,6 +492,10 @@ def on_show_selected_list(button, choice):
     if not storage_path:    # no storage path?
         show_no_storage()
         return
+
+    if not can_write_to_storage(storage_path):
+        show_storage_read_only()
+        return        
 
     page_current = 1        # start from page 1
     search_phrase = ""      # no search string first
@@ -476,9 +514,8 @@ def on_show_selected_list(button, choice):
         body.append(urwid.Text("Failed to load list!"))
         body.append(urwid.Text(error))
 
-        btn = urwid.Button("Back")
-        urwid.connect_signal(btn, 'click', back_to_main_menu)
-        body.append(urwid.AttrMap(btn, None, focus_map='reversed'))
+        btn = create_my_button("Back", back_to_main_menu)
+        body.append(btn)
 
         main.original_widget = urwid.Filler(urwid.Pile(body))
         return
@@ -507,20 +544,17 @@ def show_current_page(button):
     # the next row will hold pages related stufff
     pages_row = []
 
-    btn_prev = urwid.Button("prev")       # prev page button
-    urwid.connect_signal(btn_prev, 'click', btn_prev_clicked)
-    pages_row.append(urwid.AttrMap(btn_prev, None, focus_map='reversed'))
+    btn_prev = create_my_button("prev", btn_prev_clicked)
+    pages_row.append(btn_prev)
 
     text_pages = urwid.Text("0/0", align='center')          # pages showing text
     pages_row.append(text_pages)
 
-    btn_next = urwid.Button("next")       # next page button
-    urwid.connect_signal(btn_next, 'click', btn_next_clicked)
-    pages_row.append(urwid.AttrMap(btn_next, None, focus_map='reversed'))
+    btn_next = create_my_button("next", btn_next_clicked)
+    pages_row.append(btn_next)
 
-    btn_main = urwid.Button("back to menu")     # back to main menu button
-    urwid.connect_signal(btn_main, 'click', back_to_main_menu)
-    pages_row.append(urwid.AttrMap(btn_main, None, focus_map='reversed'))
+    btn_main = create_my_button("back to menu", back_to_main_menu)
+    pages_row.append(btn_main)
 
     body.append(urwid.Columns(pages_row))
 
@@ -671,12 +705,98 @@ def get_storage_path():
 
 # ----------------------
 
+def can_write_to_storage(path):
+    """ check if can write to storage path """
+    test_file = os.path.join(path, "test_file.txt")
+
+    try:        # first remove the test file if it exists
+        os.remove(test_file)
+    except:     # don't fail if failed to remove file - might not exist at this time
+        pass
+
+    good = False
+
+    try:        # create file and write to file
+        with open(test_file, 'wt') as out:
+            out.write("whatever")
+
+        good = True
+    except:     # this error is expected
+        pass
+
+    try:        # remove the test file if it exists
+        os.remove(test_file)
+    except:     # don't fail if failed to remove file - might not exist at this time
+        pass
+
+    return good
+
+# ----------------------
+
+def show_storage_read_only():
+    """ show warning message that cannot write storage """
+    body = []
+
+    body.append(urwid.Text("Cannot write to storage path."))
+    body.append(urwid.Divider())
+    body.append(urwid.Text("You won't be able to download images, and even might have issues loading your images."))
+    body.append(urwid.Divider())
+
+    btn = create_my_button("Back", back_to_main_menu)
+    body.append(btn)
+
+    main.original_widget = urwid.Filler(urwid.Pile(body))
+
+# ----------------------
+
 def back_to_main_menu(button):
     """ when we should return back to main menu """
     main.original_widget = urwid.Padding(create_main_menu(), left=2, right=2)
 
 def exit_program(button):
     raise urwid.ExitMainLoop()
+
+
+def on_unhandled_keys(key):
+    """ when some key is not handled, this function is called """
+
+    if pile_current_page is None:               # no pile yet? quit
+        return
+
+    widget = pile_current_page.focus            # get which image button has focus
+
+    if not hasattr(widget, 'user_data'):        # no user data? unhandled key not on image button
+        return
+
+    user_data = widget.user_data
+    filename = user_data['filename']     # get user data from that image button
+
+    storage_path = get_storage_path()           # check if got storage path
+
+    if not storage_path:                        # no storage path? just quit
+        return
+
+    if not can_write_to_storage(storage_path):  # check if can write to storage path
+        return
+
+    is_download = key in ['d', 'D']
+    is_insert = key in ['1', '2', '3']
+
+    path = os.path.join(storage_path, filename)     # check if got this file
+    file_exists = os.path.exists(path)
+
+    if is_insert and not file_exists:           # trying to insert, but don't have file?
+        is_download = True                      # it's a download, not insert
+        is_insert = False
+
+    if is_download and file_exists:             # trying to download, but file exists? nothing do to
+        return
+
+    if is_insert:                               # should insert?
+        slot = int(key)
+        insert_image(None, (user_data, slot))
+    else:                                       # should download?
+        queue_download.put(user_data)
 
 
 def alarm_start_threads(loop=None, data=None):
@@ -686,6 +806,11 @@ def alarm_start_threads(loop=None, data=None):
     thr_download_images.start()
 
 # ----------------------
+
+os.system('clear')
+
+terminal_cols, terminal_rows = urwid.raw_display.Screen().get_cols_rows()
+items_per_page = terminal_rows - 4
 
 # start by getting list of lists
 while True:
@@ -712,7 +837,7 @@ thr_download_lists = threading.Thread(target=download_lists)
 thr_download_images = threading.Thread(target=download_worker)
 
 try:
-    main_loop = urwid.MainLoop(top, palette=[('reversed', 'standout', '')])
+    main_loop = urwid.MainLoop(top, palette=[('reversed', 'standout', '')], unhandled_input=on_unhandled_keys)
     main_loop.set_alarm_in(0.5, alarm_start_threads)
     main_loop.run()
 except KeyboardInterrupt:
