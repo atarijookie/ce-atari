@@ -27,8 +27,6 @@ class Fuse83(Operations):
         self.root = root
 
         self.long_to_short = {}             # translate long_filename.extension to SHORT.EXT
-        self.short_to_long = {}             # tranlate SHORT.EXT to long_filename.extension
-
         self.long_to_short_exts = {}        # translate extension to EXT
         
         log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
