@@ -8,7 +8,7 @@
 
 #define SCREENCAST_BUFFER_SIZE (32000*2)
 
-ScreencastAcsiCommand::ScreencastAcsiCommand(AcsiDataTrans *dt, ScreencastService *scs):dataTrans(dt),screencastService(scs)
+ScreencastAcsiCommand::ScreencastAcsiCommand(AcsiDataTrans *dt):dataTrans(dt)
 {
     dataBuffer  = new uint8_t[SCREENCAST_BUFFER_SIZE];
 }
@@ -97,9 +97,6 @@ void ScreencastAcsiCommand::readScreen()
         return;
     }
     
-    screencastService->setSTResolution(iScreenmode);
-    screencastService->setScreen(dataBuffer);
-
     dataTrans->setStatus(RW_ALL_TRANSFERED);                    // when all the data was written
 }
 
@@ -141,9 +138,5 @@ void ScreencastAcsiCommand::readPalette()
         return;
     }
     
-    screencastService->setSTResolution(iScreenmode);
-    screencastService->setPalette(dataBuffer);
-    
     dataTrans->setStatus(RW_ALL_TRANSFERED);                    // when all the data was written
-    
 }

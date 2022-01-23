@@ -24,9 +24,6 @@
 #include "main_netserver.h"
 #include "netservermainpage.h"
 
-#include "webserver/webserver.h"
-#include "webserver/api/apimodule.h"
-
 void sigint_handler(int sig);
 void handlePthreadCreate(int res, const char *threadName, pthread_t *pThread);
 void loadLastHwConfig(void);
@@ -120,10 +117,6 @@ void networkServerMain(void)
     // generate first main page
     generateMainPage();
 
-    // start webserver with the main page
-    WebServer xServer;
-    xServer.start(true, 0);
-
     struct timeval timeout;
     fd_set readfds;
     uint8_t recvData[64];
@@ -167,7 +160,6 @@ void networkServerMain(void)
     }
 
     close(udpSocket);
-    xServer.stop();
 
     Debug::out(LOG_ERROR, "Terminating CosmosEx network server");
 }

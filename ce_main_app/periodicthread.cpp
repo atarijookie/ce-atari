@@ -25,7 +25,6 @@
 #include "native/scsi.h"
 #include "native/scsi_defs.h"
 #include "mounter.h"
-#include "downloader.h"
 #include "update.h"
 
 #include "devfinder.h"

@@ -9,7 +9,6 @@
 #include "global.h"
 #include "debug.h"
 #include "settings.h"
-#include "downloader.h"
 #include "update.h"
 #include "utils.h"
 #include "mounter.h"
@@ -18,9 +17,6 @@
 Versions Update::versions;
 
 extern THwConfig hwConfig;
-
-volatile uint8_t packageDownloadStatus     = DWNSTATUS_WAITING;
-volatile uint8_t updateListDownloadStatus  = DWNSTATUS_WAITING;
 
 void Update::initialize(void)
 {

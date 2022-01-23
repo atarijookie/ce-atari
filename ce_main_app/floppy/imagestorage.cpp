@@ -14,7 +14,6 @@
 
 #include "imagestorage.h"
 #include "../utils.h"
-#include "../downloader.h"
 #include "../debug.h"
 #include "../translated/translateddisk.h"
 

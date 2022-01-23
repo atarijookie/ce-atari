@@ -24,7 +24,6 @@
 #include "gemdos.h"
 #include "gemdos_errno.h"
 #include "desktopcreator.h"
-#include "../downloader.h"
 #include "../display/displaythread.h"
 
 extern THwConfig hwConfig;
@@ -49,9 +48,9 @@ TranslatedDisk * TranslatedDisk::getInstance(void)
     return instance;
 }
 
-TranslatedDisk * TranslatedDisk::createInstance(AcsiDataTrans *dt, ConfigService *cs, ScreencastService *scs)
+TranslatedDisk * TranslatedDisk::createInstance(AcsiDataTrans *dt)
 {
-    instance = new TranslatedDisk(dt, cs, scs);
+    instance = new TranslatedDisk(dt);
     return instance;
 }
 
@@ -61,10 +60,9 @@ void TranslatedDisk::deleteInstance(void)
     instance = NULL;
 }
 
-TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt, ConfigService *cs, ScreencastService *scs)
+TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt)
 {
     dataTrans = dt;
-    configService = cs;
 
     reloadProxy = NULL;
 
@@ -97,10 +95,10 @@ TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt, ConfigService *cs, ScreencastS
     attachConfigDrive();                                                // if config drive is enabled, attach it
 
     //ACSI command "date"
-    dateAcsiCommand         = new DateAcsiCommand(dataTrans,configService);
+    dateAcsiCommand         = new DateAcsiCommand(dataTrans);
 
     //ACSI commands "screencast"
-    screencastAcsiCommand   = new ScreencastAcsiCommand(dataTrans,scs);
+    screencastAcsiCommand   = new ScreencastAcsiCommand(dataTrans);
 
     initAsciiTranslationTable();
 
@@ -1312,14 +1310,14 @@ void TranslatedDisk::onStHttp(uint8_t *cmd)
         return;
     }
 
-    TDownloadRequest tdr;
-    tdr.srcUrl          = std::string((const char*)dataBuffer);
-    tdr.dstDir          = "";
-    tdr.downloadType    = DWNTYPE_LOG_HTTP;
-    tdr.checksum        = 0;                        // special case - don't check checsum
-    tdr.pStatusByte     = NULL;      // update status byte
-    Downloader::add(tdr);
-    Debug::out(LOG_DEBUG, "TranslatedDisk::onStHttp() %s", dataBuffer);
+//    TDownloadRequest tdr;
+//    tdr.srcUrl          = std::string((const char*)dataBuffer);
+//    tdr.dstDir          = "";
+//    tdr.downloadType    = DWNTYPE_LOG_HTTP;
+//    tdr.checksum        = 0;                        // special case - don't check checsum
+//    tdr.pStatusByte     = NULL;      // update status byte
+//    Downloader::add(tdr);
+//    Debug::out(LOG_DEBUG, "TranslatedDisk::onStHttp() %s", dataBuffer);
 
     Debug::out(LOG_DEBUG, "ST HTTP: %s", dataBuffer);
     dataTrans->setStatus(E_OK);

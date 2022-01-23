@@ -14,7 +14,6 @@
 #include "../utils.h"
 #include "acsidatatrans.h"
 #include "settingsreloadproxy.h"
-#include "../downloader.h"
 #include "misc.h"
 #include "translated/gemdos_errno.h"
 
@@ -184,14 +183,14 @@ void Misc::retrieveLicenseForSerial(void)
     Debug::out(LOG_DEBUG, "Misc::retrieveLicenseForSerial - will try to retrieve HW license from url: %s", getLicenseUrl);
 
     // start the download
-    TDownloadRequest tdr;
-    tdr.srcUrl          = getLicenseUrl;            // this URL will contain also serial number
-    tdr.checksum        = 0;                        // don't check checksum
-    tdr.dstDir          = keyName;                  // instead of destination directory we will have settings key name
-    tdr.downloadType    = DWNTYPE_HW_LICENSE;
-    tdr.pStatusByte     = NULL;                     // don't update this status byte
-
-    Downloader::add(tdr);
+//    TDownloadRequest tdr;
+//    tdr.srcUrl          = getLicenseUrl;            // this URL will contain also serial number
+//    tdr.checksum        = 0;                        // don't check checksum
+//    tdr.dstDir          = keyName;                  // instead of destination directory we will have settings key name
+//    tdr.downloadType    = DWNTYPE_HW_LICENSE;
+//    tdr.pStatusByte     = NULL;                     // don't update this status byte
+//
+//    Downloader::add(tdr);
 }
 
 void Misc::getSettings(uint8_t *cmd)

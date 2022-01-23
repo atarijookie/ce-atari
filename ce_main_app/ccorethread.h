@@ -23,7 +23,7 @@ class RetryModule;
 class CCoreThread: public ISettingsUser
 {
 public:
-    CCoreThread(ConfigService* configService, FloppyService* floppyService, ScreencastService* screencastService);
+    CCoreThread();
     virtual ~CCoreThread();
 
     void resetHansAndFranz(void);
@@ -99,7 +99,7 @@ private:
     // other
     void showHwVersion(void);
 
-    void sharedObjects_create(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService);
+    void sharedObjects_create(void);
     void sharedObjects_destroy(void);
 
     void fillDisplayLines(void);

@@ -15,7 +15,6 @@
 #include "floppysetup.h"
 #include "../utils.h"
 #include "../periodicthread.h"
-#include "../downloader.h"
 #include "../debug.h"
 
 extern SharedObjects shared;
@@ -34,7 +33,7 @@ bool ImageList::exists(void)
     }
 
     // ok, so the file does not exist
-    int cnt = Downloader::count(DWNTYPE_FLOPPYIMG_LIST); // check if it's downloaded at this moment
+    int cnt = 0; // Downloader::count(DWNTYPE_FLOPPYIMG_LIST); // check if it's downloaded at this moment
 
     if(cnt > 0) {                                       // the file is being downloaded, but we don't have it yet
         return false;
@@ -47,13 +46,13 @@ bool ImageList::exists(void)
 void ImageList::downloadFromWeb(void)
 {
     // start the download
-    TDownloadRequest tdr;
-    tdr.srcUrl          = IMAGELIST_URL;
-    tdr.checksum        = 0;                            // don't check checksum
-    tdr.dstDir          = IMAGELIST_LOCAL_DIR;
-    tdr.downloadType    = DWNTYPE_FLOPPYIMG_LIST;
-    tdr.pStatusByte     = NULL;                     // don't update this status byte
-    Downloader::add(tdr);
+//    TDownloadRequest tdr;
+//    tdr.srcUrl          = IMAGELIST_URL;
+//    tdr.checksum        = 0;                            // don't check checksum
+//    tdr.dstDir          = IMAGELIST_LOCAL_DIR;
+//    tdr.downloadType    = DWNTYPE_FLOPPYIMG_LIST;
+//    tdr.pStatusByte     = NULL;                     // don't update this status byte
+//    Downloader::add(tdr);
 }
 
 bool ImageList::getIsLoaded(void)

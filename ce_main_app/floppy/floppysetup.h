@@ -82,9 +82,7 @@ private:
 //  void searchMark(void);              // OBSOLETE
 //  void searchDownload(void);          // OBSOLETE
 
-    void searchDownload2Storage(void);  // CURRENT WAY OF DOWNLOADING
     void searchInsertToSlot(void);
-    void searchDeleteFromStorage(void);
 
     void getCurrentSlot(void);
     void setCurrentSlot(void);

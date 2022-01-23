@@ -31,7 +31,6 @@
 #include "translated/gemdos.h"
 #include "debug.h"
 #include "version.h"
-#include "downloader.h"
 #include "mounter.h"
 #include "settings.h"
 

@@ -15,14 +15,9 @@
 #include "native/scsi.h"
 #include "native/scsi_defs.h"
 #include "mounter.h"
-#include "downloader.h"
 #include "update.h"
 #include "statusreport.h"
 #include "display/displaythread.h"
-
-#include "service/configservice.h"
-#include "service/floppyservice.h"
-#include "service/screencastservice.h"
 
 #include "floppy/imagelist.h"
 #include "floppy/imagesilo.h"
@@ -46,7 +41,7 @@ extern DebugVars    dbgVars;
 
 extern SharedObjects shared;
 
-CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService)
+CCoreThread::CCoreThread()
 {
     Update::initialize();
 
@@ -66,7 +61,7 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     dataTrans->setCommunicationObject(chipInterface);
     dataTrans->setRetryObject(retryMod);
 
-    sharedObjects_create(configService, floppyService, screencastService);
+    sharedObjects_create();
 
     // now register all the objects which use some settings in the proxy
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_ACSI);
@@ -89,12 +84,6 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     shared.imageSilo->setSettingsReloadProxy(&settingsReloadProxy);
     settingsReloadProxy.reloadSettings(SETTINGSUSER_FLOPPYIMGS);            // mark that floppy settings changed (when imageSilo loaded the settings)
 
-    //Floppy Service needs access to floppysilo and this thread
-    if(floppyService) {
-        floppyService->setImageSilo(shared.imageSilo);
-        floppyService->setCoreThread(this);
-    }
-
     // set up network adapter stuff
     netAdapter.setAcsiDataTrans(dataTrans);
 
@@ -112,7 +101,7 @@ CCoreThread::~CCoreThread()
     sharedObjects_destroy();
 }
 
-void CCoreThread::sharedObjects_create(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService)
+void CCoreThread::sharedObjects_create(void)
 {
     shared.devFinder_detachAndLook = false;
     shared.devFinder_look = false;
@@ -120,7 +109,7 @@ void CCoreThread::sharedObjects_create(ConfigService* configService, FloppyServi
     shared.scsi = new Scsi();
     shared.scsi->setAcsiDataTrans(dataTrans);
 
-    TranslatedDisk * translated = TranslatedDisk::createInstance(dataTrans, configService, screencastService);
+    TranslatedDisk * translated = TranslatedDisk::createInstance(dataTrans);
     translated->setSettingsReloadProxy(&settingsReloadProxy);
 
     shared.imageList = new ImageList();

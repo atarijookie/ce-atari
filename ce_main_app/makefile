@@ -22,7 +22,7 @@ ifeq ($(ONPC),yes)
     OBJDIR = obj/onpc
     CFLAGS += -DONPC -I./
     TARGET = cosmosex_onpc
-    LDLIBS += -lcivetweb_onpc -ldl
+    LDLIBS += -ldl
 else
     LDLIBS	+= -lbcm2835
     CFLAGS += -I./
@@ -30,13 +30,13 @@ else
     ifeq ($(DISTRO),jessie)
         OBJDIR = obj/raspbian_jessie
         TARGET  =  cosmosex_raspbian_jessie
-        LDLIBS += -lcivetweb_raspbian_jessie -ldl
+        LDLIBS += -ldl
         CFLAGS += -DDISTRO_RASPBIAN
         CFLAGS += -DDISTRO_JESSIE
     else
         OBJDIR = obj/raspbian_stretch
         TARGET =  cosmosex_raspbian_stretch
-        LDLIBS += -lcivetweb_raspbian_stretch -ldl
+        LDLIBS += -ldl
         CFLAGS += -DDISTRO_RASPBIAN
         CFLAGS += -DDISTRO_STRETCH
     endif
@@ -72,7 +72,6 @@ SUBDIR1	= config
 SUBDIR2	= native
 SUBDIR3	= translated
 SUBDIR4	= floppy
-SUBDIR5	= webserver
 SUBDIR6	= lib/cjson-code-58
 SUBDIR7	= service
 SUBDIR8	= acsicommand
@@ -90,9 +89,6 @@ SRCS += $(wildcard $(SUBDIR1)/*.cpp)
 SRCS += $(wildcard $(SUBDIR2)/*.cpp) 
 SRCS += $(wildcard $(SUBDIR3)/*.cpp)
 SRCS += $(wildcard $(SUBDIR4)/*.cpp)
-SRCS += $(wildcard $(SUBDIR5)/*.cpp)
-SRCS += $(wildcard $(SUBDIR5)/**/*.cpp)
-SRCS += $(wildcard $(SUBDIR5)/**/**/*.cpp)
 SRCS += $(wildcard $(SUBDIR6)/cJSON.c)
 SRCS += $(wildcard $(SUBDIR7)/*.cpp)
 SRCS += $(wildcard $(SUBDIR8)/*.cpp)
@@ -110,9 +106,6 @@ HDRS += $(wildcard $(SUBDIR1)/*.h)
 HDRS += $(wildcard $(SUBDIR2)/*.h)
 HDRS += $(wildcard $(SUBDIR3)/*.h)
 HDRS += $(wildcard $(SUBDIR4)/*.h)
-HDRS += $(wildcard $(SUBDIR5)/*.h)
-HDRS += $(wildcard $(SUBDIR5)/**/*.h)
-HDRS += $(wildcard $(SUBDIR5)/**/**/*.h)
 HDRS += $(wildcard $(SUBDIR6)/cJSON.h)
 HDRS += $(wildcard $(SUBDIR7)/*.h)
 HDRS += $(wildcard $(SUBDIR8)/*.h)
@@ -163,17 +156,6 @@ $(WEB_JS_PATH)/jquery-combined.js.gz: $(WEB_JS_PATH)/jquery.js ${WEB_JS_MODULES}
 
 $(WEB_JS_PATH)/log.js.gz: $(WEB_JS_PATH)/log.js
 	$(AT)cat $^ | gzip -f > $@
-
-ifeq ($(ONPC),yes)
--lcivetweb_onpc:	lib/libcivetweb_onpc.a
-
-lib/libcivetweb_onpc.a: lib/civetweb-master.zip
-	rm -rf lib/civetweb-master
-	cd lib && unzip civetweb-master.zip
-	$(MAKE) -C lib/civetweb-master lib WITH_CPP=1 CC=$(ACTUAL_CC) CXX=$(ACTUAL_CXX)
-	mv lib/civetweb-master/libcivetweb.a $@
-	rm -rf lib/civetweb-master
-endif
 
 print-%:	; @echo $* = $($*)
 

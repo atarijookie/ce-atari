@@ -123,11 +123,11 @@ class TranslatedDisk: public ISettingsUser
 private:
     static TranslatedDisk * instance;
     static pthread_mutex_t mutex;
-    TranslatedDisk(AcsiDataTrans *dt, ConfigService *cs, ScreencastService *scs);
+    TranslatedDisk(AcsiDataTrans *dt);
     virtual ~TranslatedDisk();
 
 public:
-    static TranslatedDisk * createInstance(AcsiDataTrans *dt, ConfigService *cs, ScreencastService *scsi);
+    static TranslatedDisk * createInstance(AcsiDataTrans *dt);
     static TranslatedDisk * getInstance(void);
     static void deleteInstance(void);
 

@@ -11,7 +11,6 @@
 #include "../periodicthread.h"
 #include "../acsidatatrans.h"
 #include "../translated/gemdos_errno.h"
-#include "../downloader.h"
 #include "floppysetup.h"
 #include "imagesilo.h"
 #include "imagelist.h"
@@ -102,9 +101,9 @@ void FloppySetup::processCommand(uint8_t *command)
         case FDD_CMD_SEARCH_RESULTS:            searchResult();             break;
         case FDD_CMD_SEARCH_REFRESHLIST:        searchRefreshList();        break;
 
-        case FDD_CMD_SEARCH_DOWNLOAD2STORAGE:   searchDownload2Storage();   break;
+        case FDD_CMD_SEARCH_DOWNLOAD2STORAGE:   break;
         case FDD_CMD_SEARCH_INSERT2SLOT:        searchInsertToSlot();       break;
-        case FDD_CMD_SEARCH_DELETEFROMSTORAGE:  searchDeleteFromStorage();  break;
+        case FDD_CMD_SEARCH_DELETEFROMSTORAGE:  break;
     }
 
     dataTrans->sendDataAndStatus();         // send all the stuff after handling, if we got any
@@ -168,112 +167,6 @@ void FloppySetup::searchResult(void)
 
     dataTrans->addDataBfr(bfr64k, pageSize * 68, true);
     dataTrans->setStatus(FDD_OK);                   // done
-}
-
-void FloppySetup::searchDownload2Storage(void)
-{
-    dataTrans->recvData(bfr64k, 512);   // read data
-
-    bool bres = shared.imageStorage->doWeHaveStorage();
-
-    if(!bres) {         // don't have storage? fail
-        dataTrans->setStatus(FDD_ERROR);
-        return;
-    }
-
-    int pageSize = (int) bfr64k[0];         // 0   : items per page
-    int page = Utils::getWord(bfr64k + 1);  // 1, 2: page number
-    int rowNo = (int) bfr64k[3];            // 3   : row number
-
-    int itemIndex = (page * pageSize) + rowNo;
-
-    std::string imageName;      // get image name by index of item
-    bres = shared.imageList->getImageNameFromResultsByIndex(itemIndex, imageName);
-
-    if(!bres) {         // couldn't get image name? fail
-        dataTrans->setStatus(FDD_ERROR);
-        return;
-    }
-
-    // check if we got this floppy image file, and if we do, just return OK
-    bres = shared.imageStorage->weHaveThisImage(imageName.c_str());
-
-    if(bres) {          // we have this image, quit
-        dataTrans->setStatus(FDD_OK);
-        return;
-    }
-
-    // get full image url into download request url
-    TDownloadRequest tdr;
-
-    bres = shared.imageList->getImageUrl(imageName.c_str(), tdr.srcUrl);   // try to get source URL
-
-    if(!bres) {     // failed to get URL? fail
-        dataTrans->setStatus(FDD_ERROR);
-        return;
-    }
-
-    std::string storagePath;
-    shared.imageStorage->getStoragePath(storagePath);   // get path of where we should store the images
-
-    // start downloading the image
-    tdr.checksum        = 0;                    // special case - don't check checsum
-    tdr.dstDir          = storagePath;          // save it here
-    tdr.downloadType    = DWNTYPE_FLOPPYIMG;
-    tdr.pStatusByte     = NULL;                 // don't update this status byte
-    Downloader::add(tdr);
-
-    dataTrans->setStatus(FDD_OK);               // done
-}
-
-void FloppySetup::searchDeleteFromStorage(void)
-{
-    dataTrans->recvData(bfr64k, 512);   // read data
-
-    bool bres = shared.imageStorage->doWeHaveStorage();
-
-    if(!bres) {                 // don't have storage? fail
-        dataTrans->setStatus(FDD_ERROR);
-        return;
-    }
-
-    int pageSize = (int) bfr64k[0];			// items per page
-    int page = Utils::getWord(bfr64k + 1);	// page number
-    int rowNo = (int) bfr64k[3];			// row number
-
-    int itemIndex = (page * pageSize) + rowNo;
-
-    std::string imageName;      // get image name by index of item
-    bres = shared.imageList->getImageNameFromResultsByIndex(itemIndex, imageName);
-
-    if(!bres) {         // couldn't get image name? fail
-        dataTrans->setStatus(FDD_ERROR);
-        return;
-    }
-
-    // check if we got this floppy image file, and if we don't, fail
-    bres = shared.imageStorage->weHaveThisImage(imageName.c_str());
-
-    if(!bres) {          // we don't have this image, quit
-        dataTrans->setStatus(FDD_ERROR);
-        return;
-    }
-
-    // try to get local path for this image
-    std::string localPath;
-    bres = shared.imageStorage->getImageLocalPath(imageName.c_str(), localPath);
-
-    if(!bres) {                                 // we don't have this image, quit
-        dataTrans->setStatus(FDD_ERROR);
-        return;
-    }
-
-    unlink(localPath.c_str());                  // delete file
-
-    // if this image was inserted in some slot(s), eject it from it / them
-    shared.imageSilo->removeByFileName(imageName);
-
-    dataTrans->setStatus(FDD_OK);               // done
 }
 
 void FloppySetup::searchInsertToSlot(void)
@@ -738,8 +631,8 @@ void FloppySetup::getImageEncodingRunning(void)
 
     bool encoding = false;	// don't show encoding status - now encoding should not slow down floppy access. Was: ImageSilo::getFloppyEncodingRunning();
     bool doWeHaveStorage = shared.imageStorage->doWeHaveStorage();
-    int  downloadCount = Downloader::count(DWNTYPE_FLOPPYIMG);
-    int  downloadProgr = Downloader::progressOfCurrentDownload();
+    int  downloadCount = 0; // Downloader::count(DWNTYPE_FLOPPYIMG);
+    int  downloadProgr = 0; // Downloader::progressOfCurrentDownload();
 
     dataTrans->addDataByte(encoding);            // is the encoding thread is encoding some image?
     dataTrans->addDataByte(doWeHaveStorage);     // do have image storage or not?

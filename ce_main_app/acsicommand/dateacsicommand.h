@@ -3,8 +3,6 @@
 
 #include "../acsidatatrans.h"
 
-#include "../service/configservice.h"
-
 #define DATE_CMD_IDENTIFY                    0
 #define DATE_CMD_GETDATETIME                 1
 
@@ -15,12 +13,11 @@
 class DateAcsiCommand
 {
 public:
-  DateAcsiCommand(AcsiDataTrans *dt, ConfigService *ds);
+  DateAcsiCommand(AcsiDataTrans *dt);
   ~DateAcsiCommand();
   void processCommand(uint8_t *command);
 private:
   AcsiDataTrans       *dataTrans;
-  ConfigService   *pxDateService;
   uint8_t    *cmd;
 };
 #endif

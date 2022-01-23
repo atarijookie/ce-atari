@@ -9,6 +9,7 @@
 #include <pty.h>
 #include <sys/file.h>
 #include <errno.h>
+#include <limits.h>
 
 #include "config/configstream.h"
 #include "settings.h"
@@ -16,7 +17,6 @@
 #include "ccorethread.h"
 #include "debug.h"
 #include "mounter.h"
-#include "downloader.h"
 #include "ikbd/ikbd.h"
 #include "update.h"
 #include "version.h"
@@ -25,14 +25,6 @@
 #include "floppy/floppyencoder.h"
 #include "chipinterface_v1_v2/chipinterface12.h"
 #include "chipinterface_network/chipinterfacenetwork.h"
-
-#include "webserver/webserver.h"
-#include "webserver/api/apimodule.h"
-#include "webserver/app/appmodule.h"
-#include "service/virtualkeyboardservice.h"
-#include "service/virtualmouseservice.h"
-#include "service/configservice.h"
-#include "service/screencastservice.h"
 
 #define PIDFILE "/var/run/cosmosex.pid"
 
@@ -154,7 +146,7 @@ int main(int argc, char *argv[])
         } else if(flags.getHwInfo) {                    // if should just get HW info, do a shorter / simpler version of app run
             Debug::out(LOG_INFO, ">>> Starting app as HW INFO tool <<<\n");
 
-            CCoreThread *core = new CCoreThread(NULL, NULL, NULL);   // create main thread
+            CCoreThread *core = new CCoreThread();   // create main thread
             core->run();                               // run the main thread
 
         } else if(flags.justDoReset) {                  // is this a reset command? (used with STM32 ST-Link debugger)
@@ -179,7 +171,6 @@ int runCore(int instanceNo, bool localNotNetwork)
 {
     CCoreThread *core;
     pthread_t   mountThreadInfo;
-    pthread_t   downloadThreadInfo;
     pthread_t   ikbdThreadInfo;
     pthread_t   floppyEncThreadInfo;
     pthread_t   periodicThreadInfo;
@@ -224,34 +215,6 @@ int runCore(int instanceNo, bool localNotNetwork)
 
     Utils::setTimezoneVariable_inThisContext();
 
-    Downloader::initBeforeThreads();
-
-    //start up virtual devices
-    VirtualKeyboardService* pxVKbdService=new VirtualKeyboardService();
-    VirtualMouseService* pxVMouseService=new VirtualMouseService();
-    pxVKbdService->start();
-    pxVMouseService->start();
-
-    //start up date service
-    ConfigService* pxDateService=new ConfigService();
-    pxDateService->start();
-
-    //start up floppy service
-    FloppyService* pxFloppyService=new FloppyService();
-    pxFloppyService->start();
-
-    //start up screencast service
-    ScreencastService* pxScreencastService=new ScreencastService();
-    pxScreencastService->start();
-
-    //this runs its own thread
-    int webServerPortOffset = localNotNetwork ? 0 : (1 + instanceNo); // local device runs on port 80 (offset 0), network server instances run on port 81-96 (offset 1-16)
-
-    WebServer xServer;
-    xServer.addModule(new ApiModule(pxVKbdService,pxVMouseService,pxFloppyService));
-    xServer.addModule(new AppModule(pxDateService,pxFloppyService,pxScreencastService));
-    xServer.start(false, webServerPortOffset);
-
     //-------------
     // Copy the configdrive to /tmp so we can change the content as needed.
     // This must be done before new CCoreThread because it reads the data from /tmp/configdrive
@@ -259,14 +222,11 @@ int runCore(int instanceNo, bool localNotNetwork)
     system("mkdir /tmp/configdrive");                       // create dir
     system("cp -r /ce/app/configdrive/* /tmp/configdrive"); // copy new content
     //-------------
-    core = new CCoreThread(pxDateService,pxFloppyService,pxScreencastService);
+    core = new CCoreThread();
     int res;
 
     res = pthread_create(&mountThreadInfo, NULL, mountThreadCode, NULL);        // create mount thread and run it
     handlePthreadCreate(res, "ce mount", &mountThreadInfo);
-
-    res = pthread_create(&downloadThreadInfo, NULL, downloadThreadCode, NULL);  // create download thread and run it
-    handlePthreadCreate(res, "ce download", &downloadThreadInfo);
 
     res = pthread_create(&ikbdThreadInfo, NULL, ikbdThreadCode, NULL);          // create the keyboard emulation thread and run it
     handlePthreadCreate(res, "ce ikbd", &ikbdThreadInfo);
@@ -292,37 +252,11 @@ int runCore(int instanceNo, bool localNotNetwork)
 
     printf("\n\nExit from main loop\n");
 
-    xServer.stop();
-
-    printf("Stoping screecast service\n");
-    pxScreencastService->stop();
-    delete pxScreencastService;
-
-    printf("Stoping floppy service\n");
-    pxFloppyService->stop();
-    delete pxFloppyService;
-
-    printf("Stoping date service\n");
-    pxDateService->stop();
-    delete pxDateService;
-
-    printf("Stoping virtual keyboard service\n");
-    pxVKbdService->stop();
-    delete pxVKbdService;
-
-    printf("Stoping virtual mouse service\n");
-    pxVMouseService->stop();
-    delete pxVMouseService;
-
     delete core;
 
     printf("Stoping mount thread\n");
     Mounter::stop();
     pthread_join(mountThreadInfo, NULL);                // wait until mount     thread finishes
-
-    printf("Stoping download thread\n");
-    Downloader::stop();
-    pthread_join(downloadThreadInfo, NULL);             // wait until download  thread finishes
 
     printf("Stoping ikbd thread\n");
     pthread_kill(ikbdThreadInfo, SIGINT);               // stop the select()
@@ -349,9 +283,6 @@ int runCore(int instanceNo, bool localNotNetwork)
     delete chipInterface;
     chipInterface = NULL;
     //---------------------------------------------------
-
-    printf("Downloader clean up before quit\n");
-    Downloader::cleanupBeforeQuit();
 
     if(singleInstanceSocketFd > 0) {                    // if we got the single instance socket, close it
         close(singleInstanceSocketFd);
