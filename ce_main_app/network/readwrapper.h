@@ -2,8 +2,6 @@
 #ifndef _READWRAPPER_H_
 #define _READWRAPPER_H_
 
-#include "../stupidvector.h"
-
 #define MAX_TOTAL_ITEMS_SIZE    (1024 * 1024)
 #define TMP_BFR_SIZE            (  64 * 1024)
 
@@ -51,7 +49,6 @@ private:
     void udpTryReceive    (void);
     int  getItemsTotalSize(void);
     void prunItemsIfNeeded(void);
-    StupidVector          items;
 
     //----------------------------
     // for TCP

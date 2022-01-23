@@ -42,6 +42,8 @@ NdbItem::~NdbItem(void)
     delete []data;
 }
 
+std::deque<NdbItem*> items;
+
 //---------------------------------------------
 ReadWrapper::ReadWrapper(void)
 {

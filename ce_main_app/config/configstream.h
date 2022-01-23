@@ -4,7 +4,6 @@
 
 #include <stdio.h>
 
-#include "../stupidvector.h"
 #include "../settingsreloadproxy.h"
 #include "../version.h"
 
