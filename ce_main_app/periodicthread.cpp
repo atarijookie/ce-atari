@@ -30,7 +30,6 @@
 
 #include "devfinder.h"
 #include "ifacewatcher.h"
-#include "timesync.h"
 
 #include "periodicthread.h"
 #include "display/displaythread.h"
@@ -87,13 +86,6 @@ void *periodicThreadCode(void *ptr)
 
     IfaceWatcher ifaceWatcher;
 
-    TimeSync *timeSync = NULL;
-
-    // do timesync only for local device, or if it's network server core then only on instance 0 (we don't need 16x timeSync)
-    if(flags.localNotNetwork || (!flags.localNotNetwork && flags.instanceNo == 0)) {
-        timeSync = new TimeSync();
-    }
-
     while(sigintReceived == 0) {
         max_fd = -1;
         FD_ZERO(&readfds);
@@ -134,14 +126,6 @@ void *periodicThreadCode(void *ptr)
             continue;
         }
 
-        if(timeSync != NULL) {
-            if(now >= timeSync->nextProcessTime) {
-                timeSync->process(false);
-            } else {
-                if(now + wait > timeSync->nextProcessTime) wait = timeSync->nextProcessTime - now;
-            }
-        }
-
         // file descriptors to "select"
         if(shared.configPipes.web.fd1 >= 0) {
             FD_SET(shared.configPipes.web.fd1, &readfds);
@@ -158,11 +142,6 @@ void *periodicThreadCode(void *ptr)
         if(ifaceWatcher.getFd() >= 0) {
             FD_SET(ifaceWatcher.getFd(), &readfds);
             if(ifaceWatcher.getFd() > max_fd) max_fd = ifaceWatcher.getFd();
-        }
-
-        if(timeSync != NULL && timeSync->waitingForDataOnFd()) {
-            FD_SET(timeSync->getFd(), &readfds);
-            if(timeSync->getFd() > max_fd) max_fd = timeSync->getFd();
         }
 
         memset(&timeout, 0, sizeof(timeout));
@@ -220,11 +199,6 @@ void *periodicThreadCode(void *ptr)
         }
         if(shared.configPipes.term.fd1 >= 0 && FD_ISSET(shared.configPipes.term.fd1, &readfds)) {
             handleConfigStreams(shared.configStream.term, shared.configPipes.term);
-        }
-
-        //------------------------------------
-        if(timeSync != NULL && timeSync->waitingForDataOnFd() && FD_ISSET(timeSync->getFd(), &readfds)) {
-            timeSync->process(true);
         }
     }
 
