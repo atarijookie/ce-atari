@@ -1,17 +1,8 @@
 #!/bin/sh
 
 ce_is_running() {
-    # find out whether we're on Yocto or Raspbian
-    issue=$( cat /etc/issue | grep -o "Yocto" | wc -l )
-
-    # If at least once the Yocto was found, it's Yocto
-    if [ "$issue" -gt "0" ]; then   # on Yocto
-        # Count how many instances are running
-        cnt=$( ps | grep cosmosex | grep -v grep | wc -l )
-    else                            # on Raspbian
-        # Count how many instances are running
-        cnt=$( ps -A | grep cosmosex | wc -l )
-    fi
+    # Count how many instances are running
+    cnt=$( ps -A | grep cosmosex | wc -l )
 
     # CosmosEx app is not running?
     if [ "$cnt" -eq "0" ]; then

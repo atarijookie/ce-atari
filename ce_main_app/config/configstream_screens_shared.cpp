@@ -219,12 +219,10 @@ void ConfigStream::onSharedSave(void)
         }
     }
 
-    #ifndef DISTRO_YOCTO
     // on Raspbian - warn about NFS
     if(nfsNotSamba) {
         showMessageScreen("Warning", "You are using NFS on Raspbian, which\n\ris currently not working well on\n\rRaspbian and causes system to hang when\n\rnetwork connection is bad or slow.\n\rPlease consider using CIFS instead.");
     }
-    #endif
 
     std::replace( path.begin(), path.end(), '\\', '/');  // replace all slashes for the right slashes
 

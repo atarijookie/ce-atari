@@ -55,11 +55,7 @@ SharedObjects       shared;
 ChipInterface*      chipInterface;
 ExternalServices    externalServices;
 
-#ifdef DISTRO_YOCTO
-const char *distroString = "Yocto";
-#else
 const char *distroString = "Raspbian";
-#endif
 
 bool otherInstanceIsRunning(void);
 int  singleInstanceSocketFd;

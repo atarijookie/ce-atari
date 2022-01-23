@@ -7,13 +7,8 @@
 #define NAMESERVER_FILE         "/etc/resolv.conf"
 #define NETWORK_DHCPCD_FILE     "/etc/dhcpcd.conf"
 
-#ifdef DISTRO_YOCTO
-    // for yocto
-    #define WPA_SUPPLICANT_FILE     "/etc/wpa_supplicant.conf"
-#else
-    // for raspbian
-    #define WPA_SUPPLICANT_FILE     "/etc/wpa_supplicant/wpa_supplicant.conf"
-#endif
+// for raspbian
+#define WPA_SUPPLICANT_FILE     "/etc/wpa_supplicant/wpa_supplicant.conf"
 
 typedef struct {
     bool        isEnabled;
@@ -47,9 +42,6 @@ public:
     std::string     hostname;
 
 private:
-    void loadOnYocto(void);
-    void saveOnYocto(void);
-
     void loadOnRaspbian(void);
     void saveOnRaspbian(void);
 
@@ -70,7 +62,6 @@ private:
     void loadWpaSupplicant(void);
     void saveWpaSupplicant(void);
     
-    void writeNetInterfaceSettingsYocto   (FILE *f, TNetInterface *iface, const char *ifaceName);
     void writeNetInterfaceSettingsRaspbian(FILE *f, TNetInterface *iface, const char *ifaceName);
     
     void replaceIPonDhcpIface(void);

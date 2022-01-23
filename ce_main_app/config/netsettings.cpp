@@ -33,11 +33,7 @@ void NetworkSettings::load(void)
 {
     Debug::out(LOG_INFO, "NetworkSettings::load() - starting to load settings");
 
-    #ifdef DISTRO_YOCTO
-    loadOnYocto();
-    #else
     loadOnRaspbian();
-    #endif
 
     Settings s;
     wlan0.isEnabled = s.getBool("WIFI_ENABLED", true);          // wifi enabled by default
@@ -47,11 +43,7 @@ void NetworkSettings::save(void)
 {
     Debug::out(LOG_INFO, "NetworkSettings::save() - starting to save settings");
 
-    #ifdef DISTRO_YOCTO
-    saveOnYocto();
-    #else
     saveOnRaspbian();
-    #endif
 
     Settings s;
     s.setBool("WIFI_ENABLED", wlan0.isEnabled);                 // store wifi enabled flag
@@ -187,15 +179,10 @@ void NetworkSettings::saveWpaSupplicant(void)
         return;
     }
 
-#ifdef DISTRO_YOCTO
-    // do this for yocto
-    fprintf(f, "ctrl_interface=/var/run/wpa_supplicant\n");               // this is needed for wpa_cli to work
-#else
     // do this for raspbian
     fprintf(f, "country=GB\n");
     fprintf(f, "ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev\n");
     fprintf(f, "update_config=1\n");
-#endif
 
     fprintf(f, "network={\n");
     fprintf(f, "    ssid=\"%s\"\n", wlan0.wpaSsid.c_str()); 

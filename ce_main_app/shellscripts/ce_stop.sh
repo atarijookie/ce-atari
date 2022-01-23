@@ -52,7 +52,6 @@ killall -2 cosmosex > /dev/null 2> /dev/null
 # wait a while
 echo "Waiting for cosmosex to terminate nicely..."
 
-# as Yocto and Raspbian shells behave differently, there could be a loop here which would work on both, but...
 ce_is_running
 if [ "$?" -eq "0" ]; then
     echo "cosmosex terminated"

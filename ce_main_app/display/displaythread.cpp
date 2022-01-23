@@ -77,17 +77,11 @@ static void display_drawScreen(int screenIndex);
 static char *get_displayLinePtr(int displayLineId);
 
 #ifndef ONPC
-    #ifndef DISTRO_YOCTO
-        // on Raspbian - display, button, beeper
-        #include <bcm2835.h>
+    // on Raspbian - display, button, beeper
+    #include <bcm2835.h>
 
-        #define PIN_BEEPER          RPI_V2_GPIO_P1_32
-        #define PIN_BUTTON          RPI_V2_GPIO_P1_33
-    #else
-        // on yocto - no display, no button, no beeper
-        #define PIN_BEEPER          0
-        #define PIN_BUTTON          0
-    #endif
+    #define PIN_BEEPER          RPI_V2_GPIO_P1_32
+    #define PIN_BUTTON          RPI_V2_GPIO_P1_33
 #endif
 
 void *displayThreadCode(void *ptr)

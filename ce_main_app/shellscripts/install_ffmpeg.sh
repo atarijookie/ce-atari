@@ -7,11 +7,7 @@ VERSION_FFMPEG=3.2.2
 FFMPEG_BINARY=/usr/local/bin/ffmpeg
 URLGET=$(which wget)
 
-if [ -f /etc/issue ] && grep Yocto /etc/issue > /dev/null 2>&1 ; then
-	DISTRO="$(grep Yocto /etc/issue | cut -f 1 -d ' ' | tr A-Z a-z )-yocto"
-else
-	DISTRO=raspbian
-fi
+DISTRO=raspbian
 
 FFMPEG_PACKAGE=ffmpeg-${VERSION_FFMPEG}-${DISTRO}-bin.tar.bz2
 BASEURL=http://nanard.free.fr/CosmosEx/

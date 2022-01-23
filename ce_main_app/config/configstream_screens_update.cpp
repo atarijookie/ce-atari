@@ -96,17 +96,11 @@ void ConfigStream::createScreen_update(void)
 
     line++;
     //-------
-    #ifndef DISTRO_YOCTO
     line++;
     cl1 = 5;
     cl2 = 20;
-    #endif
 
-    #ifdef DISTRO_YOCTO
-    comp = new ConfigComponent(this, ConfigComponent::label, "RPi revision      : ", 22, cl1, line, gotoOffset);
-    #else
     comp = new ConfigComponent(this, ConfigComponent::label, "RPi revision: ", 22, cl1, line, gotoOffset);
-    #endif
 
     screen.push_back(comp);
 
@@ -115,10 +109,8 @@ void ConfigStream::createScreen_update(void)
 
     line++;
     //-------
-    #ifndef DISTRO_YOCTO
     comp = new ConfigComponent(this, ConfigComponent::label, rpiConfig.model, 40, cl1, line, gotoOffset);
     screen.push_back(comp);
-    #endif
 
     line += 2;
     //-------

@@ -27,28 +27,21 @@ else
     LDLIBS	+= -lbcm2835
     CFLAGS += -I./
     DISTRO := $(shell ./whichdistro.sh )
-    ifeq ($(DISTRO),yocto)
-        OBJDIR = obj/yocto
-        TARGET = cosmosex_yocto
-        LDLIBS += -lcivetweb_yocto
-        CFLAGS += -DDISTRO_YOCTO
+    ifeq ($(DISTRO),jessie)
+        OBJDIR = obj/raspbian_jessie
+        TARGET  =  cosmosex_raspbian_jessie
+        LDLIBS += -lcivetweb_raspbian_jessie -ldl
+        CFLAGS += -DDISTRO_RASPBIAN
+        CFLAGS += -DDISTRO_JESSIE
     else
-        ifeq ($(DISTRO),jessie)
-            OBJDIR = obj/raspbian_jessie
-            TARGET  =  cosmosex_raspbian_jessie
-            LDLIBS += -lcivetweb_raspbian_jessie -ldl
-            CFLAGS += -DDISTRO_RASPBIAN
-            CFLAGS += -DDISTRO_JESSIE
-        else
-            OBJDIR = obj/raspbian_stretch
-            TARGET =  cosmosex_raspbian_stretch
-            LDLIBS += -lcivetweb_raspbian_stretch -ldl
-            CFLAGS += -DDISTRO_RASPBIAN
-            CFLAGS += -DDISTRO_STRETCH
-        endif
+        OBJDIR = obj/raspbian_stretch
+        TARGET =  cosmosex_raspbian_stretch
+        LDLIBS += -lcivetweb_raspbian_stretch -ldl
+        CFLAGS += -DDISTRO_RASPBIAN
+        CFLAGS += -DDISTRO_STRETCH
     endif
     # add search path for libbcm2835.a
-    # /usr/local/bin on yocto or more exotic path when cross-compiling
+    # /usr/local/bin on rpi or more exotic path when cross-compiling
     VPATH += $(shell for d in `$(ACTUAL_CC) -print-search-dirs | \
                      sed '/^lib/b 1;d;:1;s,/[^/.][^/]*/\.\./,/,;t 1;s,:[^=]*=,:;,;s,;,;  ,g' | \
                      tr ';' \\\\012 | tail -n 1 | tr ':' \\\\012 ` /usr/local/lib ; do \

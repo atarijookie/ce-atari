@@ -29,13 +29,8 @@ typedef struct {
 // count of key to check for key combination
 #define KBD_KEY_COUNT   256
 
-#ifdef DISTRO_YOCTO
-    // use this serial port on yocto
-    #define UARTFILE            "/dev/ttyAMA0"
-#else
-    // use this serial port on Raspbian
-    #define UARTFILE            "/dev/serial0"
-#endif
+// use this serial port on Raspbian
+#define UARTFILE            "/dev/serial0"
 
 #define UARTMARK_STCMD      0xAA
 #define UARTMARK_KEYBDATA   0xBB

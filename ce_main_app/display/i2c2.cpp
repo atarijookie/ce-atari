@@ -1,15 +1,10 @@
 #include "i2c2.h"
 
 #ifndef ONPC
-    #ifndef DISTRO_YOCTO
-        #include <bcm2835.h>
+    #include <bcm2835.h>
 
-        #define PIN_SCL             RPI_V2_GPIO_P1_29
-        #define PIN_SDA             RPI_V2_GPIO_P1_31
-    #else
-        #define PIN_SCL             0
-        #define PIN_SDA             0
-    #endif
+    #define PIN_SCL             RPI_V2_GPIO_P1_29
+    #define PIN_SDA             RPI_V2_GPIO_P1_31
 #endif
 
 i2c2::i2c2() : i2c_started(false)
@@ -210,7 +205,7 @@ uint8_t i2c2::i2c_read_byte(bool nack, bool send_stop)
 
 // KERNEL-LIKE I2C METHODS
 
-// This executes the SMBus “write byte” protocol, returning negative errno else zero on success.
+// This executes the SMBus ï¿½write byteï¿½ protocol, returning negative errno else zero on success.
 int32_t i2c2::i2c_smbus_write_byte_data(uint8_t i2c_address, uint8_t command, uint8_t value)
 {
     // 7 bit address + 1 bit read/write
@@ -236,7 +231,7 @@ int32_t i2c2::i2c_smbus_write_byte_data(uint8_t i2c_address, uint8_t command, ui
     return -1;
 }
 
-// This executes the SMBus “read byte” protocol, returning negative errno else a data byte received from the device.
+// This executes the SMBus ï¿½read byteï¿½ protocol, returning negative errno else a data byte received from the device.
 int32_t i2c2::i2c_smbus_read_byte_data(uint8_t i2c_address, uint8_t command)
 {
     uint8_t address = (i2c_address << 1) | 0;
@@ -263,7 +258,7 @@ int32_t i2c2::i2c_smbus_read_byte_data(uint8_t i2c_address, uint8_t command)
     return -1;
 }
 
-// This executes the SMBus “block write” protocol, returning negative errno else zero on success.
+// This executes the SMBus ï¿½block writeï¿½ protocol, returning negative errno else zero on success.
 int32_t i2c2::i2c_smbus_write_i2c_block_data(uint8_t i2c_address, uint8_t command, uint8_t length,
         const uint8_t * values)
 {
@@ -299,7 +294,7 @@ int32_t i2c2::i2c_smbus_write_i2c_block_data(uint8_t i2c_address, uint8_t comman
     return -1;
 }
 
-// This executes the SMBus “block read” protocol, returning negative errno else the number
+// This executes the SMBus ï¿½block readï¿½ protocol, returning negative errno else the number
 // of data bytes in the slave's response.
 int32_t i2c2::i2c_smbus_read_i2c_block_data(uint8_t i2c_address, uint8_t command, uint8_t length,
         uint8_t* values)

@@ -131,10 +131,6 @@ bool Update::checkForUpdateListOnUsb(std::string &updateFilePath)
 
 const char *Update::getUsbArchiveName(void)
 {
-    #ifdef DISTRO_YOCTO
-        return "yocto.zip";
-    #endif
-
     #ifdef DISTRO_JESSIE
         return "jessie.zip";
     #endif

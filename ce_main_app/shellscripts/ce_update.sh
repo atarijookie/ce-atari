@@ -29,7 +29,7 @@ else    # download update from internet, by wget
     printf "update from internet - will use wget\n"
 
     rm -f $path_to_tmp_update                       # delete if file exists
-    wget -O $path_to_tmp_update $url_zip            # download to /tmp/yocto.zip
+    wget -O $path_to_tmp_update $url_zip            # download to /tmp/stretch.zip
 
     unzip -o $path_to_tmp_update -d /ce             # unzip update into /ce directory, overwrite without prompting
 fi

@@ -530,13 +530,8 @@ void Mounter::restartNetworkWlan0(void)
 
     //-------------
     // bring wlan0 down
-#ifdef DISTRO_YOCTO
-    // do this for yocto
-    system("ifconfig wlan0 down > /dev/null 2> /dev/null");
-#else
     // do this for raspbian
     system("ifdown wlan0        > /dev/null 2> /dev/null");
-#endif
 
     //-------------
     // now check if we should bring wlan0 back (if enabled), or should we totally stop it
@@ -546,14 +541,8 @@ void Mounter::restartNetworkWlan0(void)
     if(!ns.wlan0.isEnabled) {                   // wlan0 not enabled? bring it down, stop wpa_supplicant
         Debug::out(LOG_DEBUG, "Mounter::restartNetworkWlan0 - wlan0 not enabled, bringing down\n");
 
-#ifdef DISTRO_YOCTO
-        // do this for yocto
-        system("killall -9 wifisuper.sh > /dev/null 2> /dev/null");
-        system("ifconfig wlan0 down     > /dev/null 2> /dev/null");
-#else
         // do this for raspbian
         system("ifdown wlan0            > /dev/null 2> /dev/null");
-#endif
 
         // do this on both linuxes
         system("wpa_cli terminate       > /dev/null 2> /dev/null");
@@ -563,38 +552,22 @@ void Mounter::restartNetworkWlan0(void)
         bool isWpaSupplicantRunning = getWpaSupplicantRunning();
 
         if(!isWpaSupplicantRunning) {           // if wpa supplicant is not running, run it
-#ifdef DISTRO_YOCTO
-            system("/ce/wifisuper.sh & > /dev/null 2> /dev/null");  // on yocto just start the wifi supervisor script and it will do everything needed
-            sleep(6);                           // wifisuper.sh needs around 5 seconds to start wpa_supplicant
-#else
             // on Raspbian turn on wpa_supplicant on manually
             system("wpa_supplicant -B -iwlan0 -c/etc/wpa_supplicant/wpa_supplicant.conf");
-#endif
         }
     }
 
     // if came to this place, wlan0 is present in the system, wlan0 is enabled in CE config, wpa supplicant should be running, time to bring it back to life
-#ifdef DISTRO_YOCTO
-    // for yocto
-    system("wpa_cli reconfigure");
-    system("ifconfig wlan0 up");
-#else
     // for raspbian
     system("ifup wlan0");
-#endif
 
     Debug::out(LOG_DEBUG, "Mounter::restartNetworkWlan0 - done\n");
 }
 
 bool Mounter::getWpaSupplicantRunning(void)
 {
-#ifdef DISTRO_YOCTO
-    // for yocto
-    system("ps | grep 'wpa_supplicant' | grep -v 'grep' | wc -l > /tmp/wpasupplicantcount");
-#else
     // for raspbian
     system("ps -A | grep 'wpa_supplicant' | grep -v 'grep' | wc -l > /tmp/wpasupplicantcount");
-#endif
 
     // try to open the file with count of wpa supplicants running
     FILE *f = fopen("/tmp/wpasupplicantcount", "rt");
