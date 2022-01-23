@@ -45,9 +45,6 @@ void parseCmdLineArguments(int argc, char *argv[]);
 void printfPossibleCmdLineArgs(void);
 void loadDefaultArgumentsFromFile(void);
 
-int     linuxConsole_fdMaster;                                  // file descriptors for linux console
-pid_t   childPid;                                               // pid of forked child
-
 void loadLastHwConfig(void);
 void initializeFlags(void);
 
@@ -57,6 +54,7 @@ RPiConfig           rpiConfig;                          // RPi model, revision, 
 InterProcessEvents  events;
 SharedObjects       shared;
 ChipInterface*      chipInterface;
+ExternalServices    externalServices;
 
 #ifdef DISTRO_YOCTO
 const char *distroString = "Yocto";
@@ -68,7 +66,6 @@ bool otherInstanceIsRunning(void);
 int  singleInstanceSocketFd;
 
 void showOnDisplay(int argc, char *argv[]);
-void forkLinuxConsole(void);
 int  runCore(int instanceNo, bool localNotNetwork);
 void networkServerMain(void);
 
@@ -133,7 +130,6 @@ int main(int argc, char *argv[])
         }
     } else if(flags.chipInterface == CHIPIF_NETWORK) {
         Debug::out(LOG_INFO, "ChipInterface: starting NETWORK server");
-        forkLinuxConsole();     // start only ONE linux console for all the network servers, get fd to pipe for talking to console
         networkServerMain();
         return 0;
     } else {
@@ -189,31 +185,7 @@ int main(int argc, char *argv[])
     }
 
     // if came here, we should run this app as the main local core
-    forkLinuxConsole();         // start a linux console, get fd to pipe for talking to console
     return runCore(0, true);
-}
-
-void forkLinuxConsole(void)
-{
-    //------------------------------------
-    // we should fork this and run shell in the forked child
-    childPid = forkpty(&linuxConsole_fdMaster, NULL, NULL, NULL);
-
-    if(childPid == 0) {                             // code executed only by child
-        const char *shell = "/bin/sh";              // default shell
-        const char *term = "vt52";
-        shell = getenv("SHELL");
-        if(access("/etc/terminfo/a/atari", R_OK) == 0)
-            term = "atari";
-        if(setenv("TERM", term, 1) < 0) {
-            fprintf(stderr, "Failed to setenv(\"TERM\", \"%s\"): %s\n", term, strerror(errno));
-        }
-        execlp(shell, shell, "-i", (char *) NULL);  // -i for interactive
-
-        return;
-    }
-
-    // parent (full app) continues here
 }
 
 // instanceNo: number of core instance, used for separating folders and ports
@@ -647,11 +619,6 @@ void sigint_handler(int sig)
 {
     Debug::out(LOG_DEBUG, "Some SIGNAL received, terminating.");
     sigintReceived = 1;
-
-    if(childPid != 0) {             // in case we fork()ed, kill the child
-        Debug::out(LOG_DEBUG, "Killing child with pid %d\n", childPid);
-        kill(childPid, SIGKILL);
-    }
 }
 
 bool otherInstanceIsRunning(void)

@@ -20,11 +20,9 @@
 #include "config_commands.h"
 #include "../debug.h"
 
-extern int linuxConsole_fdMaster;                                       // file descriptor for linux console master
-
 void ConfigStream::linuxConsole_KeyDown(uint8_t atariKey)
 {
-    if(linuxConsole_fdMaster <= 0) {                                    // if don't have the handle, quit
+    if(externalServices.linuxTermFd <= 0) {                                    // if don't have the handle, quit
         return;
     }
 
@@ -33,9 +31,9 @@ void ConfigStream::linuxConsole_KeyDown(uint8_t atariKey)
 
     atariKeyToConsoleKey(atariKey, consoleKeys, consoleKeysLength);     // convert it from Atari pseudo key to console key
 
-    ssize_t n = write(linuxConsole_fdMaster, consoleKeys, consoleKeysLength);       // send the key
+    ssize_t n = write(externalServices.linuxTermFd, consoleKeys, consoleKeysLength);       // send the key
     if(n < 0) {
-        Debug::out(LOG_ERROR, "ConfigStream::linuxConsole_KeyDown: write(linuxConsole_fdMaster=%d) failed: %s", linuxConsole_fdMaster, strerror(errno));
+        Debug::out(LOG_ERROR, "ConfigStream::linuxConsole_KeyDown: write(externalServices.linuxTermFd=%d) failed: %s", externalServices.linuxTermFd, strerror(errno));
     }
 }
 
@@ -46,12 +44,12 @@ int ConfigStream::linuxConsole_getStream(uint8_t *bfr, int maxLen)
 
     bool maxData = false;                                               // flag that we will send full buffer
 
-    if(linuxConsole_fdMaster <= 0) {                                    // can't read data from console? quit
+    if(externalServices.linuxTermFd <= 0) {                                    // can't read data from console? quit
         return 0;
     }
 
     int bytesAvailable;
-    int ires = ioctl(linuxConsole_fdMaster, FIONREAD, &bytesAvailable); // how many bytes we can read?
+    int ires = ioctl(externalServices.linuxTermFd, FIONREAD, &bytesAvailable); // how many bytes we can read?
 
     if(ires != -1 && bytesAvailable > 0) {
         int readCount;
@@ -66,7 +64,7 @@ int ConfigStream::linuxConsole_getStream(uint8_t *bfr, int maxLen)
             bfr[maxLen - 1] = LINUXCONSOLE_GET_MORE_DATA;               // last byte of buffer - no more data
         }
 
-        int rcnt = read(linuxConsole_fdMaster, bfr, readCount);         // read the data
+        int rcnt = read(externalServices.linuxTermFd, bfr, readCount);         // read the data
 
         if(rcnt != -1) {                                                // if did reat the data
             int fcnt = filterVT100((char *) bfr, rcnt);                 // filter out those VT100 commands
@@ -177,5 +175,3 @@ void ConfigStream::atariKeyToConsoleKey(uint8_t atariKey, char *bfr, int &cnt)
             cnt = 1;
     }
 }
-
-

@@ -115,6 +115,14 @@ typedef struct {
 
 extern InterProcessEvents events;
 
+typedef struct {
+    int linuxTermFd;
+    int configFd;
+    int downloaderFd;
+} ExternalServices;
+
+extern ExternalServices externalServices;
+
 //////////////////////////////////////////////////////
 
 #define SPECIAL_FDD_IMAGE_CE_CONF       100
