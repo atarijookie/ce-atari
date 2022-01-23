@@ -17,7 +17,6 @@
 #include "mounter.h"
 #include "downloader.h"
 #include "update.h"
-#include "config/netsettings.h"
 #include "statusreport.h"
 #include "display/displaythread.h"
 
@@ -49,16 +48,6 @@ extern SharedObjects shared;
 
 CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService)
 {
-    NetworkSettings ns;
-    ns.load();
-    ns.updateResolvConf(false);     // update resolv.conf
-
-    if(!ns.wlan0.isEnabled) {       // if wlan0 not enabled, send one wlan0 restart, which might bring the wlan0 down
-        TMounterRequest tmr;
-        tmr.action = MOUNTER_ACTION_RESTARTNETWORK_WLAN0;
-        Mounter::add(tmr);
-    }
-
     Update::initialize();
 
     setEnabledIDbits        = false;
@@ -1039,13 +1028,6 @@ void CCoreThread::deleteSettingAndSetNetworkToDhcp(void)
 {
     // delete settings
     system("rm -f /ce/settings/*");
-
-    // get the network settings
-    NetworkSettings ns;
-    ns.load();                      // load the current values
-    ns.eth0.dhcpNotStatic   = true; // force DHCP on eth0
-    ns.wlan0.dhcpNotStatic  = true; // force DHCP on wlan0
-    ns.save();                      // save those settings
 
     // sync to write stuff to card
     system("sync");

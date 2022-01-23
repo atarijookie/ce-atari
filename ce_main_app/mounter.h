@@ -54,8 +54,6 @@ public:
     bool mountDevice(const char *devicePath, const char *mountDir);
     void mountZipFile(const char *zipFilePath, const char *mountDir);
     void umountIfMounted(const char *mountDir);
-    void restartNetworkEth0(void);
-    void restartNetworkWlan0(void);
     void sync(void);
 
     static int add(TMounterRequest &tmr);
@@ -74,9 +72,6 @@ private:
     void createSource(const char *host, const char *hostDir, bool nfsNotSamba, char *source);
     
     bool mountDumpContains(const char *searchedString);
-    bool wlan0IsPresent(void);
-    bool checkIfUp( const char* ifname );
-    bool getWpaSupplicantRunning(void);
 
     void copyTextFileToLog(const char *path);
 

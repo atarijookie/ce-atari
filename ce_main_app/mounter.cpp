@@ -26,7 +26,6 @@
 #include "utils.h"
 #include "debug.h"
 #include "update.h"
-#include "config/netsettings.h"
 
 pthread_mutex_t Mounter::mountQueueMutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t Mounter::mountQueueNotEmpty = PTHREAD_COND_INITIALIZER;
@@ -154,14 +153,6 @@ void Mounter::run(void)
             umountIfMounted(tmr.mountDir.c_str());
         }
 
-        if(tmr.action == MOUNTER_ACTION_RESTARTNETWORK_ETH0) {  // restart eth0 network?
-            restartNetworkEth0();
-        }
-
-        if(tmr.action == MOUNTER_ACTION_RESTARTNETWORK_WLAN0) { // restart wlan0 network?
-            restartNetworkWlan0();
-        }
-
         if(tmr.action == MOUNTER_ACTION_SYNC) {             // sync system caches?
             sync();
         }
@@ -235,18 +226,18 @@ bool Mounter::mountShared(const char *host, const char *hostDir, bool nfsNotSamb
 
     //Workaround: do not mount NFS if no network interface is up - NFS tends to hog the CPU almost completely until an interface is present
     //see: https://github.com/atarijookie/ce-atari/issues/87
-    if( nfsNotSamba && !checkIfUp( "eth0" ) && !checkIfUp( "wlan0" ) )    {
-        char logpath[128];
-        Debug::out(LOG_DEBUG, "Mounter::mountShared -- No network, not doing anything.", source);
-        snprintf(logpath, sizeof(logpath), "%s/mount.err", mountDir);
-        FILE * flog = fopen(logpath, "wb");
-        if(flog) {
-            fprintf(flog, "mount() not done - awaiting network.\r\n");
-            fclose(flog);
-        }
-
-        return false;
-    }
+//    if( nfsNotSamba *&& !checkIfUp( "eth0" ) && !checkIfUp( "wlan0" ) )    {
+//        char logpath[128];
+//        Debug::out(LOG_DEBUG, "Mounter::mountShared -- No network, not doing anything.", source);
+//        snprintf(logpath, sizeof(logpath), "%s/mount.err", mountDir);
+//        FILE * flog = fopen(logpath, "wb");
+//        if(flog) {
+//            fprintf(flog, "mount() not done - awaiting network.\r\n");
+//            fclose(flog);
+//        }
+//
+//        return false;
+//    }
 
     if(strlen(username) == 0) {             // no user name?
         if(nfsNotSamba) {                   // for NFS - don't specify auth
@@ -502,142 +493,6 @@ void Mounter::umountIfMounted(const char *mountDir)
 {
     if(isMountdirUsed(mountDir)) {                // if mountDir is used, umount
         tryUnmount(mountDir);
-    }
-}
-
-void Mounter::restartNetworkEth0(void)
-{
-    Debug::out(LOG_DEBUG, "Mounter::restartNetworkEth0 - starting to restart the network\n");
-
-    system("ifconfig eth0 down");               // shut down ethernet
-    system("ifconfig eth0 up");                 // bring up ethernet
-
-    Debug::out(LOG_DEBUG, "Mounter::restartNetworkEth0 - done\n");
-}
-
-void Mounter::restartNetworkWlan0(void)
-{
-    Debug::out(LOG_DEBUG, "Mounter::restartNetworkWlan0 - starting to restart the network\n");
-
-    //-------------
-    // first find out if we got wlan0 or not
-    bool gotWlan0 = wlan0IsPresent();
-
-    if(!gotWlan0) {
-        Debug::out(LOG_DEBUG, "Mounter::restartNetworkWlan0 - no wlan0 adapter, so done\n");
-        return;
-    }
-
-    //-------------
-    // bring wlan0 down
-    // do this for raspbian
-    system("ifdown wlan0        > /dev/null 2> /dev/null");
-
-    //-------------
-    // now check if we should bring wlan0 back (if enabled), or should we totally stop it
-    NetworkSettings ns;
-    ns.load();
-
-    if(!ns.wlan0.isEnabled) {                   // wlan0 not enabled? bring it down, stop wpa_supplicant
-        Debug::out(LOG_DEBUG, "Mounter::restartNetworkWlan0 - wlan0 not enabled, bringing down\n");
-
-        // do this for raspbian
-        system("ifdown wlan0            > /dev/null 2> /dev/null");
-
-        // do this on both linuxes
-        system("wpa_cli terminate       > /dev/null 2> /dev/null");
-        Debug::out(LOG_DEBUG, "Mounter::restartNetworkWlan0 - wlan0 is down, done\n");
-        return;
-    } else {                                    // wlan0 is enabled? check if wpa_supplicant is on, possibly start it
-        bool isWpaSupplicantRunning = getWpaSupplicantRunning();
-
-        if(!isWpaSupplicantRunning) {           // if wpa supplicant is not running, run it
-            // on Raspbian turn on wpa_supplicant on manually
-            system("wpa_supplicant -B -iwlan0 -c/etc/wpa_supplicant/wpa_supplicant.conf");
-        }
-    }
-
-    // if came to this place, wlan0 is present in the system, wlan0 is enabled in CE config, wpa supplicant should be running, time to bring it back to life
-    // for raspbian
-    system("ifup wlan0");
-
-    Debug::out(LOG_DEBUG, "Mounter::restartNetworkWlan0 - done\n");
-}
-
-bool Mounter::getWpaSupplicantRunning(void)
-{
-    // for raspbian
-    system("ps -A | grep 'wpa_supplicant' | grep -v 'grep' | wc -l > /tmp/wpasupplicantcount");
-
-    // try to open the file with count of wpa supplicants running
-    FILE *f = fopen("/tmp/wpasupplicantcount", "rt");
-
-    // couldn't open file? pretend - not running
-    if(!f) {
-        return false;
-    }
-
-    // try to read the number from file
-    int cnt, ires;
-    ires = fscanf(f, "%d", &cnt);
-    fclose(f);
-
-    if(ires != 1) {     // couldn't read the number? pretend - not running
-        return false;
-    }
-
-    return (cnt > 0);   // if cnt is non-zero, wpa supplicant is running
-}
-
-bool Mounter::wlan0IsPresent(void)
-{
-    system("ifconfig -a | grep wlan0 > /tmp/wlan0dump.txt");                    // first check ifconfig for presence of wlan0 interface
-
-    struct stat attr;
-    int res = stat("/tmp/wlan0dump.txt", &attr);                                // get the file status
-
-    if(res != 0) {
-        Debug::out(LOG_DEBUG, "Mounter::wlan0IsPresent() -- stat() failed\n");
-        return false;
-    }
-
-    if(attr.st_size == 0) {                                                     // if the file is empty, ifconfig doesn't contain wlan0
-        Debug::out(LOG_DEBUG, "Mounter::wlan0IsPresent() -- file empty, wlan0 not present\n");
-        return false;
-    }
-
-      Debug::out(LOG_DEBUG, "Mounter::wlan0IsPresent() -- wlan0 is present\n");
-    return true;                                                                // ifconfig contains wlan0, so we got wlan0
-}
-
-/*
-Check if interface with given name is up & running
-*/
-bool Mounter::checkIfUp( const char* ifname )
-{
-    struct ifreq ifr;
-
-    int dummy_fd = socket( AF_INET, SOCK_DGRAM, 0 );
-    if( dummy_fd<0 )
-    {
-        Debug::out(LOG_DEBUG, "Mounter::checkIfUp() -- no dummy socket\n");
-        return false;
-    }
-    memset( &ifr, 0, sizeof(ifr) );
-    strcpy( ifr.ifr_name, ifname );
-
-    if( ioctl( dummy_fd, SIOCGIFFLAGS, &ifr ) != -1 )
-    {
-        close(dummy_fd);
-        bool up_and_running = (ifr.ifr_flags & ( IFF_UP | IFF_RUNNING )) == ( IFF_UP | IFF_RUNNING );
-        return up_and_running;
-    }
-    else
-    {
-        close(dummy_fd);
-        Debug::out(LOG_DEBUG, "Mounter::checkIfUp() -- error\n");
-        // error
-        return false;
     }
 }
 
