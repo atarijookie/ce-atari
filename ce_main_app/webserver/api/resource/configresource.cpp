@@ -20,7 +20,6 @@
 #include "../../../utils.h"
 #include "../../../config/configstream.h"
 #include "../../../config/config_commands.h"
-#include "../../../ce_conf_on_rpi.h"
 #include "../../../statusreport.h"
 
 extern int translateVT52toVT100(uint8_t *bfr, uint8_t *tmp, int cnt);
@@ -59,11 +58,11 @@ ConfigResource::~ConfigResource()
 void ConfigResource::openFIFOsIfNeeded(void)
 {
     if(webFd1 <= 0) {
-        webFd1 = open(FIFO_WEB_PATH1, O_RDWR);      // will be used for writing only
+        //webFd1 = open(FIFO_WEB_PATH1, O_RDWR);      // will be used for writing only
     }
     
     if(webFd2 <= 0) {
-        webFd2 = open(FIFO_WEB_PATH2, O_RDWR);      // will be used for reading only
+        //webFd2 = open(FIFO_WEB_PATH2, O_RDWR);      // will be used for reading only
     }
 }
 
@@ -122,17 +121,18 @@ bool ConfigResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
         openFIFOsIfNeeded();
 
         int iReadLen;
-        sendCmd(CFG_CMD_SET_RESOLUTION, ST_RESOLUTION_HIGH, webFd1, webFd2, in_bfr, tmp_bfr, iReadLen);
+        //sendCmd(CFG_CMD_SET_RESOLUTION, ST_RESOLUTION_HIGH, webFd1, webFd2, in_bfr, tmp_bfr, iReadLen);
         
-        bool res = sendCmd(CFG_CMD_REFRESH, 0, webFd1, webFd2, in_bfr, tmp_bfr, iReadLen);
+        //bool res = sendCmd(CFG_CMD_REFRESH, 0, webFd1, webFd2, in_bfr, tmp_bfr, iReadLen);
+        bool res = false;
         
         if( res ){
-            int realLen = strnlen((const char *) in_bfr, iReadLen);         // get real string length - might have 2 more bytes (isUpdateScreen, updateComponents) after string terminator
-        
-            mg_printf(conn, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n");
-            mg_printf(conn, "Cache: no-cache\r\n");
-            mg_printf(conn, "Content-Length: %d\r\n\r\n", realLen);         // Always set Content-Length
-            mg_write(conn, in_bfr, realLen);
+//            int realLen = strnlen((const char *) in_bfr, iReadLen);         // get real string length - might have 2 more bytes (isUpdateScreen, updateComponents) after string terminator
+//
+//            mg_printf(conn, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n");
+//            mg_printf(conn, "Cache: no-cache\r\n");
+//            mg_printf(conn, "Content-Length: %d\r\n\r\n", realLen);         // Always set Content-Length
+//            mg_write(conn, in_bfr, realLen);
             return true;
         } else{
             Debug::out(LOG_ERROR, "could not send config command");
@@ -202,14 +202,15 @@ bool ConfigResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
                 openFIFOsIfNeeded();
 
                 int iReadLen;
-                bool res = sendCmd(CFG_CMD_KEYDOWN, iCode, webFd1, webFd2, in_bfr, tmp_bfr, iReadLen);
+                //bool res = sendCmd(CFG_CMD_KEYDOWN, iCode, webFd1, webFd2, in_bfr, tmp_bfr, iReadLen);
+                bool res = false;
                 if( res ){
-                    int realLen = strnlen((const char *) in_bfr, iReadLen);         // get real string length - might have 2 more bytes (isUpdateScreen, updateComponents) after string terminator
-
-                    mg_printf(conn, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n");
-                    mg_printf(conn, "Cache: no-cache\r\n");
-                    mg_printf(conn, "Content-Length: %d\r\n\r\n", realLen);         // Always set Content-Length
-                    mg_write(conn, in_bfr, realLen);
+//                    int realLen = strnlen((const char *) in_bfr, iReadLen);         // get real string length - might have 2 more bytes (isUpdateScreen, updateComponents) after string terminator
+//
+//                    mg_printf(conn, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n");
+//                    mg_printf(conn, "Cache: no-cache\r\n");
+//                    mg_printf(conn, "Content-Length: %d\r\n\r\n", realLen);         // Always set Content-Length
+//                    mg_write(conn, in_bfr, realLen);
                     return true;
                 } else{
                     Debug::out(LOG_ERROR, "could not send config command");

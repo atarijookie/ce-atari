@@ -20,7 +20,6 @@
 #include "ikbd/ikbd.h"
 #include "update.h"
 #include "version.h"
-#include "ce_conf_on_rpi.h"
 #include "periodicthread.h"
 #include "display/displaythread.h"
 #include "floppy/floppyencoder.h"
@@ -88,16 +87,6 @@ int main(int argc, char *argv[])
     // if should only show help and quit
     if(flags.justShowHelp) {
         printfPossibleCmdLineArgs();
-        return 0;
-    }
-
-    //------------------------------------
-    // if should run as ce_conf app, do this code instead
-    if(flags.actAsCeConf) {
-        printf("CE_CONF tool - Raspberry Pi version.\nPress Ctrl+C to quit.\n");
-
-        Debug::setLogFile("/var/log/ce_conf.log");
-        ce_conf_mainLoop();
         return 0;
     }
 
@@ -400,7 +389,6 @@ void initializeFlags(void)
     flags.justDoReset  = false;         // if shouldn't run the app, but just reset Hans and Franz (used with STM32 ST-Link JTAG)
     flags.noReset      = false;         // don't reset Hans and Franz on start - used with STM32 ST-Link JTAG
     flags.test         = false;         // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
-    flags.actAsCeConf  = false;         // if set to true, this app will behave as ce_conf app instead of CosmosEx app
     flags.getHwInfo    = false;         // if set to true, wait for HW info from Hans, and then quit and report it
     flags.noFranz      = false;         // if set to true, won't communicate with Franz
     flags.ikbdLogs     = false;         // no ikbd logs by default
@@ -540,12 +528,6 @@ void parseCmdLineArguments(int argc, char *argv[])
             isKnownTag          = true;                             // this is a known tag
             flags.test          = true;
             continue;
-        }
-
-        // for running this app as ce_conf terminal
-        if(strcmp(argv[i], "ce_conf") == 0) {
-            isKnownTag          = true;                             // this is a known tag
-            flags.actAsCeConf   = true;
         }
 
         // get hardware version and HDD interface type

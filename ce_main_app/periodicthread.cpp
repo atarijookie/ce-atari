@@ -27,7 +27,6 @@
 #include "mounter.h"
 #include "downloader.h"
 #include "update.h"
-#include "ce_conf_on_rpi.h"
 
 #include "devfinder.h"
 #include "ifacewatcher.h"
@@ -70,8 +69,6 @@ void *periodicThreadCode(void *ptr)
     uint32_t now;
 
     Debug::out(LOG_DEBUG, "Periodic thread starting...");
-
-    ce_conf_createFifos();                                                  // if should run normally, create the ce_conf FIFOs
 
     inotifyFd = inotify_init();
     if(inotifyFd < 0) {

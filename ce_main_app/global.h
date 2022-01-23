@@ -88,7 +88,6 @@ typedef struct {
     bool justDoReset;           // if shouldn't run the app, but just reset Hans and Franz (used with STM32 ST-Link JTAG)
     bool noReset;               // don't reset Hans and Franz on start - used with STM32 ST-Link JTAG
     bool test;                  // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
-    bool actAsCeConf;           // if set to true, this app will behave as ce_conf app instead of CosmosEx app
     bool getHwInfo;             // if set to true, wait for HW info from Hans, and then quit and report it
     bool noFranz;               // if set to true, won't communicate with Franz
     bool ikbdLogs;              // if set to true, will generate ikbd logs file

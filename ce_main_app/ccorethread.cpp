@@ -18,7 +18,6 @@
 #include "downloader.h"
 #include "update.h"
 #include "config/netsettings.h"
-#include "ce_conf_on_rpi.h"
 #include "statusreport.h"
 #include "display/displaythread.h"
 
