@@ -13,7 +13,6 @@
 #include "update.h"
 #include "utils.h"
 #include "mounter.h"
-#include "dir2fdd/cdirectory.h"
 #include "floppy/imagelist.h"
 
 Versions Update::versions;
