@@ -82,6 +82,43 @@ class MyRadioButton(urwid.RadioButton):
     reserve_columns = 6
 
 
+class EditOne(urwid.Text):
+    _selectable = True
+    ignore_focus = False
+    # (this variable is picked up by the MetaSignals metaclass)
+    signals = ["change", "postchange"]
+
+    def __init__(self, edit_text):
+        super().__init__(markup=edit_text)
+
+    def valid_char(self, ch):
+        if len(ch) != 1:
+            return False
+
+        och = ord(ch)
+        return (65 <= och <= 90) or (97 <= och <= 122)
+
+    def keypress(self, size, key):
+        if self.valid_char(key):        # valid key, use it
+            new_text = str(key).upper()
+            self.set_text(new_text)
+        else:                           # key wasn't handled
+            return key
+
+
+def create_edit_one(edit_text):
+    edit_one = EditOne(edit_text)
+    edit_one_decorated = urwid.AttrMap(edit_one, None, focus_map='reversed')
+
+    cols = urwid.Columns([
+        ('fixed', 2, urwid.Text('[ ')),
+        ('fixed', 1, edit_one_decorated),
+        ('fixed', 2, urwid.Text(' ]'))],
+        dividechars=0)
+
+    return cols
+
+
 def create_my_button(text, on_clicked_fn, on_clicked_data=None):
     button = MyButton(text, on_clicked_fn, on_clicked_data)
     attrmap = urwid.AttrMap(button, None, focus_map='reversed')  # reversed on button focused
@@ -187,6 +224,86 @@ def on_acsi_ids_save(button):
 
 
 def on_screen_translated(button):
+    body = []
+    body.append(urwid.AttrMap(urwid.Text('>> Translated disk <<', align='center'), 'reversed'))
+    body.append(urwid.Divider())
+
+    body.append(urwid.AttrMap(urwid.Text('Drive letters assignment', align='center'), 'reversed'))
+    body.append(urwid.Divider())
+
+    # helper function to create one translated drives letter config row
+    def create_drive_row(label):
+        col1 = 25
+        col2 = 5
+
+        edit_one = create_edit_one("")
+
+        cols = urwid.Columns([
+            ('fixed', col1, urwid.Text(label)),
+            ('fixed', col2, edit_one)],
+            dividechars=0)
+
+        return cols
+
+    # translated drive letter
+    trans_first = create_drive_row("First translated drive")
+    body.append(trans_first)
+    body.append(urwid.Divider())
+
+    # shared drive letter
+    trans_shared = create_drive_row("Shared drive")
+    body.append(trans_shared)
+
+    # config drive letter
+    trans_config = create_drive_row("Config drive")
+    body.append(trans_config)
+
+    body.append(urwid.Divider())
+    body.append(urwid.AttrMap(urwid.Text('Options', align='center'), 'reversed'))
+    body.append(urwid.Divider())
+
+    def create_options_rows(label, option1, option2):
+        bgroup = []  # button group
+        b1 = MyRadioButton(bgroup, u"")  # option1 button
+        b2 = MyRadioButton(bgroup, u"")  # option2 button
+
+        cols1_ = urwid.Columns([
+            ('fixed', 21, urwid.Text(label)),
+            ('fixed', 6, b1),
+            ('fixed', 10, urwid.Text(option1))],
+            dividechars=0)
+
+        cols2_ = urwid.Columns([
+            ('fixed', 21, urwid.Text("")),
+            ('fixed', 6, b2),
+            ('fixed', 10, urwid.Text(option2))],
+            dividechars=0)
+
+        return cols1_, cols2_
+
+    cols1, cols2 = create_options_rows("Mount USB media as", "translated", "raw")
+    body.extend([cols1, cols2, urwid.Divider()])
+
+    cols1, cols2 = create_options_rows("Access ZIP files as", "files", "dirs")
+    body.extend([cols1, cols2, urwid.Divider()])
+
+    # add save + cancel button
+    button_save = create_my_button(" Save", on_translated_save)
+    button_cancel = create_my_button("Cancel", back_to_main_menu)
+    buttons = urwid.GridFlow([button_save, button_cancel], 10, 1, 1, 'center')
+    body.append(buttons)
+
+    body.append(urwid.Divider())
+
+    body.append(urwid.Text('If you use also raw disks (Atari native ', align='center'))
+    body.append(urwid.Text('disks), you should avoid using few      ', align='center'))
+    body.append(urwid.Text('letters from C: to leave some space for ', align='center'))
+    body.append(urwid.Text('them.                                   ', align='center'))
+
+    main.original_widget = urwid.Padding(urwid.ListBox(urwid.SimpleFocusListWalker(body)), 'center', 40)
+
+
+def on_translated_save(button):
     pass
 
 def on_screen_hdd_image(button):
