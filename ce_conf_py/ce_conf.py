@@ -57,7 +57,7 @@ class MyButton(urwid.Button):
     button_right = "]"
 
     def __init__(self, label, on_press=None, user_data=None):
-        self._label = ButtonLabel("")
+        self._label = ButtonLabel('')
         self.user_data = user_data
 
         cols = urwid.Columns([
@@ -149,7 +149,7 @@ def create_header_footer(header_text, footer_text=None):
 
 
 def create_edit(text, width):
-    edit_line = urwid.Edit(caption="", edit_text=text)
+    edit_line = urwid.Edit(caption='', edit_text=text)
     edit_decorated = urwid.AttrMap(edit_line, None, focus_map='reversed')
 
     cols = urwid.Columns([
@@ -168,7 +168,7 @@ def on_license_save(button):
 
 
 def on_screen_license_key(button):
-    header, footer = create_header_footer('>> HW License <<')
+    header, footer = create_header_footer('HW License')
 
     body = []
     body.append(urwid.Divider())
@@ -182,7 +182,7 @@ def on_screen_license_key(button):
     body.append(urwid.Text('License key:'))
 
     # add license edit line
-    cols = create_edit("", 40)              # license number here
+    cols = create_edit('', 40)              # license number here
     body.append(cols)
     body.append(urwid.Divider())
 
@@ -197,7 +197,7 @@ def on_screen_license_key(button):
 
 
 def on_screen_acsi_config(button):
-    header, footer = create_header_footer('>> ACSI IDs config <<')
+    header, footer = create_header_footer('ACSI IDs config')
 
     body = []
     body.append(urwid.Divider())
@@ -221,10 +221,10 @@ def on_screen_acsi_config(button):
         id_str = urwid.Text(f" {id_}")           # ID number
 
         bgroup = []                             # button group
-        b1 = MyRadioButton(bgroup, u"")         # off
-        b2 = MyRadioButton(bgroup, u"")         # sd
-        b3 = MyRadioButton(bgroup, u"")         # raw
-        b4 = MyRadioButton(bgroup, u"")         # ce_dd
+        b1 = MyRadioButton(bgroup, u'')         # off
+        b2 = MyRadioButton(bgroup, u'')         # sd
+        b3 = MyRadioButton(bgroup, u'')         # raw
+        b4 = MyRadioButton(bgroup, u'')         # ce_dd
 
         # put items into Columns (== in a Row)
         cols = urwid.Columns([
@@ -263,7 +263,7 @@ def on_acsi_ids_save(button):
 
 
 def on_screen_translated(button):
-    header, footer = create_header_footer('>> Translated disk <<')
+    header, footer = create_header_footer('Translated disk')
 
     body = []
     body.append(urwid.Divider())
@@ -276,7 +276,7 @@ def on_screen_translated(button):
         col1 = 25
         col2 = 5
 
-        edit_one = create_edit_one("")
+        edit_one = create_edit_one('')
 
         cols = urwid.Columns([
             ('fixed', col1, urwid.Text(label)),
@@ -304,8 +304,8 @@ def on_screen_translated(button):
 
     def create_options_rows(label, option1, option2):
         bgroup = []  # button group
-        b1 = MyRadioButton(bgroup, u"")  # option1 button
-        b2 = MyRadioButton(bgroup, u"")  # option2 button
+        b1 = MyRadioButton(bgroup, u'')  # option1 button
+        b2 = MyRadioButton(bgroup, u'')  # option2 button
 
         cols1_ = urwid.Columns([
             ('fixed', 21, urwid.Text(label)),
@@ -314,7 +314,7 @@ def on_screen_translated(button):
             dividechars=0)
 
         cols2_ = urwid.Columns([
-            ('fixed', 21, urwid.Text("")),
+            ('fixed', 21, urwid.Text('')),
             ('fixed', 6, b2),
             ('fixed', 10, urwid.Text(option2))],
             dividechars=0)
@@ -349,14 +349,14 @@ def on_translated_save(button):
 
 
 def on_screen_hdd_image(button):
-    header, footer = create_header_footer('>> Disk image settings <<')
+    header, footer = create_header_footer('Disk image settings')
 
     body = []
     body.append(urwid.Divider())
 
     body.append(urwid.Text('HDD image path on RPi', align='left'))
 
-    cols = create_edit("", 40)          # hdd image path here
+    cols = create_edit('', 40)          # hdd image path here
     body.append(cols)
 
     body.append(urwid.Divider())
@@ -394,7 +394,7 @@ def on_hdd_img_clear(button):
 
 
 def on_screen_shared_drive(button):
-    header, footer = create_header_footer('>> Shared drive settings <<')
+    header, footer = create_header_footer('Shared drive settings')
 
     body = []
     body.append(urwid.Divider())
@@ -404,7 +404,7 @@ def on_screen_shared_drive(button):
     body.append(urwid.Text('on CosmosEx. Works in translated mode.  ', align='center'))
     body.append(urwid.Divider())
 
-    btn_enabled = MyCheckBox("")
+    btn_enabled = MyCheckBox('')
 
     # enabling / disabling shared drive
     cols = urwid.Columns([
@@ -418,8 +418,8 @@ def on_screen_shared_drive(button):
     body.append(urwid.Text('Sharing protocol', align='left'))
 
     bgrp = []  # button group
-    b1 = MyRadioButton(bgrp, u"")       # NFS
-    b2 = MyRadioButton(bgrp, u"")       # samba / cifs
+    b1 = MyRadioButton(bgrp, u'')       # NFS
+    b2 = MyRadioButton(bgrp, u'')       # samba / cifs
 
     cols = urwid.Columns([              # NFS option row
         ('fixed', 10, urwid.Text('')),
@@ -439,7 +439,7 @@ def on_screen_shared_drive(button):
     # IP of machine sharing info
     body.append(urwid.Text('IP address of server', align='left'))
 
-    cols_edit_ip = create_edit("", 17)
+    cols_edit_ip = create_edit('', 17)
     cols = urwid.Columns([              # NFS option row
         ('fixed', 10, urwid.Text('')),
         ('fixed', 17, cols_edit_ip)],
@@ -450,19 +450,19 @@ def on_screen_shared_drive(button):
     # folder on sharing machine
     body.append(urwid.Text('Shared folder path on server', align='left'))
 
-    cols_edit_path = create_edit("", 40)
+    cols_edit_path = create_edit('', 40)
     body.append(cols_edit_path)
     body.append(urwid.Divider())
 
     # username and password
-    cols_edit_username = create_edit("", 20)
+    cols_edit_username = create_edit('', 20)
     cols = urwid.Columns([
         ('fixed', 10, urwid.Text('Username', align='left')),
         ('fixed', 20, cols_edit_username)],
         dividechars=0)
     body.append(cols)
 
-    cols_edit_password = create_edit("", 20)
+    cols_edit_password = create_edit('', 20)
     cols = urwid.Columns([
         ('fixed', 10, urwid.Text('Password', align='left')),
         ('fixed', 20, cols_edit_password)],
@@ -485,7 +485,7 @@ def on_shared_save(button):
 
 
 def on_screen_floppy_config(button):
-    header, footer = create_header_footer('>> Floppy configuration <<')
+    header, footer = create_header_footer('Floppy configuration')
 
     body = []
     body.append(urwid.Divider())
@@ -494,7 +494,7 @@ def on_screen_floppy_config(button):
     colw = 5
 
     # enabling / disabling floppy
-    btn_enabled = MyCheckBox("")
+    btn_enabled = MyCheckBox('')
     cols = urwid.Columns([
         ('fixed', col1w, urwid.Text('Floppy enabled')),
         ('fixed', colw, btn_enabled)],
@@ -513,8 +513,8 @@ def on_screen_floppy_config(button):
 
     # drive ID selection row
     bgrp = []  # button group
-    b1 = MyRadioButton(bgrp, u"")       # drive ID 0
-    b2 = MyRadioButton(bgrp, u"")       # drive ID 1
+    b1 = MyRadioButton(bgrp, u'')       # drive ID 0
+    b2 = MyRadioButton(bgrp, u'')       # drive ID 1
 
     cols = urwid.Columns([
         ('fixed', col1w-2, urwid.Text('Drive ID')),
@@ -525,7 +525,7 @@ def on_screen_floppy_config(button):
     body.extend([urwid.Divider(), urwid.Divider()])
 
     # write protected floppy
-    btn_write_protect = MyCheckBox("")
+    btn_write_protect = MyCheckBox('')
     cols = urwid.Columns([
         ('fixed', col1w, urwid.Text('Write protected')),
         ('fixed', colw, btn_write_protect)],
@@ -534,7 +534,7 @@ def on_screen_floppy_config(button):
     body.extend([urwid.Divider(), urwid.Divider()])
 
     # make seek sound checkbox
-    btn_make_sound = MyCheckBox("")
+    btn_make_sound = MyCheckBox('')
     cols = urwid.Columns([
         ('fixed', col1w, urwid.Text('Make seek sound')),
         ('fixed', colw, btn_make_sound)],
@@ -556,21 +556,267 @@ def on_floppy_save(button):
     pass
 
 
-def on_screen_network_settings(button):
-    pass
+def ikbd_checkbox_line(label, hint):
+    body = []
+
+    checkbox = MyCheckBox('')
+
+    # first line with label and checkbox
+    cols = urwid.Columns([
+        ('fixed', 31, urwid.Text(label)),
+        ('fixed', 5, checkbox)],
+        dividechars=0)
+    body.append(cols)
+
+    # second line with hint
+    if hint:
+        body.append(urwid.Text(hint))
+
+    # third line with divider
+    body.append(urwid.Divider())
+
+    return body
+
+
+def ikbd_keyboard_joystick():
+    body = []
+
+    w_edit = 12
+    cols_btn = create_edit('', w_edit)
+    cols_up = create_edit('', w_edit)
+    cols_left = create_edit('', w_edit)
+    cols_down = create_edit('', w_edit)
+    cols_right = create_edit('', w_edit)
+
+    # button key and up key
+    cols = urwid.Columns([
+        ('fixed', w_edit, cols_btn),
+        ('fixed', w_edit, cols_up),
+        ('fixed', w_edit, urwid.Text(''))],
+        dividechars=0)
+    body.append(cols)
+
+    # button left, down, right
+    cols = urwid.Columns([
+        ('fixed', w_edit, cols_left),
+        ('fixed', w_edit, cols_down),
+        ('fixed', w_edit, cols_right)],
+        dividechars=0)
+    body.append(cols)
+
+    # divider
+    body.append(urwid.Divider())
+
+    return body
 
 
 def on_screen_ikbd(button):
+    header, footer = create_header_footer('IKBD settings')
+
+    body = []
+    body.append(urwid.Divider())
+
+    # attach 1st joy as JOY 0
+    chb_line = ikbd_checkbox_line('Attach 1st joy as JOY 0', '(hotkey: CTRL+any SHIFT+HELP/F11)')
+    body.extend(chb_line)
+
+    # mouse wheel as arrow up / down
+    chb_line = ikbd_checkbox_line('Mouse wheel as arrow UP / DOWN', '')
+    body.extend(chb_line)
+
+    # Keyboard Joy 0 enabled
+    body.append(urwid.Padding(urwid.AttrMap(urwid.Text(''), 'reversed'), 'center', 40))     # inverse divider line
+    chb_line = ikbd_checkbox_line('Keyboard Joy 0 enabled', '(hotkey: CTRL+LSHIFT+UNDO/F12)')
+    body.extend(chb_line)
+
+    # keyboard buttons for joy 0
+    cols_joy0 = ikbd_keyboard_joystick()
+    body.extend(cols_joy0)
+
+    # Keyboard Joy 1 enabled
+    body.append(urwid.Padding(urwid.AttrMap(urwid.Text(''), 'reversed'), 'center', 40))     # inverse divider line
+    chb_line = ikbd_checkbox_line('Keyboard Joy 1 enabled', '(hotkey: CTRL+RSHIFT+UNDO/F12)')
+    body.extend(chb_line)
+
+    # keyboard buttons for joy 1
+    cols_joy1 = ikbd_keyboard_joystick()
+    body.extend(cols_joy1)
+
+    # add save + cancel button
+    button_save = create_my_button(" Save", on_ikbd_save)
+    button_cancel = create_my_button("Cancel", back_to_main_menu)
+    buttons = urwid.GridFlow([button_save, button_cancel], 10, 1, 1, 'center')
+    body.append(buttons)
+
+    w_body = urwid.Padding(urwid.ListBox(urwid.SimpleFocusListWalker(body)), 'center', 36)
+    main.original_widget = urwid.Frame(w_body, header=header, footer=footer)
+
+
+def on_ikbd_save(button):
+    pass
+
+
+def create_setting_row(label, what, value, col1w, col2w, reverse=False):
+    if what == 'checkbox':      # for checkbox
+        widget = MyCheckBox('', state=value)
+        label = "   " + label
+    elif what == 'edit':        # for edit line
+        widget = create_edit(value, col2w)
+        label = "   " + label
+    elif what == 'text':
+        widget = urwid.Text(value)
+
+        if reverse:     # if should be reversed, apply attrmap
+            widget = urwid.AttrMap(widget, 'reversed')
+    else:                       # for title
+        widget = urwid.Text('')
+
+    # create label text
+    text_label = urwid.Text(label)
+
+    if reverse:         # if should be reversed, apply attrmap
+        text_label = urwid.AttrMap(text_label, 'reversed')
+
+    # put things into columns
+    cols = urwid.Columns([
+        ('fixed', col1w, text_label),
+        ('fixed', col2w, widget)],
+        dividechars=0)
+
+    return cols
+
+
+def on_screen_network_settings(button):
+    header, footer = create_header_footer('Network settings')
+
+    body = []
+    body.append(urwid.Divider())
+
+    col1w = 16
+    col2w = 17
+
+    # hostname and DNS
+    cols = create_setting_row('Hostname', 'edit', '', col1w, col2w)
+    body.append(cols)
+
+    cols = create_setting_row('DNS', 'edit', '', col1w, col2w)
+    body.append(cols)
+    body.append(urwid.Divider())
+
+    # ethernet settings
+    cols = create_setting_row('Ethernet', 'title', '', col1w, col2w)
+    body.append(cols)
+
+    cols = create_setting_row('Use DHCP', 'checkbox', False, col1w, col2w)
+    body.append(cols)
+
+    cols = create_setting_row('IP address', 'edit', '', col1w, col2w)
+    body.append(cols)
+
+    cols = create_setting_row('Mask', 'edit', '', col1w, col2w)
+    body.append(cols)
+
+    cols = create_setting_row('Gateway', 'edit', '', col1w, col2w)
+    body.append(cols)
+    body.append(urwid.Divider())
+
+    # wifi settings
+    cols = create_setting_row('Wifi', 'title', '', col1w, col2w)
+    body.append(cols)
+
+    cols = create_setting_row('Enable', 'checkbox', False, col1w, col2w)
+    body.append(cols)
+
+    cols = create_setting_row('WPA SSID', 'edit', '', col1w, col2w)
+    body.append(cols)
+
+    cols = create_setting_row('WPA PSK', 'edit', '', col1w, col2w)
+    body.append(cols)
+    body.append(urwid.Divider())
+
+    cols = create_setting_row('Use DHCP', 'checkbox', False, col1w, col2w)
+    body.append(cols)
+
+    cols = create_setting_row('IP address', 'edit', '', col1w, col2w)
+    body.append(cols)
+
+    cols = create_setting_row('Mask', 'edit', '', col1w, col2w)
+    body.append(cols)
+
+    cols = create_setting_row('Gateway', 'edit', '', col1w, col2w)
+    body.append(cols)
+    body.append(urwid.Divider())
+
+    # add save + cancel button
+    button_save = create_my_button(" Save", on_network_save)
+    button_cancel = create_my_button("Cancel", back_to_main_menu)
+    buttons = urwid.GridFlow([button_save, button_cancel], 10, 1, 1, 'center')
+    body.append(buttons)
+
+    w_body = urwid.Padding(urwid.ListBox(urwid.SimpleFocusListWalker(body)), 'center', 36)
+    main.original_widget = urwid.Frame(w_body, header=header, footer=footer)
+
+
+def on_network_save(button):
     pass
 
 
 def on_screen_update(button):
+    header, footer = create_header_footer('Software & Firmware updates')
+
+    body = []
+    body.append(urwid.Divider())
+
+    col1w = 24
+    col2w = 12
+
+    cols = create_setting_row('Hardware version  :', 'text', '', col1w, col2w)
+    body.append(cols)
+
+    cols = create_setting_row('HDD interface type:', 'text', '', col1w, col2w)
+    body.append(cols)
+
+    cols = create_setting_row('RPi revision      :', 'text', '', col1w, col2w)
+    body.append(cols)
+    body.append(urwid.Divider())
+
+    cols = create_setting_row('part', 'text', 'version', col1w, col2w, reverse=True)
+    body.append(cols)
+
+    cols = create_setting_row('Main App', 'text', '', col1w, col2w)
+    body.append(cols)
+
+    cols = create_setting_row('Horst', 'text', '', col1w, col2w)
+    body.append(cols)
+    body.append(urwid.Divider())
+
+    cols = create_setting_row('Status', 'text', 'unknown', col1w, col2w, reverse=True)
+    body.append(cols)
+    body.append(urwid.Divider())
+
+    # add update + cancel buttons
+    button_up_online = create_my_button("OnlineUp", on_update_online)
+    button_up_usb = create_my_button("  USB", on_update_usb)
+    button_cancel = create_my_button(" Cancel", back_to_main_menu)
+    buttons = urwid.GridFlow([button_up_online, button_up_usb, button_cancel], 12, 0, 1, 'center')
+    body.append(buttons)
+
+    w_body = urwid.Padding(urwid.ListBox(urwid.SimpleFocusListWalker(body)), 'center', col1w + col2w)
+    main.original_widget = urwid.Frame(w_body, header=header, footer=footer)
+
+
+def on_update_online(button):
+    pass
+
+
+def on_update_usb(button):
     pass
 
 
 def create_main_menu():
     body = []
-    body.append(urwid.AttrMap(urwid.Text('>> CE Config - main menu <<', align='center'), 'reversed'))
+    header, footer = create_header_footer('CE Config - main menu')
+
     body.append(urwid.Divider())
 
     menu_items = [('! License key !', on_screen_license_key), ('ACSI IDs', on_screen_acsi_config),
@@ -587,7 +833,9 @@ def create_main_menu():
         body.append(urwid.Divider())
 
     body.append(urwid.Divider())
-    return urwid.Padding(urwid.ListBox(urwid.SimpleFocusListWalker(body)), 'center', 40)
+
+    w_body = urwid.Padding(urwid.ListBox(urwid.SimpleFocusListWalker(body)), 'center', 40)
+    return urwid.Frame(w_body, header=header, footer=footer)
 
 
 def show_no_storage():
