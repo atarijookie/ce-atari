@@ -1,3 +1,4 @@
+import copy
 import sys
 import os
 import re
@@ -11,6 +12,8 @@ from setproctitle import setproctitle
 import subprocess
 import logging
 from logging.handlers import RotatingFileHandler
+from urwid_helpers import create_edit_one, create_my_button, create_header_footer, create_edit, MyRadioButton, \
+    MyCheckBox, show_text_dialog
 
 setproctitle("ce_config")       # set process title
 terminal_cols = 80  # should be 40 for ST low, 80 for ST mid
@@ -20,7 +23,7 @@ should_run = True
 
 log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
 
-my_handler = RotatingFileHandler('/tmp/ce_downloader.log', mode='a', maxBytes=1024 * 1024, backupCount=1, encoding=None,
+my_handler = RotatingFileHandler('/tmp/ce_conf.log', mode='a', maxBytes=1024 * 1024, backupCount=1, encoding=None,
                                  delay=0)
 my_handler.setFormatter(log_formatter)
 my_handler.setLevel(logging.DEBUG)
@@ -28,6 +31,44 @@ my_handler.setLevel(logging.DEBUG)
 app_log = logging.getLogger('root')
 app_log.setLevel(logging.DEBUG)
 app_log.addHandler(my_handler)
+
+settings_path = "/ce/settings"          # path to settings dir
+settings = {}                           # current settings
+settings_changed = {}                   # settings that changed and need to be saved
+settings_default = {'DRIVELETTER_FIRST': 'C', 'DRIVELETTER_SHARED': 'P', 'DRIVELETTER_CONFDRIVE': 'O',
+                    'MOUNT_RAW_NOT_TRANS': 0, 'SHARED_ENABLED': 0, 'SHARED_NFS_NOT_SAMBA': 0, 'FLOPPYCONF_ENABLED': 1,
+                    'FLOPPYCONF_DRIVEID': 0, 'FLOPPYCONF_WRITEPROTECTED': 0, 'FLOPPYCONF_SOUND_ENABLED': 1,
+                    'ACSI_DEVTYPE_0': 0, 'ACSI_DEVTYPE_1': 1, 'ACSI_DEVTYPE_2': 0, 'ACSI_DEVTYPE_3': 0,
+                    'ACSI_DEVTYPE_4': 0, 'ACSI_DEVTYPE_5': 0, 'ACSI_DEVTYPE_6': 0, 'ACSI_DEVTYPE_7': 0,
+                    'KEYBOARD_KEYS_JOY0': 'A%S%D%W%LSHIFT', 'KEYBOARD_KEYS_JOY1': 'LEFT%DOWN%RIGHT%UP%RSHIFT'}
+
+
+def settings_load():
+    """ load all the present settings from the settings dir """
+
+    global settings
+    settings = copy.deepcopy(settings_default)  # fill settings with default values before loading
+
+    for f in os.listdir(settings_path):         # go through the settings dir
+        path = os.path.join(settings_path, f)   # create full path
+
+        if not os.path.isfile(path):            # if it's not a file, skip it
+            continue
+
+        with open(path, "r") as file:           # read the file into value in dictionary
+            value = file.readline()
+            settings[f] = value
+            app_log.debug(f"settings_load: settings[{f}] = {value}")
+
+
+def settings_save():
+    """ save only changed settings to settings dir """
+    for key, value in settings_changed.items():     # get all the settings that have changed
+        path = os.path.join(settings_path, key)     # create full path
+
+        with open(path, "w") as file:               # write to that file
+            file.write(str(value))
+            app_log.debug(f"settings_save: {key} -> {value}")
 
 
 def alarm_callback(loop=None, data=None):
@@ -41,124 +82,6 @@ def update_status(new_status):
 
     if main_loop:  # if got main loop, trigger alarm to redraw widgets
         main_loop.set_alarm_in(1, alarm_callback)
-
-
-class ButtonLabel(urwid.SelectableIcon):
-    """ to hide curson on button, move cursor position outside of button
-    """
-
-    def set_text(self, label):
-        self.__super.set_text(label)
-        self._cursor_position = len(label) + 1  # move cursor position outside of button
-
-
-class MyButton(urwid.Button):
-    button_left = "["
-    button_right = "]"
-
-    def __init__(self, label, on_press=None, user_data=None):
-        self._label = ButtonLabel('')
-        self.user_data = user_data
-
-        cols = urwid.Columns([
-            ('fixed', len(self.button_left), urwid.Text(self.button_left)),
-            self._label,
-            ('fixed', len(self.button_right), urwid.Text(self.button_right))],
-            dividechars=1)
-        super(urwid.Button, self).__init__(cols)
-
-        if on_press:
-            urwid.connect_signal(self, 'click', on_press, user_data)
-
-        self.set_label(label)
-
-
-class MyRadioButton(urwid.RadioButton):
-    states = {
-        True: urwid.SelectableIcon("[ * ]", 2),
-        False: urwid.SelectableIcon("[   ]", 2),
-        'mixed': urwid.SelectableIcon("[ # ]", 2)
-    }
-    reserve_columns = 5
-
-
-class MyCheckBox(urwid.CheckBox):
-    states = {
-        True: urwid.SelectableIcon("[ * ]", 2),
-        False: urwid.SelectableIcon("[   ]", 2),
-        'mixed': urwid.SelectableIcon("[ # ]", 2)
-    }
-    reserve_columns = 5
-
-
-class EditOne(urwid.Text):
-    _selectable = True
-    ignore_focus = False
-    # (this variable is picked up by the MetaSignals metaclass)
-    signals = ["change", "postchange"]
-
-    def __init__(self, edit_text):
-        super().__init__(markup=edit_text)
-
-    def valid_char(self, ch):
-        if len(ch) != 1:
-            return False
-
-        och = ord(ch)
-        return (65 <= och <= 90) or (97 <= och <= 122)
-
-    def keypress(self, size, key):
-        if self.valid_char(key):        # valid key, use it
-            new_text = str(key).upper()
-            self.set_text(new_text)
-        else:                           # key wasn't handled
-            return key
-
-
-def create_edit_one(edit_text):
-    edit_one = EditOne(edit_text)
-    edit_one_decorated = urwid.AttrMap(edit_one, None, focus_map='reversed')
-
-    cols = urwid.Columns([
-        ('fixed', 2, urwid.Text('[ ')),
-        ('fixed', 1, edit_one_decorated),
-        ('fixed', 2, urwid.Text(' ]'))],
-        dividechars=0)
-
-    return cols
-
-
-def create_my_button(text, on_clicked_fn, on_clicked_data=None):
-    button = MyButton(text, on_clicked_fn, on_clicked_data)
-    attrmap = urwid.AttrMap(button, None, focus_map='reversed')  # reversed on button focused
-    attrmap.user_data = on_clicked_data
-    return attrmap
-
-
-def create_header_footer(header_text, footer_text=None):
-    header = urwid.AttrMap(urwid.Text(header_text, align='center'), 'reversed')
-    header = urwid.Padding(header, 'center', 40)
-
-    if footer_text is None:
-        footer_text = 'F5 - refresh, Ctrl+C or F10 - quit'
-
-    footer = urwid.AttrMap(urwid.Text(footer_text, align='center'), 'reversed')
-    footer = urwid.Padding(footer, 'center', 40)
-
-    return header, footer
-
-
-def create_edit(text, width):
-    edit_line = urwid.Edit(caption='', edit_text=text)
-    edit_decorated = urwid.AttrMap(edit_line, None, focus_map='reversed')
-
-    cols = urwid.Columns([
-        ('fixed', 1, urwid.Text('[')),
-        ('fixed', width - 2, edit_decorated),
-        ('fixed', 1, urwid.Text(']'))],
-        dividechars=0)
-
-    return cols
 
 
 def on_license_save(button):
@@ -188,7 +111,7 @@ def on_screen_license_key(button):
 
     # add save + cancel button
     button_save = create_my_button(" Save", on_license_save)
-    button_cancel = create_my_button("Cancel", back_to_main_menu)
+    button_cancel = create_my_button("Cancel", on_cancel)
     buttons = urwid.GridFlow([button_save, button_cancel], 10, 1, 1, 'center')
     body.append(buttons)
 
@@ -218,13 +141,13 @@ def on_screen_acsi_config(button):
 
     # fill in each row
     for id_ in range(8):
-        id_str = urwid.Text(f" {id_}")           # ID number
+        id_str = urwid.Text(f" {id_}")          # ID number
 
         bgroup = []                             # button group
-        b1 = MyRadioButton(bgroup, u'')         # off
-        b2 = MyRadioButton(bgroup, u'')         # sd
-        b3 = MyRadioButton(bgroup, u'')         # raw
-        b4 = MyRadioButton(bgroup, u'')         # ce_dd
+        b1 = MyRadioButton(bgroup, u'', on_state_change=on_acsi_id_changed, user_data={'id': id_, 'value': 0})  # off
+        b2 = MyRadioButton(bgroup, u'', on_state_change=on_acsi_id_changed, user_data={'id': id_, 'value': 1})  # sd
+        b3 = MyRadioButton(bgroup, u'', on_state_change=on_acsi_id_changed, user_data={'id': id_, 'value': 2})  # raw
+        b4 = MyRadioButton(bgroup, u'', on_state_change=on_acsi_id_changed, user_data={'id': id_, 'value': 3})  # ce_dd
 
         # put items into Columns (== in a Row)
         cols = urwid.Columns([
@@ -241,7 +164,7 @@ def on_screen_acsi_config(button):
 
     # add save + cancel button
     button_save = create_my_button(" Save", on_acsi_ids_save)
-    button_cancel = create_my_button("Cancel", back_to_main_menu)
+    button_cancel = create_my_button("Cancel", on_cancel)
     buttons = urwid.GridFlow([button_save, button_cancel], 10, 1, 1, 'center')
     body.append(buttons)
 
@@ -257,8 +180,75 @@ def on_screen_acsi_config(button):
     main.original_widget = urwid.Frame(w_body, header=header, footer=footer)
 
 
+def on_acsi_id_changed(button, state, data):
+    """ when ACSI ID setting changes from one value to another (e.g. off -> sd) """
+    if not state:                   # called on the checkbox, which is now off? skip it
+        return
+
+    id_ = data['id']                        # get ID
+    key = f'ACSI_DEVTYPE_{id_}'             # construct key name
+    value = data['value']
+    settings_changed[key] = value           # store value
+    app_log.debug(f"on_acsi_id_changed: {key = } -> {value = }")
+
+
 def on_acsi_ids_save(button):
-    # TODO: save IDs here
+    """ function that gets called on saving ACSI IDs config """
+
+    global settings, settings_changed
+
+    if not settings_changed:        # no settings changed, just quit
+        back_to_main_menu(button)
+
+    something_active = False
+    count_sd = 0
+    count_translated = 0
+
+    id_types = {}
+    for id_ in range(8):
+        key = f'ACSI_DEVTYPE_{id_}'
+        id_types[key] = settings.get(key, 0)        # get settings before change
+
+        new_type = settings_changed.get(key)        # try to get the changed value
+
+        if new_type is not None:                    # if value was found, store it
+            id_types[key] = new_type
+
+        if id_types[key] != 0:                      # if found something that is not OFF, got something active
+            something_active = True
+
+        if id_types[key] == 1:                      # found SD card type
+            count_sd += 1
+
+        if id_types[key] == 3:                      # found translated type
+            count_translated += 1
+
+    # after the loop validate settings, show warning
+    if not something_active:
+        show_text_dialog("All ACSI/SCSI IDs are set to 'OFF',\n" 
+                         "it is invalid and would brick the device.\n"
+                         "Select at least one active ACSI/SCSI ID.")
+        return
+
+    if count_translated > 1:
+        show_text_dialog("You have more than 1 CE_DD selected.\r"
+                         "Unselect some to leave only\n"
+                         "1 active.")
+        return
+
+    if count_sd > 1:
+        show_text_dialog("You have more than 1 SD cards\n"
+                         "selected. Unselect some to leave only\n"
+                         "1 active.")
+        return
+
+    # if(hwConfig.hddIface == HDD_IF_SCSI) {                         // running on SCSI? Show warning if ID 0 or 7 is used
+    #if (devTypes[0] != DEVTYPE_OFF | | devTypes[7] != DEVTYPE_OFF) {
+    #showMessageScreen("Warning", "You assigned something to ID 0 or ID 7.\n\rThey might not work as they might be\n\rused by SCSI controller.\n\r");
+    #}
+
+    settings_save()
+
     back_to_main_menu(button)
 
 
@@ -329,7 +319,7 @@ def on_screen_translated(button):
 
     # add save + cancel button
     button_save = create_my_button(" Save", on_translated_save)
-    button_cancel = create_my_button("Cancel", back_to_main_menu)
+    button_cancel = create_my_button("Cancel", on_cancel)
     buttons = urwid.GridFlow([button_save, button_cancel], 10, 1, 1, 'center')
     body.append(buttons)
 
@@ -363,7 +353,7 @@ def on_screen_hdd_image(button):
 
     # add save + cancel button
     button_save = create_my_button(" Save", on_hdd_img_save)
-    button_cancel = create_my_button("Cancel", back_to_main_menu)
+    button_cancel = create_my_button("Cancel", on_cancel)
     button_clear = create_my_button("Clear", on_hdd_img_clear)
     buttons = urwid.GridFlow([button_save, button_cancel, button_clear], 10, 1, 1, 'center')
     body.append(buttons)
@@ -472,7 +462,7 @@ def on_screen_shared_drive(button):
 
     # add save + cancel button
     button_save = create_my_button(" Save", on_shared_save)
-    button_cancel = create_my_button("Cancel", back_to_main_menu)
+    button_cancel = create_my_button("Cancel", on_cancel)
     buttons = urwid.GridFlow([button_save, button_cancel], 10, 1, 1, 'center')
     body.append(buttons)
 
@@ -544,7 +534,7 @@ def on_screen_floppy_config(button):
 
     # add save + cancel button
     button_save = create_my_button(" Save", on_floppy_save)
-    button_cancel = create_my_button("Cancel", back_to_main_menu)
+    button_cancel = create_my_button("Cancel", on_cancel)
     buttons = urwid.GridFlow([button_save, button_cancel], 10, 1, 1, 'center')
     body.append(buttons)
 
@@ -644,7 +634,7 @@ def on_screen_ikbd(button):
 
     # add save + cancel button
     button_save = create_my_button(" Save", on_ikbd_save)
-    button_cancel = create_my_button("Cancel", back_to_main_menu)
+    button_cancel = create_my_button("Cancel", on_cancel)
     buttons = urwid.GridFlow([button_save, button_cancel], 10, 1, 1, 'center')
     body.append(buttons)
 
@@ -749,7 +739,7 @@ def on_screen_network_settings(button):
 
     # add save + cancel button
     button_save = create_my_button(" Save", on_network_save)
-    button_cancel = create_my_button("Cancel", back_to_main_menu)
+    button_cancel = create_my_button("Cancel", on_cancel)
     buttons = urwid.GridFlow([button_save, button_cancel], 10, 1, 1, 'center')
     body.append(buttons)
 
@@ -797,7 +787,7 @@ def on_screen_update(button):
     # add update + cancel buttons
     button_up_online = create_my_button("OnlineUp", on_update_online)
     button_up_usb = create_my_button("  USB", on_update_usb)
-    button_cancel = create_my_button(" Cancel", back_to_main_menu)
+    button_cancel = create_my_button(" Cancel", on_cancel)
     buttons = urwid.GridFlow([button_up_online, button_up_usb, button_cancel], 12, 0, 1, 'center')
     body.append(buttons)
 
@@ -853,6 +843,12 @@ def show_no_storage():
     main.original_widget = urwid.Filler(urwid.Pile(body))
 
 
+def on_cancel(button):
+    global settings_changed
+    settings_changed = {}       # no settings have been changed
+    back_to_main_menu(None)     # return to main menu
+
+
 def back_to_main_menu(button):
     """ when we should return back to main menu """
     main.original_widget = urwid.Padding(create_main_menu(), left=2, right=2)
@@ -862,6 +858,7 @@ def exit_program(button):
     raise urwid.ExitMainLoop()
 
 
+# the config tool execution starts here
 terminal_cols, terminal_rows = urwid.raw_display.Screen().get_cols_rows()
 items_per_page = terminal_rows - 4
 
@@ -871,6 +868,8 @@ top = urwid.Overlay(main, urwid.SolidFill(),
                     align='center', width=('relative', 100),
                     valign='middle', height=('relative', 100),
                     min_width=20, min_height=9)
+
+settings_load()     # load all the settings
 
 try:
     main_loop = urwid.MainLoop(top, palette=[('reversed', 'standout', '')])
