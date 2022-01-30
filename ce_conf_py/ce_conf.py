@@ -36,7 +36,7 @@ app_log.addHandler(my_handler)
 
 settings_path = "/ce/settings"          # path to settings dir
 settings = {}                           # current settings
-settings_changed = {}                   # settings that changed and need to be saved
+settings_changed = {}
 settings_default = {'DRIVELETTER_FIRST': 'C', 'DRIVELETTER_SHARED': 'P', 'DRIVELETTER_CONFDRIVE': 'O',
                     'MOUNT_RAW_NOT_TRANS': 0, 'SHARED_ENABLED': 0, 'SHARED_NFS_NOT_SAMBA': 0, 'FLOPPYCONF_ENABLED': 1,
                     'FLOPPYCONF_DRIVEID': 0, 'FLOPPYCONF_WRITEPROTECTED': 0, 'FLOPPYCONF_SOUND_ENABLED': 1,
@@ -59,8 +59,9 @@ def settings_load():
 
         with open(path, "r") as file:           # read the file into value in dictionary
             value = file.readline()
+            value = re.sub('[\n\r\t]', '', value)
             settings[f] = value
-            app_log.debug(f"settings_load: settings[{f}] = {value}")
+            #app_log.debug(f"settings_load: settings[{f}] = {value}")
 
 
 def settings_save():
@@ -125,6 +126,7 @@ def on_screen_acsi_config(button):
     header, footer = create_header_footer('ACSI IDs config')
 
     global settings
+    settings_load()
 
     body = []
     body.append(urwid.Divider())
@@ -203,10 +205,7 @@ def on_acsi_id_changed(button, state, data):
 def on_acsi_ids_save(button):
     """ function that gets called on saving ACSI IDs config """
 
-    global settings, settings_changed
-
-    if not settings_changed:        # no settings changed, just quit
-        back_to_main_menu(button)
+    global settings
 
     something_active = False
     count_sd = 0
@@ -215,7 +214,7 @@ def on_acsi_ids_save(button):
     id_types = {}
     for id_ in range(8):
         key = f'ACSI_DEVTYPE_{id_}'
-        id_types[key] = settings.get(key, 0)        # get settings before change
+        id_types[key] = int(settings.get(key, 0))   # get settings before change
 
         new_type = settings_changed.get(key)        # try to get the changed value
 
@@ -231,6 +230,8 @@ def on_acsi_ids_save(button):
         if id_types[key] == 3:                      # found translated type
             count_translated += 1
 
+    app_log.debug(f"on acsi save: {id_types}")
+
     # after the loop validate settings, show warning
     if not something_active:
         dialog(main_loop, current_body,
@@ -239,11 +240,11 @@ def on_acsi_ids_save(button):
         return
 
     if count_translated > 1:
-        dialog(main_loop, current_body, "You have more than 1 CE_DD selected. Unselect some to leave only 1 active.")
+        dialog(main_loop, current_body, f"You have {count_translated} IDs selected as CE_DD type. Unselect some to leave only 1 active.")
         return
 
     if count_sd > 1:
-        dialog(main_loop, current_body, "You have more than 1 SD cards selected. Unselect some to leave only 1 active.")
+        dialog(main_loop, current_body, f"You have {count_sd} IDs selected as SD type. Unselect some to leave only 1 active.")
         return
 
     # if(hwConfig.hddIface == HDD_IF_SCSI) {                         // running on SCSI? Show warning if ID 0 or 7 is used
@@ -259,6 +260,9 @@ def on_acsi_ids_save(button):
 def on_screen_translated(button):
     header, footer = create_header_footer('Translated disk')
 
+    global settings
+    settings_load()
+
     body = []
     body.append(urwid.Divider())
 
@@ -266,11 +270,11 @@ def on_screen_translated(button):
     body.append(urwid.Divider())
 
     # helper function to create one translated drives letter config row
-    def create_drive_row(label):
+    def create_drive_row(label, letter, setting_name):
         col1 = 25
         col2 = 5
 
-        edit_one = create_edit_one('')
+        edit_one = create_edit_one(letter, setting_name, on_edit_changed)
 
         cols = urwid.Columns([
             ('fixed', col1, urwid.Text(label)),
@@ -280,45 +284,55 @@ def on_screen_translated(button):
         return cols
 
     # translated drive letter
-    trans_first = create_drive_row("First translated drive")
+    letter = settings.get('DRIVELETTER_FIRST', 'C')
+    trans_first = create_drive_row("First translated drive", letter, 'DRIVELETTER_FIRST')
     body.append(trans_first)
     body.append(urwid.Divider())
 
     # shared drive letter
-    trans_shared = create_drive_row("Shared drive")
+    letter = settings.get('DRIVELETTER_SHARED', 'N')
+    trans_shared = create_drive_row("Shared drive", letter, 'DRIVELETTER_SHARED')
     body.append(trans_shared)
 
     # config drive letter
-    trans_config = create_drive_row("Config drive")
+    letter = settings.get('DRIVELETTER_CONFDRIVE', 'O')
+    trans_config = create_drive_row("Config drive", letter, 'DRIVELETTER_CONFDRIVE')
     body.append(trans_config)
 
     body.append(urwid.Divider())
     body.append(urwid.AttrMap(urwid.Text('Options', align='center'), 'reversed'))
     body.append(urwid.Divider())
 
-    def create_options_rows(label, option1, option2):
+    def create_options_rows(label, option1_true, option2_false, setting_name):
+        value = bool(settings.get(setting_name, 0))
+
         bgroup = []  # button group
-        b1 = MyRadioButton(bgroup, u'')  # option1 button
-        b2 = MyRadioButton(bgroup, u'')  # option2 button
+        b1 = MyRadioButton(bgroup, '', on_state_change=on_option_changed,
+            user_data={'id': setting_name, 'value': 1}, state=value)        # option1 button
+
+        b2 = MyRadioButton(bgroup, '', on_state_change=on_option_changed,
+            user_data={'id': setting_name, 'value': 0},  state=not value)   # option2 button
 
         cols1_ = urwid.Columns([
             ('fixed', 21, urwid.Text(label)),
             ('fixed', 6, b1),
-            ('fixed', 10, urwid.Text(option1))],
+            ('fixed', 10, urwid.Text(option1_true))],
             dividechars=0)
 
         cols2_ = urwid.Columns([
             ('fixed', 21, urwid.Text('')),
             ('fixed', 6, b2),
-            ('fixed', 10, urwid.Text(option2))],
+            ('fixed', 10, urwid.Text(option2_false))],
             dividechars=0)
 
         return cols1_, cols2_
 
-    cols1, cols2 = create_options_rows("Mount USB media as", "translated", "raw")
+    mount_as_raw = settings.get('MOUNT_RAW_NOT_TRANS', 0)
+    cols1, cols2 = create_options_rows("Mount USB media as", "raw", "translated", 'MOUNT_RAW_NOT_TRANS')
     body.extend([cols1, cols2, urwid.Divider()])
 
-    cols1, cols2 = create_options_rows("Access ZIP files as", "files", "dirs")
+    mount_zip = settings.get('MOUNT_RAW_NOT_TRANS', 0)
+    cols1, cols2 = create_options_rows("Access ZIP files as", "dirs", "files", 'MOUNT_ZIP_FILES')
     body.extend([cols1, cols2, urwid.Divider()])
 
     # add save + cancel button
@@ -338,8 +352,27 @@ def on_screen_translated(button):
     main.original_widget = urwid.Frame(w_body, header=header, footer=footer)
 
 
+def on_option_changed(button, state, data):
+    """ translated options changed """
+    if not state:                           # called on the radiobutton, which is now off? skip it
+        return
+
+    key = data['id']                        # get key
+    value = data['value']
+    settings_changed[key] = value           # store value
+    app_log.debug(f"on_option_changed: {key = } -> {value = }")
+
+
+def on_edit_changed(button, state, data):
+    """ edit line changed """
+    key = data['id']                        # get key
+    value = data['value']
+    settings_changed[key] = value           # store value
+    app_log.debug(f"on_edit_changed: {key = } -> {value = }")
+
+
 def on_translated_save(button):
-    pass
+    app_log.debug(f"on_translated_save: {settings_changed}")
 
 
 def on_screen_hdd_image(button):
@@ -873,8 +906,6 @@ top = urwid.Overlay(main, urwid.SolidFill(),
                     valign='middle', height=('relative', 100),
                     min_width=20, min_height=9)
 current_body = top
-
-settings_load()     # load all the settings
 
 try:
     main_loop = urwid.MainLoop(top, palette=[('reversed', 'standout', '')])

@@ -63,7 +63,7 @@ class EditOne(urwid.Text):
             return False
 
         och = ord(ch)
-        return (65 <= och <= 90) or (97 <= och <= 122)
+        return (67 <= och <= 90) or (99 <= och <= 122)      # C-Z
 
     def keypress(self, size, key):
         if self.valid_char(key):        # valid key, use it
@@ -73,8 +73,9 @@ class EditOne(urwid.Text):
             return key
 
 
-def create_edit_one(edit_text):
+def create_edit_one(edit_text, setting_name, on_edit_changed):
     edit_one = EditOne(edit_text)
+    urwid.connect_signal(edit_one, 'postchange', on_edit_changed, {'id': setting_name})
     edit_one_decorated = urwid.AttrMap(edit_one, None, focus_map='reversed')
 
     cols = urwid.Columns([
