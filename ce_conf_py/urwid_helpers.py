@@ -123,61 +123,61 @@ main_loop_original = None
 current_body_original = None
 
 
-def dialog(main_loop, current_body, text = ['']):
+def dialog(main_loop, current_body, text, title='Warning'):
     """
     Overlays a dialog box on top of the console UI
 
     Args:
-        test (list): A list of strings to display
+        main_loop: original main loop
+        current_body: current body shown on screen
+        text: message to display
+        title: dialog title message
     """
 
+    # store the original values, so we can restore then on dialog end
     global main_loop_original, current_body_original
     main_loop_original = main_loop
     current_body_original = current_body
 
-    # Header
-    header_text = urwid.Text(('banner', 'Help'), align = 'center')
+    # header
+    header_text = urwid.AttrMap(urwid.Text(title, align='center'), 'reversed')
     header = urwid.AttrMap(header_text, 'banner')
 
     # Body
-    body_text = urwid.Text(text, align = 'center')
-    body_filler = urwid.Filler(body_text, valign = 'top')
+    body_text = urwid.Text(text, align='center')
+    body_filler = urwid.Filler(body_text)
     body_padding = urwid.Padding(
         body_filler,
-        left = 1,
-        right = 1
+        left=1,
+        right=1
     )
-    body = urwid.LineBox(body_padding)
 
     # Footer
-    footer = urwid.Button('Okay', reset_layout)
+    footer = create_my_button(' OK', reset_layout)
     footer = urwid.AttrWrap(footer, 'selectable', 'focus')
     footer = urwid.GridFlow([footer], 8, 1, 1, 'center')
 
     # Layout
     layout = urwid.Frame(
-        body,
-        header = header,
-        footer = footer,
-        focus_part = 'footer'
+        body_padding,
+        header=header,
+        footer=footer,
+        focus_part='footer'
     )
 
     w = urwid.Overlay(
         urwid.LineBox(layout),
         current_body,
-        align = 'center',
-        width = 40,
-        valign = 'middle',
-        height = 10
+        align='center',
+        width=36,
+        valign='middle',
+        height=10
     )
 
     main_loop.widget = w
 
 
 def reset_layout(button):
-    '''
-    Resets the console UI to the default layout
-    '''
-
+    """ resets the console UI to the previous layout """
     main_loop_original.widget = current_body_original
     main_loop_original.draw_screen()

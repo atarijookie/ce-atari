@@ -124,6 +124,8 @@ def on_screen_license_key(button):
 def on_screen_acsi_config(button):
     header, footer = create_header_footer('ACSI IDs config')
 
+    global settings
+
     body = []
     body.append(urwid.Divider())
 
@@ -145,11 +147,15 @@ def on_screen_acsi_config(button):
     for id_ in range(8):
         id_str = urwid.Text(f" {id_}")          # ID number
 
+        key = f'ACSI_DEVTYPE_{id_}'             # construct setting name
+        selected = int(settings.get(key, 0))
+        app_log.debug(f"on_screen_acsi_config: {key = } -> {selected = }")
+
         bgroup = []                             # button group
-        b1 = MyRadioButton(bgroup, u'', on_state_change=on_acsi_id_changed, user_data={'id': id_, 'value': 0})  # off
-        b2 = MyRadioButton(bgroup, u'', on_state_change=on_acsi_id_changed, user_data={'id': id_, 'value': 1})  # sd
-        b3 = MyRadioButton(bgroup, u'', on_state_change=on_acsi_id_changed, user_data={'id': id_, 'value': 2})  # raw
-        b4 = MyRadioButton(bgroup, u'', on_state_change=on_acsi_id_changed, user_data={'id': id_, 'value': 3})  # ce_dd
+        b1 = MyRadioButton(bgroup, u'', on_state_change=on_acsi_id_changed, user_data={'id': id_, 'value': 0}, state=(selected == 0))  # off
+        b2 = MyRadioButton(bgroup, u'', on_state_change=on_acsi_id_changed, user_data={'id': id_, 'value': 1}, state=(selected == 1))  # sd
+        b3 = MyRadioButton(bgroup, u'', on_state_change=on_acsi_id_changed, user_data={'id': id_, 'value': 2}, state=(selected == 2))  # raw
+        b4 = MyRadioButton(bgroup, u'', on_state_change=on_acsi_id_changed, user_data={'id': id_, 'value': 3}, state=(selected == 3))  # ce_dd
 
         # put items into Columns (== in a Row)
         cols = urwid.Columns([
@@ -227,21 +233,17 @@ def on_acsi_ids_save(button):
 
     # after the loop validate settings, show warning
     if not something_active:
-        dialog(main_loop, current_body, ["All ACSI/SCSI IDs are set to 'OFF',\n" 
-                         "it is invalid and would brick the device.\n"
-                         "Select at least one active ACSI/SCSI ID."])
+        dialog(main_loop, current_body,
+               "All ACSI/SCSI IDs are set to 'OFF', this is invalid and would brick the device. "
+               "Select at least one active ACSI/SCSI ID.")
         return
 
     if count_translated > 1:
-        dialog(main_loop, current_body, ["You have more than 1 CE_DD selected.\r"
-                         "Unselect some to leave only\n"
-                         "1 active."])
+        dialog(main_loop, current_body, "You have more than 1 CE_DD selected. Unselect some to leave only 1 active.")
         return
 
     if count_sd > 1:
-        dialog(main_loop, current_body, "You have more than 1 SD cards\n"
-                         "selected. Unselect some to leave only\n"
-                         "1 active.")
+        dialog(main_loop, current_body, "You have more than 1 SD cards selected. Unselect some to leave only 1 active.")
         return
 
     # if(hwConfig.hddIface == HDD_IF_SCSI) {                         // running on SCSI? Show warning if ID 0 or 7 is used
