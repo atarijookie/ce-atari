@@ -119,106 +119,65 @@ def create_edit(text, width):
     return cols
 
 
-class DialogExit(Exception):
-    pass
+main_loop_original = None
+current_body_original = None
 
 
-# dialogs taken from:
-# https://github.com/urwid/urwid/blob/master/examples/dialog.py
+def dialog(main_loop, current_body, text = ['']):
+    """
+    Overlays a dialog box on top of the console UI
 
-class DialogDisplay:
-    palette = [
-        ('body','black','light gray', 'standout'),
-        ('border','black','dark blue'),
-        ('shadow','white','black'),
-        ('selectable','black', 'dark cyan'),
-        ('focus','white','dark blue','bold'),
-        ('focustext','light gray','dark blue'),
-        ]
+    Args:
+        test (list): A list of strings to display
+    """
 
-    def __init__(self, text, height, width, body=None):
-        width = int(width)
-        if width <= 0:
-            width = ('relative', 80)
-        height = int(height)
-        if height <= 0:
-            height = ('relative', 80)
+    global main_loop_original, current_body_original
+    main_loop_original = main_loop
+    current_body_original = current_body
 
-        self.body = body
-        if body is None:
-            # fill space with nothing
-            body = urwid.Filler(urwid.Divider(),'top')
+    # Header
+    header_text = urwid.Text(('banner', 'Help'), align = 'center')
+    header = urwid.AttrMap(header_text, 'banner')
 
-        self.frame = urwid.Frame( body, focus_part='footer')
-        if text is not None:
-            self.frame.header = urwid.Pile( [urwid.Text(text),
-                urwid.Divider()] )
-        w = self.frame
+    # Body
+    body_text = urwid.Text(text, align = 'center')
+    body_filler = urwid.Filler(body_text, valign = 'top')
+    body_padding = urwid.Padding(
+        body_filler,
+        left = 1,
+        right = 1
+    )
+    body = urwid.LineBox(body_padding)
 
-        # pad area around listbox
-        w = urwid.Padding(w, ('fixed left',2), ('fixed right',2))
-        w = urwid.Filler(w, ('fixed top',1), ('fixed bottom',1))
-        w = urwid.AttrWrap(w, 'body')
+    # Footer
+    footer = urwid.Button('Okay', reset_layout)
+    footer = urwid.AttrWrap(footer, 'selectable', 'focus')
+    footer = urwid.GridFlow([footer], 8, 1, 1, 'center')
 
-        # "shadow" effect
-        w = urwid.Columns( [w,('fixed', 2, urwid.AttrWrap(
-            urwid.Filler(urwid.Text(('border','  ')), "top")
-            ,'shadow'))])
-        w = urwid.Frame( w, footer =
-            urwid.AttrWrap(urwid.Text(('border','  ')),'shadow'))
+    # Layout
+    layout = urwid.Frame(
+        body,
+        header = header,
+        footer = footer,
+        focus_part = 'footer'
+    )
 
-        # outermost border area
-        w = urwid.Padding(w, 'center', width )
-        w = urwid.Filler(w, 'middle', height )
-        w = urwid.AttrWrap( w, 'border' )
+    w = urwid.Overlay(
+        urwid.LineBox(layout),
+        current_body,
+        align = 'center',
+        width = 40,
+        valign = 'middle',
+        height = 10
+    )
 
-        self.view = w
-
-
-    def add_buttons(self, buttons):
-        l = []
-        for name, exitcode in buttons:
-            b = urwid.Button( name, self.button_press )
-            b.exitcode = exitcode
-            b = urwid.AttrWrap( b, 'selectable','focus' )
-            l.append( b )
-        self.buttons = urwid.GridFlow(l, 10, 3, 1, 'center')
-        self.frame.footer = urwid.Pile( [ urwid.Divider(),
-            self.buttons ], focus_item = 1)
-
-    def button_press(self, button):
-        raise DialogExit(button.exitcode)
-
-    def main(self):
-        self.loop = urwid.MainLoop(self.view, self.palette)
-        try:
-            self.loop.run()
-        except DialogExit as e:
-            return self.on_exit( e.args[0] )
-
-    def on_exit(self, exitcode):
-        return exitcode, ""
+    main_loop.widget = w
 
 
-class TextDialogDisplay(DialogDisplay):
-    def __init__(self, message, height, width):
-        l = []
-        l.append(urwid.Text(message))
+def reset_layout(button):
+    '''
+    Resets the console UI to the default layout
+    '''
 
-        body = urwid.ListBox(urwid.SimpleListWalker(l))
-        body = urwid.AttrWrap(body, 'selectable', 'focustext')
-
-        DialogDisplay.__init__(self, None, height, width, body)
-
-    def unhandled_key(self, size, k):
-        if k in ('up','page up','down','page down'):
-            self.frame.set_focus('body')
-            self.view.keypress( size, k )
-            self.frame.set_focus('footer')
-
-
-def show_text_dialog(message, height=5, width=30):
-    d = TextDialogDisplay(message, height, width)
-    d.add_buttons([("Exit", 0)])
-    d.main()
-
+    main_loop_original.widget = current_body_original
+    main_loop_original.draw_screen()

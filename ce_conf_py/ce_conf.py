@@ -13,12 +13,14 @@ import subprocess
 import logging
 from logging.handlers import RotatingFileHandler
 from urwid_helpers import create_edit_one, create_my_button, create_header_footer, create_edit, MyRadioButton, \
-    MyCheckBox, show_text_dialog
+    MyCheckBox, dialog
 
 setproctitle("ce_config")       # set process title
 terminal_cols = 80  # should be 40 for ST low, 80 for ST mid
 terminal_rows = 23
 
+main_loop = None
+current_body = None
 should_run = True
 
 log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
@@ -225,19 +227,19 @@ def on_acsi_ids_save(button):
 
     # after the loop validate settings, show warning
     if not something_active:
-        show_text_dialog("All ACSI/SCSI IDs are set to 'OFF',\n" 
+        dialog(main_loop, current_body, ["All ACSI/SCSI IDs are set to 'OFF',\n" 
                          "it is invalid and would brick the device.\n"
-                         "Select at least one active ACSI/SCSI ID.")
+                         "Select at least one active ACSI/SCSI ID."])
         return
 
     if count_translated > 1:
-        show_text_dialog("You have more than 1 CE_DD selected.\r"
+        dialog(main_loop, current_body, ["You have more than 1 CE_DD selected.\r"
                          "Unselect some to leave only\n"
-                         "1 active.")
+                         "1 active."])
         return
 
     if count_sd > 1:
-        show_text_dialog("You have more than 1 SD cards\n"
+        dialog(main_loop, current_body, "You have more than 1 SD cards\n"
                          "selected. Unselect some to leave only\n"
                          "1 active.")
         return
@@ -868,6 +870,7 @@ top = urwid.Overlay(main, urwid.SolidFill(),
                     align='center', width=('relative', 100),
                     valign='middle', height=('relative', 100),
                     min_width=20, min_height=9)
+current_body = top
 
 settings_load()     # load all the settings
 
