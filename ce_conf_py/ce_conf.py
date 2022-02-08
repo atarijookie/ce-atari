@@ -1,15 +1,8 @@
 import copy
-import sys
 import os
 import re
-import threading, queue
-import time
-import math
-import urllib3
-import codecs
 import urwid
 from setproctitle import setproctitle
-import subprocess
 import logging
 from logging.handlers import RotatingFileHandler
 from urwid_helpers import create_edit_one, create_my_button, create_header_footer, create_edit, MyRadioButton, \
@@ -87,13 +80,17 @@ def update_status(new_status):
         main_loop.set_alarm_in(1, alarm_callback)
 
 
-def on_license_save(button):
+def license_save(button):
     # TODO: save license here
 
     back_to_main_menu(button)
 
 
-def on_screen_license_key(button):
+def license_create(button):
+    global settings, settings_changed
+    settings_changed = {}                       # no settings have been changed
+    settings_load()
+
     header, footer = create_header_footer('HW License')
 
     body = []
@@ -113,7 +110,7 @@ def on_screen_license_key(button):
     body.append(urwid.Divider())
 
     # add save + cancel button
-    button_save = create_my_button(" Save", on_license_save)
+    button_save = create_my_button(" Save", license_save)
     button_cancel = create_my_button("Cancel", on_cancel)
     buttons = urwid.GridFlow([button_save, button_cancel], 10, 1, 1, 'center')
     body.append(buttons)
@@ -122,11 +119,12 @@ def on_screen_license_key(button):
     main.original_widget = urwid.Frame(w_body, header=header, footer=footer)
 
 
-def on_screen_acsi_config(button):
-    header, footer = create_header_footer('ACSI IDs config')
-
-    global settings
+def acsi_ids_create(button):
+    global settings, settings_changed
+    settings_changed = {}                       # no settings have been changed
     settings_load()
+
+    header, footer = create_header_footer('ACSI IDs config')
 
     body = []
     body.append(urwid.Divider())
@@ -154,10 +152,10 @@ def on_screen_acsi_config(button):
         app_log.debug(f"on_screen_acsi_config: {key = } -> {selected = }")
 
         bgroup = []                             # button group
-        b1 = MyRadioButton(bgroup, u'', on_state_change=on_acsi_id_changed, user_data={'id': id_, 'value': 0}, state=(selected == 0))  # off
-        b2 = MyRadioButton(bgroup, u'', on_state_change=on_acsi_id_changed, user_data={'id': id_, 'value': 1}, state=(selected == 1))  # sd
-        b3 = MyRadioButton(bgroup, u'', on_state_change=on_acsi_id_changed, user_data={'id': id_, 'value': 2}, state=(selected == 2))  # raw
-        b4 = MyRadioButton(bgroup, u'', on_state_change=on_acsi_id_changed, user_data={'id': id_, 'value': 3}, state=(selected == 3))  # ce_dd
+        b1 = MyRadioButton(bgroup, u'', on_state_change=acsi_ids_changed, user_data={'id': id_, 'value': 0}, state=(selected == 0))  # off
+        b2 = MyRadioButton(bgroup, u'', on_state_change=acsi_ids_changed, user_data={'id': id_, 'value': 1}, state=(selected == 1))  # sd
+        b3 = MyRadioButton(bgroup, u'', on_state_change=acsi_ids_changed, user_data={'id': id_, 'value': 2}, state=(selected == 2))  # raw
+        b4 = MyRadioButton(bgroup, u'', on_state_change=acsi_ids_changed, user_data={'id': id_, 'value': 3}, state=(selected == 3))  # ce_dd
 
         # put items into Columns (== in a Row)
         cols = urwid.Columns([
@@ -173,7 +171,7 @@ def on_screen_acsi_config(button):
     body.append(urwid.Divider())
 
     # add save + cancel button
-    button_save = create_my_button(" Save", on_acsi_ids_save)
+    button_save = create_my_button(" Save", acsi_ids_save)
     button_cancel = create_my_button("Cancel", on_cancel)
     buttons = urwid.GridFlow([button_save, button_cancel], 10, 1, 1, 'center')
     body.append(buttons)
@@ -190,7 +188,7 @@ def on_screen_acsi_config(button):
     main.original_widget = urwid.Frame(w_body, header=header, footer=footer)
 
 
-def on_acsi_id_changed(button, state, data):
+def acsi_ids_changed(button, state, data):
     """ when ACSI ID setting changes from one value to another (e.g. off -> sd) """
     if not state:                   # called on the checkbox, which is now off? skip it
         return
@@ -202,7 +200,7 @@ def on_acsi_id_changed(button, state, data):
     app_log.debug(f"on_acsi_id_changed: {key = } -> {value = }")
 
 
-def on_acsi_ids_save(button):
+def acsi_ids_save(button):
     """ function that gets called on saving ACSI IDs config """
 
     global settings
@@ -257,23 +255,24 @@ def on_acsi_ids_save(button):
     back_to_main_menu(button)
 
 
-def on_screen_translated(button):
-    header, footer = create_header_footer('Translated disk')
-
-    global settings
+def translated_create(button):
+    global settings, settings_changed
+    settings_changed = {}                       # no settings have been changed
     settings_load()
+
+    header, footer = create_header_footer('Translated disk')
 
     body = []
     body.append(urwid.Divider())
 
     body.append(urwid.AttrMap(urwid.Text('Drive letters assignment', align='center'), 'reversed'))
-    body.append(urwid.Divider())
 
     # helper function to create one translated drives letter config row
-    def create_drive_row(label, letter, setting_name):
+    def create_drive_row(label, setting_name):
         col1 = 25
         col2 = 5
 
+        letter = settings.get(setting_name, 'C')
         edit_one = create_edit_one(letter, setting_name, on_edit_changed)
 
         cols = urwid.Columns([
@@ -284,19 +283,16 @@ def on_screen_translated(button):
         return cols
 
     # translated drive letter
-    letter = settings.get('DRIVELETTER_FIRST', 'C')
-    trans_first = create_drive_row("First translated drive", letter, 'DRIVELETTER_FIRST')
+    trans_first = create_drive_row("First translated drive", 'DRIVELETTER_FIRST')
     body.append(trans_first)
     body.append(urwid.Divider())
 
     # shared drive letter
-    letter = settings.get('DRIVELETTER_SHARED', 'N')
-    trans_shared = create_drive_row("Shared drive", letter, 'DRIVELETTER_SHARED')
+    trans_shared = create_drive_row("Shared drive", 'DRIVELETTER_SHARED')
     body.append(trans_shared)
 
     # config drive letter
-    letter = settings.get('DRIVELETTER_CONFDRIVE', 'O')
-    trans_config = create_drive_row("Config drive", letter, 'DRIVELETTER_CONFDRIVE')
+    trans_config = create_drive_row("Config drive", 'DRIVELETTER_CONFDRIVE')
     body.append(trans_config)
 
     body.append(urwid.Divider())
@@ -336,7 +332,7 @@ def on_screen_translated(button):
     body.extend([cols1, cols2, urwid.Divider()])
 
     # add save + cancel button
-    button_save = create_my_button(" Save", on_translated_save)
+    button_save = create_my_button(" Save", translated_save)
     button_cancel = create_my_button("Cancel", on_cancel)
     buttons = urwid.GridFlow([button_save, button_cancel], 10, 1, 1, 'center')
     body.append(buttons)
@@ -366,16 +362,24 @@ def on_option_changed(button, state, data):
 def on_edit_changed(button, state, data):
     """ edit line changed """
     key = data['id']                        # get key
-    value = data['value']
-    settings_changed[key] = value           # store value
-    app_log.debug(f"on_edit_changed: {key = } -> {value = }")
+    settings_changed[key] = state           # store value
+    app_log.debug(f"on_edit_changed: {key = } -> {state = }")
 
 
-def on_translated_save(button):
+def translated_save(button):
     app_log.debug(f"on_translated_save: {settings_changed}")
 
+    # TODO: translated settings verification before saving here
 
-def on_screen_hdd_image(button):
+    settings_save()
+    back_to_main_menu(None)
+
+
+def hdd_image_create(button):
+    global settings, settings_changed
+    settings_changed = {}                       # no settings have been changed
+    settings_load()
+
     header, footer = create_header_footer('Disk image settings')
 
     body = []
@@ -389,9 +393,9 @@ def on_screen_hdd_image(button):
     body.append(urwid.Divider())
 
     # add save + cancel button
-    button_save = create_my_button(" Save", on_hdd_img_save)
+    button_save = create_my_button(" Save", hdd_img_save)
     button_cancel = create_my_button("Cancel", on_cancel)
-    button_clear = create_my_button("Clear", on_hdd_img_clear)
+    button_clear = create_my_button("Clear", hdd_img_clear)
     buttons = urwid.GridFlow([button_save, button_cancel, button_clear], 10, 1, 1, 'center')
     body.append(buttons)
 
@@ -412,15 +416,19 @@ def on_screen_hdd_image(button):
     main.original_widget = urwid.Frame(w_body, header=header, footer=footer)
 
 
-def on_hdd_img_save(button):
+def hdd_img_save(button):
     pass
 
 
-def on_hdd_img_clear(button):
+def hdd_img_clear(button):
     pass
 
 
-def on_screen_shared_drive(button):
+def shared_drive_create(button):
+    global settings, settings_changed
+    settings_changed = {}                       # no settings have been changed
+    settings_load()
+
     header, footer = create_header_footer('Shared drive settings')
 
     body = []
@@ -451,14 +459,14 @@ def on_screen_shared_drive(button):
     cols = urwid.Columns([              # NFS option row
         ('fixed', 10, urwid.Text('')),
         ('fixed', 7, b1),
-        ('fixed', 25, urwid.Text('NFS'))],
+        ('fixed', 22, urwid.Text('NFS'))],
         dividechars=0)
     body.append(cols)
 
     cols = urwid.Columns([              # samba / cifs option row
         ('fixed', 10, urwid.Text('')),
         ('fixed', 7, b2),
-        ('fixed', 25, urwid.Text('Samba / cifs / windows'))],
+        ('fixed', 22, urwid.Text('Samba / cifs / windows'))],
         dividechars=0)
     body.append(cols)
     body.append(urwid.Divider())
@@ -498,7 +506,7 @@ def on_screen_shared_drive(button):
     body.append(urwid.Divider())
 
     # add save + cancel button
-    button_save = create_my_button(" Save", on_shared_save)
+    button_save = create_my_button(" Save", shared_drive_save)
     button_cancel = create_my_button("Cancel", on_cancel)
     buttons = urwid.GridFlow([button_save, button_cancel], 10, 1, 1, 'center')
     body.append(buttons)
@@ -507,11 +515,15 @@ def on_screen_shared_drive(button):
     main.original_widget = urwid.Frame(w_body, header=header, footer=footer)
 
 
-def on_shared_save(button):
+def shared_drive_save(button):
     pass
 
 
-def on_screen_floppy_config(button):
+def floppy_create(button):
+    global settings, settings_changed
+    settings_changed = {}                       # no settings have been changed
+    settings_load()
+
     header, footer = create_header_footer('Floppy configuration')
 
     body = []
@@ -570,7 +582,7 @@ def on_screen_floppy_config(button):
     body.extend([urwid.Divider(), urwid.Divider()])
 
     # add save + cancel button
-    button_save = create_my_button(" Save", on_floppy_save)
+    button_save = create_my_button(" Save", floppy_save)
     button_cancel = create_my_button("Cancel", on_cancel)
     buttons = urwid.GridFlow([button_save, button_cancel], 10, 1, 1, 'center')
     body.append(buttons)
@@ -579,7 +591,7 @@ def on_screen_floppy_config(button):
     main.original_widget = urwid.Frame(w_body, header=header, footer=footer)
 
 
-def on_floppy_save(button):
+def floppy_save(button):
     pass
 
 
@@ -637,7 +649,11 @@ def ikbd_keyboard_joystick():
     return body
 
 
-def on_screen_ikbd(button):
+def ikbd_create(button):
+    global settings, settings_changed
+    settings_changed = {}                       # no settings have been changed
+    settings_load()
+
     header, footer = create_header_footer('IKBD settings')
 
     body = []
@@ -670,7 +686,7 @@ def on_screen_ikbd(button):
     body.extend(cols_joy1)
 
     # add save + cancel button
-    button_save = create_my_button(" Save", on_ikbd_save)
+    button_save = create_my_button(" Save", ikbd_save)
     button_cancel = create_my_button("Cancel", on_cancel)
     buttons = urwid.GridFlow([button_save, button_cancel], 10, 1, 1, 'center')
     body.append(buttons)
@@ -679,7 +695,7 @@ def on_screen_ikbd(button):
     main.original_widget = urwid.Frame(w_body, header=header, footer=footer)
 
 
-def on_ikbd_save(button):
+def ikbd_save(button):
     pass
 
 
@@ -713,7 +729,11 @@ def create_setting_row(label, what, value, col1w, col2w, reverse=False):
     return cols
 
 
-def on_screen_network_settings(button):
+def network_create(button):
+    global settings, settings_changed
+    settings_changed = {}                       # no settings have been changed
+    settings_load()
+
     header, footer = create_header_footer('Network settings')
 
     body = []
@@ -775,7 +795,7 @@ def on_screen_network_settings(button):
     body.append(urwid.Divider())
 
     # add save + cancel button
-    button_save = create_my_button(" Save", on_network_save)
+    button_save = create_my_button(" Save", network_save)
     button_cancel = create_my_button("Cancel", on_cancel)
     buttons = urwid.GridFlow([button_save, button_cancel], 10, 1, 1, 'center')
     body.append(buttons)
@@ -784,11 +804,11 @@ def on_screen_network_settings(button):
     main.original_widget = urwid.Frame(w_body, header=header, footer=footer)
 
 
-def on_network_save(button):
+def network_save(button):
     pass
 
 
-def on_screen_update(button):
+def update_create(button):
     header, footer = create_header_footer('Software & Firmware updates')
 
     body = []
@@ -822,8 +842,8 @@ def on_screen_update(button):
     body.append(urwid.Divider())
 
     # add update + cancel buttons
-    button_up_online = create_my_button("OnlineUp", on_update_online)
-    button_up_usb = create_my_button("  USB", on_update_usb)
+    button_up_online = create_my_button("OnlineUp", update_online)
+    button_up_usb = create_my_button("  USB", update_usb)
     button_cancel = create_my_button(" Cancel", on_cancel)
     buttons = urwid.GridFlow([button_up_online, button_up_usb, button_cancel], 12, 0, 1, 'center')
     body.append(buttons)
@@ -832,11 +852,11 @@ def on_screen_update(button):
     main.original_widget = urwid.Frame(w_body, header=header, footer=footer)
 
 
-def on_update_online(button):
+def update_online(button):
     pass
 
 
-def on_update_usb(button):
+def update_usb(button):
     pass
 
 
@@ -846,11 +866,11 @@ def create_main_menu():
 
     body.append(urwid.Divider())
 
-    menu_items = [('! License key !', on_screen_license_key), ('ACSI IDs', on_screen_acsi_config),
-                  ('Translated disks', on_screen_translated), ('Hard Disk Image', on_screen_hdd_image),
-                  ('Shared drive', on_screen_shared_drive), ('Floppy config', on_screen_floppy_config),
-                  ('Network settings', on_screen_network_settings), ('IKBD', on_screen_ikbd),
-                  ('Update software', on_screen_update)]
+    menu_items = [('! License key !', license_create), ('ACSI IDs', acsi_ids_create),
+                  ('Translated disks', translated_create), ('Hard Disk Image', hdd_image_create),
+                  ('Shared drive', shared_drive_create), ('Floppy config', floppy_create),
+                  ('Network settings', network_create), ('IKBD', ikbd_create),
+                  ('Update software', update_create)]
 
     # create main menu buttons
     for btn_text, handler in menu_items:

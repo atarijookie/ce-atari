@@ -69,6 +69,7 @@ class EditOne(urwid.Text):
         if self.valid_char(key):        # valid key, use it
             new_text = str(key).upper()
             self.set_text(new_text)
+            self._emit("postchange", new_text)
         else:                           # key wasn't handled
             return key
 
