@@ -1,0 +1,96 @@
+import urwid
+from setproctitle import setproctitle
+import logging
+from logging.handlers import RotatingFileHandler
+from urwid_helpers import create_my_button, create_header_footer
+from screen_license import license_create
+from screen_ids import acsi_ids_create
+from screen_translated import translated_create
+from screen_hdd_image import hdd_image_create
+from screen_shared import shared_drive_create
+from screen_floppy import floppy_create
+from screen_network import network_create
+from screen_ikbd import ikbd_create
+from screen_update import update_create
+import shared
+
+
+def alarm_callback(loop=None, data=None):
+    """ this gets called on alarm """
+    pass
+
+
+def update_status(new_status):
+    """ call this method to update status bar on screen """
+    global main_loop
+
+    if main_loop:  # if got main loop, trigger alarm to redraw widgets
+        main_loop.set_alarm_in(1, alarm_callback)
+
+
+def create_main_menu():
+    body = []
+    header, footer = create_header_footer('CE Config - main menu')
+
+    body.append(urwid.Divider())
+
+    menu_items = [('! License key !', license_create),
+                  ('ACSI IDs', acsi_ids_create),
+                  ('Translated disks', translated_create),
+                  ('Hard Disk Image', hdd_image_create),
+                  ('Shared drive', shared_drive_create),
+                  ('Floppy config', floppy_create),
+                  ('Network settings', network_create),
+                  ('IKBD', ikbd_create),
+                  ('Update software', update_create)]
+
+    # create main menu buttons
+    for btn_text, handler in menu_items:
+        button = create_my_button(btn_text, handler)
+        button = urwid.Padding(button, 'center', 20)        # center buttons, exact width 20 chars
+        body.append(button)
+        body.append(urwid.Divider())
+
+    body.append(urwid.Divider())
+
+    w_body = urwid.Padding(urwid.ListBox(urwid.SimpleFocusListWalker(body)), 'center', 40)
+    return urwid.Frame(w_body, header=header, footer=footer)
+
+
+def exit_program(button):
+    raise urwid.ExitMainLoop()
+
+
+# the config tool execution starts here
+if __name__ == "__main__":
+    setproctitle("ce_config")  # set process title
+
+    log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
+
+    my_handler = RotatingFileHandler('/tmp/ce_conf.log', mode='a', maxBytes=1024 * 1024, backupCount=1)
+    my_handler.setFormatter(log_formatter)
+    my_handler.setLevel(logging.DEBUG)
+
+    app_log = logging.getLogger()
+    app_log.setLevel(logging.DEBUG)
+    app_log.addHandler(my_handler)
+
+    shared.terminal_cols, shared.terminal_rows = urwid.raw_display.Screen().get_cols_rows()
+    shared.items_per_page = shared.terminal_rows - 4
+
+    shared.main = urwid.Padding(create_main_menu(), left=2, right=2)
+
+    top = urwid.Overlay(shared.main, urwid.SolidFill(),
+                        align='center', width=('relative', 100),
+                        valign='middle', height=('relative', 100),
+                        min_width=20, min_height=9)
+
+    shared.current_body = top
+
+    try:
+        main_loop = urwid.MainLoop(top, palette=[('reversed', 'standout', '')])
+        main_loop.run()
+    except KeyboardInterrupt:
+        print("Terminated by keyboard...")
+
+    should_run = False
