@@ -1,12 +1,6 @@
-import copy
-import os
-import re
 import urwid
-from setproctitle import setproctitle
 import logging
-from logging.handlers import RotatingFileHandler
-from urwid_helpers import create_edit_one, create_my_button, create_header_footer, create_edit, MyRadioButton, \
-    MyCheckBox, dialog
+from urwid_helpers import create_my_button, create_header_footer, MyRadioButton, dialog
 from utils import settings_load, settings_save, on_cancel, back_to_main_menu
 import shared
 

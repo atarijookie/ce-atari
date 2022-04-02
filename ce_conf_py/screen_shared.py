@@ -1,34 +1,26 @@
-import copy
-import os
-import re
 import urwid
-from setproctitle import setproctitle
 import logging
-from logging.handlers import RotatingFileHandler
-from urwid_helpers import create_edit_one, create_my_button, create_header_footer, create_edit, MyRadioButton, \
-    MyCheckBox, dialog
-from utils import settings_load, settings_save, on_cancel, back_to_main_menu
+from IPy import IP
+from urwid_helpers import create_my_button, create_header_footer, create_edit, MyRadioButton, MyCheckBox, dialog
+from utils import settings_load, settings_save, on_cancel, back_to_main_menu, setting_get_bool, setting_get_str
+from screen_translated import on_option_changed
 import shared
 
 app_log = logging.getLogger()
 
-
 def shared_drive_create(button):
-    global settings, settings_changed
-    settings_changed = {}                       # no settings have been changed
     settings_load()
 
     header, footer = create_header_footer('Shared drive settings')
 
     body = []
-    body.append(urwid.Divider())
-
     body.append(urwid.Text('Define what folder on which machine will', align='center'))
     body.append(urwid.Text('be used as drive mounted through network', align='center'))
     body.append(urwid.Text('on CosmosEx. Works in translated mode.  ', align='center'))
     body.append(urwid.Divider())
 
-    btn_enabled = MyCheckBox('')
+    btn_enabled = MyCheckBox('', on_state_change=on_enabled_changed)
+    btn_enabled.set_state(setting_get_bool('SHARED_ENABLED'))
 
     # enabling / disabling shared drive
     cols = urwid.Columns([
@@ -42,8 +34,20 @@ def shared_drive_create(button):
     body.append(urwid.Text('Sharing protocol', align='left'))
 
     bgrp = []  # button group
-    b1 = MyRadioButton(bgrp, u'')       # NFS
-    b2 = MyRadioButton(bgrp, u'')       # samba / cifs
+    b1 = MyRadioButton(
+            bgrp, u'', on_state_change=on_option_changed,
+            user_data={'id': 'SHARED_NFS_NOT_SAMBA', 'value': 1})       # NFS
+
+    b2 = MyRadioButton(
+            bgrp, u'', on_state_change=on_option_changed,
+            user_data={'id': 'SHARED_NFS_NOT_SAMBA', 'value': 0})       # samba / cifs
+
+    value = setting_get_bool('SHARED_NFS_NOT_SAMBA')
+
+    if value:  # 1st option should be selected?
+        b1.set_state(True)
+    else:  # 2nd option should be selected?
+        b2.set_state(True)
 
     cols = urwid.Columns([              # NFS option row
         ('fixed', 10, urwid.Text('')),
@@ -63,7 +67,8 @@ def shared_drive_create(button):
     # IP of machine sharing info
     body.append(urwid.Text('IP address of server', align='left'))
 
-    cols_edit_ip = create_edit('', 17)
+    cols_edit_ip = create_edit('SHARED_ADDRESS', 17, on_editline_changed)
+
     cols = urwid.Columns([              # NFS option row
         ('fixed', 10, urwid.Text('')),
         ('fixed', 17, cols_edit_ip)],
@@ -74,19 +79,19 @@ def shared_drive_create(button):
     # folder on sharing machine
     body.append(urwid.Text('Shared folder path on server', align='left'))
 
-    cols_edit_path = create_edit('', 40)
+    cols_edit_path = create_edit('SHARED_PATH', 40, on_editline_changed)
     body.append(cols_edit_path)
     body.append(urwid.Divider())
 
     # username and password
-    cols_edit_username = create_edit('', 20)
+    cols_edit_username = create_edit('SHARED_USERNAME', 20, on_editline_changed)
     cols = urwid.Columns([
         ('fixed', 10, urwid.Text('Username', align='left')),
         ('fixed', 20, cols_edit_username)],
         dividechars=0)
     body.append(cols)
 
-    cols_edit_password = create_edit('', 20)
+    cols_edit_password = create_edit('SHARED_PASSWORD', 20, on_editline_changed)
     cols = urwid.Columns([
         ('fixed', 10, urwid.Text('Password', align='left')),
         ('fixed', 20, cols_edit_password)],
@@ -104,6 +109,44 @@ def shared_drive_create(button):
     shared.main.original_widget = urwid.Frame(w_body, header=header, footer=footer)
 
 
-def shared_drive_save(button):
-    pass
+def on_enabled_changed(button, state):
+    value = 1 if state else 0
+    app_log.debug(f"on_enabled_changed - value: {value}")
+    shared.settings_changed['SHARED_ENABLED'] = value
 
+
+def on_editline_changed(widget, text, data):
+    id_ = data.get('id')                    # get id
+
+    if id_:         # if got it, store text
+        shared.settings_changed[id_] = text
+        app_log.debug(f"on_enabled_changed - {id_}: {text}")
+
+
+def shared_drive_save(button):
+    app_log.debug(f"on_translated_save: {shared.settings_changed}")
+
+    enabled = setting_get_bool('SHARED_ENABLED')
+
+    if enabled:     # verify IP if shared drive is enabled
+        good = False
+
+        try:
+            ip_str = setting_get_str('SHARED_ADDRESS')
+            IP(ip_str)      # let IPy try to read the addr
+            good = True
+        except Exception as exc:
+            app_log.warning(f"failed to convert {ip_str} to IP: {str(exc)}")
+
+        if not good:
+            dialog(shared.main_loop, shared.current_body, f"The IP address {ip_str} seems to be invalid!")
+            return
+
+        path_str = setting_get_str('SHARED_PATH')
+
+        if not path_str:
+            dialog(shared.main_loop, shared.current_body, f"The share path cannot be empty!")
+            return
+
+    settings_save()
+    back_to_main_menu(None)

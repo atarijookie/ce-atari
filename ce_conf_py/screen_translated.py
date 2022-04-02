@@ -1,13 +1,7 @@
-import copy
-import os
-import re
 import urwid
-from setproctitle import setproctitle
 import logging
-from logging.handlers import RotatingFileHandler
-from urwid_helpers import create_edit_one, create_my_button, create_header_footer, create_edit, MyRadioButton, \
-    MyCheckBox, dialog
-from utils import settings_load, settings_save, on_cancel, back_to_main_menu
+from urwid_helpers import create_edit_one, create_my_button, create_header_footer, MyRadioButton, dialog
+from utils import settings_load, settings_save, on_cancel, back_to_main_menu, setting_get_merged, setting_get_bool
 import shared
 
 app_log = logging.getLogger()
@@ -21,8 +15,6 @@ def translated_create(button):
     header, footer = create_header_footer('Translated disk')
 
     body = []
-    body.append(urwid.Divider())
-
     body.append(urwid.AttrMap(urwid.Text('Drive letters assignment', align='center'), 'reversed'))
 
     # helper function to create one translated drives letter config row
@@ -30,8 +22,7 @@ def translated_create(button):
         col1 = 25
         col2 = 5
 
-        letter = shared.settings.get(setting_name, 'C')
-        edit_one = create_edit_one(letter, setting_name, on_edit_changed)
+        edit_one = create_edit_one(setting_name, on_edit_changed)
 
         cols = urwid.Columns([
             ('fixed', col1, urwid.Text(label)),
@@ -58,14 +49,21 @@ def translated_create(button):
     body.append(urwid.Divider())
 
     def create_options_rows(label, option1_true, option2_false, setting_name):
-        value = bool(shared.settings.get(setting_name, 0))
+        value = setting_get_bool(setting_name)
 
         bgroup = []  # button group
-        b1 = MyRadioButton(bgroup, '', on_state_change=on_option_changed,
-            user_data={'id': setting_name, 'value': 1}, state=value)        # option1 button
+        b1 = MyRadioButton(
+            bgroup, '', on_state_change=on_option_changed,
+            user_data={'id': setting_name, 'value': 1})         # option1 button
 
-        b2 = MyRadioButton(bgroup, '', on_state_change=on_option_changed,
-            user_data={'id': setting_name, 'value': 0},  state=not value)   # option2 button
+        b2 = MyRadioButton(
+            bgroup, '', on_state_change=on_option_changed,
+            user_data={'id': setting_name, 'value': 0})         # option2 button
+
+        if value:               # 1st option should be selected?
+            b1.set_state(True)
+        else:                   # 2nd option should be selected?
+            b2.set_state(True)
 
         cols1_ = urwid.Columns([
             ('fixed', 21, urwid.Text(label)),
@@ -81,11 +79,9 @@ def translated_create(button):
 
         return cols1_, cols2_
 
-    mount_as_raw = shared.settings.get('MOUNT_RAW_NOT_TRANS', 0)
     cols1, cols2 = create_options_rows("Mount USB media as", "raw", "translated", 'MOUNT_RAW_NOT_TRANS')
     body.extend([cols1, cols2, urwid.Divider()])
 
-    mount_zip = shared.settings.get('MOUNT_RAW_NOT_TRANS', 0)
     cols1, cols2 = create_options_rows("Access ZIP files as", "dirs", "files", 'MOUNT_ZIP_FILES')
     body.extend([cols1, cols2, urwid.Divider()])
 
@@ -114,20 +110,28 @@ def on_option_changed(button, state, data):
     key = data['id']                        # get key
     value = data['value']
     shared.settings_changed[key] = value           # store value
-    app_log.debug(f"on_option_changed: {key = } -> {value = }")
+    app_log.debug(f"on_option_changed: {key} -> {value}")
 
 
 def on_edit_changed(button, state, data):
     """ edit line changed """
     key = data['id']                        # get key
     shared.settings_changed[key] = state           # store value
-    app_log.debug(f"on_edit_changed: {key = } -> {state = }")
+    app_log.debug(f"on_edit_changed: {key} -> {state}")
 
 
 def translated_save(button):
     app_log.debug(f"on_translated_save: {shared.settings_changed}")
 
-    # TODO: translated settings verification before saving here
+    # translated settings verification before saving here
+    a = setting_get_merged('DRIVELETTER_FIRST')
+    b = setting_get_merged('DRIVELETTER_SHARED')
+    c = setting_get_merged('DRIVELETTER_CONFDRIVE')
+
+    # if some shared letters is the same, warn and don't save
+    if a == b or a == c or b == c:
+        dialog(shared.main_loop, shared.current_body, "You must specify different drive letters!")
+        return
 
     settings_save()
     back_to_main_menu(None)

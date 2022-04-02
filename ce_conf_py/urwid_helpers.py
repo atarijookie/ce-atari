@@ -1,4 +1,5 @@
 import urwid
+import shared
 
 
 class ButtonLabel(urwid.SelectableIcon):
@@ -74,8 +75,10 @@ class EditOne(urwid.Text):
             return key
 
 
-def create_edit_one(edit_text, setting_name, on_edit_changed):
-    edit_one = EditOne(edit_text)
+def create_edit_one(setting_name, on_edit_changed):
+    letter = shared.settings.get(setting_name, 'C')
+
+    edit_one = EditOne(letter)
     urwid.connect_signal(edit_one, 'postchange', on_edit_changed, {'id': setting_name})
     edit_one_decorated = urwid.AttrMap(edit_one, None, focus_map='reversed')
 
@@ -108,8 +111,12 @@ def create_header_footer(header_text, footer_text=None):
     return header, footer
 
 
-def create_edit(text, width):
+def create_edit(setting_name, width, on_edit_changed):
+    text = shared.settings.get(setting_name, '')
+
     edit_line = urwid.Edit(caption='', edit_text=text)
+    urwid.connect_signal(edit_line, 'change', on_edit_changed, {'id': setting_name})
+
     edit_decorated = urwid.AttrMap(edit_line, None, focus_map='reversed')
 
     cols = urwid.Columns([

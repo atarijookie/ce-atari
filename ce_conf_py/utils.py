@@ -21,6 +21,36 @@ settings_default = {'DRIVELETTER_FIRST': 'C', 'DRIVELETTER_SHARED': 'P', 'DRIVEL
                     'KEYBOARD_KEYS_JOY0': 'A%S%D%W%LSHIFT', 'KEYBOARD_KEYS_JOY1': 'LEFT%DOWN%RIGHT%UP%RSHIFT'}
 
 
+def setting_get_str(setting_name):
+    value_raw = setting_get_merged(setting_name)        # get value from settings
+
+    if not value_raw:       # if it's None, replace with empty string
+        return ''
+
+    return value_raw        # not None, return as is
+
+
+def setting_get_bool(setting_name):
+    value = False
+    value_raw = setting_get_merged(setting_name)
+
+    try:
+        value = bool(int(value_raw))
+    except Exception as exc:
+        app_log.warning(f"failed to convert {value} to bool: {str(exc)}")
+
+    return value
+
+
+def setting_get_merged(setting_name):
+    """ function gets either new value, or stored value """
+
+    if setting_name in shared.settings_changed:         # got new setting value in changes settings? return that
+        return shared.settings_changed[setting_name]
+
+    return shared.settings.get(setting_name)            # get value from stored settings
+
+
 def settings_load():
     """ load all the present settings from the settings dir """
 

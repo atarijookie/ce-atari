@@ -22,10 +22,8 @@ def alarm_callback(loop=None, data=None):
 
 def update_status(new_status):
     """ call this method to update status bar on screen """
-    global main_loop
-
-    if main_loop:  # if got main loop, trigger alarm to redraw widgets
-        main_loop.set_alarm_in(1, alarm_callback)
+    if shared.main_loop:  # if got main loop, trigger alarm to redraw widgets
+        shared.main_loop.set_alarm_in(1, alarm_callback)
 
 
 def create_main_menu():
@@ -88,8 +86,8 @@ if __name__ == "__main__":
     shared.current_body = top
 
     try:
-        main_loop = urwid.MainLoop(top, palette=[('reversed', 'standout', '')])
-        main_loop.run()
+        shared.main_loop = urwid.MainLoop(top, palette=[('reversed', 'standout', '')])
+        shared.main_loop.run()
     except KeyboardInterrupt:
         print("Terminated by keyboard...")
 
