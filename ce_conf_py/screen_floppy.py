@@ -1,8 +1,8 @@
 import logging
 import urwid
-from urwid_helpers import create_edit_one, create_my_button, create_header_footer, create_edit, MyRadioButton, \
-    MyCheckBox, dialog
-from utils import settings_load, settings_save, on_cancel, back_to_main_menu
+from urwid_helpers import create_my_button, create_header_footer, MyRadioButton, MyCheckBox, dialog
+from utils import settings_load, settings_save, on_cancel, back_to_main_menu, setting_get_bool, on_option_changed, \
+    on_checkbox_changed
 import shared
 
 app_log = logging.getLogger()
@@ -20,7 +20,9 @@ def floppy_create(button):
     colw = 5
 
     # enabling / disabling floppy
-    btn_enabled = MyCheckBox('')
+    btn_enabled = MyCheckBox('', on_state_change=on_enabled_changed)
+    btn_enabled.set_state(setting_get_bool('FLOPPYCONF_ENABLED'))
+
     cols = urwid.Columns([
         ('fixed', col1w, urwid.Text('Floppy enabled')),
         ('fixed', colw, btn_enabled)],
@@ -39,8 +41,20 @@ def floppy_create(button):
 
     # drive ID selection row
     bgrp = []  # button group
-    b1 = MyRadioButton(bgrp, u'')       # drive ID 0
-    b2 = MyRadioButton(bgrp, u'')       # drive ID 1
+    b1 = MyRadioButton(
+            bgrp, u'', on_state_change=on_option_changed,
+            user_data={'id': 'FLOPPYCONF_DRIVEID', 'value': 0})       # drive ID 0
+
+    b2 = MyRadioButton(
+            bgrp, u'', on_state_change=on_option_changed,
+            user_data={'id': 'FLOPPYCONF_DRIVEID', 'value': 1})       # drive ID 1
+
+    value = setting_get_bool('FLOPPYCONF_DRIVEID')
+
+    if not value:   # ID 0?
+        b1.set_state(True)
+    else:           # ID 1?
+        b2.set_state(True)
 
     cols = urwid.Columns([
         ('fixed', col1w-2, urwid.Text('Drive ID')),
@@ -51,7 +65,9 @@ def floppy_create(button):
     body.extend([urwid.Divider(), urwid.Divider()])
 
     # write protected floppy
-    btn_write_protect = MyCheckBox('')
+    btn_write_protect = MyCheckBox('', on_state_change=on_writeprotected_changed)
+    btn_write_protect.set_state(setting_get_bool('FLOPPYCONF_WRITEPROTECTED'))
+
     cols = urwid.Columns([
         ('fixed', col1w, urwid.Text('Write protected')),
         ('fixed', colw, btn_write_protect)],
@@ -60,7 +76,9 @@ def floppy_create(button):
     body.extend([urwid.Divider(), urwid.Divider()])
 
     # make seek sound checkbox
-    btn_make_sound = MyCheckBox('')
+    btn_make_sound = MyCheckBox('', on_state_change=on_sound_changed)
+    btn_make_sound.set_state(setting_get_bool('FLOPPYCONF_SOUND_ENABLED'))
+
     cols = urwid.Columns([
         ('fixed', col1w, urwid.Text('Make seek sound')),
         ('fixed', colw, btn_make_sound)],
@@ -78,6 +96,20 @@ def floppy_create(button):
     shared.main.original_widget = urwid.Frame(w_body, header=header, footer=footer)
 
 
-def floppy_save(button):
-    pass
+def on_enabled_changed(button, state):
+    on_checkbox_changed('FLOPPYCONF_ENABLED', state)
 
+
+def on_writeprotected_changed(button, state):
+    on_checkbox_changed('FLOPPYCONF_WRITEPROTECTED', state)
+
+
+def on_sound_changed(button, state):
+    on_checkbox_changed('FLOPPYCONF_SOUND_ENABLED', state)
+
+
+def floppy_save(button):
+    app_log.debug(f"floppy_save: {shared.settings_changed}")
+
+    settings_save()
+    back_to_main_menu(None)

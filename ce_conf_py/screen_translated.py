@@ -1,15 +1,14 @@
 import urwid
 import logging
 from urwid_helpers import create_edit_one, create_my_button, create_header_footer, MyRadioButton, dialog
-from utils import settings_load, settings_save, on_cancel, back_to_main_menu, setting_get_merged, setting_get_bool
+from utils import settings_load, settings_save, on_cancel, back_to_main_menu, setting_get_merged, setting_get_bool, \
+    on_option_changed
 import shared
 
 app_log = logging.getLogger()
 
 
 def translated_create(button):
-    global settings, settings_changed
-    settings_changed = {}                       # no settings have been changed
     settings_load()
 
     header, footer = create_header_footer('Translated disk')
@@ -102,17 +101,6 @@ def translated_create(button):
     shared.main.original_widget = urwid.Frame(w_body, header=header, footer=footer)
 
 
-def on_option_changed(button, state, data):
-    """ translated options changed """
-    if not state:                           # called on the radiobutton, which is now off? skip it
-        return
-
-    key = data['id']                        # get key
-    value = data['value']
-    shared.settings_changed[key] = value           # store value
-    app_log.debug(f"on_option_changed: {key} -> {value}")
-
-
 def on_edit_changed(button, state, data):
     """ edit line changed """
     key = data['id']                        # get key
@@ -121,7 +109,7 @@ def on_edit_changed(button, state, data):
 
 
 def translated_save(button):
-    app_log.debug(f"on_translated_save: {shared.settings_changed}")
+    app_log.debug(f"translated_save: {shared.settings_changed}")
 
     # translated settings verification before saving here
     a = setting_get_merged('DRIVELETTER_FIRST')

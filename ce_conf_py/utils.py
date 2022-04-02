@@ -91,3 +91,19 @@ def back_to_main_menu(button):
     from main import create_main_menu
     shared.main.original_widget = urwid.Padding(create_main_menu(), left=2, right=2)
 
+
+def on_option_changed(button, state, data):
+    """ translated options changed """
+    if not state:                           # called on the radiobutton, which is now off? skip it
+        return
+
+    key = data['id']                        # get key
+    value = data['value']
+    shared.settings_changed[key] = value           # store value
+    app_log.debug(f"on_option_changed: {key} -> {value}")
+
+
+def on_checkbox_changed(setting_name, state):
+    value = 1 if state else 0
+    app_log.debug(f"on_checkbox_changed - setting_name: {setting_name} -> value: {value}")
+    shared.settings_changed[setting_name] = value

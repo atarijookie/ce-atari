@@ -2,8 +2,8 @@ import urwid
 import logging
 from IPy import IP
 from urwid_helpers import create_my_button, create_header_footer, create_edit, MyRadioButton, MyCheckBox, dialog
-from utils import settings_load, settings_save, on_cancel, back_to_main_menu, setting_get_bool, setting_get_str
-from screen_translated import on_option_changed
+from utils import settings_load, settings_save, on_cancel, back_to_main_menu, setting_get_bool, setting_get_str, \
+    on_option_changed, on_checkbox_changed
 import shared
 
 app_log = logging.getLogger()
@@ -65,12 +65,10 @@ def shared_drive_create(button):
     body.append(urwid.Divider())
 
     # IP of machine sharing info
-    body.append(urwid.Text('IP address of server', align='left'))
-
     cols_edit_ip = create_edit('SHARED_ADDRESS', 17, on_editline_changed)
 
     cols = urwid.Columns([              # NFS option row
-        ('fixed', 10, urwid.Text('')),
+        ('fixed', 10, urwid.Text('IP addr.', align='left')),
         ('fixed', 17, cols_edit_ip)],
         dividechars=0)
     body.append(cols)
@@ -110,9 +108,7 @@ def shared_drive_create(button):
 
 
 def on_enabled_changed(button, state):
-    value = 1 if state else 0
-    app_log.debug(f"on_enabled_changed - value: {value}")
-    shared.settings_changed['SHARED_ENABLED'] = value
+    on_checkbox_changed('SHARED_ENABLED', state)
 
 
 def on_editline_changed(widget, text, data):
@@ -124,7 +120,7 @@ def on_editline_changed(widget, text, data):
 
 
 def shared_drive_save(button):
-    app_log.debug(f"on_translated_save: {shared.settings_changed}")
+    app_log.debug(f"shared_drive_save: {shared.settings_changed}")
 
     enabled = setting_get_bool('SHARED_ENABLED')
 
