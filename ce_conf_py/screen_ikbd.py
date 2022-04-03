@@ -104,7 +104,6 @@ def ikbd_create(button):
     header, footer = create_header_footer('IKBD settings')
 
     body = []
-    body.append(urwid.Divider())
 
     # attach 1st joy as JOY 0
     chb_line = ikbd_checkbox_line('Attach 1st joy as JOY 0', '(hotkey: CTRL+any SHIFT+HELP/F11)', 'JOY_FIRST_IS_0')
