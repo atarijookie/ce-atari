@@ -1,13 +1,7 @@
-import copy
-import os
-import re
 import urwid
-from setproctitle import setproctitle
 import logging
-from logging.handlers import RotatingFileHandler
-from urwid_helpers import create_edit_one, create_my_button, create_header_footer, create_edit, MyRadioButton, \
-    MyCheckBox, dialog
-from utils import settings_load, settings_save, on_cancel, back_to_main_menu
+from urwid_helpers import create_my_button, create_header_footer, create_edit, dialog
+from utils import settings_load, settings_save, on_cancel, back_to_main_menu, on_editline_changed
 import shared
 
 app_log = logging.getLogger()
@@ -32,7 +26,7 @@ def license_create(button):
     body.append(urwid.Text('License key:'))
 
     # add license edit line
-    cols = create_edit('', 40)              # license number here
+    cols, _ = create_edit('LICENSE_KEY', 40, on_editline_changed)              # license number here
     body.append(cols)
     body.append(urwid.Divider())
 

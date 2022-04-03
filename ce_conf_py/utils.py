@@ -93,7 +93,7 @@ def back_to_main_menu(button):
 
 
 def on_option_changed(button, state, data):
-    """ translated options changed """
+    """ on option changed """
     if not state:                           # called on the radiobutton, which is now off? skip it
         return
 
@@ -107,3 +107,10 @@ def on_checkbox_changed(setting_name, state):
     value = 1 if state else 0
     app_log.debug(f"on_checkbox_changed - setting_name: {setting_name} -> value: {value}")
     shared.settings_changed[setting_name] = value
+
+
+def on_editline_changed(widget, text, data):
+    id_ = data.get('id')                    # get id
+
+    if id_:         # if got it, store text
+        shared.settings_changed[id_] = text

@@ -32,8 +32,7 @@ def create_main_menu():
 
     body.append(urwid.Divider())
 
-    menu_items = [('! License key !', license_create),
-                  ('ACSI IDs', acsi_ids_create),
+    menu_items = [('ACSI IDs', acsi_ids_create),
                   ('Translated disks', translated_create),
                   ('Hard Disk Image', hdd_image_create),
                   ('Shared drive', shared_drive_create),
@@ -41,6 +40,11 @@ def create_main_menu():
                   ('Network settings', network_create),
                   ('IKBD', ikbd_create),
                   ('Update software', update_create)]
+
+    if False:       # if should show license menu
+        menu_items.insert(0, ('! License key !', license_create))
+    else:
+        body.append(urwid.Divider())
 
     # create main menu buttons
     for btn_text, handler in menu_items:

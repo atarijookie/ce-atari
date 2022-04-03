@@ -3,7 +3,7 @@ import logging
 from IPy import IP
 from urwid_helpers import create_my_button, create_header_footer, create_edit, MyRadioButton, MyCheckBox, dialog
 from utils import settings_load, settings_save, on_cancel, back_to_main_menu, setting_get_bool, setting_get_str, \
-    on_option_changed, on_checkbox_changed
+    on_option_changed, on_checkbox_changed, on_editline_changed
 import shared
 
 app_log = logging.getLogger()
@@ -65,7 +65,7 @@ def shared_drive_create(button):
     body.append(urwid.Divider())
 
     # IP of machine sharing info
-    cols_edit_ip = create_edit('SHARED_ADDRESS', 17, on_editline_changed)
+    cols_edit_ip, _ = create_edit('SHARED_ADDRESS', 17, on_editline_changed)
 
     cols = urwid.Columns([              # NFS option row
         ('fixed', 10, urwid.Text('IP addr.', align='left')),
@@ -77,19 +77,19 @@ def shared_drive_create(button):
     # folder on sharing machine
     body.append(urwid.Text('Shared folder path on server', align='left'))
 
-    cols_edit_path = create_edit('SHARED_PATH', 40, on_editline_changed)
+    cols_edit_path, _ = create_edit('SHARED_PATH', 40, on_editline_changed)
     body.append(cols_edit_path)
     body.append(urwid.Divider())
 
     # username and password
-    cols_edit_username = create_edit('SHARED_USERNAME', 20, on_editline_changed)
+    cols_edit_username, _ = create_edit('SHARED_USERNAME', 20, on_editline_changed)
     cols = urwid.Columns([
         ('fixed', 10, urwid.Text('Username', align='left')),
         ('fixed', 20, cols_edit_username)],
         dividechars=0)
     body.append(cols)
 
-    cols_edit_password = create_edit('SHARED_PASSWORD', 20, on_editline_changed)
+    cols_edit_password, _ = create_edit('SHARED_PASSWORD', 20, on_editline_changed)
     cols = urwid.Columns([
         ('fixed', 10, urwid.Text('Password', align='left')),
         ('fixed', 20, cols_edit_password)],
@@ -109,14 +109,6 @@ def shared_drive_create(button):
 
 def on_enabled_changed(button, state):
     on_checkbox_changed('SHARED_ENABLED', state)
-
-
-def on_editline_changed(widget, text, data):
-    id_ = data.get('id')                    # get id
-
-    if id_:         # if got it, store text
-        shared.settings_changed[id_] = text
-        app_log.debug(f"on_enabled_changed - {id_}: {text}")
 
 
 def shared_drive_save(button):

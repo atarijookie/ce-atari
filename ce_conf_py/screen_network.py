@@ -16,7 +16,7 @@ def create_setting_row(label, what, value, col1w, col2w, reverse=False):
         widget = MyCheckBox('', state=value)
         label = "   " + label
     elif what == 'edit':        # for edit line
-        widget = create_edit(value, col2w)
+        widget, _ = create_edit(value, col2w)
         label = "   " + label
     elif what == 'text':
         widget = urwid.Text(value)

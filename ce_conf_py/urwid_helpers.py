@@ -112,7 +112,12 @@ def create_header_footer(header_text, footer_text=None):
 
 
 def create_edit(setting_name, width, on_edit_changed):
-    text = shared.settings.get(setting_name, '')
+    from utils import setting_get_str
+
+    if setting_name:        # setting name provided? load setting value
+        text = setting_get_str(setting_name)
+    else:                   # no setting name? just empty string
+        text = ''
 
     edit_line = urwid.Edit(caption='', edit_text=text)
     urwid.connect_signal(edit_line, 'change', on_edit_changed, {'id': setting_name})
@@ -125,7 +130,7 @@ def create_edit(setting_name, width, on_edit_changed):
         ('fixed', 1, urwid.Text(']'))],
         dividechars=0)
 
-    return cols
+    return cols, edit_line
 
 
 main_loop_original = None
