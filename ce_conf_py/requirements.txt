@@ -2,3 +2,5 @@ setproctitle
 urllib3
 urwid
 IPy
+netifaces
+dnspython
