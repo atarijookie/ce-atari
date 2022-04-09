@@ -21,7 +21,7 @@ settings = {}
 MOUNT_DIR_RAW = '/tmp/ce/raw'
 MOUNT_DIR_TRANS = '/tmp/ce/trans'
 
-dev_disk_dir = '/dev/disk/by-id'
+dev_disk_dir = '/dev/disk/by-path'
 
 
 def print_and_log(loglevel, message):
@@ -34,6 +34,8 @@ def settings_load():
 
     global settings
     settings = deepcopy(settings_default)  # fill settings with default values before loading
+
+    os.makedirs(settings_path, exist_ok=True)
 
     for f in os.listdir(settings_path):         # go through the settings dir
         path = os.path.join(settings_path, f)   # create full path
@@ -65,17 +67,20 @@ def get_usb_devices():
     """ Look for all the attached disks to the system and return only those attached via usb.
     Return only root device (e.g. /dev/sda), not the individual partitions (e.g. not /dev/sda1) """
 
+    if not os.path.exists(dev_disk_dir):            # the dir doesn't exist? quit now
+        return set()
+
     devs = os.listdir(dev_disk_dir)
 
     root_devs = set()
 
     for dev in devs:                                # go through found devices
-        dev_by_id = os.path.join(dev_disk_dir, dev)      # usb-drive -> /dev/disk/by-id/usb-drive
+        dev_name = os.path.join(dev_disk_dir, dev)  # usb-drive -> /dev/disk/by-id/usb-drive
 
-        if 'usb' not in dev_by_id:                  # if not usb device, then skip it
+        if 'usb' not in dev_name:                   # if not usb device, then skip it
             continue
 
-        dev_path = os.readlink(dev_by_id)           # /dev/disk/by-id/usb-drive -> ../../sda1
+        dev_path = os.readlink(dev_name)            # /dev/disk/by-id/usb-drive -> ../../sda1
         dev_path = os.path.join(dev_disk_dir, dev_path)  # ../../sda1 -> /dev/disk/by-id/../../sda1
         dev_path = os.path.abspath(dev_path)        # /dev/disk/by-id/../../sda1 -> /dev/sda1
 
