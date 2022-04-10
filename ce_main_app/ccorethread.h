@@ -9,10 +9,10 @@
 
 #include "config/configstream.h"
 #include "floppy/floppysetup.h"
-#include "network/netadapter.h"
 #include "misc/misc.h"
 
 #include "version.h"
+#include "utils.h"
 
 class ConfigService;
 class FloppyService;
@@ -81,11 +81,6 @@ private:
 
     void handleSendTrack(uint8_t *inBuf);
     void handleSectorWritten(void);
-
-    //----------------------------------
-    // network adapter stuff
-
-    NetAdapter          netAdapter;
 
     // host module - misc
     Misc                misc;

@@ -24,11 +24,7 @@
 #include "ccorethread.h"
 #include "native/scsi.h"
 #include "native/scsi_defs.h"
-#include "mounter.h"
 #include "update.h"
-
-#include "devfinder.h"
-#include "ifacewatcher.h"
 
 #include "periodicthread.h"
 #include "display/displaythread.h"
@@ -73,17 +69,9 @@ void *periodicThreadCode(void *ptr)
         Debug::out(LOG_ERROR, "inotify_init() failed");
     } else {
         // TODO : update wd when configuration is changed
-        const char * path = shared.mountRawNotTrans ? DISK_LINKS_PATH_ID : DISK_LINKS_PATH_UUID;
-        wd = inotify_add_watch(inotifyFd, path, IN_CREATE|IN_DELETE);
-        if(wd < 0) Debug::out(LOG_ERROR, "inotify_add_watch(%s, IN_CREATE|IN_DELETE) failed", path);
     }
 
     fillNetworkDisplayLines();
-
-    DevFinder devFinder;
-    devFinder.lookForDevChanges();                          // look for devices attached / detached
-
-    IfaceWatcher ifaceWatcher;
 
     while(sigintReceived == 0) {
         max_fd = -1;
@@ -101,30 +89,6 @@ void *periodicThreadCode(void *ptr)
             }
         }
 
-        //------------------------------------
-        // should we do something related to devFinder?
-        if(shared.devFinder_detachAndLook || shared.devFinder_look) {   // detach devices & look for them again, or just look for them?
-            if(shared.devFinder_detachAndLook) {                    // if should also detach, do it
-                TranslatedDisk * translated = TranslatedDisk::getInstance();
-                pthread_mutex_lock(&shared.mtxScsi);
-                if(translated) translated->mutexLock();
-
-                if(translated) translated->detachAllUsbMedia();             // detach all translated USB media
-                shared.scsi->detachAllUsbMedia();                   // detach all RAW USB media
-
-                pthread_mutex_unlock(&shared.mtxScsi);
-                if(translated) translated->mutexUnlock();
-            }
-
-            // and now try to attach everything back
-            devFinder.clearMap();                                   // make all the devices appear as new
-            devFinder.lookForDevChanges();                          // and now find all the devices
-
-            shared.devFinder_detachAndLook  = false;
-            shared.devFinder_look           = false;
-            continue;
-        }
-
         // file descriptors to "select"
         if(shared.configPipes.web.fd1 >= 0) {
             FD_SET(shared.configPipes.web.fd1, &readfds);
@@ -138,10 +102,6 @@ void *periodicThreadCode(void *ptr)
             FD_SET(inotifyFd, &readfds);
             if(inotifyFd > max_fd) max_fd = inotifyFd;
         }
-        if(ifaceWatcher.getFd() >= 0) {
-            FD_SET(ifaceWatcher.getFd(), &readfds);
-            if(ifaceWatcher.getFd() > max_fd) max_fd = ifaceWatcher.getFd();
-        }
 
         memset(&timeout, 0, sizeof(timeout));
         timeout.tv_sec = wait / 1000;           // sec
@@ -152,42 +112,6 @@ void *periodicThreadCode(void *ptr)
             } else {
                 Debug::out(LOG_ERROR, "periodic thread : select() %s", strerror(errno));
                 continue;
-            }
-        }
-
-        //------------------------------------
-        // Network interface watcher
-        if(ifaceWatcher.getFd() >= 0 && FD_ISSET(ifaceWatcher.getFd(), &readfds)) {
-            bool newIfaceUpAndRunning = false;
-            ifaceWatcher.processMsg(&newIfaceUpAndRunning);
-            if(newIfaceUpAndRunning) {
-                Debug::out(LOG_DEBUG, "Internet interface comes up: reload network mount settings");
-                TranslatedDisk * translated = TranslatedDisk::getInstance();
-                if(translated) {
-                    translated->mutexLock();
-                    translated->reloadSettings(SETTINGSUSER_TRANSLATED);
-                    translated->mutexUnlock();
-                }
-
-                Debug::out(LOG_DEBUG, "periodicThreadCode -- eth0 or wlan0 changed to up, will now download update list");
-            }
-
-            // fill network into for display as we might have new address or something
-            fillNetworkDisplayLines();
-        }
-
-        //------------------------------------
-        // should we check for the new devices?
-        if(inotifyFd >= 0 && FD_ISSET(inotifyFd, &readfds)) {
-            char buf[sizeof(struct inotify_event) + NAME_MAX + 1];
-            res = read(inotifyFd, buf, sizeof(buf));
-            if(res < 0) {
-                Debug::out(LOG_ERROR, "read(inotifyFd) : %s", strerror(errno));
-            } else {
-                struct inotify_event *iev = (struct inotify_event *)buf;
-                Debug::out(LOG_DEBUG, "inotify msg %dbytes wd=%d mask=%04x name=%s", (int)res, iev->wd, iev->mask, (iev->len > 0) ? iev->name : "");
-                // if(iev->mask & IN_DELETE) / & IN_CREATE
-                devFinder.lookForDevChanges();                          // look for devices attached / detached
             }
         }
 

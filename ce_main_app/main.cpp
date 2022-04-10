@@ -16,7 +16,6 @@
 #include "global.h"
 #include "ccorethread.h"
 #include "debug.h"
-#include "mounter.h"
 #include "ikbd/ikbd.h"
 #include "update.h"
 #include "version.h"
@@ -170,7 +169,6 @@ int main(int argc, char *argv[])
 int runCore(int instanceNo, bool localNotNetwork)
 {
     CCoreThread *core;
-    pthread_t   mountThreadInfo;
     pthread_t   ikbdThreadInfo;
     pthread_t   floppyEncThreadInfo;
     pthread_t   periodicThreadInfo;
@@ -225,9 +223,6 @@ int runCore(int instanceNo, bool localNotNetwork)
     core = new CCoreThread();
     int res;
 
-    res = pthread_create(&mountThreadInfo, NULL, mountThreadCode, NULL);        // create mount thread and run it
-    handlePthreadCreate(res, "ce mount", &mountThreadInfo);
-
     res = pthread_create(&ikbdThreadInfo, NULL, ikbdThreadCode, NULL);          // create the keyboard emulation thread and run it
     handlePthreadCreate(res, "ce ikbd", &ikbdThreadInfo);
 
@@ -253,10 +248,6 @@ int runCore(int instanceNo, bool localNotNetwork)
     printf("\n\nExit from main loop\n");
 
     delete core;
-
-    printf("Stoping mount thread\n");
-    Mounter::stop();
-    pthread_join(mountThreadInfo, NULL);                // wait until mount     thread finishes
 
     printf("Stoping ikbd thread\n");
     pthread_kill(ikbdThreadInfo, SIGINT);               // stop the select()

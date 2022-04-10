@@ -167,7 +167,6 @@ public:
     void fillDisplayLines(void);
 
 private:
-	void mountAndAttachSharedDrive(void);
 	void attachConfigDrive(void);
 
     AcsiDataTrans       *dataTrans;

@@ -16,7 +16,7 @@ DEPFLAGS = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
 
 VPATH = ./lib
 LDFLAGS	= -Llib $(CPU_FLAGS)
-LDLIBS = -lrt -lanl -lpthread -lcurl -ldl -lutil
+LDLIBS = -lrt -lanl -lpthread -ldl -lutil
 
 ifeq ($(ONPC),yes)
     OBJDIR = obj/onpc
@@ -75,10 +75,8 @@ SUBDIR4	= floppy
 SUBDIR6	= lib/cjson-code-58
 SUBDIR7	= service
 SUBDIR8	= acsicommand
-SUBDIR9	= network
 SUBDIR10 = dir2fdd
 SUBDIR11 = ikbd
-SUBDIR12 = mediastreaming
 SUBDIR13 = display
 SUBDIR14 = chipinterface_v1_v2
 SUBDIR15 = chipinterface_network
@@ -92,10 +90,8 @@ SRCS += $(wildcard $(SUBDIR4)/*.cpp)
 SRCS += $(wildcard $(SUBDIR6)/cJSON.c)
 SRCS += $(wildcard $(SUBDIR7)/*.cpp)
 SRCS += $(wildcard $(SUBDIR8)/*.cpp)
-SRCS += $(wildcard $(SUBDIR9)/*.cpp)
 SRCS += $(wildcard $(SUBDIR10)/*.cpp)
 SRCS += $(wildcard $(SUBDIR11)/*.cpp)
-SRCS += $(wildcard $(SUBDIR12)/*.cpp)
 SRCS += $(wildcard $(SUBDIR13)/*.cpp)
 SRCS += $(wildcard $(SUBDIR14)/*.cpp)
 SRCS += $(wildcard $(SUBDIR15)/*.cpp)
@@ -109,10 +105,8 @@ HDRS += $(wildcard $(SUBDIR4)/*.h)
 HDRS += $(wildcard $(SUBDIR6)/cJSON.h)
 HDRS += $(wildcard $(SUBDIR7)/*.h)
 HDRS += $(wildcard $(SUBDIR8)/*.h)
-HDRS += $(wildcard $(SUBDIR9)/*.h)
 HDRS += $(wildcard $(SUBDIR10)/*.h)
 HDRS += $(wildcard $(SUBDIR11)/*.h)
-HDRS += $(wildcard $(SUBDIR12)/*.h)
 HDRS += $(wildcard $(SUBDIR13)/*.h)
 HDRS += $(wildcard $(SUBDIR14)/*.h)
 HDRS += $(wildcard $(SUBDIR15)/*.h)
@@ -121,49 +115,17 @@ HDRS += $(wildcard $(SUBDIR16)/*.h)
 OBJS = $(addprefix $(OBJDIR)/, $(patsubst %.cpp,%.o,$(SRCS:.c=.o)))
 DEPS = $(patsubst %.o,%.d,$(OBJS))
 
-#combine web scripts
-WEB_CSS_PATH=webroot/css
-WEB_JS_PATH=webroot/js
-WEB_CSS_MODULES = $(WEB_CSS_PATH)/bootstrap.light.css\
-					$(WEB_CSS_PATH)/style.css 
-WEB_JS_MODULES = $(WEB_JS_PATH)/actual.js\
-					$(WEB_JS_PATH)/keylinux.js\
-					$(WEB_JS_PATH)/modernizr.custom.50426.js\
-					$(WEB_JS_PATH)/jquery.doubletap.js\
-					$(WEB_JS_PATH)/atariscreen.min.js\
-					$(WEB_JS_PATH)/screen.js\
-					$(WEB_JS_PATH)/script.js
-
-WEBCOMPONENTS = $(WEB_CSS_PATH)/combined.css.gz \
-    $(WEB_JS_PATH)/jquery-combined.js.gz \
-    $(WEB_JS_PATH)/zepto-combined.js.gz \
-    $(WEB_JS_PATH)/log.js.gz
-
-all:	$(TARGET) $(WEBCOMPONENTS)
+all:	$(TARGET)
 
 $(TARGET): $(OBJS) $(HDRS) $(LDLIBS)
 	$(CXX_LINK) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $@ $(LDLIBS)
 #	$(STRIP) -s $@
-
-$(WEB_CSS_PATH)/combined.css.gz: ${WEB_CSS_MODULES}
-	$(AT)cat $^ | gzip -f > $@
-
-$(WEB_JS_PATH)/zepto-combined.js.gz: $(WEB_JS_PATH)/zepto.js $(WEB_JS_PATH)/zepto.hack.js ${WEB_JS_MODULES}
-	$(AT)cat $^ | gzip -f > $@
-
-$(WEB_JS_PATH)/jquery-combined.js.gz: $(WEB_JS_PATH)/jquery.js ${WEB_JS_MODULES}
-	$(AT)cat $^ | gzip -f > $@
-
-$(WEB_JS_PATH)/log.js.gz: $(WEB_JS_PATH)/log.js
-	$(AT)cat $^ | gzip -f > $@
 
 print-%:	; @echo $* = $($*)
 
 .PHONY:	clean depclean
 
 clean:	depclean
-	$(AT)$(RM) $(WEB_JS_PATH)/*.gz
-	$(AT)$(RM) $(WEB_CSS_PATH)/*.gz
 	$(AT)$(RM) $(OBJS)
 	$(AT)$(RM) *.o *~ $(TARGET)
 

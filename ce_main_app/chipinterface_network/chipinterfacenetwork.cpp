@@ -8,8 +8,8 @@
 #include <unistd.h>
 #include <sys/select.h>
 #include <sys/inotify.h>
-#include <limits.h>
 #include <sys/socket.h>
+#include <limits.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 

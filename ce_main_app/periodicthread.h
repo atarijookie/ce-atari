@@ -40,10 +40,6 @@ typedef struct {
     pthread_mutex_t mtxConfigStreams;
 
     bool mountRawNotTrans;
-
-    bool devFinder_detachAndLook;
-    bool devFinder_look;
-
 } SharedObjects;
 
 void *periodicThreadCode(void *ptr);

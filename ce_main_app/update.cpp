@@ -11,7 +11,6 @@
 #include "settings.h"
 #include "update.h"
 #include "utils.h"
-#include "mounter.h"
 #include "floppy/imagelist.h"
 
 Versions Update::versions;

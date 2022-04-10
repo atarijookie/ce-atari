@@ -14,7 +14,6 @@
 #include "../debug.h"
 #include "../settings.h"
 #include "../utils.h"
-#include "../mounter.h"
 #include "acsidatatrans.h"
 #include "acsicommand/screencastacsicommand.h"
 #include "acsicommand/dateacsicommand.h"
@@ -91,7 +90,6 @@ TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt)
 
     loadSettings();
 
-    mountAndAttachSharedDrive();                                        // if shared drive is enabled, try to mount it and attach it
     attachConfigDrive();                                                // if config drive is enabled, attach it
 
     //ACSI command "date"
@@ -195,79 +193,11 @@ void TranslatedDisk::reloadSettings(int type)
     }
 
     // attach shared and config disk if they weren't attached before and now should be
-    mountAndAttachSharedDrive();                            // if shared drive is enabled, try to mount it and attach it
     attachConfigDrive();                                    // if config drive is enabled, attach it
 
-    // todo: attach remainig DOS drives when they couldn't be attached before (not enough letters before)
+    // todo: attach remaining DOS drives when they couldn't be attached before (not enough letters before)
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::configChanged_reload -- attached again, good %d, bad %d", good, bad);
-}
-
-void TranslatedDisk::mountAndAttachSharedDrive(void)
-{
-    std::string mountPath = SHARED_DRIVE_PATH;
-
-    Settings s;
-    std::string addr, path, username, password;
-    bool sharedEnabled;
-    bool nfsNotSamba;
-
-    addr            = s.getString("SHARED_ADDRESS",  "");
-    path            = s.getString("SHARED_PATH",     "");
-
-    username        = s.getString("SHARED_USERNAME", "");
-    password        = s.getString("SHARED_PASSWORD", "");
-
-    sharedEnabled   = s.getBool("SHARED_ENABLED", false);
-    nfsNotSamba     = s.getBool("SHARED_NFS_NOT_SAMBA", false);
-
-    if(!sharedEnabled) {
-        Debug::out(LOG_DEBUG, "mountAndAttachSharedDrive: shared drive not enabled, not mounting and not attaching...");
-        return;
-    }
-
-    if(addr.empty() || path.empty()) {
-        Debug::out(LOG_ERROR, "mountAndAttachSharedDrive: address or path is empty, this won't work!");
-        return;
-    }
-
-    TMounterRequest tmr;                                                    // fill this struct to mount something somewhere
-    tmr.action              = MOUNTER_ACTION_MOUNT;                         // action: mount
-    tmr.deviceNotShared     = false;
-    tmr.shared.host         = addr;
-    tmr.shared.hostDir      = path;
-    tmr.shared.nfsNotSamba  = nfsNotSamba;
-    tmr.shared.username     = username;
-    tmr.shared.password     = password;
-    tmr.mountDir            = mountPath;
-    Mounter::add(tmr);
-
-    std::string devicePath;
-    if(nfsNotSamba) {
-        devicePath = std::string("NFS: ") + addr + std::string(":");
-
-        if(path.length() > 0 && (path[0] != '/' && path[0] != '\\')) {      // if the path doesn't end with slash, add it
-            devicePath += "/";
-        }
-
-        devicePath += path;                                                 // now add the path
-        std::replace( devicePath.begin(), devicePath.end(), '\\', '/');
-    } else {
-        devicePath = std::string("samba: \\\\") + addr;
-
-        if(path.length() > 0 && (path[0] != '/' && path[0] != '\\')) {      // if the path doesn't end with slash, add it
-            devicePath += "\\";
-        }
-
-        devicePath += path;
-        std::replace(devicePath.begin(), devicePath.end(), '/', '\\');
-    }
-
-    bool res = attachToHostPath(mountPath, TRANSLATEDTYPE_SHAREDDRIVE, devicePath); // try to attach
-
-    if(!res) {                                                              // if didn't attach, skip the rest
-        Debug::out(LOG_ERROR, "mountAndAttachSharedDrive: failed to attach shared drive %s", mountPath.c_str());
-    }
 }
 
 void TranslatedDisk::attachConfigDrive(void)
@@ -568,11 +498,7 @@ void TranslatedDisk::onUnmountDrive(uint8_t *cmd)
 
     Debug::out(LOG_DEBUG, "onUnmountDrive -- drive: %d, hostRootPath: %s", drive, conf[drive].hostRootPath.c_str());
 
-    // send umount request
-    TMounterRequest tmr;
-    tmr.action          = MOUNTER_ACTION_UMOUNT;                            // action: umount
-    tmr.mountDir        = conf[drive].hostRootPath;                         // e.g. /mnt/sda2
-    Mounter::add(tmr);
+    // TODO: unmount here
 
     detachByIndex(drive);                                                   // detach drive from translated disk module
 
@@ -1678,13 +1604,10 @@ void TranslatedDisk::doZipDirMountOrStateCheck(bool isMounted, char *zipFilePath
 
         //----------
         // issue mount request
-        TMounterRequest tmr;
-        tmr.action      = MOUNTER_ACTION_MOUNT_ZIP;         // action: mount ZIP file
-        tmr.devicePath  = zipFilePath;                      // e.g. /mnt/shared/normal/archive.zip
-        tmr.mountDir    = zipDirs[zipDirIndex]->mountPoint; // e.g. /tmp/zipdir2
-        int masId       = Mounter::add(tmr);                // add mounter action, get mount action state id
-
-        zipDirs[zipDirIndex]->mountActionStateId    = masId;    // store the mounter action state id, for future mount state query
+        // TODO: mount zip
+//        tmr.devicePath  = zipFilePath;                      // e.g. /mnt/shared/normal/archive.zip
+//        tmr.mountDir    = zipDirs[zipDirIndex]->mountPoint; // e.g. /tmp/zipdir2
+//        zipDirs[zipDirIndex]->mountActionStateId    = masId;    // store the mounter action state id, for future mount state query
         zipDirs[zipDirIndex]->isMounted             = false;    // not mounted yet
         //----------
         // mark this ZIP file as mounted
@@ -1696,9 +1619,9 @@ void TranslatedDisk::doZipDirMountOrStateCheck(bool isMounted, char *zipFilePath
         Debug::out(LOG_DEBUG, "TranslatedDisk::doZipDirMountOrStateCheck -- file %s already mounted to %s, reusing and not mounting", zipFilePath, zipDirs[zipDirIndex]->mountPoint.c_str());
 
         if(!zipDirs[zipDirIndex]->isMounted) {                                      // if not mounted yet
-            int state = Mounter::mas_getState(zipDirs[zipDirIndex]->mountActionStateId);     // get state of this mount action
+            int state = 0;     // TODO: remake ZIP mount check
 
-            if(state == MOUNTACTION_STATE_DONE) {                                   // if state is DONE, mark that it's mounted and continue
+            if(state == 0) {                                   // if state is DONE, mark that it's mounted and continue
                 zipDirs[zipDirIndex]->isMounted = true;
             } else {                                                                // state is NOT DONE yet
                 waitingForMount = true;                                             // return that we're waiting for mount to finish

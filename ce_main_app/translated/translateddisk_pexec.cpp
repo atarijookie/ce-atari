@@ -12,7 +12,6 @@
 #include "../debug.h"
 #include "../settings.h"
 #include "../utils.h"
-#include "../mounter.h"
 #include "acsidatatrans.h"
 #include "translateddisk.h"
 #include "translatedhelper.h"

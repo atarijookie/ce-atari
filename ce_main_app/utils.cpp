@@ -31,7 +31,6 @@
 #include "translated/gemdos.h"
 #include "debug.h"
 #include "version.h"
-#include "mounter.h"
 #include "settings.h"
 
 uint32_t Utils::getCurrentMs(void)
@@ -364,9 +363,7 @@ void Utils::getIpAdds(uint8_t *bfrIPs, uint8_t *bfrMasks)
 
 void Utils::forceSync(void)
 {
-    TMounterRequest tmr;
-    tmr.action  = MOUNTER_ACTION_SYNC;                          // let the mounter thread do filesystem caches sync
-    Mounter::add(tmr);
+    printf("TODO: forceSync\n");
 }
 
 uint16_t Utils::getWord(uint8_t *bfr)

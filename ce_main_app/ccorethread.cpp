@@ -14,8 +14,8 @@
 #include "ccorethread.h"
 #include "native/scsi.h"
 #include "native/scsi_defs.h"
-#include "mounter.h"
 #include "update.h"
+#include "utils.h"
 #include "statusreport.h"
 #include "display/displaythread.h"
 
@@ -23,8 +23,6 @@
 #include "floppy/imagesilo.h"
 #include "floppy/imagestorage.h"
 #include "floppy/floppyencoder.h"
-
-#include "mediastreaming/mediastreaming.h"
 
 #include "periodicthread.h"
 
@@ -84,12 +82,7 @@ CCoreThread::CCoreThread()
     shared.imageSilo->setSettingsReloadProxy(&settingsReloadProxy);
     settingsReloadProxy.reloadSettings(SETTINGSUSER_FLOPPYIMGS);            // mark that floppy settings changed (when imageSilo loaded the settings)
 
-    // set up network adapter stuff
-    netAdapter.setAcsiDataTrans(dataTrans);
-
     misc.setDataTrans(dataTrans);
-
-    // set up mediastreaming service
 }
 
 CCoreThread::~CCoreThread()
@@ -97,15 +90,11 @@ CCoreThread::~CCoreThread()
     delete dataTrans;
     delete retryMod;
 
-    MediaStreaming::deleteInstance();
     sharedObjects_destroy();
 }
 
 void CCoreThread::sharedObjects_create(void)
 {
-    shared.devFinder_detachAndLook = false;
-    shared.devFinder_look = false;
-
     shared.scsi = new Scsi();
     shared.scsi->setAcsiDataTrans(dataTrans);
 
@@ -519,16 +508,6 @@ void CCoreThread::handleAcsiCommand(uint8_t *bufIn)
             pthread_mutex_unlock(&shared.mtxImages);    // unlock floppy images shared objects
             break;
 
-        case HOSTMOD_NETWORK_ADAPTER:
-            wasHandled = true;
-            netAdapter.processCommand(pCmd);
-            break;
-
-        case HOSTMOD_MEDIA_STREAMING:
-            wasHandled = true;
-            MediaStreaming::getInstance()->processCommand(pCmd, dataTrans);
-            break;
-
         case HOSTMOD_MISC:
             wasHandled = true;
             misc.processCommand(pCmd);
@@ -567,8 +546,6 @@ void CCoreThread::reloadSettings(int type)
             shared.mountRawNotTrans = newMountRawNotTrans;
 
             Debug::out(LOG_DEBUG, "CCoreThread::reloadSettings -- USB media mount strategy changed, remounting");
-
-            shared.devFinder_detachAndLook = true;
         }
 
         return;
@@ -594,9 +571,6 @@ void CCoreThread::reloadSettings(int type)
 
     // then load the new settings
     loadSettings();
-
-    // and now try to attach everything back
-    shared.devFinder_look = true;
 }
 
 void CCoreThread::fillDisplayLines(void)
