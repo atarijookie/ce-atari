@@ -112,6 +112,64 @@ def get_mounts():
     return mounts
 
 
+def get_symlinked_mount_folders():
+    """ go through our MOUNT_DIR_TRANS, find out which dirs are just a symlink to other mount points and return them """
+
+    # get letters from config, convert them to bit numbers
+    first = settings_letter_to_bitno('DRIVELETTER_FIRST')
+    shared = settings_letter_to_bitno('DRIVELETTER_SHARED')
+    config = settings_letter_to_bitno('DRIVELETTER_CONFDRIVE')
+
+    symlinks = []
+
+    for i in range(16):                     # go through available drive letters - from 0 to 15
+        if i < first:                       # below first char? skip it
+            continue
+
+        if i == shared or i == config:      # skip these two special drives
+            continue
+
+        letter = chr(97 + i)                # bit number to ascii char
+
+        # check if position at id_ is used or not
+        path = get_mount_path_for_letter(letter)    # construct path where the drive letter should be mounted
+
+        if not os.path.exists(path):        # if mount point doesn't exist, skip it
+            continue
+
+        if not os.path.islink(path):        # not a link? skip it
+            continue
+
+        # the path exists and it's a link, store original mount path vs atari mount path
+        source_path = os.readlink(path)
+        source_dest = source_path, path
+        symlinks.append(source_dest)
+
+    return symlinks
+
+
+def to_be_linked(mounts, symlinked):
+    """ get folders which should be symlinked
+    :param mounts: list of tuples device-vs-mount_dir
+    :param symlinked: list of tuples mount_dir-vs-symlink_destination
+    """
+
+    link_these = []
+
+    for dev, mountdir in mounts:        # go through the list of mounted devices
+        found = False
+
+        for source, dest in symlinked:  # see if this mountdir has been already symlinked
+            if mountdir == source:      # the mount dir is the same as source of some link? found this mount in symlink
+                found = True
+                break
+
+        if not found:                   # this mountdir wasn't found, add it to those which should be linked
+            link_these.append(mountdir)
+
+    return link_these
+
+
 def get_not_mounted_devices(devs, mounts_in):
     """ Go through the list of devices (devs) and through list of mounts (mnts), and if the device from devs is not
     found in the already mounted devices, it will be returned as a list with others. """
@@ -209,6 +267,11 @@ def get_free_letters(mounts_in):
                     found = True
                     break
 
+                if os.path.islink(path):    # if this is a link
+                    # TODO: check if link is not broken
+                    found = True
+                    break
+
             if not found:                   # not found? use it
                 letters_out.append(letter)
 
@@ -223,48 +286,71 @@ def delete_files(files):
             print_and_log(logging.WARNING, f'failed to delete {file} : {str(exc)}')
 
 
+def mount_device_raw(device):
+    # find which ACSI slots are configured as RAW and are free
+    ids = get_free_ids()
+
+    if not ids:
+        print_and_log(logging.WARNING, f"No free RAW IDs found, cannot mount device: {device}")
+        return False
+
+    id_ = ids[0]  # get 0th available id
+    path = get_mount_path_for_id(id_)  # create mount path for this id
+
+    # create symlink from device to ACSI slot
+    print_and_log(logging.DEBUG, f"mount_device as RAW: {device} -> {path}")
+    os.symlink(device, path)
+
+
+def mount_device_translated(mounts, device):
+    # find empty device letters
+    letters = get_free_letters(mounts)
+
+    if not letters:
+        print_and_log(logging.WARNING, f"No free translated letters found, cannot mount device: {device}")
+        return False
+
+    letter = letters[0]  # get 0th letter
+    path = get_mount_path_for_letter(letter)  # construct path where the drive letter should be mounted
+
+    # mount device to expected path
+    print_and_log(logging.DEBUG, f"mount_device as TRANSLATED: {device} -> {path}")
+
+    os.makedirs(path, exist_ok=True)  # make mount dir if it doesn't exist
+
+    logfile = "/tmp/mount.log"  # define log files, delete them before mount
+    logfile2 = os.path.join(path, os.path.basename(logfile))
+    delete_files([logfile, logfile2])
+
+    # TODO: from root device get device for partition (e.g. from sdd -> sdd1)
+
+    mount_cmd = f"mount -v {device} {path} > {logfile} 2>&1"
+    status = os.system(mount_cmd)  # do the mount
+
+    if status != 0:  # some error? then copy in the log files
+        shutil.copy(logfile, logfile2)
+        print_and_log(logging.WARNING, f'mount of {device} failed, log copied')
+
+
+def symlink_dir(mounts, mountdir):
+    # find empty device letters
+    letters = get_free_letters(mounts)
+
+    if not letters:
+        print_and_log(logging.WARNING, f"No free translated letters found, cannot mount device: {device}")
+        return False
+
+    letter = letters[0]  # get 0th letter
+    path = get_mount_path_for_letter(letter)  # construct path where the drive letter should be mounted
+
+    # TODO: symlink mountdir
+
+
 def mount_device(mount_raw_not_trans, mounts, device):
     if mount_raw_not_trans:         # mount USB as RAW?
-        # find which ACSI slots are configured as RAW and are free
-        ids = get_free_ids()
-
-        if not ids:
-            print_and_log(logging.WARNING, f"No free RAW IDs found, cannot mount device: {device}")
-            return False
-
-        id_ = ids[0]                        # get 0th available id
-        path = get_mount_path_for_id(id_)   # create mount path for this id
-
-        # create symlink from device to ACSI slot
-        print_and_log(logging.DEBUG, f"mount_device as RAW: {device} -> {path}")
-        os.symlink(device, path)
-
+        mount_device_raw(device)
     else:                           # mount USB as translated?
-        # find empty device letters
-        letters = get_free_letters(mounts)
-
-        if not letters:
-            print_and_log(logging.WARNING, f"No free translated letters found, cannot mount device: {device}")
-            return False
-
-        letter = letters[0]                         # get 0th letter
-        path = get_mount_path_for_letter(letter)    # construct path where the drive letter should be mounted
-
-        # mount device to expected path
-        print_and_log(logging.DEBUG, f"mount_device as TRANSLATED: {device} -> {path}")
-
-        os.makedirs(path, exist_ok=True)        # make mount dir if it doesn't exist
-
-        logfile = "/tmp/mount.log"              # define log files, delete them before mount
-        logfile2 = os.path.join(path, os.path.basename(logfile))
-        delete_files([logfile, logfile2])
-
-        mount_cmd = f"mount -v {device} {path} > {logfile} 2>&1"
-        status = os.system(mount_cmd)           # do the mount
-
-        if status != 0:                         # some error? then copy in the log files
-            shutil.copy(logfile, logfile2)
-            print_and_log(logging.WARNING, f'mount of {device} failed, log copied')
+        mount_device_translated(mounts, device)
 
 
 def find_and_mount_devices():
@@ -277,11 +363,18 @@ def find_and_mount_devices():
     print_and_log(logging.INFO, f'devices: {devices}')
     print_and_log(logging.INFO, f'mounts: {mounts}')
 
+    symlinked = get_symlinked_mount_folders()           # get folders which are already symlinked
+    link_these = to_be_linked(mounts, symlinked)        # get folders which should be symlinked
+
     devices = get_not_mounted_devices(devices, mounts)      # filter out devices which are already mounted
     print_and_log(logging.INFO, f'not mounted: {devices}')
 
     for device in devices:          # go through the not-mounted devices and try to mount them
         mount_device(mount_raw_not_trans, mounts, device)
+
+    if not mount_raw_not_trans:         # if translated mounting enabled
+        for mountdir in link_these:     # link these mount dirs into atari mount path
+            symlink_dir(mountdir)
 
 
 def handle_read_callback(notifier):
@@ -312,6 +405,8 @@ if __name__ == "__main__":
     find_and_mount_devices()        # find devices and mount them
 
     print_and_log(logging.INFO, f'Will now start watching folder: {dev_disk_dir}')
+
+    # TODO: mount shared drive
 
     # watch the dev_disk_dir folder, on changes look for devices and mount them
     wm = pyinotify.WatchManager()
