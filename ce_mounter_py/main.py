@@ -1,26 +1,30 @@
 from copy import deepcopy
 import os
 import re
-import glob
+import threading
 import shutil
 import pyinotify
 import asyncio
 from setproctitle import setproctitle
+from time import sleep
 import subprocess
 import logging
 from logging.handlers import RotatingFileHandler
 
 settings_path = "/ce/settings"          # path to settings dir
 
-settings_default = {'DRIVELETTER_FIRST': 'C', 'DRIVELETTER_SHARED': 'P', 'DRIVELETTER_CONFDRIVE': 'O',
-                    'MOUNT_RAW_NOT_TRANS': 0, 'SHARED_ENABLED': 0, 'SHARED_NFS_NOT_SAMBA': 0,
+settings_default = {'DRIVELETTER_FIRST': 'C', 'MOUNT_RAW_NOT_TRANS': 0, 'SHARED_ENABLED': 0, 'SHARED_NFS_NOT_SAMBA': 0,
                     'ACSI_DEVTYPE_0': 0, 'ACSI_DEVTYPE_1': 1, 'ACSI_DEVTYPE_2': 0, 'ACSI_DEVTYPE_3': 0,
                     'ACSI_DEVTYPE_4': 0, 'ACSI_DEVTYPE_5': 0, 'ACSI_DEVTYPE_6': 0, 'ACSI_DEVTYPE_7': 0}
 
 settings = {}
 
+MOUNT_COMMANDS_DIR = '/tmp/ce/cmds'
 MOUNT_DIR_RAW = '/tmp/ce/raw'
 MOUNT_DIR_TRANS = '/tmp/ce/trans'
+LETTER_SHARED = 'N'                     # network drive on N
+LETTER_CONFIG = 'O'                     # config drive on O
+LETTER_ZIP = 'P'                        # ZIP file drive on P
 
 dev_disk_dir = '/dev/disk/by-path'
 
@@ -132,9 +136,7 @@ def get_symlinked_mount_folders():
     """ go through our MOUNT_DIR_TRANS, find out which dirs are just a symlink to other mount points and return them """
 
     # get letters from config, convert them to bit numbers
-    first = settings_letter_to_bitno('DRIVELETTER_FIRST')
-    shared = settings_letter_to_bitno('DRIVELETTER_SHARED')
-    config = settings_letter_to_bitno('DRIVELETTER_CONFDRIVE')
+    first, shared, config, zip_ = get_drives_bitno_from_settings()
 
     symlinks = []
 
@@ -142,7 +144,7 @@ def get_symlinked_mount_folders():
         if i < first:                       # below first char? skip it
             continue
 
-        if i == shared or i == config:      # skip these two special drives
+        if i in [shared, config, zip_]:     # skip these special drives
             continue
 
         letter = chr(97 + i)                # bit number to ascii char
@@ -174,6 +176,9 @@ def to_be_linked(mounts, symlinked):
 
     for dev, mountdir in mounts:        # go through the list of mounted devices
         found = False
+
+        if mountdir in ['/', '/boot']:  # don't symlink these linux folders
+            continue
 
         for source, dest in symlinked:  # see if this mountdir has been already symlinked
             if mountdir == source:      # the mount dir is the same as source of some link? found this mount in symlink
@@ -236,11 +241,30 @@ def get_free_ids():
     return ids
 
 
+def get_drives_bitno_from_settings():
+    """ get letters from config, convert them to bit numbers """
+
+    first = settings_letter_to_bitno('DRIVELETTER_FIRST')
+    shared = letter_to_bitno(LETTER_SHARED)     # network drive
+    config = letter_to_bitno(LETTER_CONFIG)     # config drive
+    zip_ = letter_to_bitno(LETTER_ZIP)          # ZIP file drive
+
+    return first, shared, config, zip_
+
+
 def settings_letter_to_bitno(setting_name):
     """ get setting by setting name, convert it to integer and then to drive bit number for Atari, e.g. 
     'a' is 0, 'b' is 1, 'p' is 15 """
 
-    letter = settings.get(setting_name, 'c').lower()        # get setting and convert it to lowercase
+    drive_letter = settings.get(setting_name, 'c')
+    return letter_to_bitno(drive_letter)
+
+
+def letter_to_bitno(drive_letter):
+    """ convert drive letter to integer and then to drive bit number for Atari, e.g.
+    'a' is 0, 'b' is 1, 'p' is 15 """
+
+    letter = drive_letter.lower()        # get setting and convert it to lowercase
     letter = letter[:1]         # get only 0th character
     ascii_no = ord(letter)      # letter to ascii number ('c' -> 99)
     bitno = ascii_no - 97       # ascii number to bit number (99 -> 2)
@@ -257,15 +281,13 @@ def get_free_letters(mounts_in):
     letters_out = []
 
     # get letters from config, convert them to bit numbers
-    first = settings_letter_to_bitno('DRIVELETTER_FIRST')
-    shared = settings_letter_to_bitno('DRIVELETTER_SHARED')
-    config = settings_letter_to_bitno('DRIVELETTER_CONFDRIVE')
+    first, shared, config, zip_ = get_drives_bitno_from_settings()
 
     for i in range(16):                     # go through available drive letters - from 0 to 15
         if i < first:                       # below first char? skip it
             continue
 
-        if i == shared or i == config:      # char reserved for shared or config? skip it
+        if i in [shared, config, zip_]:     # skip these special drives
             continue
 
         letter = chr(97 + i)                # bit number to ascii char
@@ -411,13 +433,75 @@ def find_and_mount_devices():
                 mount_device_translated(mounts, device)
 
         for mountdir in link_these:  # link these mount dirs into atari mount path
-            symlink_dir(mountdir)
+            symlink_dir(mounts, mountdir)
 
 
 def handle_read_callback(notifier):
     print_and_log(logging.INFO, f'monitored folder changed...')
 
     find_and_mount_devices()        # find devices and mount them
+
+
+def get_mount_zip_cmd():
+    """ get which ZIP file should be mounted """
+
+    path_ = os.path.join(MOUNT_COMMANDS_DIR, "mount_zip")
+
+    if not os.path.exists(path_):       # no file like this exists? quit
+        return None
+
+    try:
+        with open(path_) as f:          # open and read file
+            line = f.read()
+
+        os.unlink(path_)                # delete the file
+
+        line = line.strip()             # remove whitespaces
+        return line
+    except Exception as exc:            # on exception
+        print_and_log(logging.INFO, f'failed to read {path_} : {str(exc)}')
+
+    return None                         # if got here, it failed
+
+
+def umount_if_mounted(mount_dir):
+    """ check if this dir is mounted and if it is, then umount it """
+
+    try:
+        cmd = f'umount {mount_dir}'     # construct umount command
+        os.system(cmd)                  # execute umount command
+        print_and_log(logging.INFO, f'umount_if_mounted: umounted {mount_dir}')
+    except Exception as exc:
+        print_and_log(logging.INFO, f'umount_if_mounted: failed to umount {mount_dir} : {str(exc)}')
+
+
+def mount_on_command():
+    while True:
+        if not os.path.exists(MOUNT_COMMANDS_DIR):              # if dir for commands doesn't exist, create it
+            os.makedirs(MOUNT_COMMANDS_DIR, exist_ok=True)
+
+        #  command to mount ZIP?
+        zip_file_path = get_mount_zip_cmd()
+
+        if not zip_file_path:                       # nothing to mount?
+            sleep(1)
+            continue
+
+        if not os.path.exists(zip_file_path):       # got path, but it doesn't exists?
+            sleep(1)
+            continue
+
+        mount_path = get_mount_path_for_letter(LETTER_ZIP)      # get where it should be mounted
+        umount_if_mounted(mount_path)                           # umount dir if it's mounted
+        os.makedirs(mount_path, exist_ok=True)                  # create mount dir
+
+        mount_cmd = f'fuse-zip {zip_file_path} {mount_path}'    # construct mount command
+
+        try:                        # try to mount it
+            os.system(mount_cmd)
+            print_and_log(logging.INFO, f'mounted {zip_file_path} to {mount_path}')
+        except Exception as exc:    # on exception
+            print_and_log(logging.INFO, f'failed to mount zip with cmd: {mount_cmd} : {str(exc)}')
 
 
 if __name__ == "__main__":
@@ -443,6 +527,9 @@ if __name__ == "__main__":
 
     print_and_log(logging.INFO, f'Will now start watching folder: {dev_disk_dir}')
 
+    mount_thread = threading.Thread(target=mount_on_command, daemon=True)
+    mount_thread.start()
+
     # TODO: mount shared drive
 
     # TODO: remove broken linked devices / mounts on removal
@@ -452,5 +539,10 @@ if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     notifier = pyinotify.AsyncioNotifier(wm, loop, callback=handle_read_callback)
     wm.add_watch(dev_disk_dir, pyinotify.IN_CREATE | pyinotify.IN_DELETE | pyinotify.IN_UNMOUNT)
-    loop.run_forever()
+
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        print_and_log(logging.INFO, '\nterminated by keyboard...')
+
     notifier.stop()
