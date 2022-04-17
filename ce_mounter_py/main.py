@@ -1,6 +1,7 @@
 from copy import deepcopy
 import os
 import re
+import glob
 import shutil
 import pyinotify
 import asyncio
@@ -63,6 +64,20 @@ def setting_get_bool(setting_name):
     return value
 
 
+def setting_get_int(setting_name):
+    global settings
+
+    value = 0
+    value_raw = settings.get(setting_name)
+
+    try:
+        value = int(value_raw)
+    except Exception as exc:
+        print_and_log(logging.WARNING, f"failed to convert {value} to int: {str(exc)}")
+
+    return value
+
+
 def get_usb_devices():
     """ Look for all the attached disks to the system and return only those attached via usb.
     Return only root device (e.g. /dev/sda), not the individual partitions (e.g. not /dev/sda1) """
@@ -72,7 +87,8 @@ def get_usb_devices():
 
     devs = os.listdir(dev_disk_dir)
 
-    root_devs = set()
+    root_devs = set()           # root devices, e.g. /dev/sda
+    part_devs = set()           # partition devices, e.g. /dev/sda1, /dev/sda2
 
     for dev in devs:                                # go through found devices
         dev_name = os.path.join(dev_disk_dir, dev)  # usb-drive -> /dev/disk/by-id/usb-drive
@@ -84,12 +100,12 @@ def get_usb_devices():
         dev_path = os.path.join(dev_disk_dir, dev_path)  # ../../sda1 -> /dev/disk/by-id/../../sda1
         dev_path = os.path.abspath(dev_path)        # /dev/disk/by-id/../../sda1 -> /dev/sda1
 
-        if any(char.isdigit() for char in dev_path):     # if this is pointing to partition (e.g. sda1), ignore it
-            continue
+        if any(char.isdigit() for char in dev_path):     # pointing to partition (e.g. sda1), add to part devices?
+            part_devs.add(dev_path)
+        else:                                       # pointing to root device? (e.g. sda) add to root devices
+            root_devs.add(dev_path)
 
-        root_devs.add(dev_path)
-
-    return root_devs
+    return root_devs, part_devs
 
 
 def get_mounts():
@@ -203,7 +219,7 @@ def get_free_ids():
         key = f'ACSI_DEVTYPE_{id_}'
 
         # if id_ is not RAW, skip it
-        if settings.get(key) != 2:
+        if setting_get_int(key) != 2:
             continue
 
         # check if position at id_ is used or not
@@ -267,8 +283,7 @@ def get_free_letters(mounts_in):
                     found = True
                     break
 
-                if os.path.islink(path):    # if this is a link
-                    # TODO: check if link is not broken
+                if os.path.islink(path) and os.path.exists(path):       # if this is a link and it's not broken
                     found = True
                     break
 
@@ -286,7 +301,23 @@ def delete_files(files):
             print_and_log(logging.WARNING, f'failed to delete {file} : {str(exc)}')
 
 
-def mount_device_raw(device):
+def is_raw_device_linked(device):
+    """ check if this device is already symlinked or not """
+    for id_ in range(8):
+        path = get_mount_path_for_id(id_)
+
+        if not os.path.exists(path) or not os.path.islink(path):    # path doesn't exist or not a link, skip rest
+            continue
+
+        source = os.readlink(path)  # get link source
+
+        if device == source:        # this device is source of this link, we got this device
+            return True
+
+    return False
+
+
+def link_raw_device(device):
     # find which ACSI slots are configured as RAW and are free
     ids = get_free_ids()
 
@@ -322,8 +353,6 @@ def mount_device_translated(mounts, device):
     logfile2 = os.path.join(path, os.path.basename(logfile))
     delete_files([logfile, logfile2])
 
-    # TODO: from root device get device for partition (e.g. from sdd -> sdd1)
-
     mount_cmd = f"mount -v {device} {path} > {logfile} 2>&1"
     status = os.system(mount_cmd)  # do the mount
 
@@ -333,24 +362,21 @@ def mount_device_translated(mounts, device):
 
 
 def symlink_dir(mounts, mountdir):
+    """ create a symlink from existing mounted dir to our atari mount dir """
     # find empty device letters
     letters = get_free_letters(mounts)
 
     if not letters:
-        print_and_log(logging.WARNING, f"No free translated letters found, cannot mount device: {device}")
+        print_and_log(logging.WARNING, f"No free translated letters found, cannot symlink dir: {mountdir}")
         return False
 
     letter = letters[0]  # get 0th letter
     path = get_mount_path_for_letter(letter)  # construct path where the drive letter should be mounted
 
-    # TODO: symlink mountdir
+    print_and_log(logging.DEBUG, f"symlink_dir: {mountdir} -> {path}")
 
-
-def mount_device(mount_raw_not_trans, mounts, device):
-    if mount_raw_not_trans:         # mount USB as RAW?
-        mount_device_raw(device)
-    else:                           # mount USB as translated?
-        mount_device_translated(mounts, device)
+    # symlink mounted dir into our atari mount path
+    os.symlink(mountdir, path)
 
 
 def find_and_mount_devices():
@@ -358,22 +384,33 @@ def find_and_mount_devices():
     mount_raw_not_trans = setting_get_bool('MOUNT_RAW_NOT_TRANS')
     print_and_log(logging.INFO, f"MOUNT mode: {'RAW' if mount_raw_not_trans else 'TRANS'}")
 
-    devices = get_usb_devices()     # get attached USB devices
-    mounts = get_mounts()           # get devices and their mount points
-    print_and_log(logging.INFO, f'devices: {devices}')
-    print_and_log(logging.INFO, f'mounts: {mounts}')
+    root_devs, part_devs = get_usb_devices()            # get attached USB devices
+    print_and_log(logging.INFO, f'devices: {root_devs}')
 
-    symlinked = get_symlinked_mount_folders()           # get folders which are already symlinked
-    link_these = to_be_linked(mounts, symlinked)        # get folders which should be symlinked
+    if mount_raw_not_trans:         # for raw mount, check if symlinked
+        root_devs = [dev for dev in root_devs if not is_raw_device_linked(dev)]     # keep only not symlinked devices
 
-    devices = get_not_mounted_devices(devices, mounts)      # filter out devices which are already mounted
-    print_and_log(logging.INFO, f'not mounted: {devices}')
+        for device in root_devs:    # mount all the found partition devices, if possible
+            link_raw_device(device)
+    else:                           # for translated mounts
+        mounts = get_mounts()                               # get devices and their mount points
+        print_and_log(logging.INFO, f'mounts: {mounts}')
 
-    for device in devices:          # go through the not-mounted devices and try to mount them
-        mount_device(mount_raw_not_trans, mounts, device)
+        symlinked = get_symlinked_mount_folders()           # get folders which are already symlinked
+        link_these = to_be_linked(mounts, symlinked)        # get folders which should be symlinked
 
-    if not mount_raw_not_trans:         # if translated mounting enabled
-        for mountdir in link_these:     # link these mount dirs into atari mount path
+        root_devs_not_mounted = get_not_mounted_devices(root_devs, mounts)  # filter out devices which are already mounted
+        print_and_log(logging.INFO, f'not mounted: {root_devs_not_mounted}')
+
+        # from root device get device for partition (e.g. from sdd -> sdd1, sdd2)
+        for root_dev in root_devs_not_mounted:          # go through the not-mounted devices and try to mount them
+            devices = [part_dev for part_dev in part_devs if root_dev in part_dev]
+            print_and_log(logging.DEBUG, f"for root device {root_dev} found partition devices {devices}")
+
+            for device in devices:      # mount all the found partition devices, if possible
+                mount_device_translated(mounts, device)
+
+        for mountdir in link_these:  # link these mount dirs into atari mount path
             symlink_dir(mountdir)
 
 
@@ -407,6 +444,8 @@ if __name__ == "__main__":
     print_and_log(logging.INFO, f'Will now start watching folder: {dev_disk_dir}')
 
     # TODO: mount shared drive
+
+    # TODO: remove broken linked devices / mounts on removal
 
     # watch the dev_disk_dir folder, on changes look for devices and mount them
     wm = pyinotify.WatchManager()
