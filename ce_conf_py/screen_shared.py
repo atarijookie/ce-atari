@@ -36,30 +36,30 @@ def shared_drive_create(button):
     bgrp = []  # button group
     b1 = MyRadioButton(
             bgrp, u'', on_state_change=on_option_changed,
-            user_data={'id': 'SHARED_NFS_NOT_SAMBA', 'value': 1})       # NFS
+            user_data={'id': 'SHARED_NFS_NOT_SAMBA', 'value': 0})       # samba / cifs
 
     b2 = MyRadioButton(
             bgrp, u'', on_state_change=on_option_changed,
-            user_data={'id': 'SHARED_NFS_NOT_SAMBA', 'value': 0})       # samba / cifs
+            user_data={'id': 'SHARED_NFS_NOT_SAMBA', 'value': 1})       # NFS
 
     value = setting_get_bool('SHARED_NFS_NOT_SAMBA')
 
     if value:  # 1st option should be selected?
-        b1.set_state(True)
-    else:  # 2nd option should be selected?
         b2.set_state(True)
+    else:  # 2nd option should be selected?
+        b1.set_state(True)
 
     cols = urwid.Columns([              # NFS option row
         ('fixed', 10, urwid.Text('')),
         ('fixed', 7, b1),
-        ('fixed', 22, urwid.Text('NFS'))],
+        ('fixed', 22, urwid.Text('Samba / cifs / windows'))],
         dividechars=0)
     body.append(cols)
 
     cols = urwid.Columns([              # samba / cifs option row
         ('fixed', 10, urwid.Text('')),
         ('fixed', 7, b2),
-        ('fixed', 22, urwid.Text('Samba / cifs / windows'))],
+        ('fixed', 22, urwid.Text('NFS'))],
         dividechars=0)
     body.append(cols)
     body.append(urwid.Divider())
@@ -89,7 +89,7 @@ def shared_drive_create(button):
         dividechars=0)
     body.append(cols)
 
-    cols_edit_password, _ = create_edit('SHARED_PASSWORD', 20, on_editline_changed)
+    cols_edit_password, _ = create_edit('SHARED_PASSWORD', 20, on_editline_changed, mask='*')
     cols = urwid.Columns([
         ('fixed', 10, urwid.Text('Password', align='left')),
         ('fixed', 20, cols_edit_password)],

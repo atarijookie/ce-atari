@@ -111,7 +111,7 @@ def create_header_footer(header_text, footer_text=None):
     return header, footer
 
 
-def create_edit(setting_name, width, on_edit_changed):
+def create_edit(setting_name, width, on_edit_changed, mask=None):
     from utils import setting_get_str
 
     if setting_name:        # setting name provided? load setting value
@@ -119,7 +119,7 @@ def create_edit(setting_name, width, on_edit_changed):
     else:                   # no setting name? just empty string
         text = ''
 
-    edit_line = urwid.Edit(caption='', edit_text=text)
+    edit_line = urwid.Edit(caption='', edit_text=text, mask=mask)
     urwid.connect_signal(edit_line, 'change', on_edit_changed, {'id': setting_name})
 
     edit_decorated = urwid.AttrMap(edit_line, None, focus_map='reversed')

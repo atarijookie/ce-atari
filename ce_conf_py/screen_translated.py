@@ -31,23 +31,16 @@ def translated_create(button):
         return cols
 
     # translated drive letter
+    body.append(urwid.Divider())
     trans_first = create_drive_row("First translated drive", 'DRIVELETTER_FIRST')
     body.append(trans_first)
     body.append(urwid.Divider())
-
-    # shared drive letter
-    trans_shared = create_drive_row("Shared drive", 'DRIVELETTER_SHARED')
-    body.append(trans_shared)
-
-    # config drive letter
-    trans_config = create_drive_row("Config drive", 'DRIVELETTER_CONFDRIVE')
-    body.append(trans_config)
 
     body.append(urwid.Divider())
     body.append(urwid.AttrMap(urwid.Text('Options', align='center'), 'reversed'))
     body.append(urwid.Divider())
 
-    def create_options_rows(label, option1_true, option2_false, setting_name):
+    def create_options_rows(label, option_false, option_true, setting_name):
         value = setting_get_bool(setting_name)
 
         bgroup = []  # button group
@@ -66,22 +59,19 @@ def translated_create(button):
 
         cols1_ = urwid.Columns([
             ('fixed', 21, urwid.Text(label)),
-            ('fixed', 6, b1),
-            ('fixed', 10, urwid.Text(option1_true))],
+            ('fixed', 6, b2),
+            ('fixed', 10, urwid.Text(option_false))],
             dividechars=0)
 
         cols2_ = urwid.Columns([
             ('fixed', 21, urwid.Text('')),
-            ('fixed', 6, b2),
-            ('fixed', 10, urwid.Text(option2_false))],
+            ('fixed', 6, b1),
+            ('fixed', 10, urwid.Text(option_true))],
             dividechars=0)
 
         return cols1_, cols2_
 
-    cols1, cols2 = create_options_rows("Mount USB media as", "raw", "translated", 'MOUNT_RAW_NOT_TRANS')
-    body.extend([cols1, cols2, urwid.Divider()])
-
-    cols1, cols2 = create_options_rows("Access ZIP files as", "dirs", "files", 'MOUNT_ZIP_FILES')
+    cols1, cols2 = create_options_rows("Mount USB media as", "translated", "raw", 'MOUNT_RAW_NOT_TRANS')
     body.extend([cols1, cols2, urwid.Divider()])
 
     # add save + cancel button
@@ -113,8 +103,6 @@ def translated_save(button):
 
     # translated settings verification before saving here
     a = setting_get_merged('DRIVELETTER_FIRST')
-    b = setting_get_merged('DRIVELETTER_SHARED')
-    c = setting_get_merged('DRIVELETTER_CONFDRIVE')
 
     # if some shared letters is the same, warn and don't save
     if a == b or a == c or b == c:
