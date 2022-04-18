@@ -177,7 +177,16 @@ def to_be_linked(mounts, symlinked):
     for dev, mountdir in mounts:        # go through the list of mounted devices
         found = False
 
-        if mountdir in ['/', '/boot']:  # don't symlink these linux folders
+        if mountdir in ['/']:           # don't symlink these linux folders
+            continue
+
+        # also don't symlink folder starting with these
+        ignore = False
+        for skip in ['/boot', '/run', '/proc', '/var', '/etc', '/opt']:
+            if mountdir.startswith(skip):
+                ignore = True
+
+        if ignore:                      # should ignore this mount?
             continue
 
         for source, dest in symlinked:  # see if this mountdir has been already symlinked
@@ -475,7 +484,105 @@ def umount_if_mounted(mount_dir):
         print_and_log(logging.INFO, f'umount_if_mounted: failed to umount {mount_dir} : {str(exc)}')
 
 
+def options_to_string(opts: dict):
+    """ turn dictionary of options into single string """
+
+    opts_strs = []
+
+    for key, value in opts.items():     # go through all the dict items
+        if not value:                   # value not provided? skip adding
+            continue
+
+        opt = f'{key}={value}'          # from key, value create 'key=value' string
+        opts_strs.append(opt)
+
+    if opts_strs:       # if got some options, merge them, prepend with -o
+        options = '-o ' + ','.join(opts_strs)
+        return options
+
+    return None         # no valid options found
+
+
+def mount_shared():
+    """ this function checks for shared drive settings, mounts drive if needed """
+    global settings
+
+    cmd_last = ''
+
+    while True:
+        sleep(5)
+
+        shared_enabled = setting_get_bool('SHARED_ENABLED')
+
+        if not shared_enabled:      # if shared drive not enabled, don't do rest
+            continue
+
+        addr = settings.get('SHARED_ADDRESS')
+        path_ = settings.get('SHARED_PATH')
+        user = settings.get('SHARED_USERNAME')
+        pswd = settings.get('SHARED_PASSWORD')
+
+        if not addr or not path_:   # address or path not provided? don't do the rest
+            continue
+
+        nfs_not_samba = setting_get_bool('SHARED_NFS_NOT_SAMBA')
+        mount_path = get_mount_path_for_letter(LETTER_SHARED)       # get where it should be mounted
+
+        if nfs_not_samba:       # NFS shared drive
+            options = options_to_string({'username': user, 'password': pswd, 'vers': 3})
+            cmd = f'mount -t nfs {options} {addr}:/{path_} {mount_path}'
+        else:                   # cifs / samba / windows share
+            options = options_to_string({'username': user, 'password': pswd})
+            cmd = f'mount -t cifs {options} //{addr}/{path_} {mount_path}'
+
+        # if no change in the created command, nothing to do here
+        if cmd == cmd_last:
+            continue
+
+        cmd_last = cmd          # store this cmd
+
+        cmd += " > /tmp/ce/mount.log 2>&1 "     # append writing of stdout and stderr to file
+
+        # command changed, we should execute it
+        os.makedirs(mount_path, exist_ok=True)  # create dir if not exist
+        umount_if_mounted(mount_path)           # possibly umount
+
+        good = False
+        try:
+            print_and_log(logging.INFO, f'mount_shared: cmd: {cmd}')
+            status = os.system(cmd)         # try mounting
+            good = status == 0              # good if status is 0
+        except Exception as exc:
+            print_and_log(logging.INFO, f'mount_shared: mount failed : {str(exc)}')
+
+        if not good:        # mount failed, copy mount log
+            try:
+                shutil.copy('/tmp/ce/mount.log', mount_path)
+            except Exception as exc:
+                print_and_log(logging.INFO, f'mount_shared: copy of log file failed : {str(exc)}')
+
+
+def mount_zip_file(zip_file_path):
+    """ mount ZIP file if possible """
+    if not os.path.exists(zip_file_path):  # got path, but it doesn't exist?
+        return
+
+    mount_path = get_mount_path_for_letter(LETTER_ZIP)  # get where it should be mounted
+    umount_if_mounted(mount_path)  # umount dir if it's mounted
+    os.makedirs(mount_path, exist_ok=True)  # create mount dir
+
+    mount_cmd = f'fuse-zip {zip_file_path} {mount_path}'  # construct mount command
+
+    try:  # try to mount it
+        print_and_log(logging.INFO, f'mount_zip_file: cmd: {mount_cmd}')
+        os.system(mount_cmd)
+        print_and_log(logging.INFO, f'mounted {zip_file_path} to {mount_path}')
+    except Exception as exc:  # on exception
+        print_and_log(logging.INFO, f'failed to mount zip with cmd: {mount_cmd} : {str(exc)}')
+
+
 def mount_on_command():
+    """ endless loop to mount things from CE main app on request """
     while True:
         if not os.path.exists(MOUNT_COMMANDS_DIR):              # if dir for commands doesn't exist, create it
             os.makedirs(MOUNT_COMMANDS_DIR, exist_ok=True)
@@ -483,25 +590,10 @@ def mount_on_command():
         #  command to mount ZIP?
         zip_file_path = get_mount_zip_cmd()
 
-        if not zip_file_path:                       # nothing to mount?
-            sleep(1)
-            continue
+        if zip_file_path:       # should mount ZIP?
+            mount_zip_file(zip_file_path)
 
-        if not os.path.exists(zip_file_path):       # got path, but it doesn't exists?
-            sleep(1)
-            continue
-
-        mount_path = get_mount_path_for_letter(LETTER_ZIP)      # get where it should be mounted
-        umount_if_mounted(mount_path)                           # umount dir if it's mounted
-        os.makedirs(mount_path, exist_ok=True)                  # create mount dir
-
-        mount_cmd = f'fuse-zip {zip_file_path} {mount_path}'    # construct mount command
-
-        try:                        # try to mount it
-            os.system(mount_cmd)
-            print_and_log(logging.INFO, f'mounted {zip_file_path} to {mount_path}')
-        except Exception as exc:    # on exception
-            print_and_log(logging.INFO, f'failed to mount zip with cmd: {mount_cmd} : {str(exc)}')
+        sleep(1)
 
 
 if __name__ == "__main__":
@@ -527,10 +619,13 @@ if __name__ == "__main__":
 
     print_and_log(logging.INFO, f'Will now start watching folder: {dev_disk_dir}')
 
-    mount_thread = threading.Thread(target=mount_on_command, daemon=True)
-    mount_thread.start()
+    # start thread for mount-on-command
+    thread_mount = threading.Thread(target=mount_on_command, daemon=True)
+    thread_mount.start()
 
-    # TODO: mount shared drive
+    # start thread for mounting shared drive
+    thread_shared = threading.Thread(target=mount_shared, daemon=True)
+    thread_shared.start()
 
     # TODO: remove broken linked devices / mounts on removal
 
