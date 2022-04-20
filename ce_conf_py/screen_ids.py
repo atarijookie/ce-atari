@@ -35,7 +35,7 @@ def acsi_ids_create(button):
 
         key = f'ACSI_DEVTYPE_{id_}'             # construct setting name
         selected = int(shared.settings.get(key, 0))
-        app_log.debug(f"on_screen_acsi_config: {key = } -> {selected = }")
+        app_log.debug(f"on_screen_acsi_config: {key} -> {selected}")
 
         bgroup = []                             # button group
         b1 = MyRadioButton(bgroup, u'', on_state_change=acsi_ids_changed, user_data={'id': id_, 'value': 0}, state=(selected == 0))  # off
@@ -83,7 +83,7 @@ def acsi_ids_changed(button, state, data):
     key = f'ACSI_DEVTYPE_{id_}'             # construct key name
     value = data['value']
     shared.settings_changed[key] = value           # store value
-    app_log.debug(f"on_acsi_id_changed: {key = } -> {value = }")
+    app_log.debug(f"on_acsi_id_changed: {key} -> {value}")
 
 
 def acsi_ids_save(button):
