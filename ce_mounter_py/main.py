@@ -1,9 +1,9 @@
 from copy import deepcopy
 import os
 import re
-import threading
 import shutil
 import pyinotify
+from pythonping import ping
 import asyncio
 from setproctitle import setproctitle
 from time import sleep
@@ -11,7 +11,7 @@ import subprocess
 import logging
 from logging.handlers import RotatingFileHandler
 
-settings_path = "/ce/settings"          # path to settings dir
+SETTINGS_PATH = "/ce/settings"          # path to settings dir
 
 settings_default = {'DRIVELETTER_FIRST': 'C', 'MOUNT_RAW_NOT_TRANS': 0, 'SHARED_ENABLED': 0, 'SHARED_NFS_NOT_SAMBA': 0,
                     'ACSI_DEVTYPE_0': 0, 'ACSI_DEVTYPE_1': 1, 'ACSI_DEVTYPE_2': 0, 'ACSI_DEVTYPE_3': 0,
@@ -26,7 +26,9 @@ LETTER_SHARED = 'N'                     # network drive on N
 LETTER_CONFIG = 'O'                     # config drive on O
 LETTER_ZIP = 'P'                        # ZIP file drive on P
 
-dev_disk_dir = '/dev/disk/by-path'
+DEV_DISK_DIR = '/dev/disk/by-path'
+
+mount_shared_cmd_last = ''
 
 
 def print_and_log(loglevel, message):
@@ -40,10 +42,10 @@ def settings_load():
     global settings
     settings = deepcopy(settings_default)  # fill settings with default values before loading
 
-    os.makedirs(settings_path, exist_ok=True)
+    os.makedirs(SETTINGS_PATH, exist_ok=True)
 
-    for f in os.listdir(settings_path):         # go through the settings dir
-        path = os.path.join(settings_path, f)   # create full path
+    for f in os.listdir(SETTINGS_PATH):         # go through the settings dir
+        path = os.path.join(SETTINGS_PATH, f)   # create full path
 
         if not os.path.isfile(path):            # if it's not a file, skip it
             continue
@@ -86,22 +88,22 @@ def get_usb_devices():
     """ Look for all the attached disks to the system and return only those attached via usb.
     Return only root device (e.g. /dev/sda), not the individual partitions (e.g. not /dev/sda1) """
 
-    if not os.path.exists(dev_disk_dir):            # the dir doesn't exist? quit now
+    if not os.path.exists(DEV_DISK_DIR):            # the dir doesn't exist? quit now
         return set()
 
-    devs = os.listdir(dev_disk_dir)
+    devs = os.listdir(DEV_DISK_DIR)
 
     root_devs = set()           # root devices, e.g. /dev/sda
     part_devs = set()           # partition devices, e.g. /dev/sda1, /dev/sda2
 
     for dev in devs:                                # go through found devices
-        dev_name = os.path.join(dev_disk_dir, dev)  # usb-drive -> /dev/disk/by-id/usb-drive
+        dev_name = os.path.join(DEV_DISK_DIR, dev)  # usb-drive -> /dev/disk/by-id/usb-drive
 
         if 'usb' not in dev_name:                   # if not usb device, then skip it
             continue
 
         dev_path = os.readlink(dev_name)            # /dev/disk/by-id/usb-drive -> ../../sda1
-        dev_path = os.path.join(dev_disk_dir, dev_path)  # ../../sda1 -> /dev/disk/by-id/../../sda1
+        dev_path = os.path.join(DEV_DISK_DIR, dev_path)  # ../../sda1 -> /dev/disk/by-id/../../sda1
         dev_path = os.path.abspath(dev_path)        # /dev/disk/by-id/../../sda1 -> /dev/sda1
 
         if any(char.isdigit() for char in dev_path):     # pointing to partition (e.g. sda1), add to part devices?
@@ -445,10 +447,20 @@ def find_and_mount_devices():
             symlink_dir(mounts, mountdir)
 
 
-def handle_read_callback(notifier):
+def handle_read_callback(ntfr):
     print_and_log(logging.INFO, f'monitored folder changed...')
 
-    find_and_mount_devices()        # find devices and mount them
+    for path_, handler in watched_paths.items():    # go through the watched paths
+        if event_source.get(path_):                 # if this one did change
+            event_source[path_] = False             # clear this flag
+            print_and_log(logging.INFO, f'will now call: {handler}')
+            handler()                               # call the handler
+
+
+def reload_settings_mount_shared():
+    """ this handler gets called when settings change, reload settings and try to mount shared drive """
+    settings_load()
+    mount_shared()
 
 
 def get_mount_zip_cmd():
@@ -473,12 +485,20 @@ def get_mount_zip_cmd():
     return None                         # if got here, it failed
 
 
-def umount_if_mounted(mount_dir):
+def umount_if_mounted(mount_dir, delete=False):
     """ check if this dir is mounted and if it is, then umount it """
 
     try:
+        if not os.path.exists(mount_dir):
+            print_and_log(logging.INFO, f'umount_if_mounted: path {mount_dir} does not exists, not doing umount')
+            return
+
         cmd = f'umount {mount_dir}'     # construct umount command
         os.system(cmd)                  # execute umount command
+
+        if delete:                      # if should also delete folder
+            os.rmdir(mount_dir)
+
         print_and_log(logging.INFO, f'umount_if_mounted: umounted {mount_dir}')
     except Exception as exc:
         print_and_log(logging.INFO, f'umount_if_mounted: failed to umount {mount_dir} : {str(exc)}')
@@ -505,61 +525,71 @@ def options_to_string(opts: dict):
 
 def mount_shared():
     """ this function checks for shared drive settings, mounts drive if needed """
-    global settings
+    global settings, mount_shared_cmd_last
 
-    cmd_last = ''
+    shared_enabled = setting_get_bool('SHARED_ENABLED')
+    mount_path = get_mount_path_for_letter(LETTER_SHARED)       # get where it should be mounted
 
-    while True:
-        sleep(5)
+    if not shared_enabled:                  # if shared drive not enabled, don't do rest, possibly umount
+        print_and_log(logging.DEBUG, f"mount_shared: SHARED_ENABLED={shared_enabled}, not mounting")
 
-        shared_enabled = setting_get_bool('SHARED_ENABLED')
+        if os.path.exists(mount_path):      # got the mount path? do the umount
+            umount_if_mounted(mount_path, delete=True)   # possibly umount
 
-        if not shared_enabled:      # if shared drive not enabled, don't do rest
-            continue
+        return
 
-        addr = settings.get('SHARED_ADDRESS')
-        path_ = settings.get('SHARED_PATH')
-        user = settings.get('SHARED_USERNAME')
-        pswd = settings.get('SHARED_PASSWORD')
+    addr = settings.get('SHARED_ADDRESS')
+    path_ = settings.get('SHARED_PATH')
+    user = settings.get('SHARED_USERNAME')
+    pswd = settings.get('SHARED_PASSWORD')
 
-        if not addr or not path_:   # address or path not provided? don't do the rest
-            continue
+    if not addr or not path_:   # address or path not provided? don't do the rest
+        print_and_log(logging.DEBUG, f"mount_shared: addr={addr}, path={path_}. not mounting")
+        return
 
-        nfs_not_samba = setting_get_bool('SHARED_NFS_NOT_SAMBA')
-        mount_path = get_mount_path_for_letter(LETTER_SHARED)       # get where it should be mounted
+    # ping addr to see if it's alive, don't mount if not alive
+    resp = ping(addr, timeout=1, count=1)       # ping only once
 
-        if nfs_not_samba:       # NFS shared drive
-            options = options_to_string({'username': user, 'password': pswd, 'vers': 3})
-            cmd = f'mount -t nfs {options} {addr}:/{path_} {mount_path}'
-        else:                   # cifs / samba / windows share
-            options = options_to_string({'username': user, 'password': pswd})
-            cmd = f'mount -t cifs {options} //{addr}/{path_} {mount_path}'
+    if resp.packets_lost > 0:                   # if the only packet was lost, don't mount
+        print_and_log(logging.INFO, f"mount_shared: ping didn't get response from {addr}, not mounting")
+        return
 
-        # if no change in the created command, nothing to do here
-        if cmd == cmd_last:
-            continue
+    nfs_not_samba = setting_get_bool('SHARED_NFS_NOT_SAMBA')
 
-        cmd_last = cmd          # store this cmd
+    if nfs_not_samba:       # NFS shared drive
+        options = options_to_string({'username': user, 'password': pswd, 'vers': 3})
+        cmd = f'mount -t nfs {options} {addr}:/{path_} {mount_path}'
+    else:                   # cifs / samba / windows share
+        options = options_to_string({'username': user, 'password': pswd})
+        cmd = f'mount -t cifs {options} //{addr}/{path_} {mount_path}'
 
-        cmd += " > /tmp/ce/mount.log 2>&1 "     # append writing of stdout and stderr to file
+    # if no change in the created command, nothing to do here
+    if cmd == mount_shared_cmd_last:
+        print_and_log(logging.INFO, f"mount_shared: mount command not changed, not mounting")
+        return
 
-        # command changed, we should execute it
-        os.makedirs(mount_path, exist_ok=True)  # create dir if not exist
-        umount_if_mounted(mount_path)           # possibly umount
+    mount_shared_cmd_last = cmd             # store this cmd
 
-        good = False
+    cmd += " > /tmp/ce/mount.log 2>&1 "     # append writing of stdout and stderr to file
+
+    # command changed, we should execute it
+    os.makedirs(mount_path, exist_ok=True)  # create dir if not exist
+    umount_if_mounted(mount_path)           # possibly umount
+
+    good = False
+    try:
+        print_and_log(logging.INFO, f'mount_shared: cmd: {cmd}')
+        status = os.system(cmd)         # try mounting
+        good = status == 0              # good if status is 0
+        print_and_log(logging.INFO, f'mount_shared: good={good}')
+    except Exception as exc:
+        print_and_log(logging.INFO, f'mount_shared: mount failed : {str(exc)}')
+
+    if not good:        # mount failed, copy mount log
         try:
-            print_and_log(logging.INFO, f'mount_shared: cmd: {cmd}')
-            status = os.system(cmd)         # try mounting
-            good = status == 0              # good if status is 0
+            shutil.copy('/tmp/ce/mount.log', mount_path)
         except Exception as exc:
-            print_and_log(logging.INFO, f'mount_shared: mount failed : {str(exc)}')
-
-        if not good:        # mount failed, copy mount log
-            try:
-                shutil.copy('/tmp/ce/mount.log', mount_path)
-            except Exception as exc:
-                print_and_log(logging.INFO, f'mount_shared: copy of log file failed : {str(exc)}')
+            print_and_log(logging.INFO, f'mount_shared: copy of log file failed : {str(exc)}')
 
 
 def mount_zip_file(zip_file_path):
@@ -568,7 +598,7 @@ def mount_zip_file(zip_file_path):
         return
 
     mount_path = get_mount_path_for_letter(LETTER_ZIP)  # get where it should be mounted
-    umount_if_mounted(mount_path)  # umount dir if it's mounted
+    umount_if_mounted(mount_path)           # umount dir if it's mounted
     os.makedirs(mount_path, exist_ok=True)  # create mount dir
 
     mount_cmd = f'fuse-zip {zip_file_path} {mount_path}'  # construct mount command
@@ -583,17 +613,33 @@ def mount_zip_file(zip_file_path):
 
 def mount_on_command():
     """ endless loop to mount things from CE main app on request """
-    while True:
-        if not os.path.exists(MOUNT_COMMANDS_DIR):              # if dir for commands doesn't exist, create it
-            os.makedirs(MOUNT_COMMANDS_DIR, exist_ok=True)
+    if not os.path.exists(MOUNT_COMMANDS_DIR):              # if dir for commands doesn't exist, create it
+        os.makedirs(MOUNT_COMMANDS_DIR, exist_ok=True)
 
-        #  command to mount ZIP?
-        zip_file_path = get_mount_zip_cmd()
+    #  command to mount ZIP?
+    zip_file_path = get_mount_zip_cmd()
 
-        if zip_file_path:       # should mount ZIP?
-            mount_zip_file(zip_file_path)
+    if zip_file_path:       # should mount ZIP?
+        mount_zip_file(zip_file_path)
 
-        sleep(1)
+
+# following two will help us to determine who caused the event
+event_source = {}
+watched_paths = {SETTINGS_PATH: reload_settings_mount_shared,
+                 MOUNT_COMMANDS_DIR: mount_on_command,
+                 DEV_DISK_DIR: find_and_mount_devices}
+
+
+def my_process_event(event):
+    """ this event processor is called by pynotify when it processes an event, and we look here into the
+    path which caused this event and then mark that handler for this path should be executed
+    """
+
+    # print_and_log(logging.INFO, f"my_process: {event.__dict__}")
+
+    for path_ in watched_paths.keys():      # go through the watched paths
+        if event.path == path_:             # if this watched patch caused this event
+            event_source[path_] = True      # mark this event source
 
 
 if __name__ == "__main__":
@@ -612,28 +658,33 @@ if __name__ == "__main__":
     os.makedirs(MOUNT_DIR_RAW, exist_ok=True)
     os.makedirs(MOUNT_DIR_TRANS, exist_ok=True)
 
+    # check if running as root, fail and quit if not
+    if os.geteuid() != 0:           # If not root user, fail
+        print_and_log(logging.INFO, "\nYou must run this app as root, otherwise mount / umount won't work!")
+        exit(1)
+
     settings_load()                 # load settings from disk
 
     print_and_log(logging.INFO, f'On start will look for not mounted devices - they might be already connected')
-    find_and_mount_devices()        # find devices and mount them
 
-    print_and_log(logging.INFO, f'Will now start watching folder: {dev_disk_dir}')
-
-    # start thread for mount-on-command
-    thread_mount = threading.Thread(target=mount_on_command, daemon=True)
-    thread_mount.start()
-
-    # start thread for mounting shared drive
-    thread_shared = threading.Thread(target=mount_shared, daemon=True)
-    thread_shared.start()
+    for handler in watched_paths.values():      # call all handlers before doing them only on event
+        handler()
 
     # TODO: remove broken linked devices / mounts on removal
 
     # watch the dev_disk_dir folder, on changes look for devices and mount them
     wm = pyinotify.WatchManager()
     loop = asyncio.get_event_loop()
-    notifier = pyinotify.AsyncioNotifier(wm, loop, callback=handle_read_callback)
-    wm.add_watch(dev_disk_dir, pyinotify.IN_CREATE | pyinotify.IN_DELETE | pyinotify.IN_UNMOUNT)
+    notifier = pyinotify.AsyncioNotifier(wm, loop, callback=handle_read_callback, default_proc_fun=my_process_event)
+
+    print_and_log(logging.INFO, f'Will now start watching folder: {DEV_DISK_DIR}')
+    wm.add_watch(DEV_DISK_DIR, pyinotify.IN_CREATE | pyinotify.IN_DELETE | pyinotify.IN_UNMOUNT)
+
+    print_and_log(logging.INFO, f'Will now start watching folder: {SETTINGS_PATH}')
+    wm.add_watch(SETTINGS_PATH, pyinotify.IN_CREATE | pyinotify.IN_DELETE | pyinotify.IN_UNMOUNT | pyinotify.IN_MODIFY | pyinotify.IN_CLOSE_WRITE)
+
+    print_and_log(logging.INFO, f'Will now start watching folder: {MOUNT_COMMANDS_DIR}')
+    wm.add_watch(MOUNT_COMMANDS_DIR, pyinotify.IN_CREATE | pyinotify.IN_DELETE | pyinotify.IN_UNMOUNT | pyinotify.IN_MODIFY | pyinotify.IN_CLOSE_WRITE)
 
     try:
         loop.run_forever()

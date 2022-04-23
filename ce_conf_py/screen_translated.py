@@ -105,8 +105,8 @@ def translated_save(button):
     a = setting_get_merged('DRIVELETTER_FIRST')
 
     # if some shared letters is the same, warn and don't save
-    if a == b or a == c or b == c:
-        dialog(shared.main_loop, shared.current_body, "You must specify different drive letters!")
+    if a.upper() in ['N', 'O', 'P']:
+        dialog(shared.main_loop, shared.current_body, "You must specify different drive letter than N, O, P!")
         return
 
     settings_save()
