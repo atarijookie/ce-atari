@@ -8,6 +8,16 @@ from shared import print_and_log, log_config, settings_load, DEV_DISK_DIR, MOUNT
 from mount_usb import find_and_mount_devices
 from mount_on_cmd import mount_on_command
 from mount_shared import mount_shared
+import threading, queue
+
+task_queue = queue.Queue()
+
+
+def worker():
+    while True:
+        fnct = task_queue.get()
+        fnct()
+        task_queue.task_done()
 
 
 def handle_read_callback(ntfr):
@@ -17,7 +27,7 @@ def handle_read_callback(ntfr):
         if event_source.get(path_):                 # if this one did change
             event_source[path_] = False             # clear this flag
             print_and_log(logging.INFO, f'will now call: {handler}')
-            handler()                               # call the handler
+            task_queue.put(handler)                 # call the handler
 
 
 def reload_settings_mount_shared():
@@ -76,8 +86,14 @@ if __name__ == "__main__":
 
     print_and_log(logging.INFO, f'On start will look for not mounted devices - they might be already connected')
 
+    # try to mount what we can on start
+    mount_shared()
+    find_and_mount_devices()
+
     for handler in watched_paths.values():      # call all handlers before doing them only on event
-        handler()
+        task_queue.put(handler)
+
+    threading.Thread(target=worker, daemon=True).start()        # start the task queue worker
 
     # TODO: remove broken linked devices / mounts on removal
 

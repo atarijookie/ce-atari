@@ -1,5 +1,6 @@
 import os
 import shutil
+import subprocess
 from pythonping import ping
 import logging
 from shared import print_and_log, setting_get_bool, get_mount_path_for_letter, umount_if_mounted, \
@@ -7,6 +8,27 @@ from shared import print_and_log, setting_get_bool, get_mount_path_for_letter, u
 import shared
 
 mount_shared_cmd_last = ''
+
+
+def is_shared_mounted(shared_mount_path):
+    """ see if shared drive is already mounted or not  """
+    result = subprocess.run(['mount'], stdout=subprocess.PIPE)        # run 'mount' command
+    result = result.stdout.decode('utf-8')  # get output as string
+    lines = result.split('\n')              # split whole result to lines
+
+    for line in lines:                      # go through lines
+        parts = line.split(' ')             # split '/dev/sda1 on /mnt/drive type ...' to items
+
+        if len(parts) < 3:                  # some line, which couldn't been split to at least 3 parts? skip it
+            continue
+
+        mount_dir = parts[2]                # get mount point
+
+        if mount_dir == shared_mount_path:  # if this existing mount point is shared mount path, then shared is mounted
+            return True
+
+    # shared mount point wasn't found, shared drive not mounted
+    return False
 
 
 def mount_shared():
@@ -50,10 +72,13 @@ def mount_shared():
         options = options_to_string({'username': user, 'password': pswd})
         cmd = f'mount -t cifs {options} //{addr}/{path_} {mount_path}'
 
-    # TODO: check if shared is mounted, if not mounted, do mount anyway, even if cmd is the same below
+    # check if shared is mounted, if not mounted, do mount anyway, even if cmd is the same below
+    is_mounted = is_shared_mounted(mount_path)
+    print_and_log(logging.INFO, f"mount_shared: shared drive is_mounted: {is_mounted}")
 
-    # if no change in the created command, nothing to do here
-    if cmd == mount_shared_cmd_last:
+    # if already mounted AND no change in the created command, nothing to do here
+    # (but if not mounted, proceed with mounting, even if the command hasn't changed)
+    if is_mounted and cmd == mount_shared_cmd_last:
         print_and_log(logging.INFO, f"mount_shared: mount command not changed, not mounting")
         return
 
