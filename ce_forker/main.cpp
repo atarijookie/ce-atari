@@ -14,20 +14,23 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-struct termios ctrlOriginal;
+/*
+*
+* ce_forker usage:
+* ce_forker /PATH/TO/SOCKET 'command_to_execute -with -parameters'
+*
+* e.g.:
+* ce_forker /tmp/ce_shell term
+* ce_forker /tmp/ce_conf /ce/app/ce_conf.sh
+*
+*/
 
 // Link with -lutil
 
-#define SOCK_PATH       "/tmp/ce_"
+struct termios ctrlOriginal;
 
 //----------------------------------------------------
-#define PROC_TYPE_NONE          0
-#define PROC_TYPE_LINUX_TERM    1
-#define PROC_TYPE_CE_CONF       2
-#define PROC_TYPE_CE_DOWNLOADER 3
-
 typedef struct {
-    int type;           // type of proces - PROC_TYPE_...
     volatile int pid;   // PID of child if running
 
     int fdPty;          // fd of the PTY which the process as input + output
@@ -36,36 +39,30 @@ typedef struct {
     int fdClient;       // fd of the socket which is used for sending + receiving data to CE main app
 } ForkedProc;
 
-#define FORKED_PROC_COUNT       3
-ForkedProc fProcs[FORKED_PROC_COUNT];
+ForkedProc fProc;
+
+char pathSocket[256];
+char command[256];
 
 #define BACKLOG 5
 
 //----------------------------------------------------
-void startProcess(int i);
+void startProcess(void);
 void terminateAllChildren(void);
 void closeAllFds(void);
-void forkLinuxTerminal(ForkedProc *fproc);
+void forkLinuxTerminal(void);
+void forkCommand(void);
 void openListeningSockets(void);
-int openSocket(const char *name);
+int openSocket(void);
 void closeFd(int& fd);
-const char* sockNameForType(int type);
 
 volatile sig_atomic_t sigintReceived = 0;
 
 void handlerSIGCHLD(int sig)
 {
     pid_t childPid = wait(NULL);
-
     printf("child terminated: %d\n", childPid);
-
-    // find which child has terminated and set its PID to 0
-    for(int i=0; i<FORKED_PROC_COUNT; i++) {
-        if(fProcs[i].pid == childPid) {         // child at this index is the one that was terminated
-            fProcs[i].pid = 0;                  // we don't have child with this PID anymore
-            break;
-        }
-    }
+    fProc.pid = 0;                  // we don't have child with this PID anymore
 }
 
 void sigint_handler(int sig)
@@ -94,7 +91,21 @@ int forwardData(int fdIn, int fdOut, char *bfr, int bfrLen)
 
 int main(int argc, char *argv[])
 {
-    printf("\n\nStarting...\n");
+    // make sure the correct number of arguments is specified
+    if(argc != 3) {
+        printf("\n\n%s -- Wrong number of arguments specified.\nUsage:\n", argv[0]);
+        printf("%s /PATH/TO/SOCKET 'command_to_execute -with -parameters'\n", argv[0]);
+        printf("Terminated.\n\n");
+        return 0;
+    }
+
+    // copy in the socket path and command
+    memset(pathSocket, 0, sizeof(pathSocket));
+    memset(command, 0, sizeof(command));
+    strncpy(pathSocket, argv[1], sizeof(pathSocket) - 1);
+    strncpy(command, argv[2], sizeof(command) - 1);
+
+    printf("\n\nStarting ce_forker\n");
 
     if(signal(SIGCHLD, handlerSIGCHLD) == SIG_ERR) {
         printf("Cannot register SIGCHLD handler!\n");
@@ -108,7 +119,6 @@ int main(int argc, char *argv[])
         printf("Cannot register SIGHUP handler!\n");
     }
 
-    fProcs[0].type = PROC_TYPE_LINUX_TERM;      // set type
     openListeningSockets();     // open listening socket for all processes with defined types
 
     fd_set fdSet;               // fd flags
@@ -127,19 +137,17 @@ int main(int argc, char *argv[])
         timeout.tv_usec = 0;
 
         // set all valid FDs to set
-        for(int i=0; i<FORKED_PROC_COUNT; i++) {
-            if(fProcs[i].fdListen > 0)  FD_SET(fProcs[i].fdListen, &fdSet);     // check for new connections
+        if(fProc.fdListen > 0)  FD_SET(fProc.fdListen, &fdSet);     // check for new connections
 
-            if(fProcs[i].fdClient > 0) {                // if got some client connected
-                FD_SET(fProcs[i].fdClient, &fdSet);     // wait for data from client
+        if(fProc.fdClient > 0) {                // if got some client connected
+            FD_SET(fProc.fdClient, &fdSet);     // wait for data from client
 
-                if(fProcs[i].pid <= 0) {                // don't have PID?
-                    startProcess(i);                    // fork process and get handle to pty
-                }
+            if(fProc.pid <= 0) {                // don't have PID?
+                startProcess();                 // fork process and get handle to pty
+            }
 
-                if(fProcs[i].fdPty > 0) {               // hopefully we got the fd now
-                    FD_SET(fProcs[i].fdPty, &fdSet);
-                }
+            if(fProc.fdPty > 0) {               // hopefully we got the fd now
+                FD_SET(fProc.fdPty, &fdSet);
             }
         }
 
@@ -149,29 +157,21 @@ int main(int argc, char *argv[])
         }
 
         // find out which FD is ready and handle it
-        for(int i=0; i<FORKED_PROC_COUNT; i++) {            // go through the list of processes
-            // first try to accept all new connections
-            if(fProcs[i].fdListen > 0) {
-                if(FD_ISSET(fProcs[i].fdListen, &fdSet)) {  // listening socket ready?
-                    closeFd(fProcs[i].fdClient);              // close communication socket if open
-                    fProcs[i].fdClient = accept(fProcs[i].fdListen, (struct sockaddr *)&client_sockaddr, (socklen_t*)&client_sockaddr);  // accept new connection
-                    printf("Accepted connection from client.\n");
-
-                    // for linux terminal type show this message on client to let him know he has entered remote terminal (without it it's harder to notice)
-                    if(fProcs[i].type == PROC_TYPE_LINUX_TERM && fProcs[i].fdClient > 0) {
-                        const char* msg = ">>> YOU ARE ON REMOTE TERMINAL <<<\n";
-                        write(fProcs[i].fdClient, (const void *) msg, strlen(msg));
-                    }
-                }
+        // first try to accept all new connections
+        if(fProc.fdListen > 0) {
+            if(FD_ISSET(fProc.fdListen, &fdSet)) {  // listening socket ready?
+                closeFd(fProc.fdClient);              // close communication socket if open
+                fProc.fdClient = accept(fProc.fdListen, (struct sockaddr *)&client_sockaddr, (socklen_t*)&client_sockaddr);  // accept new connection
+                printf("Accepted connection from client.\n");
             }
+        }
 
-            if(fProcs[i].fdClient > 0 && FD_ISSET(fProcs[i].fdClient, &fdSet)) {            // got data waiting in sock?
-                forwardData(fProcs[i].fdClient, fProcs[i].fdPty, bfr, sizeof(bfr));       // from socket to pty
-            }
+        if(fProc.fdClient > 0 && FD_ISSET(fProc.fdClient, &fdSet)) {        // got data waiting in sock?
+            forwardData(fProc.fdClient, fProc.fdPty, bfr, sizeof(bfr));     // from socket to pty
+        }
 
-            if(fProcs[i].fdPty > 0 && FD_ISSET(fProcs[i].fdPty, &fdSet)) {              // got data waiting in pty?
-                forwardData(fProcs[i].fdPty, fProcs[i].fdClient, bfr, sizeof(bfr));       // from socket to pty
-            }
+        if(fProc.fdPty > 0 && FD_ISSET(fProc.fdPty, &fdSet)) {              // got data waiting in pty?
+            forwardData(fProc.fdPty, fProc.fdClient, bfr, sizeof(bfr));     // from socket to pty
         }
     }
 
@@ -184,62 +184,38 @@ int main(int argc, char *argv[])
 
 void openListeningSockets(void)
 {
-    for(int i=0; i<FORKED_PROC_COUNT; i++) {            // go through the list of processes
-        if(fProcs[i].type == PROC_TYPE_NONE) {          // if no type specified, skip
-            continue;
-        }
-
-        if(fProcs[i].fdListen != 0) {                   // already got listening socket? skip it
-            continue;
-        }
-
-        const char* sockName = sockNameForType(fProcs[i].type); // get socket name for process type
-        fProcs[i].fdListen = openSocket(sockName);              // create listening socket
-    }
-}
-
-void startProcess(int i)
-{
-    if(i < 0 || i > FORKED_PROC_COUNT) {            // index out of bounds? fail
+    if(fProc.fdListen != 0) {           // already got listening socket? skip it
         return;
     }
 
-    ForkedProc *fp = &fProcs[i];        // get pointer to right process structure
+    // TODO: get sockName
+    fProc.fdListen = openSocket();      // create listening socket
+}
 
-    closeFd(fp->fdPty);                 // close fd to pty if exists
+void startProcess(void)
+{
+    closeFd(fProc.fdPty);               // close fd to pty if exists
 
-    if(fp->pid > 0) {                  // kill process by PID if exists
-        kill(fp->pid, SIGKILL);
-        fp->pid = 0;
+    if(fProc.pid > 0) {                 // kill process by PID if exists
+        kill(fProc.pid, SIGKILL);
+        fProc.pid = 0;
     }
 
-    // start process based on type
-    switch(fp->type) {
-        case PROC_TYPE_LINUX_TERM:      forkLinuxTerminal(&fProcs[i]); break;
-        case PROC_TYPE_CE_CONF:         break;
-        case PROC_TYPE_CE_DOWNLOADER:   break;
+    if(strcasecmp(command, "term") == 0) {      // if command is just term, then fork linux terminal
+        forkLinuxTerminal();
+    } else {                            // for other commands fork pty and run specified command in it
+        forkCommand();
     }
 
-    usleep(100);        // wait a little until process opens pty and forks
+    usleep(100);                        // wait a little until process opens pty and forks
     // in this moment we should have valid pid and fdPty
 }
 
-const char* sockNameForType(int type)
-{
-    switch(type) {
-        case PROC_TYPE_LINUX_TERM:      return "term";
-        case PROC_TYPE_CE_CONF:         return "conf";
-        case PROC_TYPE_CE_DOWNLOADER:   return "dwnl";
-    }
-
-    return "";
-}
-
-void forkLinuxTerminal(ForkedProc *fproc)
+void forkLinuxTerminal(void)
 {
     printf("fork() linux terminal\n");
 
-    int childPid = forkpty(&fproc->fdPty, NULL, NULL, NULL);
+    int childPid = forkpty(&fProc.fdPty, NULL, NULL, NULL);
 
     if(childPid == 0) {                             // code executed only by child
         const char *shell = "/bin/sh";              // default shell
@@ -255,55 +231,47 @@ void forkLinuxTerminal(ForkedProc *fproc)
     }
 
     // parent continues here
-    fproc->pid = childPid;          // store PID
+    fProc.pid = childPid;          // store PID
+}
+
+void forkCommand(void)
+{
+    printf("fork() command: %s\n", command);
+
+    int childPid = forkpty(&fProc.fdPty, NULL, NULL, NULL);
+
+    if(childPid == 0) {                             // code executed only by child
+        execlp(command, command, (char *) NULL);
+        return;
+    }
+
+    // parent continues here
+    fProc.pid = childPid;          // store PID
 }
 
 void closeAllFds(void)
 {
-    for(int i=0; i<FORKED_PROC_COUNT; i++) {    // go through the list of processes
-        closeFd(fProcs[i].fdPty);
-        closeFd(fProcs[i].fdListen);
-        closeFd(fProcs[i].fdClient);
-    }
+    closeFd(fProc.fdPty);
+    closeFd(fProc.fdListen);
+    closeFd(fProc.fdClient);
 }
 
 void terminateAllChildren(void)
 {
-    int got = 0;                                // how many running child processes we got
-
-    for(int i=0; i<FORKED_PROC_COUNT; i++) {    // go through the list of processes
-        if(!fProcs[i].pid) {                    // no pid? skip
-            continue;
-        }
-
-        kill(fProcs[i].pid, SIGTERM);           // ask child to terminate - nicely
-        got++;
-    }
-
-    if(!got) {                                  // no children? just quit immediately
+    if(!fProc.pid) {                    // no pid? skip
         return;
     }
 
-    sleep(1);                                   // give children some time to terminate
+    kill(fProc.pid, SIGTERM);           // ask child to terminate - nicely
 
-    for(int i=0; i<FORKED_PROC_COUNT; i++) {    // go through the list of processes
-        if(!fProcs[i].pid) {                    // no pid? skip
-            continue;
-        }
+    sleep(1);                           // give children some time to terminate
 
-        kill(fProcs[i].pid, SIGKILL);           // ask child to terminate - this instant
-        fProcs[i].pid = 0;                      // forget the pid
-    }
+    kill(fProc.pid, SIGKILL);           // ask child to terminate - this instant
+    fProc.pid = 0;                      // forget the pid
 }
 
-int openSocket(const char *name)
+int openSocket(void)
 {
-    char fullname[128];
-
-    // construct filename for pipe going from process to ce - READ pipe
-    strcpy(fullname, SOCK_PATH);        // start with path
-    strcat(fullname, name);             // add socket name
-
     struct sockaddr_un addr;
 
     // Create a new server socket with domain: AF_UNIX, type: SOCK_STREAM, protocol: 0
@@ -315,14 +283,14 @@ int openSocket(const char *name)
 
     // Delete any file that already exists at the address. Make sure the deletion
     // succeeds. If the error is just that the file/directory doesn't exist, it's fine.
-    if (remove(fullname) == -1 && errno != ENOENT) {
+    if (remove(pathSocket) == -1 && errno != ENOENT) {
         return -1;
     }
 
     // Zero out the address, and set family and path.
     memset(&addr, 0, sizeof(struct sockaddr_un));
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, fullname, sizeof(addr.sun_path) - 1);
+    strncpy(addr.sun_path, pathSocket, sizeof(addr.sun_path) - 1);
 
     // Bind the socket to the address. Note that we're binding the server socket
     // to a well-known address so that clients know where to connect.
