@@ -25,6 +25,13 @@
 *
 */
 
+// TODO:
+// - in some cases we want the Ctrl+C to pass from client to forker - e.g. when forker is serving terminal
+//   (user in terminal runs 'top' and withouth forwarding of Ctrl+C he's not able to terminate 'top' command)
+// - in some cases we want to prevent the Ctrl+C to be passed - e.g. when forker is running ce_conf, we don't
+//   want user to terminate ce_conf, just quit the client
+// - so the client needs some Ctrl+C pass/exit option and ce_forker maybe too needs to ignore Ctrl+C or something in some cases
+
 // Link with -lutil
 
 struct termios ctrlOriginal;
@@ -73,7 +80,7 @@ void sigint_handler(int sig)
 
 #define MIN(X, Y)   ((X) < (Y) ? (X) : (Y))
 
-int forwardData(int fdIn, int fdOut, char *bfr, int bfrLen)
+size_t forwardData(int& fdIn, int& fdOut, char* bfr, int bfrLen, bool fromSock)
 {
     int bytesAvailable = 0;
     int ires = ioctl(fdIn, FIONREAD, &bytesAvailable);       // how many bytes we can read?
@@ -83,10 +90,31 @@ int forwardData(int fdIn, int fdOut, char *bfr, int bfrLen)
     }
 
     size_t bytesRead = MIN(bytesAvailable, bfrLen); // how many bytes can we read into buffer?
-    ires = read(fdIn, bfr, bytesRead);      // read to buffer
-    write(fdOut, (const void *)bfr, bytesRead);
+    ssize_t sres = 0;
 
-    return ires;
+    if(fromSock) {      // if from sock to pty, then use recv to get data from sock
+        sres = recv(fdIn, bfr, bytesRead, MSG_NOSIGNAL);      // read to buffer
+    } else {
+        sres = read(fdIn, bfr, bytesRead);      // read to buffer
+    }
+
+    if(sres < 0 && errno == EPIPE) {            // close fd when socket was closed
+        closeFd(fdIn);
+        return 0;
+    }
+
+    if(fromSock) {      // if from sock to pty, then use write to send data to pty
+        sres = write(fdOut, (const void *)bfr, bytesRead);
+    } else {
+        sres = send(fdOut, (const void *)bfr, bytesRead, MSG_NOSIGNAL);
+    }
+
+    if(sres < 0 && errno == EPIPE) {            // close fd when socket was closed
+        closeFd(fdOut);
+        return 0;
+    }
+
+    return sres;
 }
 
 int main(int argc, char *argv[])
@@ -167,11 +195,11 @@ int main(int argc, char *argv[])
         }
 
         if(fProc.fdClient > 0 && FD_ISSET(fProc.fdClient, &fdSet)) {        // got data waiting in sock?
-            forwardData(fProc.fdClient, fProc.fdPty, bfr, sizeof(bfr));     // from socket to pty
+            forwardData(fProc.fdClient, fProc.fdPty, bfr, sizeof(bfr), true);       // from socket to pty
         }
 
         if(fProc.fdPty > 0 && FD_ISSET(fProc.fdPty, &fdSet)) {              // got data waiting in pty?
-            forwardData(fProc.fdPty, fProc.fdClient, bfr, sizeof(bfr));     // from socket to pty
+            forwardData(fProc.fdPty, fProc.fdClient, bfr, sizeof(bfr), false);     // from pty to socket
         }
     }
 
