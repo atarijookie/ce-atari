@@ -25,13 +25,6 @@
 *
 */
 
-// TODO:
-// - in some cases we want the Ctrl+C to pass from client to forker - e.g. when forker is serving terminal
-//   (user in terminal runs 'top' and withouth forwarding of Ctrl+C he's not able to terminate 'top' command)
-// - in some cases we want to prevent the Ctrl+C to be passed - e.g. when forker is running ce_conf, we don't
-//   want user to terminate ce_conf, just quit the client
-// - so the client needs some Ctrl+C pass/exit option and ce_forker maybe too needs to ignore Ctrl+C or something in some cases
-
 // Link with -lutil
 
 struct termios ctrlOriginal;

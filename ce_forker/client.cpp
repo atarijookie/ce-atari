@@ -41,6 +41,7 @@ void setTerminalOptions(void)
 
     ctrl.c_lflag &= ~ICANON;    // turning off canonical mode makes input unbuffered
     ctrl.c_lflag &= ~ECHO;      // turn off echo on master's side
+    ctrl.c_lflag &= ~ISIG;      // turn off signal generation on Ctrl+C and similar ones
 
     tcsetattr(STDIN_FILENO, TCSANOW, &ctrl);
 }
@@ -52,7 +53,7 @@ void restoreTerminalSettings(void)
 
 #define MIN(X, Y)   ((X) < (Y) ? (X) : (Y))
 
-int forwardData(int fdIn, int fdOut, char *bfr, int bfrLen)
+ssize_t forwardData(int& fdIn, int& fdOut, char* bfr, int bfrLen, bool fromSock)
 {
     int bytesAvailable = 0;
     int ires = ioctl(fdIn, FIONREAD, &bytesAvailable);       // how many bytes we can read?
@@ -62,10 +63,39 @@ int forwardData(int fdIn, int fdOut, char *bfr, int bfrLen)
     }
 
     size_t bytesRead = MIN(bytesAvailable, bfrLen); // how many bytes can we read into buffer?
-    ires = read(fdIn, bfr, bytesRead);      // read to buffer
-    write(fdOut, (const void *)bfr, bytesRead);
+    ssize_t sres = 0;
 
-    return ires;
+    if(fromSock) {      // if from sock to pty, then use recv to get data from sock
+        sres = recv(fdIn, bfr, bytesRead, MSG_NOSIGNAL);      // read to buffer
+    } else {
+        sres = read(fdIn, bfr, bytesRead);      // read to buffer
+    }
+
+    if(sres < 0 && errno == EPIPE) {            // close fd when socket was closed
+        closeFd(fdIn);
+        return 0;
+    }
+
+    if(!fromSock) {         // if reading from keyboard here
+        for(int i=0; i<bytesRead; i++) {
+            if(bfr[i] == 0x1a) {        // expected quit key received? (Pause/Break) quit
+                sigintReceived = 1;
+            }
+        }
+    }
+
+    if(fromSock) {      // if from sock to pty, then use write to send data to pty
+        sres = write(fdOut, (const void *)bfr, bytesRead);
+    } else {
+        sres = send(fdOut, (const void *)bfr, bytesRead, MSG_NOSIGNAL);
+    }
+
+    if(sres < 0 && errno == EPIPE) {            // close fd when socket was closed
+        closeFd(fdOut);
+        return 0;
+    }
+
+    return sres;
 }
 
 int main(int argc, char *argv[])
@@ -98,14 +128,17 @@ int main(int argc, char *argv[])
 
     setTerminalOptions();       // disable echo and caching
 
-    printf("Entering loop...\n");
+    printf("Entering loop...\n\n>>> To quit, press PAUSE/BREAK key! <<<\n\n");
+    sleep(1);
 
     char bfr[512];
     while(!sigintReceived) {
-        int got = 0;
+        ssize_t got = 0;
+        int stdOut = STDOUT_FILENO;
+        int stdIn = STDIN_FILENO;
 
-        got += forwardData(fd, STDOUT_FILENO, bfr, sizeof(bfr));      // from pipe to terminal
-        got += forwardData(STDIN_FILENO, fd, bfr, sizeof(bfr));       // from keyboard to pipe
+        got += forwardData(fd, stdOut, bfr, sizeof(bfr), true);      // from sock to terminal
+        got += forwardData(stdIn, fd, bfr, sizeof(bfr), false);      // from keyboard to sock
 
         if(got < 1) {
             usleep(1000);
