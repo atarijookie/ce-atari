@@ -13,15 +13,16 @@
 #include <sys/wait.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <limits.h>
 
 /*
 *
-* ce_forker usage:
-* ce_forker /PATH/TO/SOCKET 'command_to_execute -with -parameters'
+* appviasock usage:
+* appviasock /PATH/TO/SOCKET 'command_to_execute -with -parameters'
 *
 * e.g.:
-* ce_forker /tmp/ce_shell term
-* ce_forker /tmp/ce_conf /ce/app/ce_conf.sh
+* appviasock /tmp/ce_shell term
+* appviasock /tmp/ce_conf /ce/app/ce_conf.sh
 *
 */
 
@@ -41,6 +42,7 @@ typedef struct {
 
 ForkedProc fProc;
 
+char pathPid[256];
 char pathSocket[256];
 char command[256];
 
@@ -55,6 +57,7 @@ void forkCommand(void);
 void openListeningSockets(void);
 int openSocket(void);
 void closeFd(int& fd);
+bool otherInstanceIsRunning(void);
 
 volatile sig_atomic_t sigintReceived = 0;
 
@@ -126,7 +129,12 @@ int main(int argc, char *argv[])
     strncpy(pathSocket, argv[1], sizeof(pathSocket) - 1);
     strncpy(command, argv[2], sizeof(command) - 1);
 
-    printf("\n\nStarting ce_forker\n");
+    if(otherInstanceIsRunning()) {
+        printf("\n\nOther instance is running for this socket, terminating!\n");
+        return 0;
+    }
+
+    printf("\n\nStarting appviasock\n");
 
     if(signal(SIGCHLD, handlerSIGCHLD) == SIG_ERR) {
         printf("Cannot register SIGCHLD handler!\n");
@@ -334,4 +342,47 @@ void closeFd(int& fd)
         close(fd);
         fd = 0;
     }
+}
+
+bool otherInstanceIsRunning(void)
+{
+    FILE * f;
+    int other_pid = 0;
+    int self_pid = 0;
+
+    // create path to PID file from path to socket + '.pid'
+    strcpy(pathPid, pathSocket);
+    strcat(pathPid, ".pid");
+
+    self_pid = getpid();
+    f = fopen(pathPid, "r");
+
+    if(f) {                 // if file opened
+        int r = fscanf(f, "%d", &other_pid);
+        fclose(f);
+
+        if(r == 1) {        // got the PID from file
+            if(getpgid(other_pid) >= 0) {
+                printf("Other instance running: YES\n");
+                return true;
+            } else {
+                printf("Other instance running: NO\n");
+            }
+        } else {
+            printf("\nFailed to read PID from file %s\n", pathPid);
+        }
+    } else {
+        printf("\nFailed to open PID file for reading: %s\n", pathPid);
+    }
+
+    // write our PID to file
+    f = fopen(pathPid, "w");
+    if(f) {
+        fprintf(f, "%d", self_pid);
+        fclose(f);
+    } else {
+        printf("\nFailed to write PID to file: %s\n", pathPid);
+    }
+
+    return false;
 }
