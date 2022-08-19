@@ -32,5 +32,8 @@ echo "Starting apps."
 
 echo "Apps started."
 
+# store description of started apps to file
+echo -e "CE config tool\nCE floppy config\nlinux shell" > "$VAR_DIR/apps.txt"
+
 # remove PID file at the end
 rm -f $PID_FILE
