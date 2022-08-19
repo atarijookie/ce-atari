@@ -58,7 +58,6 @@ void networkServerMain(void);
 int main(int argc, char *argv[])
 {
     pthread_mutex_init(&shared.mtxScsi,             NULL);
-    pthread_mutex_init(&shared.mtxConfigStreams,    NULL);
     pthread_mutex_init(&shared.mtxImages,           NULL);
 
     printf("\033[H\033[2J\n");

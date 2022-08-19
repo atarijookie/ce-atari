@@ -83,10 +83,15 @@ CCoreThread::CCoreThread()
     settingsReloadProxy.reloadSettings(SETTINGSUSER_FLOPPYIMGS);            // mark that floppy settings changed (when imageSilo loaded the settings)
 
     misc.setDataTrans(dataTrans);
+
+    configStream = new ConfigStream();
+    configStream->setAcsiDataTrans(dataTrans);
+    configStream->setSettingsReloadProxy(&settingsReloadProxy);
 }
 
 CCoreThread::~CCoreThread()
 {
+    delete configStream;
     delete dataTrans;
     delete retryMod;
 
@@ -104,24 +109,6 @@ void CCoreThread::sharedObjects_create(void)
     shared.imageList = new ImageList();
     shared.imageSilo = new ImageSilo();
     shared.imageStorage = new ImageStorage();
-
-    //-----------
-    // create config stream for ACSI interface
-    shared.configStream.acsi = new ConfigStream(CONFIGSTREAM_ON_ATARI);
-    shared.configStream.acsi->setAcsiDataTrans(dataTrans);
-    shared.configStream.acsi->setSettingsReloadProxy(&settingsReloadProxy);
-
-    // create config stream for web interface
-    shared.configStream.dataTransWeb    = new AcsiDataTrans();
-    shared.configStream.web             = new ConfigStream(CONFIGSTREAM_THROUGH_WEB);
-    shared.configStream.web->setAcsiDataTrans(shared.configStream.dataTransWeb);
-    shared.configStream.web->setSettingsReloadProxy(&settingsReloadProxy);
-
-    // create config stream for linux terminal
-    shared.configStream.dataTransTerm   = new AcsiDataTrans();
-    shared.configStream.term            = new ConfigStream(CONFIGSTREAM_IN_LINUX_CONSOLE);
-    shared.configStream.term->setAcsiDataTrans(shared.configStream.dataTransTerm);
-    shared.configStream.term->setSettingsReloadProxy(&settingsReloadProxy);
 }
 
 void CCoreThread::sharedObjects_destroy(void)
@@ -139,21 +126,6 @@ void CCoreThread::sharedObjects_destroy(void)
 
     delete shared.imageStorage;
     shared.imageStorage = NULL;
-
-    delete shared.configStream.acsi;
-    shared.configStream.acsi = NULL;
-
-    delete shared.configStream.web;
-    shared.configStream.web = NULL;
-
-    delete shared.configStream.dataTransWeb;
-    shared.configStream.dataTransWeb = NULL;
-
-    delete shared.configStream.term;
-    shared.configStream.term = NULL;
-
-    delete shared.configStream.dataTransTerm;
-    shared.configStream.dataTransTerm = NULL;
 }
 
 #define INBUF_SIZE  (WRITTENMFMSECTOR_SIZE + 8)
@@ -482,10 +454,7 @@ void CCoreThread::handleAcsiCommand(uint8_t *bufIn)
         switch(module) {
         case HOSTMOD_CONFIG:                            // config console command?
             wasHandled = true;
-
-            pthread_mutex_lock(&shared.mtxConfigStreams);
-            shared.configStream.acsi->processCommand(pCmd);
-            pthread_mutex_unlock(&shared.mtxConfigStreams);
+            configStream->processCommand(pCmd);
             break;
 
         case HOSTMOD_TRANSLATED_DISK:                   // translated disk command?

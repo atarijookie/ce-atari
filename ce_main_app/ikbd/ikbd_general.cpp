@@ -136,7 +136,9 @@ void *ikbdThreadCode(void *ptr)
             }
         }
 
-        bool clientConnected = ((Utils::getCurrentMs() - shared.configStream.acsi->getLastCmdTimestamp()) <= 2000);
+        // TODO: fix this later
+        //bool clientConnected = ((Utils::getCurrentMs() - shared.configStream.acsi->getLastCmdTimestamp()) <= 2000);
+        bool clientConnected = false;
 
         if(fdUart >= 0 && FD_ISSET(fdUart, &readfds)) {
             // process the incomming data from original keyboard and from ST

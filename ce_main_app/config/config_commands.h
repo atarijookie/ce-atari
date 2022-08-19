@@ -14,6 +14,9 @@
 
 #define CFG_CMD_LINUXCONSOLE_GETSTREAM  10
 
+#define CFG_CMD_GET_APP_NAMES       20
+#define CFG_CMD_SET_APP_INDEX       21
+
 // two values of a last byte of LINUXCONSOLE stream - more data, or no more data
 #define LINUXCONSOLE_NO_MORE_DATA   0x00
 #define LINUXCONSOLE_GET_MORE_DATA  0xda

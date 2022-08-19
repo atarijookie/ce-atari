@@ -39,6 +39,7 @@ private:
     bool running;
 
     AcsiDataTrans   *dataTrans;
+    ConfigStream    *configStream;
 
     //-----------------------------------
     // settings and config stuff

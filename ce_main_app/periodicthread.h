@@ -10,11 +10,6 @@ class ImageStorage;
 class ImageSilo;
 
 typedef struct {
-    int fd1;
-    int fd2;
-} ConfigPipes;
-
-typedef struct {
     Scsi            *scsi;
     pthread_mutex_t mtxScsi;
 
@@ -22,22 +17,6 @@ typedef struct {
     ImageStorage    *imageStorage;
     ImageSilo       *imageSilo;
     pthread_mutex_t  mtxImages;
-
-    struct {
-        ConfigStream    *acsi;
-        ConfigStream    *web;
-        ConfigStream    *term;
-
-        AcsiDataTrans   *dataTransWeb;
-        AcsiDataTrans   *dataTransTerm;
-    } configStream;
-
-    struct {
-        ConfigPipes web;
-        ConfigPipes term;
-    } configPipes;
-
-    pthread_mutex_t mtxConfigStreams;
 
     bool mountRawNotTrans;
 } SharedObjects;

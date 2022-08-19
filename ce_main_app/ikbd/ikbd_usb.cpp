@@ -306,7 +306,9 @@ void Ikbd::processMouse(input_event *ev)
         // handle this EV_KEY event. This is because Logitech K400 on RPi appears only as mouse device instead of mouse device + keyboard device,
         // but the EV_KEY events are still sent - through that single mouse device.
         if(ev->code != BTN_LEFT && ev->code != BTN_RIGHT) {
-            bool clientConnected = ((Utils::getCurrentMs() - shared.configStream.acsi->getLastCmdTimestamp()) <= 2000); 
+            // TODO: fix this later
+            //bool clientConnected = ((Utils::getCurrentMs() - shared.configStream.acsi->getLastCmdTimestamp()) <= 2000);
+            bool clientConnected = false;
             processKeyboard(ev, clientConnected);
             return;
         }

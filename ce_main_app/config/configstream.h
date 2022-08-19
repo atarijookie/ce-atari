@@ -26,11 +26,11 @@ class AcsiDataTrans;
 class ConfigStream
 {
 public:
-    ConfigStream(int whereItWillBeShown);
+    ConfigStream();
     ~ConfigStream();
 
     // functions which are called from the main loop
-    void processCommand(uint8_t *cmd, int writeToFd=-1);
+    void processCommand(uint8_t *cmd);
     void setAcsiDataTrans(AcsiDataTrans *dt);
     void setSettingsReloadProxy(SettingsReloadProxy *rp);
 
@@ -41,24 +41,26 @@ private:
     int stScreenWidth;
     int gotoOffset;
 
+    int appIndex;       // index of app to which we want to connect, e.g. 0 for /var/run/ce/app0.sock
+    int appFd;          // file descriptor for socket connected to app
+
     AcsiDataTrans       *dataTrans;
     SettingsReloadProxy *reloadProxy;
 
     // private methods
     void onKeyDown(uint8_t key);
-    int  getStream(bool homeScreen, uint8_t *bfr, int maxLen);
+    int  getStream(uint8_t *bfr, int maxLen);
 
     uint32_t lastCmdTime;
-
-    //-------------
-    // remote console stuff
-    void linuxConsole_KeyDown(uint8_t atariKey);
-    int  linuxConsole_getStream(uint8_t *bfr, int maxLen);
-    
+   
     int  filterVT100(char *bfr, int cnt);
     void atariKeyToConsoleKey(uint8_t atariKey, char *bfr, int &cnt);
-    // Set values
-    //void onSetCfgValue(void);
+
+    void connectIfNeeded(void);
+    int openSocket(void);
+    void closeFd(int& fd);
+    ssize_t sockRead(int& fdIn, char* bfr, int bfrLen);
+    ssize_t sockWrite(int& fdOut, char* bfr, int count);
 };
 
 #endif
