@@ -11,16 +11,6 @@ PID_FILE="$VAR_DIR/start_apps.pid"
 
 mkdir -p "$VAR_DIR"             # create var dir if not exists
 
-# make sure this script still isn't running from the previous run
-if [ -f "$PID_FILE" ]; then             # if pid file exists
-    current_pid=$( cat "$PID_FILE" )
-
-    if [ -n "$(ps -p $current_pid -o pid=)" ]; then         # if the PID is still running
-        echo "Instance of this script is still running, not running again."
-        exit
-    fi
-fi
-
 # output PID to file
 echo $$ > $PID_FILE
 
