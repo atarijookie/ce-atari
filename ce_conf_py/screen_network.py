@@ -1,11 +1,15 @@
 import urwid
+import logging
 from urwid_helpers import create_my_button, create_header_footer, create_edit, MyCheckBox, dialog
 from utils import settings_load, settings_save, on_cancel, back_to_main_menu, setting_get_bool, on_editline_changed, \
-    on_checkbox_changed
+    on_checkbox_changed, setting_get_merged
 import shared
 import netifaces as ni
 import dns.resolver
+from IPy import IP
 import subprocess
+
+app_log = logging.getLogger()
 
 
 def create_setting_row(label, what, value, col1w, col2w, reverse=False, setting_name=None):
@@ -40,19 +44,19 @@ def create_setting_row(label, what, value, col1w, col2w, reverse=False, setting_
     return cols
 
 
-def get_eth_iface():
-    return get_iface_for('eth0', 'enp')
+def get_eth_iface(default=None):
+    return get_iface_for('eth0', 'enp', default)
 
 
-def get_wifi_iface():
-    return get_iface_for('wlan0', 'wlp')
+def get_wifi_iface(default=None):
+    return get_iface_for('wlan0', 'wlp', default)
 
 
-def get_iface_for(old_name, predictable_name):
+def get_iface_for(old_name, predictable_name, default=None):
     # go through interfaces, find ethernet
     ifaces = ni.interfaces()
 
-    eth = None
+    eth = default
 
     if old_name in ifaces:        # if eth0 is present, use it
         return old_name
@@ -164,7 +168,178 @@ def on_net_checkbox_changed(widget, state):
     on_checkbox_changed(widget.setting_name, state)
 
 
+config_file_dhcp = '''
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+# The primary network interface
+allow-hotplug {ETH_IF}
+iface {ETH_IF} inet dhcp
+hostname {HOSTNAME}
+
+# The wireless network interface
+allow-hotplug {WLAN_IF}
+iface {WLAN_IF} inet dhcp
+hostname {HOSTNAME}
+    wpa-conf /etc/wpa_supplicant/wpa_supplicant.conf
+'''
+
+
+config_file_static = '''
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+# The primary network interface
+allow-hotplug {ETH_IF}
+auto {ETH_IF}
+iface {ETH_IF} inet static
+address {ETH_IP}
+netmask {ETH_MASK}
+gateway {ETH_GW}
+dns-nameservers {DNS}
+
+# The wireless network interface
+allow-hotplug {WLAN_IF}
+iface {WLAN_IF} inet dhcp
+hostname {HOSTNAME}
+    wpa-conf /etc/wpa_supplicant/wpa_supplicant.conf
+'''
+
+
+dhcpcd_file_static = '''
+# Inform the DHCP server of our hostname for DDNS.
+hostname
+
+# Use the hardware address of the interface for the Client ID.
+clientid
+
+# Persist interface configuration when dhcpcd exits.
+persistent
+
+# Rapid commit support.
+option rapid_commit
+
+# A list of options to request from the DHCP server.
+option domain_name_servers, domain_name, domain_search, host_name
+option classless_static_routes
+
+# Most distributions have NTP support.
+option ntp_servers
+
+# A ServerID is required by RFC2131.
+require dhcp_server_identifier
+
+# Generate Stable Private IPv6 Addresses instead of hardware based ones
+slaac private
+
+# A hook script is provided to lookup the hostname if not set by the DHCP
+# server, but it should not be run by default.
+nohook lookup-hostname
+
+interface {ETH_IF}
+        static ip_address={ETH_IP_SLASH}
+        static routers={ETH_GW}
+        static domain_name_servers={DNS}
+'''
+
+
+dhcpcd_file_dhcp = '''
+# Inform the DHCP server of our hostname for DDNS.
+hostname
+
+# Use the hardware address of the interface for the Client ID.
+clientid
+
+# Persist interface configuration when dhcpcd exits.
+persistent
+
+# Rapid commit support.
+option rapid_commit
+
+# A list of options to request from the DHCP server.
+option domain_name_servers, domain_name, domain_search, host_name
+option classless_static_routes
+
+# Most distributions have NTP support.
+option ntp_servers
+
+# A ServerID is required by RFC2131.
+require dhcp_server_identifier
+
+# Generate Stable Private IPv6 Addresses instead of hardware based ones
+slaac private
+
+# A hook script is provided to lookup the hostname if not set by the DHCP
+# server, but it should not be run by default.
+nohook lookup-hostname
+'''
+
+
 def network_save(button):
-    pass
+    # fetch network settings
+    setting_names = ['HOSTNAME', 'DNS', 'ETH_USE_DHCP', 'ETH_IP', 'ETH_MASK', 'ETH_GW']
 
+    values = {}
+    for name in setting_names:                  # fetch settings by name
+        values[name] = setting_get_merged(name)
 
+    # verify iP addresses
+    if not values['ETH_USE_DHCP']:      # not using dhcp, check IP addresses
+        ips = ['DNS', 'ETH_IP', 'ETH_MASK', 'ETH_GW']
+
+        for name in ips:                # go through the names with IP addresses
+            good = False
+            try:
+                IP(values[name])      # let IPy try to read the addr
+                good = True
+            except Exception as exc:
+                app_log.warning(f"failed to convert {values[name]} to IP: {str(exc)}")
+
+            if not good:
+                dialog(shared.main_loop, shared.current_body, f"The IP address {values[name]} seems to be invalid!")
+                return
+
+    # if hostname seems to be empty
+    if not values['HOSTNAME']:
+        dialog(shared.main_loop, shared.current_body, f"Hostname seems to be invalid!")
+        return
+
+    # get interface names
+    values['ETH_IF'] = get_eth_iface('eth0')
+    values['WLAN_IF'] = get_wifi_iface('wlan0')
+
+    # if not using dhcp, we also need ip in slash formwat for dhcpcd.conf
+    if not values['ETH_USE_DHCP']:
+        ip_slash_mask = '{}/{}'.format(values['ETH_IP'], values['ETH_MASK'])
+        ip_slash_format = IP(ip_slash_mask, make_net=True).strNormal()
+        values['ETH_IP_SLASH'] = ip_slash_format
+
+    # --------------------------
+    # for /etc/network/interface
+    # select the right template and fill with values
+    config = config_file_dhcp if values['ETH_USE_DHCP'] else config_file_static
+    config = config.format(**values)
+
+    # write network settings to file
+    with open("/etc/network/interfaces", "wt") as text_file:
+        text_file.write(config)
+
+    # --------------------------
+    # for /etc/dhcpcd.conf
+    # select the right template and fill with values
+    config = dhcpcd_file_dhcp if values['ETH_USE_DHCP'] else dhcpcd_file_static
+    config = config.format(**values)
+
+    # write network settings to file
+    with open("/etc/dhcpcd.conf", "wt") as text_file:
+        text_file.write(config)
+
+    # --------------------------
+    # for /etc/hostname
+    # write new hostname to file
+    with open("/etc/hostname", "wt") as text_file:
+        text_file.write(values['HOSTNAME'])
+
+    back_to_main_menu(None)
