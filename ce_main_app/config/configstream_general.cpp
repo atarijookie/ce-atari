@@ -138,11 +138,13 @@ void ConfigStream::processCommand(uint8_t *cmd)
     }
 
     case CFG_CMD_GET_APP_NAMES:
-        // TODO: read app names from file and send them to ST
+        // read app names from file and send them to ST
+        readAppNames();
         break;
 
     case CFG_CMD_SET_APP_INDEX:
-        // TODO: set current app index, disconnect, connect to new app sock
+        // switch to different app as asked by user
+        connectToAppIndex(cmd[5]);
         break;
 
     default:                            // other cases: error
@@ -151,6 +153,53 @@ void ConfigStream::processCommand(uint8_t *cmd)
     }
 
     dataTrans->sendDataAndStatus();     // send all the stuff after handling, if we got any
+}
+
+void ConfigStream::connectToAppIndex(int nextAppIndex)
+{
+    uint8_t status = SCSI_ST_CHECK_CONDITION;   // default status to fail
+
+    char sockPath[128];                     // construct filename for socket, e.g. /var/run/ce/app0.sock
+    sprintf(sockPath, "%s/app%d.sock", APP_SOCK_PATH, nextAppIndex);
+
+    if (access(sockPath, F_OK) == 0) {      // socket path valid
+        appIndex = nextAppIndex;            // store next socket index
+        closeFd(appFd);                     // close current socket
+        connectIfNeeded();                  // open next socket
+        status = SCSI_ST_OK;                // success!
+    } else {                                // socket path not found
+        Debug::out(LOG_INFO, "handleConfigStream -- CFG_CMD_SET_APP_INDEX -- app %d with path %s does not exist", nextAppIndex, sockPath);
+    }
+
+    dataTrans->setStatus(status);           // return status
+}
+
+void ConfigStream::readAppNames(void)
+{
+    dataTrans->setStatus(SCSI_ST_CHECK_CONDITION);      // default status is failure
+
+    char path[128];                     // construct filename for socket, e.g. /var/run/ce/app0.sock
+    sprintf(path, "%s/apps.txt", APP_SOCK_PATH);
+    FILE *f = fopen(path, "rt");
+
+    if(!f) {            // failed to open file?
+        return;
+    }
+
+    char line[80];
+
+    while(!feof(f)) {   // read while not end of file
+        memset(line, 0, sizeof(line));                  // clear line before reading
+        char* res = fgets(line, sizeof(line) - 1, f);     // read line from file
+
+        if(res > 0) {           // got some line? add it to response
+            dataTrans->addDataBfr(line, 80, false);
+        }
+    }
+    fclose(f);
+
+    dataTrans->padDataToMul16();            // pad buffer
+    dataTrans->setStatus(SCSI_ST_OK);       // success
 }
 
 int ConfigStream::getStream(uint8_t *bfr, int maxLen)

@@ -51,6 +51,9 @@ private:
     void onKeyDown(uint8_t key);
     int  getStream(uint8_t *bfr, int maxLen);
 
+    void readAppNames(void);
+    void connectToAppIndex(int nextAppIndex);
+
     uint32_t lastCmdTime;
    
     int  filterVT100(char *bfr, int cnt);

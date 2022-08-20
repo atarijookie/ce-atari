@@ -30,6 +30,8 @@ echo "Starting apps."
 ./appviasock "$VAR_DIR/app1.sock" /ce/ce_fdd.sh > /dev/null 2>&1 &
 ./appviasock "$VAR_DIR/app2.sock" term > /dev/null 2>&1 &
 
+# TODO: start optional console apps (e.g. from installed extensions)
+
 echo "Apps started."
 
 # store description of started apps to file
