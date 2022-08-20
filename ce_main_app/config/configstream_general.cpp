@@ -35,9 +35,6 @@ uint8_t isUpdateStartingFlag = 0;
 
 ConfigStream::ConfigStream()
 {
-    stScreenWidth   = 40;
-    gotoOffset      = 0;
-
     dataTrans   = NULL;
     reloadProxy = NULL;
 
@@ -105,13 +102,19 @@ void ConfigStream::processCommand(uint8_t *cmd)
         break;
 
     case CFG_CMD_SET_RESOLUTION:
+        char bfr[3];
+        memset(bfr, 0, sizeof(bfr));
+
         switch(cmd[5]) {
-        case ST_RESOLUTION_LOW:     stScreenWidth = 40; break;
-        case ST_RESOLUTION_MID:
-        case ST_RESOLUTION_HIGH:    stScreenWidth = 80; break;
+            case ST_RESOLUTION_LOW:
+                bfr[0] = 0xfa; break;       // 40 cols
+
+            case ST_RESOLUTION_MID:
+            case ST_RESOLUTION_HIGH:
+                bfr[0] = 0xfb; break;       // 80 cols
         }
 
-        gotoOffset = (stScreenWidth - 40) / 2;
+        sockWrite(appFd, bfr, 1);           // send to app
 
         dataTrans->setStatus(SCSI_ST_OK);
         Debug::out(LOG_DEBUG, "handleConfigStream -- CFG_CMD_SET_RESOLUTION -- %d", cmd[5]);

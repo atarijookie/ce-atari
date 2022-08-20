@@ -26,6 +26,7 @@ void startProcesses(void);
 int openSocket(const char *name);
 void closeFd(int& fd);
 volatile sig_atomic_t sigintReceived = 0;
+bool lowRes = false;            // if true, show low resolution, if false show mid resolution (starts default in mid res)
 
 void sigint_handler(int sig)
 {
@@ -81,6 +82,11 @@ ssize_t forwardData(int& fdIn, int& fdOut, char* bfr, int bfrLen, bool fromSock)
             if(bfr[i] == 0x1a) {        // expected quit key received? (Pause/Break) quit
                 sigintReceived = 1;
             }
+
+            if(bfr[i] == 0x23) {        // '#' key pressed? transform into set resolution command
+                lowRes = !lowRes;
+                bfr[i] = lowRes ? 0xfa : 0xfb;
+            }
         }
     }
 
@@ -128,7 +134,7 @@ int main(int argc, char *argv[])
 
     setTerminalOptions();       // disable echo and caching
 
-    printf("Entering loop...\n\n>>> To quit, press PAUSE/BREAK key! <<<\n\n");
+    printf("Entering loop...\n\n>>> To quit, press PAUSE/BREAK key, press '#' to switch resolution (40/80 cols)! <<<\n\n");
     sleep(1);
 
     char bfr[512];

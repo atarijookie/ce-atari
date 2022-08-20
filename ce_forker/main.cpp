@@ -99,6 +99,18 @@ size_t forwardData(int& fdIn, int& fdOut, char* bfr, int bfrLen, bool fromSock)
         return 0;
     }
 
+    if(fromSock) {                              // if data comes from sock, we should check if it isn't one of the commands
+        for(int i=0; i<bytesRead; i++) {
+            if(bfr[i] == 0xfa || bfr[i] == 0xfb) {      // LOW of MED resolution cmd?
+                winsize ws;
+                ws.ws_col = (bfr[i] == 0xfa) ? 40 : 80; // 40 cols for LOW, 80 cols for MED resolution
+                ws.ws_row = 23;                         // 23 rows
+                ioctl(fProc.fdPty, TIOCSWINSZ, &ws);
+                bfr[i] = ' ';                           // replace with space
+            }
+        }
+    }
+
     if(fromSock) {      // if from sock to pty, then use write to send data to pty
         sres = write(fdOut, (const void *)bfr, bytesRead);
     } else {
@@ -261,6 +273,12 @@ void forkLinuxTerminal(void)
 
     // parent continues here
     fProc.pid = childPid;          // store PID
+
+    // set terminal size
+    winsize ws;
+    ws.ws_col = 80;                 // start with 80 cols for MED resolution
+    ws.ws_row = 23;                 // 23 rows
+    ioctl(fProc.fdPty, TIOCSWINSZ, &ws);
 }
 
 void forkCommand(void)
@@ -276,6 +294,12 @@ void forkCommand(void)
 
     // parent continues here
     fProc.pid = childPid;          // store PID
+
+    // set terminal size
+    winsize ws;
+    ws.ws_col = 80;                 // start with 80 cols for MED resolution
+    ws.ws_row = 23;                 // 23 rows
+    ioctl(fProc.fdPty, TIOCSWINSZ, &ws);    
 }
 
 void closeAllFds(void)
