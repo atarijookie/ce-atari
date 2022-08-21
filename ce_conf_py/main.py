@@ -13,6 +13,7 @@ from screen_network import network_create
 from screen_ikbd import ikbd_create
 from screen_update import update_create
 import shared
+from utils import delete_update_files
 
 
 def alarm_callback(loop=None, data=None):
@@ -76,6 +77,8 @@ if __name__ == "__main__":
     app_log = logging.getLogger()
     app_log.setLevel(logging.DEBUG)
     app_log.addHandler(my_handler)
+
+    delete_update_files()
 
     shared.terminal_cols, shared.terminal_rows = urwid.raw_display.Screen().get_cols_rows()
     shared.items_per_page = shared.terminal_rows - 4

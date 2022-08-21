@@ -110,3 +110,23 @@ def on_editline_changed(widget, text, data):
 
     if id_:         # if got it, store text
         shared.settings_changed[id_] = text
+
+
+def delete_file(path):
+    """ function to delete file and not die on exception if it fails """
+    if os.path.exists(path):
+        try:
+            os.remove(path)
+        except Exception as ex:
+            app_log.warning('Could not delete file {}', path)
+
+
+FILE_STATUS = '/tmp/UPDATE_STATUS'
+FILE_PENDING_YES = '/tmp/UPDATE_PENDING_YES'
+FILE_PENDING_NO = '/tmp/UPDATE_PENDING_NO'
+
+
+def delete_update_files():
+    """ delete all update chceck files """
+    for path in [FILE_STATUS, FILE_PENDING_YES, FILE_PENDING_NO]:
+        delete_file(path)

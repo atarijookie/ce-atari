@@ -111,4 +111,3 @@ def translated_save(button):
 
     settings_save()
     back_to_main_menu(None)
-

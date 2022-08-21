@@ -1,7 +1,7 @@
 import urwid
 import logging
 from urwid_helpers import create_my_button, create_header_footer, create_edit, MyCheckBox, dialog
-from utils import settings_load, settings_save, on_cancel, back_to_main_menu, setting_get_bool, on_editline_changed, \
+from utils import settings_load, on_cancel, back_to_main_menu, setting_get_bool, on_editline_changed, \
     on_checkbox_changed, setting_get_merged
 import shared
 import netifaces as ni
@@ -12,18 +12,22 @@ import subprocess
 app_log = logging.getLogger()
 
 
-def create_setting_row(label, what, value, col1w, col2w, reverse=False, setting_name=None):
+def create_setting_row(label, what, value, col1w, col2w, reverse=False, setting_name=None, return_widget=False):
+    wret = None     # widget to return
+
     if what == 'checkbox':      # for checkbox
         checked = setting_get_bool(setting_name)
         widget = MyCheckBox('', state=checked, on_state_change=on_net_checkbox_changed)
+        wret = widget
         widget.setting_name = setting_name
         label = "   " + label
     elif what == 'edit':        # for edit line
         widget, _ = create_edit(setting_name, col2w, on_editline_changed)
+        wret = widget
         label = "   " + label
     elif what == 'text':
         widget = urwid.Text(value)
-
+        wret = widget
         if reverse:     # if should be reversed, apply attrmap
             widget = urwid.AttrMap(widget, 'reversed')
     else:                       # for title
@@ -40,6 +44,9 @@ def create_setting_row(label, what, value, col1w, col2w, reverse=False, setting_
         ('fixed', col1w, text_label),
         ('fixed', col2w, widget)],
         dividechars=0)
+
+    if return_widget:       # if should return also the individual widget
+        return cols, wret
 
     return cols
 

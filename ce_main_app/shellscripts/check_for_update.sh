@@ -27,6 +27,9 @@ read_from_file()
 distro=$( /ce/whichdistro.sh )
 url_hash="http://joo.kie.sk/cosmosex/update/$distro.hash"
 
+# TODO: check for update on mounted USB media
+
+
 echo "We're running on distro: $distro"
 echo "checking using wget" > /tmp/UPDATE_STATUS
 
