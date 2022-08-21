@@ -1,5 +1,4 @@
-from os import path
-from subprocess import run, DEVNULL
+from os import path, system
 import urwid
 import logging
 from urwid_helpers import create_edit_one, create_my_button, create_header_footer, create_edit, MyRadioButton, \
@@ -28,7 +27,10 @@ def update_create(button):
 
     body = []
 
-    for i in range(5):
+    body.append(urwid.Divider())
+    body.append(urwid.Text('Press the button to check for update and then press it again to install it.', align='left'))
+
+    for i in range(3):
         body.append(urwid.Divider())
 
     col1w = 24
@@ -36,11 +38,14 @@ def update_create(button):
 
     cols = create_setting_row('Status', 'text', '', col1w, col2w, reverse=True)
     body.append(cols)
+    body.append(urwid.Divider())
 
     global widget_status
     widget_status = urwid.Text(status_text)
     body.append(widget_status)
-    body.append(urwid.Divider())
+
+    for i in range(3):
+        body.append(urwid.Divider())
 
     # add update + cancel buttons
     global widget_button
@@ -137,16 +142,17 @@ def on_action(button):
     status, should_update = get_status()        # get current update check status
 
     if status == 'before_check':                # didn't check yet? run the check
-        run('/ce/update/check_for_update.sh', stdout=DEVNULL, stderr=DEVNULL)
+        system('/ce/update/check_for_update.sh > /dev/null 2>&1 &')
+
     elif status == 'after_check':               # we're after the check
         if should_update:                       # should update device? run the update
-            run('/ce/ce_update.sh')
+            system('/ce/ce_update.sh > /dev/null 2>&1 &')
             return
 
-        if not should_update:                   # update not really needed, show question
-            dialog_yes_no(shared.main_loop, shared.current_body,
-                          f"Your device seems to be up to date. Do you want to force update anyway?", on_update_force)
-            return
+        # update not really needed, show question
+        dialog_yes_no(shared.main_loop, shared.current_body,
+                      f"Your device is up to date.\nDo you want to force update anyway?",
+                      on_update_force, title='Force update?')
 
 
 def on_update_force(should_force):
@@ -155,4 +161,4 @@ def on_update_force(should_force):
         return
 
     # user selected force update? run it
-    run('/ce/ce_update.sh')
+    system('/ce/ce_update.sh > /dev/null 2>&1 &')

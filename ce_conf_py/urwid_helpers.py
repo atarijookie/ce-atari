@@ -146,44 +146,14 @@ fun_call_on_answer = None
 
 
 def dialog(main_loop, current_body, text, title='Warning'):
-    """
-    Overlays a dialog box on top of the console UI
-
-    Args:
-        main_loop: original main loop
-        current_body: current body shown on screen
-        text: message to display
-        title: dialog title message
-    """
-
-    # store the original values, so we can restore then on dialog end
-    global main_loop_original, current_body_original
-    main_loop_original = main_loop
-    current_body_original = current_body
-
-    # header
-    header_text = urwid.AttrMap(urwid.Text(title, align='center'), 'reversed')
-    header = urwid.AttrMap(header_text, 'banner')
-
-    # Body
-    body_text = urwid.Text(text, align='center')
-    body_filler = urwid.Filler(body_text)
-    body_padding = urwid.Padding(body_filler, left=1, right=1)
-
-    # Footer
-    footer = create_my_button(' OK', reset_layout)
-    footer = urwid.AttrWrap(footer, 'selectable', 'focus')
-    footer = urwid.GridFlow([footer], 8, 1, 1, 'center')
-
-    # Layout
-    layout = urwid.Frame(body_padding, header=header, footer=footer, focus_part='footer')
-
-    w = urwid.Overlay(urwid.LineBox(layout), current_body, align='center', width=36, valign='middle', height=10)
-
-    main_loop.widget = w
+    dialog_yes_no_ok(main_loop, current_body, text, None, True, title)
 
 
 def dialog_yes_no(main_loop, current_body, text, call_on_answer, title='Question'):
+    dialog_yes_no_ok(main_loop, current_body, text, call_on_answer, False, title)
+
+
+def dialog_yes_no_ok(main_loop, current_body, text, call_on_answer, is_ok_dialog, title='Title'):
     """
     Overlays a dialog box on top of the console UI
 
@@ -193,6 +163,7 @@ def dialog_yes_no(main_loop, current_body, text, call_on_answer, title='Question
         text: message to display
         call_on_answer: dialog will call this function when answer from user is selected
         title: dialog title message
+        is_ok_dialog: if True, shows 'OK' button, if False then shows Yes+No buttons
     """
 
     # store the original values, so we can restore then on dialog end
@@ -211,14 +182,20 @@ def dialog_yes_no(main_loop, current_body, text, call_on_answer, title='Question
     body_padding = urwid.Padding(body_filler, left=1, right=1)
 
     # Footer
-    btn_yes = create_my_button(' Yes ', on_btn_yes)
-    btn_no = create_my_button(' No ', on_btn_no)
-    footer = urwid.GridFlow([btn_yes, btn_no], 10, 1, 1, 'center')
+    if is_ok_dialog:        # dialog with OK button?
+        footer = create_my_button(' OK', reset_layout)
+        footer = urwid.AttrWrap(footer, 'selectable', 'focus')
+        footer = urwid.GridFlow([footer], 8, 1, 1, 'center')
+    else:                   # dialog with Yes/No buttons?
+        btn_yes = create_my_button('Yes', on_btn_yes)
+        btn_no = create_my_button(' No', on_btn_no)
+        footer = urwid.GridFlow([btn_yes, btn_no], 8, 1, 1, 'center')
 
     # Layout
     layout = urwid.Frame(body_padding, header=header, footer=footer, focus_part='footer')
 
-    w = urwid.Overlay(urwid.LineBox(layout), current_body, align='center', width=36, valign='middle', height=10)
+    w = urwid.Overlay(urwid.LineBox(layout, tlcorner='+', tline='-', lline='|', trcorner='+', blcorner='+', rline='|',
+                      bline='-', brcorner='+'), current_body, align='center', width=36, valign='middle', height=10)
     main_loop.widget = w
 
 
