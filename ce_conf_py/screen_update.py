@@ -1,8 +1,7 @@
 from os import path, system
 import urwid
 import logging
-from urwid_helpers import create_edit_one, create_my_button, create_header_footer, create_edit, MyRadioButton, \
-    MyCheckBox, dialog_yes_no
+from urwid_helpers import create_my_button, create_header_footer, dialog_yes_no, dialog
 from utils import on_cancel, back_to_main_menu, FILE_STATUS, FILE_PENDING_YES, FILE_PENDING_NO
 import shared
 from screen_network import create_setting_row
@@ -72,7 +71,7 @@ def get_status():
         return 'before_check', False
 
     # STATUS file exists, but no UPDATE_PENDING_* files present, but there's UPDATE_STATUS file, 'checking' state
-    if not path.exists(FILE_PENDING_YES) and not path.exist(FILE_PENDING_NO):
+    if not path.exists(FILE_PENDING_YES) and not path.exists(FILE_PENDING_NO):
         return 'checking', False
 
     # if there's UPDATE_PENDING_* file present, it's 'after_check' state
@@ -146,7 +145,7 @@ def on_action(button):
 
     elif status == 'after_check':               # we're after the check
         if should_update:                       # should update device? run the update
-            system('/ce/ce_update.sh > /dev/null 2>&1 &')
+            on_update_force(True)               # do the checks and start update via this function to reuse code
             return
 
         # update not really needed, show question
@@ -157,8 +156,24 @@ def on_action(button):
 
 def on_update_force(should_force):
     """ this function gets called when dialog_yes_no terminates with True/False (yes/no) answer """
-    if not should_force:
+    if not should_force:        # user didn't want to force update, quit
         return
 
+    # check if update is not already running
+    running = system('/ce/update/update_running.sh > /dev/null 2>&1 &')
+    app_log.debug("update_running: {}".format(running))
+
+    if running > 0:     # if the update is already running
+        dialog(shared.main_loop, shared.current_body,
+               "Update is already running. Do not turn off your device!")
+        return
+
+    # warn that update will take a while
+    dialog(shared.main_loop, shared.current_body,
+           "Updating device. This will could take up to 5 minutes. Do not turn off your device!")
+
     # user selected force update? run it
+    app_log.debug("starting update now")
     system('/ce/ce_update.sh > /dev/null 2>&1 &')
+
+    on_cancel(None)         # back to main menu

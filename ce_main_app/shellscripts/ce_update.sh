@@ -1,7 +1,32 @@
 #!/bin/sh
+VAR_DIR="/var/run/ce"
+PID_FILE="$VAR_DIR/update.pid"
+mkdir -p "$VAR_DIR"                         # create var dir if doesn't exist
 
+LOG_DIR="/var/log/ce"
+mkdir -p "$LOG_DIR"                         # create log dir if doesn't exist
+timestamp=$( date "+%Y%m%d%H%M%S" )
+LOG_FILE="$LOG_DIR/update.log.$timestamp"   # generate logfile name with timestamp, so multiple runs of update can be observed
+
+{           # start of block for output redirect
 start=$( date )
 printf "ce_update.sh started at : $start\n"     # show start time
+
+# check if this update script is already running and terminate if it is
+/ce/update/update_running.sh
+
+if [ $? -ne 0 ]; then
+    echo " "
+    echo "The update is already / still running, not running it again."
+    echo "If you want to run it again, wait until it finishes."
+    
+    stop=$( date )
+    printf "\nce_update.sh finished at: $stop\n\n"     # show stop time
+    exit
+fi
+
+# output PID to file
+echo $$ > $PID_FILE
 
 # Stop any cosmosex app, and pass 1st and 2nd argument of this script to the stop script
 # When arguments are not given, ce_stop will stop not only CosmosEx app, but also cesuper.sh script, which is fine when called manually from shell by user.
@@ -119,3 +144,9 @@ printf "\nUpdate done, you may start the /ce/ce_start.sh now!\n";
 
 stop=$( date )
 printf "ce_update.sh finished at: $stop\n\n"     # show stop time
+
+# remove PID file at the end
+rm -f $PID_FILE
+
+# end of block for output redirect to console and log file
+} 2>&1 | tee $LOG_FILE
