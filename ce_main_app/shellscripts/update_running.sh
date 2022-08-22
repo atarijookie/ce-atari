@@ -1,5 +1,11 @@
 #!/bin/sh
 
+# check if running as root
+if [ $(id -u) != 0 ]; then
+  echo "Please run this as root"
+  exit
+fi
+
 VAR_DIR="/var/run/ce"
 PID_FILE="$VAR_DIR/update.pid"
 
