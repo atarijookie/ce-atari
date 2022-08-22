@@ -1,3 +1,4 @@
+from os import system
 import urwid
 import logging
 from urwid_helpers import create_my_button, create_header_footer, create_edit, MyCheckBox, dialog
@@ -348,5 +349,9 @@ def network_save(button):
     # write new hostname to file
     with open("/etc/hostname", "wt") as text_file:
         text_file.write(values['HOSTNAME'])
+
+    system('sync')
+    dialog(shared.main_loop, shared.current_body,
+           "Your network settings have been saved. Restart your device for the changes to take effect.")
 
     back_to_main_menu(None)
