@@ -4,7 +4,7 @@ import subprocess
 import glob
 import urwid
 import logging
-from urwid_helpers import create_my_button, create_header_footer, create_edit, dialog
+from urwid_helpers import create_my_button, create_header_footer, create_edit, dialog, dialog_yes_no
 from utils import settings_load, settings_save, on_cancel, back_to_main_menu, setting_get_str, on_editline_changed
 import shared
 
@@ -131,11 +131,14 @@ def hdd_img_save(button):
         return
 
     path_out = None
+    path_resolved = False           # becomes true if some additional logic resolved input to final path
 
     if path_image.startswith('usb') or path_image.startswith('shared'):     # starts with usb or shared?
         path_out = find_usb_or_shared(path_image)
+        path_resolved = True
     elif '*' in path_image:                 # wildcard in path found?
         path_out = find_path_with_wildcard(path_image)
+        path_resolved = True
     else:       # not usb/shared path, and no wildcard? just check if it exists
         if os.path.exists(path_image) and os.path.isfile(path_image):   # path exists and it's a file? use it
             path_out = path_image
@@ -145,11 +148,28 @@ def hdd_img_save(button):
         dialog(shared.main_loop, shared.current_body, f"The path is invalid:\n{path_image}")
         return
 
+    # store the new path to changed settings
+    shared.settings_changed['HDDIMAGE'] = path_out
+
     # path is pointing to shared drive? warn user
     if "/mnt/shared/" in path_out:
-        dialog(shared.main_loop, shared.current_body, "It is not safe to mount HDD Image from network.")
+        dialog_yes_no(shared.main_loop, shared.current_body,
+                      "It is not safe to mount HDD image from network.\nAre you sure?", call_on_answer=on_user_answer)
+        return
 
-    # store the new path to changed settings, save and return
-    shared.settings_changed['HDDIMAGE'] = path_out
+    # if the input path was resolved to something else, show it
+    if path_resolved:
+        dialog_yes_no(shared.main_loop, shared.current_body,
+                      f"Your path was resolved to:\n{path_out}\nIs this ok?", call_on_answer=on_user_answer)
+
+
+def on_user_answer(yes_pressed):
+    # when user pressed YES, we want to save path and return to main menu
+    if yes_pressed:
+        save_and_return()
+
+
+def save_and_return():
+    # save path and return to main menu
     settings_save()
     back_to_main_menu(None)

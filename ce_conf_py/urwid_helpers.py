@@ -145,8 +145,8 @@ current_body_original = None
 fun_call_on_answer = None
 
 
-def dialog(main_loop, current_body, text, title='Warning'):
-    dialog_yes_no_ok(main_loop, current_body, text, None, True, title)
+def dialog(main_loop, current_body, text, call_on_answer=None, title='Warning'):
+    dialog_yes_no_ok(main_loop, current_body, text, call_on_answer, True, title)
 
 
 def dialog_yes_no(main_loop, current_body, text, call_on_answer, title='Question'):
@@ -183,7 +183,7 @@ def dialog_yes_no_ok(main_loop, current_body, text, call_on_answer, is_ok_dialog
 
     # Footer
     if is_ok_dialog:        # dialog with OK button?
-        footer = create_my_button(' OK', reset_layout)
+        footer = create_my_button(' OK', on_btn_yes)
         footer = urwid.AttrWrap(footer, 'selectable', 'focus')
         footer = urwid.GridFlow([footer], 8, 1, 1, 'center')
     else:                   # dialog with Yes/No buttons?
@@ -211,7 +211,8 @@ def on_button_yes_no(button, yes_pressed):
     reset_layout(button)                # reset layout
 
     global fun_call_on_answer
-    fun_call_on_answer(yes_pressed)     # call the callback
+    if fun_call_on_answer:                  # if callback function was provided
+        fun_call_on_answer(yes_pressed)     # call the callback
 
 
 def reset_layout(button):
