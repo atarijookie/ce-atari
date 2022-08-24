@@ -17,6 +17,7 @@ test_sting/test_server
 *.tra
 *.dep
 *.bak
- ce_forker/appviasock
- ce_forker/client
- 
+ce_forker/appviasock
+ce_forker/client
+**/.idea/
+**/venv/
