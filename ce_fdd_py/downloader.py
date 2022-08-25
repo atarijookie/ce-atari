@@ -83,7 +83,62 @@ def on_show_selected_list(button, choice):
         dialog(shared.main_loop, shared.current_body, f"Failed to load list!\n{error}")
         return
 
+    shared.on_unhandled_keys_handler = on_unhandled_keys        # call this handler on arrows and other unhandled keys
+
     show_current_page(None)
+
+
+def on_unhandled_keys(key):
+    """ when some key is not handled, this function is called """
+
+    if shared.pile_current_page is None:               # no pile yet? quit
+        return
+
+    if key == 'left':           # left = prev
+        btn_prev_clicked(None)
+        return
+
+    if key == 'right':          # right = next
+        btn_next_clicked(None)
+        return
+
+    widget = shared.pile_current_page.focus            # get which image button has focus
+
+    if not hasattr(widget, 'user_data'):        # no user data? unhandled key not on image button
+        return
+
+    user_data = widget.user_data
+    filename = user_data['filename']     # get user data from that image button
+
+    storage_path = get_storage_path()           # check if got storage path
+
+    if not storage_path:                        # no storage path? just quit
+        return
+
+    if not can_write_to_storage(storage_path):  # check if can write to storage path
+        return
+
+    is_download = key in ['d', 'D']
+    is_insert = key in ['1', '2', '3']
+
+    path = os.path.join(storage_path, filename)     # check if got this file
+    file_exists = os.path.exists(path)
+
+    if is_insert and not file_exists:           # trying to insert, but don't have file?
+        is_download = True                      # it's a download, not insert
+        is_insert = False
+
+    if is_download and file_exists:             # trying to download, but file exists? nothing do to
+        return
+
+    if is_insert:                               # should insert?
+        slot = int(key)
+        insert_image(None, (user_data, slot))
+        return
+
+    if is_download:                             # should download?
+        shared.queue_download.put(user_data)
+        return
 
 
 def show_current_page(button):
@@ -94,7 +149,8 @@ def show_current_page(button):
         - returning back from image submenu
     """
     body = []
-    body.append(urwid.Text(shared.list_of_lists[shared.list_index]['name'], align='center'))
+    title = "CE FDD: " + shared.list_of_lists[shared.list_index]['name']
+    header, footer = create_header_footer(title)
 
     # add search edit line
     widget_search = urwid.Edit("Search: ", edit_text=shared.search_phrase)
@@ -129,10 +185,11 @@ def show_current_page(button):
     show_page_text()  # show the new page text
 
     shared.main_list_pile = urwid.Pile(body)
-    shared.main.original_widget = urwid.Filler(shared.main_list_pile)
+    shared.main.original_widget = urwid.Frame(urwid.Filler(shared.main_list_pile), header=header, footer=footer)
 
     if shared.last_focus_path is not None:
         shared.main_list_pile.set_focus_path(shared.last_focus_path)
+
 
 def search_changed(widget, search_string):
     """ this gets called when search string changes """
@@ -291,6 +348,7 @@ def load_list_from_csv(csv_filename):
 
     # first the filtered list is the same as original list
     shared.list_of_items_filtered = shared.list_of_items
+
 
 def update_pile_with_current_buttons():
     """ the shared.pile_current_page might be already shown on the screen,

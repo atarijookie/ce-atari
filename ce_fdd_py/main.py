@@ -3,12 +3,13 @@ import re
 import os
 import logging
 import urwid
+import urllib3
 import threading, queue
 from setproctitle import setproctitle
 from logging.handlers import RotatingFileHandler
-from downloader import on_show_selected_list
+from downloader import on_show_selected_list, get_storage_path
 import shared
-from urwid_helpers import create_my_button
+from urwid_helpers import create_my_button, create_header_footer
 
 
 app_log = logging.getLogger('root')
@@ -208,7 +209,10 @@ def download_worker():
 
 def create_main_menu():
     body = []
-    body.append(urwid.Text('>>> CosmosEx Floppy Tool <<<', align='center'))
+    header, footer = create_header_footer('>>> CosmosEx Floppy Tool <<<')
+
+    shared.on_unhandled_keys_handler = None     # no unhandled keys handler on main menu
+
     body.append(urwid.Text('Choose a list from which you want to download or mount items.'))
     body.append(urwid.Divider())
 
@@ -223,60 +227,8 @@ def create_main_menu():
 
     body.append(shared.text_status)            # add status widget
 
-    return urwid.ListBox(urwid.SimpleFocusListWalker(body))
-
-
-def on_unhandled_keys(key):
-    """ when some key is not handled, this function is called """
-
-    if shared.pile_current_page is None:               # no pile yet? quit
-        return
-
-    if key == 'left':           # left = prev
-        btn_prev_clicked(None)
-        return
-
-    if key == 'right':          # right = next
-        btn_next_clicked(None)
-        return
-
-    widget = shared.pile_current_page.focus            # get which image button has focus
-
-    if not hasattr(widget, 'user_data'):        # no user data? unhandled key not on image button
-        return
-
-    user_data = widget.user_data
-    filename = user_data['filename']     # get user data from that image button
-
-    storage_path = get_storage_path()           # check if got storage path
-
-    if not storage_path:                        # no storage path? just quit
-        return
-
-    if not can_write_to_storage(storage_path):  # check if can write to storage path
-        return
-
-    is_download = key in ['d', 'D']
-    is_insert = key in ['1', '2', '3']
-
-    path = os.path.join(storage_path, filename)     # check if got this file
-    file_exists = os.path.exists(path)
-
-    if is_insert and not file_exists:           # trying to insert, but don't have file?
-        is_download = True                      # it's a download, not insert
-        is_insert = False
-
-    if is_download and file_exists:             # trying to download, but file exists? nothing do to
-        return
-
-    if is_insert:                               # should insert?
-        slot = int(key)
-        insert_image(None, (user_data, slot))
-        return
-
-    if is_download:                             # should download?
-        shared.queue_download.put(user_data)
-        return
+    w_body = urwid.Padding(urwid.ListBox(urwid.SimpleFocusListWalker(body)), 'center', 40)
+    return urwid.Frame(w_body, header=header, footer=footer)
 
 
 def alarm_start_threads(loop=None, data=None):
@@ -315,23 +267,22 @@ if __name__ == "__main__":
     # read list of lists into memory
     read_list_of_lists()
 
-    shared.main = urwid.Padding(create_main_menu(), left=2, right=2)
-
-    shared.current_body = urwid.Overlay(shared.main, urwid.SolidFill(),
-        align='center', width=('relative', 100),
-        valign='middle', height=('relative', 100),
-        min_width=20, min_height=9)
-
     # threads for updating lists
     thr_download_lists = threading.Thread(target=download_lists)
     thr_download_images = threading.Thread(target=download_worker)
 
+    shared.main = urwid.Padding(create_main_menu(), left=2, right=2)
+
+    top = urwid.Overlay(shared.main, urwid.SolidFill(), align='center', width=('relative', 100), valign='middle',
+                        height=('relative', 100), min_width=20, min_height=9)
+
+    shared.current_body = top
+
     try:
-        shared.main_loop = urwid.MainLoop(shared.current_body, palette=[('reversed', 'standout', '')],
-                                   unhandled_input=on_unhandled_keys)
-        shared.main_loop.set_alarm_in(0.5, alarm_start_threads)
+        shared.main_loop = urwid.MainLoop(top, palette=[('reversed', 'standout', '')],
+                                          unhandled_input=shared.on_unhandled_keys_generic)
         shared.main_loop.run()
     except KeyboardInterrupt:
         print("Terminated by keyboard...")
 
-    shared.should_run = False
+    should_run = False

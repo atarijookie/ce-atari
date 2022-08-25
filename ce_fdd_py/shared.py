@@ -30,3 +30,14 @@ terminal_cols = 80      # should be 40 for ST low, 80 for ST mid
 terminal_rows = 23
 items_per_page = terminal_rows - 4
 last_storage_path = None
+
+on_unhandled_keys_handler = None
+
+
+def on_unhandled_keys_generic(key):
+    # generic handler for unhandled keys, will be assigned on start...
+    # later on, when you want to handle unhandled keys on specific screen, set the on_unhandled_keys_handler
+    # to handling function
+
+    if on_unhandled_keys_handler:
+        on_unhandled_keys_handler(key)

@@ -107,13 +107,11 @@ def create_my_button(text, on_clicked_fn, on_clicked_data=None, return_widget=Fa
 
 def create_header_footer(header_text, footer_text=None):
     header = urwid.AttrMap(urwid.Text(header_text, align='center'), 'reversed')
-    header = urwid.Padding(header, 'center', 40)
 
     if footer_text is None:
         footer_text = 'F5 - refresh, Ctrl+C or F10 - quit'
 
     footer = urwid.AttrMap(urwid.Text(footer_text, align='center'), 'reversed')
-    footer = urwid.Padding(footer, 'center', 40)
 
     return header, footer
 
