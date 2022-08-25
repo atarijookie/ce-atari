@@ -70,7 +70,7 @@ if __name__ == "__main__":
 
     log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
 
-    my_handler = RotatingFileHandler('/tmp/ce_conf.log', mode='a', maxBytes=1024 * 1024, backupCount=1)
+    my_handler = RotatingFileHandler('/var/log/ce/ce_conf_py.log', mode='a', maxBytes=1024 * 1024, backupCount=1)
     my_handler.setFormatter(log_formatter)
     my_handler.setLevel(logging.DEBUG)
 

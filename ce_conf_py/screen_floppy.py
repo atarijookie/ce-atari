@@ -1,6 +1,6 @@
 import logging
 import urwid
-from urwid_helpers import create_my_button, create_header_footer, MyRadioButton, MyCheckBox, dialog
+from urwid_helpers import create_my_button, create_header_footer, MyRadioButton, MyCheckBox
 from utils import settings_load, settings_save, on_cancel, back_to_main_menu, setting_get_bool, on_option_changed, \
     on_checkbox_changed
 import shared
