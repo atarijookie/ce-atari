@@ -109,20 +109,22 @@ def create_header_footer(header_text, footer_text=None):
     header = urwid.AttrMap(urwid.Text(header_text, align='center'), 'reversed')
 
     if footer_text is None:
-        footer_text = 'F5 - refresh, Ctrl+C or F10 - quit'
+        footer_text = 'Ctrl+C / F10: quit'
 
-    footer = urwid.AttrMap(urwid.Text(footer_text, align='center'), 'reversed')
+    widget_footer1 = urwid.AttrMap(urwid.Text(footer_text, align='center'), 'reversed')
 
-    return header, footer
+    cols_footer = urwid.Columns([
+        ('flow', widget_footer1),
+        ('flow', urwid.AttrMap(shared.text_status, 'reversed'))
+    ], dividechars=3)
+
+    cols_footer = urwid.AttrMap(urwid.Padding(cols_footer, 'center', 40), 'reversed')
+
+    return header, cols_footer
 
 
 def create_edit(setting_name, width, on_edit_changed, mask=None):
-    from utils import setting_get_str
-
-    if setting_name:        # setting name provided? load setting value
-        text = setting_get_str(setting_name)
-    else:                   # no setting name? just empty string
-        text = ''
+    text = ''
 
     edit_line = urwid.Edit(caption='', edit_text=text, mask=mask)
     urwid.connect_signal(edit_line, 'change', on_edit_changed, {'id': setting_name})

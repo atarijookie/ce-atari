@@ -8,13 +8,12 @@ import threading, queue
 from setproctitle import setproctitle
 from logging.handlers import RotatingFileHandler
 from downloader import on_show_selected_list, get_storage_path
+from image_slots import on_show_image_slots
 import shared
 from urwid_helpers import create_my_button, create_header_footer
 
 
 app_log = logging.getLogger('root')
-
-queue_download = queue.Queue()      # queue that holds things to download
 
 
 def update_list_of_lists():
@@ -24,7 +23,8 @@ def update_list_of_lists():
     if should_download:     # download file if should
         download_list(shared.LIST_OF_LISTS_URL, shared.LIST_OF_LISTS_LOCAL)
 
-    # check again if should download - True here after download would mean that the list is not available locally or is outdated, but failed udpate
+    # check again if should download - True here after download would mean that the
+    # list is not available locally or is outdated, but failed udpate
     should_download = should_download_list(shared.LIST_OF_LISTS_LOCAL)
     return (not should_download)        # return success / failure
 
@@ -153,8 +153,8 @@ def alarm_callback(loop=None, data=None):
 
 def update_status(new_status):
     """ call this method to update status bar on screen """
-    if shared.text_status:     # got status widget? show status
-        shared.text_status.set_text(new_status)
+    shared.text_status.set_text(new_status)
+    app_log.debug(f"new_status: {new_status}")
 
     if shared.main_loop:       # if got main loop, trigger alarm to redraw widgets
         shared.main_loop.set_alarm_in(1, alarm_callback)
@@ -213,7 +213,15 @@ def create_main_menu():
 
     shared.on_unhandled_keys_handler = None     # no unhandled keys handler on main menu
 
-    body.append(urwid.Text('Choose a list from which you want to download or mount items.'))
+    for i in range(3):
+        body.append(urwid.Divider())
+
+    button = create_my_button('Image slots', on_show_image_slots)
+    body.append(button)
+    body.append(urwid.Divider())
+    body.append(urwid.Divider())
+
+    body.append(urwid.Text('Games to download:'))
     body.append(urwid.Divider())
 
     for index, item in enumerate(shared.list_of_lists):           # go through the list of lists, extract names, put them in the buttons
@@ -221,11 +229,6 @@ def create_main_menu():
         body.append(button)
 
     body.append(urwid.Divider())
-
-    if not shared.text_status:
-        shared.text_status = urwid.Text("Status: idle")        # text showing status
-
-    body.append(shared.text_status)            # add status widget
 
     w_body = urwid.Padding(urwid.ListBox(urwid.SimpleFocusListWalker(body)), 'center', 40)
     return urwid.Frame(w_body, header=header, footer=footer)
@@ -240,6 +243,8 @@ def alarm_start_threads(loop=None, data=None):
 
 if __name__ == "__main__":
     setproctitle("ce_fdd_py")  # set process title
+
+    shared.text_status = urwid.Text("S: idle")  # text showing status
 
     log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
 

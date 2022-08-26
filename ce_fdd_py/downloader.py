@@ -10,8 +10,6 @@ from urwid_helpers import create_my_button, dialog, back_to_main_menu, create_he
 
 app_log = logging.getLogger()
 
-queue_download = queue.Queue()      # queue that holds things to download
-
 
 def show_storage_read_only():
     """ show warning message that cannot write storage """
@@ -176,11 +174,6 @@ def show_current_page(button):
 
     update_pile_with_current_buttons()  # first update pile with current buttons
     body.append(shared.pile_current_page)  # then add the pile with current page to body
-
-    if not shared.text_status:
-        shared.text_status = urwid.Text("Status: idle")  # text showing status
-
-    body.append(shared.text_status)
 
     show_page_text()  # show the new page text
 
@@ -428,7 +421,7 @@ def get_current_page_buttons(as_tuple):
         btn = (btn, (WEIGHT, 1)) if as_tuple else btn               # tuple or just the button
         buttons.append(btn)
 
-    padding_cnt = shared.items_per_page - len(sublist) # calculate how much padding at the bottom we need
+    padding_cnt = shared.items_per_page - len(sublist)  # calculate how much padding at the bottom we need
 
     for i in range(padding_cnt):                # add all padding as needed
         one = (urwid.Divider(), (WEIGHT, 1)) if as_tuple else urwid.Divider()
