@@ -7,7 +7,7 @@ import urllib3
 import threading, queue
 from setproctitle import setproctitle
 from logging.handlers import RotatingFileHandler
-from downloader import on_show_selected_list, get_storage_path
+from downloader import DownloaderView
 from image_slots import on_show_image_slots
 import shared
 from urwid_helpers import create_my_button, create_header_footer
@@ -182,7 +182,7 @@ def download_worker():
         except Exception as ex:                 # we're expecting exception on no item to download
             continue
 
-        storage_path = get_storage_path()       # check if got storage and get path
+        storage_path = shared.get_storage_path()       # check if got storage and get path
 
         if not storage_path:                    # no storage? skip item
             shared.queue_download.task_done()
@@ -217,6 +217,11 @@ def download_worker():
             update_status("Status: {}".format(str(ex)))
 
         shared.queue_download.task_done()
+
+
+def on_show_selected_list(button, choice):
+    shared.view_object = DownloaderView()
+    shared.view_object.on_show_selected_list(button, choice)
 
 
 def create_main_menu():

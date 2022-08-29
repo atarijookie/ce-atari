@@ -3,7 +3,7 @@ import urwid
 import logging
 import shared
 from urwid_helpers import create_my_button, dialog, back_to_main_menu, create_header_footer
-from downloader import load_list_from_csv
+from shared import load_list_from_csv
 
 app_log = logging.getLogger()
 
@@ -17,8 +17,6 @@ image_name_to_content = {}              # holds dict with image name to content,
 
 screen_shown = False
 last_slots_mod_time = 0
-
-# TODO: refresh screen if slots change
 
 
 def alarm_callback_refresh(loop=None, data=None):
