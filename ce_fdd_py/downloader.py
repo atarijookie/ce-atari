@@ -70,11 +70,17 @@ def on_show_selected_list(button, choice):
     shared.last_focus_path = None
 
     # try to load the list into memory
+
+    shared.list_of_items = []
+
     error = None
     try:
-        load_list_from_csv(shared.list_of_lists[shared.list_index]['filename'])
+        shared.list_of_items = load_list_from_csv(shared.list_of_lists[shared.list_index]['filename'])
     except Exception as ex:
         error = str(ex)
+
+    # first the filtered list is the same as original list
+    shared.list_of_items_filtered = shared.list_of_items
 
     # if failed to load, show error
     if error:
@@ -314,8 +320,9 @@ def get_storage_path():
 
 
 def load_list_from_csv(csv_filename):
-    shared.list_of_items = []
-    shared.list_of_items_filtered = []
+    list_of_items = []
+
+    app_log.debug(f'will load .csv: {csv_filename}')
 
     # read whole file into memory, split to lines
     file = open(csv_filename, "r")
@@ -337,10 +344,9 @@ def load_list_from_csv(csv_filename):
         url_filename = os.path.basename(item['url'])    # get filename from url
         item['filename'] = url_filename
 
-        shared.list_of_items.append(item)
+        list_of_items.append(item)
 
-    # first the filtered list is the same as original list
-    shared.list_of_items_filtered = shared.list_of_items
+    return list_of_items
 
 
 def update_pile_with_current_buttons():

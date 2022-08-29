@@ -11,6 +11,8 @@ main_loop = None
 current_body = None
 should_run = True
 
+PATH_VAR = '/var/run/ce'
+
 PATH_TO_LISTS = "/ce/lists/"                                    # where the lists are stored locally
 BASE_URL = "http://joo.kie.sk/cosmosex/update/"                 # base url where the lists will be stored online
 LIST_OF_LISTS_FILE = "list_of_lists.csv"
