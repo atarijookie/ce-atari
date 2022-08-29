@@ -15,6 +15,9 @@ from urwid_helpers import create_my_button, create_header_footer
 
 app_log = logging.getLogger('root')
 
+thr_download_lists = None
+thr_download_images = None
+
 
 def update_list_of_lists():
     # check if should download this file
@@ -126,8 +129,12 @@ def download_lists():
     down_count = 0
     fail_count = 0
 
+    app_log.debug("about to download lists")
+
     for item in shared.list_of_lists:      # go through lists, check if should download, do download if needed
         should_download = should_download_list(item['filename'])        # check if should download this file
+
+        app_log.debug(f"should download {item['filename']} - {should_download}")
 
         if should_download:
             try:
@@ -153,7 +160,8 @@ def alarm_callback(loop=None, data=None):
 
 def update_status(new_status):
     """ call this method to update status bar on screen """
-    shared.text_status.set_text(new_status)
+    status = 'S: ' + new_status
+    shared.text_status.set_text(status)
     app_log.debug(f"new_status: {new_status}")
 
     if shared.main_loop:       # if got main loop, trigger alarm to redraw widgets
@@ -234,13 +242,6 @@ def create_main_menu():
     return urwid.Frame(w_body, header=header, footer=footer)
 
 
-def alarm_start_threads(loop=None, data=None):
-    global thr_download_lists, thr_download_images
-
-    thr_download_lists.start()
-    thr_download_images.start()
-
-
 if __name__ == "__main__":
     setproctitle("ce_fdd_py")  # set process title
 
@@ -276,6 +277,9 @@ if __name__ == "__main__":
     thr_download_lists = threading.Thread(target=download_lists)
     thr_download_images = threading.Thread(target=download_worker)
 
+    thr_download_lists.start()
+    thr_download_images.start()
+
     shared.main = urwid.Padding(create_main_menu(), left=2, right=2)
 
     top = urwid.Overlay(shared.main, urwid.SolidFill(), align='center', width=('relative', 100), valign='middle',
@@ -286,8 +290,9 @@ if __name__ == "__main__":
     try:
         shared.main_loop = urwid.MainLoop(top, palette=[('reversed', 'standout', '')],
                                           unhandled_input=shared.on_unhandled_keys_generic)
+
         shared.main_loop.run()
     except KeyboardInterrupt:
         print("Terminated by keyboard...")
 
-    should_run = False
+    shared.should_run = False

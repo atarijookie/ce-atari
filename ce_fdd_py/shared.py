@@ -12,6 +12,7 @@ current_body = None
 should_run = True
 
 PATH_VAR = '/var/run/ce'
+FILE_SLOTS = PATH_VAR + '/slots.txt'
 
 PATH_TO_LISTS = "/ce/lists/"                                    # where the lists are stored locally
 BASE_URL = "http://joo.kie.sk/cosmosex/update/"                 # base url where the lists will be stored online
