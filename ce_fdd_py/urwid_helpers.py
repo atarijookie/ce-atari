@@ -109,16 +109,17 @@ def create_header_footer(header_text, footer_text=None):
     header = urwid.AttrMap(urwid.Text(header_text, align='center'), 'reversed')
 
     if footer_text is None:
-        footer_text = 'Ctrl+C / F10: quit'
+        footer_text = ' Ctrl+C / F10: quit'
 
     widget_footer1 = urwid.AttrMap(urwid.Text(footer_text, align='center'), 'reversed')
+    shared.text_status = urwid.Text(' ')
 
     cols_footer = urwid.Columns([
-        ('flow', widget_footer1),
-        ('flow', urwid.AttrMap(shared.text_status, 'reversed'))
-    ], dividechars=3)
+        ('pack', widget_footer1),
+        ('pack', urwid.AttrMap(shared.text_status, 'reversed')),
+    ], dividechars=2)
 
-    cols_footer = urwid.AttrMap(urwid.Padding(cols_footer, 'center', 40), 'reversed')
+    cols_footer = urwid.AttrMap(urwid.Padding(cols_footer, 'left'), 'reversed')
 
     return header, cols_footer
 
@@ -224,4 +225,4 @@ def reset_layout(button):
 def back_to_main_menu(button):
     """ when we should return back to main menu """
     from main import create_main_menu
-    shared.main.original_widget = urwid.Padding(create_main_menu(), left=2, right=2)
+    shared.main.original_widget = urwid.Padding(create_main_menu())

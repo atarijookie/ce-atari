@@ -148,7 +148,7 @@ def download_lists():
     if down_count > 0:      # if something was downloaded
         update_status("Downloaded {} lists.".format(down_count))
     elif fail_count > 0:    # nothing downloaded, just failed?
-        update_status("Failed to download {} lists.".format(fail_count))
+        update_status("Failed to download {} list(s).".format(fail_count))
     else:                   # nothing downloaded, nothing failed?
         update_status("Lists are up to date.")
 
@@ -160,12 +160,16 @@ def alarm_callback(loop=None, data=None):
 
 def update_status(new_status):
     """ call this method to update status bar on screen """
-    status = 'S: ' + new_status
-    shared.text_status.set_text(status)
-    app_log.debug(f"new_status: {new_status}")
+    app_log.debug(f"status: {new_status}")
+    new_status = (new_status[:58] + '..') if len(new_status) > 60 else new_status       # cut to 60 chars
 
-    if shared.main_loop:       # if got main loop, trigger alarm to redraw widgets
-        shared.main_loop.set_alarm_in(1, alarm_callback)
+    if shared.text_status:
+        shared.text_status.set_text(new_status)
+
+    shared.main_loop.draw_screen()
+
+    # if shared.main_loop:       # if got main loop, trigger alarm to redraw widgets
+    #     shared.main_loop.set_alarm_in(1, alarm_callback)
 
 
 def download_worker():
@@ -245,8 +249,6 @@ def create_main_menu():
 if __name__ == "__main__":
     setproctitle("ce_fdd_py")  # set process title
 
-    shared.text_status = urwid.Text("S: idle")  # text showing status
-
     log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
 
     my_handler = RotatingFileHandler('/var/log/ce/ce_fdd_py.log', mode='a', maxBytes=1024 * 1024, backupCount=1)
@@ -280,7 +282,7 @@ if __name__ == "__main__":
     thr_download_lists.start()
     thr_download_images.start()
 
-    shared.main = urwid.Padding(create_main_menu(), left=2, right=2)
+    shared.main = urwid.Padding(create_main_menu())
 
     top = urwid.Overlay(shared.main, urwid.SolidFill(), align='center', width=('relative', 100), valign='middle',
                         height=('relative', 100), min_width=20, min_height=9)

@@ -380,6 +380,7 @@ def on_image_button_clicked(button, item):
 
     path = os.path.join(storage_path, item['filename'])     # check if got this file
 
+    header, footer = create_header_footer('>>> CosmosEx Floppy Tool <<<')
     body = []
 
     body.append(urwid.Text("file: " + item['filename'], align='center'))   # show filename
@@ -405,7 +406,7 @@ def on_image_button_clicked(button, item):
     btn = create_my_button("Back", show_current_page)
     body.append(btn)
 
-    shared.main.original_widget = urwid.Filler(urwid.Pile(body))
+    shared.main.original_widget = urwid.Frame(urwid.Filler(urwid.Pile(body)), header=header, footer=footer)
 
 
 def get_current_page_buttons(as_tuple):
