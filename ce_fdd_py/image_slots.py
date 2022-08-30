@@ -4,6 +4,7 @@ import logging
 import shared
 from urwid_helpers import create_my_button, dialog, back_to_main_menu, create_header_footer
 from shared import load_list_from_csv
+from file_view import FilesView
 
 app_log = logging.getLogger()
 
@@ -156,7 +157,8 @@ def on_back_to_main_menu(button):
 
 
 def on_insert(button, index):
-    pass
+    shared.view_object = FilesView()
+    shared.view_object.on_show_selected_list(button, '/mnt')
 
 
 def on_eject(button, index):

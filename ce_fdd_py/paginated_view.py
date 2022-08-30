@@ -18,6 +18,8 @@ class PaginatedView:
     search_phrase_lc = None
     pile_current_page = None
     page_current_zbi = 0
+    btn_prev = None
+    btn_next = None
 
     def on_show_selected_list(self, button, choice):
         # load anything you want to show and call show_current_page
@@ -57,17 +59,17 @@ class PaginatedView:
         urwid.connect_signal(widget_search, 'change', self.search_changed)
         body.append(urwid.AttrMap(widget_search, None, focus_map='reversed'))
 
-        # the next row will hold pages related stufff
+        # the next row will hold pages related stuff
         pages_row = []
 
-        btn_prev = create_my_button("prev", self.btn_prev_clicked)
-        pages_row.append(btn_prev)
+        btn_prev_decorated, self.btn_prev = create_my_button("prev", self.btn_prev_clicked, return_widget=True)
+        pages_row.append(btn_prev_decorated)
 
         self.text_pages = urwid.Text("0/0", align='center')  # pages showing text
         pages_row.append(self.text_pages)
 
-        btn_next = create_my_button("next", self.btn_next_clicked)
-        pages_row.append(btn_next)
+        btn_next_decorated, self.btn_next = create_my_button("next", self.btn_next_clicked, return_widget=True)
+        pages_row.append(btn_next_decorated)
 
         btn_main = create_my_button("back", back_to_main_menu)
         pages_row.append(btn_main)
