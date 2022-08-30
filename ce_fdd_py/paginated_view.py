@@ -7,6 +7,11 @@ from urwid_helpers import create_my_button, back_to_main_menu, create_header_foo
 app_log = logging.getLogger()
 
 
+class MyDivider(urwid.Divider):
+    def keypress(self, tsize, key):
+        return key      # key wasn't handled
+
+
 class PaginatedView:
     title = 'this view title'
     page_current = 1            # start from page 1
@@ -71,7 +76,7 @@ class PaginatedView:
         btn_next_decorated, self.btn_next = create_my_button("next", self.btn_next_clicked, return_widget=True)
         pages_row.append(btn_next_decorated)
 
-        btn_main = create_my_button("back", back_to_main_menu)
+        btn_main = create_my_button("back", self.on_back_button)
         pages_row.append(btn_main)
 
         body.append(urwid.Columns(pages_row))
@@ -87,23 +92,30 @@ class PaginatedView:
         if self.last_focus_path is not None:
             self.main_list_pile.set_focus_path(self.last_focus_path)
 
+    def on_back_button(self, button):
+        # default back button action - main menu... if you need to go elsewhere, override in child
+        back_to_main_menu(button)
+
     def search_changed(self, widget, search_string):
         """ this gets called when search string changes """
         self.list_of_items_filtered = []
         self.search_phrase = search_string
         self.search_phrase_lc = search_string.lower()        # search string to lower case before search
 
-        for item in self.list_of_items:                      # go through all items in list
-            content = item['content'].lower()           # content to lower case
-
-            if self.search_phrase_lc in content:             # if search string in content found
-                self.list_of_items_filtered.append(item)     # append item
+        self.filter_items_by_search_phrase()
 
         # now set the 1st page and show page text
         self.page_current = 1
         self.last_focus_path = None
         self.show_page_text()                    # show the new page text
         self.update_pile_with_current_buttons()  # show the new buttons
+
+    def filter_items_by_search_phrase(self):
+        for item in self.list_of_items:                      # go through all items in list
+            content = item['content'].lower()           # content to lower case
+
+            if self.search_phrase_lc in content:             # if search string in content found
+                self.list_of_items_filtered.append(item)     # append item
 
     def get_total_pages(self):
         total_items = len(self.list_of_items_filtered)                   # how many items current list has
@@ -183,7 +195,7 @@ class PaginatedView:
         padding_cnt = shared.items_per_page - len(sublist)  # calculate how much padding at the bottom we need
 
         for i in range(padding_cnt):                # add all padding as needed
-            one = (urwid.Divider(), (WEIGHT, 1)) if as_tuple else urwid.Divider()
+            one = (MyDivider(), (WEIGHT, 1)) if as_tuple else MyDivider()
             buttons.append(one)
 
         return buttons, focused_index

@@ -2,7 +2,7 @@ import os
 import urwid
 import logging
 import shared
-from urwid_helpers import dialog
+from urwid_helpers import dialog, back_to_main_menu
 from paginated_view import PaginatedView
 
 app_log = logging.getLogger()
@@ -107,6 +107,9 @@ class FilesView(PaginatedView):
         if item['is_file']:         # is file? insert
             # TODO: actual insert into slot
             app_log.debug(f"insert image {path} to slot {self.fdd_slot}")
+
+            from image_slots import on_show_image_slots
+            on_show_image_slots(button)
         else:                       # is dir? browse
             self.on_show_selected_list(button, path)
 
@@ -114,3 +117,14 @@ class FilesView(PaginatedView):
         """ for a specified item retrieve text """
         btn_text = f"{item['filename']:13} {item['size']}"
         return btn_text
+
+    def on_back_button(self, button):
+        from image_slots import on_show_image_slots
+        on_show_image_slots(button)
+
+    def filter_items_by_search_phrase(self):
+        for item in self.list_of_items:                     # go through all items in list
+            content = item['filename'].lower()              # content to lower case
+
+            if self.search_phrase_lc in content:            # if search string in content found
+                self.list_of_items_filtered.append(item)    # append item
