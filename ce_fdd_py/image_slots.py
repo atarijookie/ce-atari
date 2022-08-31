@@ -158,9 +158,10 @@ def on_back_to_main_menu(button):
 
 def on_insert(button, index):
     shared.view_object = FilesView()
+    shared.view_object.set_fdd_slot(index)      # tell files view to which slot it should insert image
     shared.view_object.on_show_selected_list(button, '/mnt')
 
 
 def on_eject(button, index):
-    pass
-
+    """ eject image from slot """
+    shared.slot_eject(index)

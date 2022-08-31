@@ -8,6 +8,7 @@ import logging
 app_log = logging.getLogger()
 
 queue_download = queue.Queue()      # queue that holds things to download
+queue_send = queue.Queue()          # queue that holds things to send to core
 
 terminal_cols = 80  # should be 40 for ST low, 80 for ST mid
 terminal_rows = 23
@@ -182,3 +183,22 @@ def load_list_from_csv(csv_filename):
         list_of_items.append(item)
 
     return list_of_items
+
+
+def slot_insert(slot_index, path_to_image):
+    """ insert floppy image to specified slot
+    :param slot_index: index of slot to eject - 0-2
+    :param path_to_image: filesystem path to image file which should be inserted
+    """
+    global queue_send
+    item = {'module': 'floppy', 'action': 'insert', 'slot': slot_index, 'image': path_to_image}
+    queue_send.put(item)
+
+
+def slot_eject(slot_index):
+    """ eject floppy image from specified slot
+    :param slot_index: index of slot to eject - 0-2
+    """
+    global queue_send
+    item = {'module': 'floppy', 'action': 'eject', 'slot': slot_index}
+    queue_send.put(item)

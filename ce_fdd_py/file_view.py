@@ -105,7 +105,8 @@ class FilesView(PaginatedView):
         path = item['full_path']     # check if got this file
 
         if item['is_file']:         # is file? insert
-            # TODO: actual insert into slot
+            # insert image into slot
+            shared.slot_insert(self.fdd_slot, path)
             app_log.debug(f"insert image {path} to slot {self.fdd_slot}")
 
             from image_slots import on_show_image_slots

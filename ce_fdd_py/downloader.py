@@ -92,7 +92,7 @@ class DownloaderView(PaginatedView):
 
         if is_insert:                               # should insert?
             slot = int(key)
-            self.insert_image(None, (user_data, slot))
+            self.insert_image(None, (path, slot))
             return
 
         if is_download:                             # should download?
@@ -107,8 +107,10 @@ class DownloaderView(PaginatedView):
 
     def insert_image(self, button, item_slot):
         """ when image should be inserted to slot """
-        item, slot = item_slot
-        app_log.debug("insert image {} to slot {}".format(item['filename'], slot))
+        path_to_image, slot = item_slot
+        shared.slot_insert(slot, path_to_image)
+        app_log.debug(f"insert image {path_to_image} to slot {slot}")
+        self.show_current_page(None)  # show current list page
 
     def on_item_button_clicked(self, button, item):
         """ when user clicks on image button """
@@ -143,7 +145,7 @@ class DownloaderView(PaginatedView):
         if os.path.exists(path):                    # if exists, show insert options
             for i in range(3):
                 slot = i + 1
-                btn = create_my_button("Insert to slot {}".format(slot), self.insert_image, (item, slot))
+                btn = create_my_button("Insert to slot {}".format(slot), self.insert_image, (path, slot))
                 body.append(btn)
         else:                                       # if doesn't exist, show download option
             btn = create_my_button("Download", self.download_image, item)
