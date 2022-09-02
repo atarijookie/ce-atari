@@ -91,7 +91,7 @@ class DownloaderView(PaginatedView):
             return
 
         if is_insert:                               # should insert?
-            slot = int(key)
+            slot = int(key) - 1
             self.insert_image(None, (path, slot))
             return
 
@@ -145,7 +145,7 @@ class DownloaderView(PaginatedView):
         if os.path.exists(path):                    # if exists, show insert options
             for i in range(3):
                 slot = i + 1
-                btn = create_my_button("Insert to slot {}".format(slot), self.insert_image, (path, slot))
+                btn = create_my_button("Insert to slot {}".format(slot), self.insert_image, (path, i))
                 body.append(btn)
         else:                                       # if doesn't exist, show download option
             btn = create_my_button("Download", self.download_image, item)

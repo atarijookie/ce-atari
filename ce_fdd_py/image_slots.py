@@ -31,7 +31,7 @@ def alarm_callback_refresh(loop=None, data=None):
     if slots_mod_time != last_slots_mod_time:               # modification time changed?
         app_log.debug('alarm_callback_refresh - reloading!')
         last_slots_mod_time = slots_mod_time
-        on_show_image_slots(None)                           # re-create this screen
+        on_update_image_slots(None)
 
     shared.main_loop.set_alarm_in(1, alarm_callback_refresh)        # check for changes in 1 second
 
@@ -81,7 +81,9 @@ def get_image_slots():
             break
 
         image_name = txt_image_name[i].strip()
-        content = get_content_for_image_name(image_name)
+        image_name = os.path.basename(image_name)           # get just filename from the path
+        txt_image_name[i] = image_name
+        content = get_content_for_image_name(image_name)    # get content (game names) for this image name
         txt_image_content.append(content)
 
 
@@ -110,15 +112,12 @@ def on_show_image_slots(button):
         btn_insert = create_my_button("Insert", on_insert, i)
         btn_eject = create_my_button("Eject", on_eject, i)
 
-        txt_name = txt_image_name[i] if i<len(txt_image_name) else None
+        txt_name = txt_image_name[i] if i < len(txt_image_name) else None
         txt_name = txt_name if txt_name else '(  empty  )'
 
         app_log.debug(f'txt_name: {txt_name}')
 
-        if i < len(widget_image_name):      # have this widget? (== refresh) just set text
-            widget_image_name[i].set_text(txt_name)
-        else:                               # don't have this widget? (== create) append it to list
-            widget_image_name.append(urwid.Text(txt_name))
+        widget_image_name.append(urwid.Text(txt_name))
 
         cols = urwid.Columns([
             ('fixed', 6, urwid.AttrMap(urwid.Text(f'Slot {i + 1}'), 'reversed')),
@@ -133,10 +132,7 @@ def on_show_image_slots(button):
         image_content_text = txt_image_content[i] if i < len(txt_image_content) else ''
         app_log.debug(f'image_content_text: {image_content_text}')
 
-        if i < len(widget_image_content):       # refresh?
-            widget_image_content[i].set_text(image_content_text)
-        else:                                   # create?
-            widget_image_content.append(urwid.Text(image_content_text))
+        widget_image_content.append(urwid.Text(image_content_text))
 
         body.append(widget_image_content[i])
         body.append(urwid.Divider())
@@ -148,6 +144,33 @@ def on_show_image_slots(button):
 
     w_body = urwid.Padding(urwid.ListBox(urwid.SimpleFocusListWalker(body)), 'center', 40)
     shared.main.original_widget = urwid.Frame(w_body, header=header, footer=footer)
+
+
+def on_update_image_slots(button):
+    """ replace old image names and content with new ones """
+    global screen_shown
+    if not screen_shown:        # if this is create (screen not already shown), start refresh in 1 second
+        return
+
+    # get current images and their content
+    get_image_slots()
+
+    global txt_image_name, widget_image_name, txt_image_content, widget_image_content
+
+    for i in range(3):
+        app_log.debug(f'index {i}')
+
+        txt_name = txt_image_name[i] if i < len(txt_image_name) else None
+        txt_name = txt_name if txt_name else '(  empty  )'
+
+        app_log.debug(f'txt_name: {txt_name}')
+        widget_image_name[i].set_text(txt_name)
+
+        # create text widget for image # i content
+        image_content_text = txt_image_content[i] if i < len(txt_image_content) else ''
+        app_log.debug(f'image_content_text: {image_content_text}')
+
+        widget_image_content[i].set_text(image_content_text)
 
 
 def on_back_to_main_menu(button):

@@ -30,13 +30,13 @@ def prep():
     sckt = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 
     try:
-        print(f'Setting up server socket on {srv_sock}')
+        print(f'Bind and listen on socket: {srv_sock}')
         sckt.bind(srv_sock)
         sckt.listen(5)
-        print(f'Success, listening on unix domain socket {srv_sock}')
+        print(f'Success, listening on: {srv_sock}')
         return sckt
     except Exception as e:
-        print(f'exception on bing or listen: {str(e)}')
+        print(f'exception on bind or listen: {str(e)}')
         return False
 
 
@@ -56,15 +56,13 @@ if __name__ == "__main__":
             while True:
                 data = connection.recv(1024)
                 rcvd_bytes = rcvd_bytes + len(data)
-                if not data:
-                    print('Finished receiving data')
+                if not data:        # on connection close
                     break
 
                 buffer = buffer + data
 
             decoded = bson.loads(buffer)
             print(f'received: {decoded}')
-            print(f'decoded type: {type(decoded)}')
 
             # {'module': 'floppy', 'action': 'eject', 'slot': 0}
             if decoded.get('module') == 'floppy':       # command for floppy module?
@@ -73,5 +71,10 @@ if __name__ == "__main__":
                 if decoded.get('action') == 'eject':    # action is eject?
                     slots.pop(slot, None)
                     write_slots_to_file()
+
+                if decoded.get('action') == 'insert':    # action is insert?
+                    slots[slot] = decoded.get('image')
+                    write_slots_to_file()
+
         finally:
             connection.close()
