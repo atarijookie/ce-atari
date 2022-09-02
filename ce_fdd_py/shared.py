@@ -4,6 +4,7 @@ from urwid_helpers import dialog
 import subprocess
 import codecs
 import logging
+from zipfile import ZipFile
 
 app_log = logging.getLogger()
 
@@ -202,3 +203,39 @@ def slot_eject(slot_index):
     global queue_send
     item = {'module': 'floppy', 'action': 'eject', 'slot': slot_index}
     queue_send.put(item)
+
+
+def file_seems_to_be_image(path_to_image, check_if_exists):
+    """ check if the supplied path seems to be image or not """
+    if not os.path.exists(path_to_image) or not os.path.isfile(path_to_image):
+        return False, f"Error accessing {path_to_image}"
+
+    path = path_to_image.strip()
+    path = os.path.basename(path)       # get just filename
+    ext = os.path.splitext(path)[1]     # get file extension
+
+    if ext.startswith('.'):             # if extension starts with dot, remove it
+        ext = ext[1:]
+
+    ext = ext.lower()                   # to lowercase
+
+    if ext in ['st', 'msa']:            # if extension is one of the expected values, we're good
+        return True, None
+
+    if ext != 'zip':                    # not a zip file and not any of supported extensions? fail
+        return False, f"Files with '{ext}' extension not supported."
+
+    # if we got here, it's a zip file
+    try:
+        with ZipFile(path_to_image, 'r') as zipObj:
+            files = zipObj.namelist()       # Get list of files names in zip
+
+            for file in files:
+                if file_seems_to_be_image(file, False):
+                    app_log.debug(f"the ZIP file {path_to_image} contains valid image {file}")
+                    return True, None
+
+    except Exception as ex:
+        app_log.warning(f"file_seems_to_be_image failed: {str(ex)}")
+
+    return False, "No valid image found in ZIP file"

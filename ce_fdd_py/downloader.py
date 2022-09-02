@@ -108,6 +108,14 @@ class DownloaderView(PaginatedView):
     def insert_image(self, button, item_slot):
         """ when image should be inserted to slot """
         path_to_image, slot = item_slot
+
+        # check if this is a valid image
+        is_image, error_str = shared.file_seems_to_be_image(path_to_image, True)
+
+        if not is_image:        # if not valid image
+            dialog(shared.main_loop, shared.current_body, error_str)
+            return
+
         shared.slot_insert(slot, path_to_image)
         app_log.debug(f"insert image {path_to_image} to slot {slot}")
         self.show_current_page(None)  # show current list page

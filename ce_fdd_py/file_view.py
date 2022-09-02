@@ -105,6 +105,13 @@ class FilesView(PaginatedView):
         path = item['full_path']     # check if got this file
 
         if item['is_file']:         # is file? insert
+            # check if this is a valid image
+            is_image, error_str = shared.file_seems_to_be_image(path, True)
+
+            if not is_image:        # if not valid image
+                dialog(shared.main_loop, shared.current_body, error_str)
+                return
+
             # insert image into slot
             shared.slot_insert(self.fdd_slot, path)
             app_log.debug(f"insert image {path} to slot {self.fdd_slot}")
