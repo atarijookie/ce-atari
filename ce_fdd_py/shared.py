@@ -49,6 +49,9 @@ last_storage_path = None
 on_unhandled_keys_handler = None
 view_object = None
 
+last_status_string = ''
+new_status_string = ''
+
 
 def on_unhandled_keys_generic(key):
     # generic handler for unhandled keys, will be assigned on start...

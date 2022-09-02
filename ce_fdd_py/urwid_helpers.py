@@ -112,7 +112,7 @@ def create_header_footer(header_text, footer_text=None):
         footer_text = ' Ctrl+C / F10: quit'
 
     widget_footer1 = urwid.AttrMap(urwid.Text(footer_text, align='center'), 'reversed')
-    shared.text_status = urwid.Text(' ')
+    shared.text_status = urwid.Text(shared.last_status_string)
 
     cols_footer = urwid.Columns([
         ('pack', widget_footer1),

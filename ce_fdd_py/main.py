@@ -156,23 +156,24 @@ def download_lists():
         update_status("Lists are up to date.")
 
 
-def alarm_callback(loop=None, data=None):
-    """ this gets called on alarm """
-    pass
+def update_status_alarm(loop=None, data=None):
+    """ this gets called on alarm to update the status from main thread, not from download thread """
+    shared.last_status_string = shared.new_status_string      # this new string is the last one used
+
+    if shared.text_status:                      # got this widget? set new text
+        shared.text_status.set_text(shared.new_status_string)
+
+    shared.main_loop.draw_screen()              # force redraw
 
 
 def update_status(new_status):
     """ call this method to update status bar on screen """
     app_log.debug(f"status: {new_status}")
-    new_status = (new_status[:58] + '..') if len(new_status) > 60 else new_status       # cut to 60 chars
+    shared.new_status_string = (new_status[:58] + '..') if len(new_status) > 60 else new_status       # cut to 60 chars
 
-    if shared.text_status:
-        shared.text_status.set_text(new_status)
-
-    shared.main_loop.draw_screen()
-
-    # if shared.main_loop:       # if got main loop, trigger alarm to redraw widgets
-    #     shared.main_loop.set_alarm_in(1, alarm_callback)
+    if shared.new_status_string != shared.last_status_string:     # if status string has changed since last set
+        if shared.main_loop:    # if got main loop, trigger alarm to redraw widgets to do the update from main thread
+            shared.main_loop.set_alarm_in(0.1, update_status_alarm)
 
 
 def download_worker():
