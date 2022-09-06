@@ -75,7 +75,7 @@ void DirTranslator::shortToLongPath(const std::string &shortPath, std::string &l
         std::string longName;
 
         if(fs->shortToLongFileName(shortPathParts[i], longName)) {  // try to convert the name
-            longPathParts.push_back(std::string(longName));                 // if there was a long version of the file name, replace the short one
+            longPathParts.push_back(std::string(longName));         // if there was a long version of the file name, replace the short one
         } else {
             longPathParts.push_back(shortPathParts[i]);             // failed to find long path, use the original in this place
             Utils::out(LOG_DEBUG, "DirTranslator::shortToLongPath - shortToLongFileName() failed for short name: %s , subPath=%s", shortPathParts[i].c_str(), subPath.c_str());
@@ -307,10 +307,6 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, const char *
     uint16_t atariTime = Utils::fileTimeToAtariTime(timestr);
     uint16_t atariDate = Utils::fileTimeToAtariDate(timestr);
 
-    // now convert the short 'FILE.C' to 'FILE    .C  '
-    //char shortFnameExtended[14];
-    //FilenameShortener::extendWithSpaces(shortFname.c_str(), shortFnameExtended);
-
     // check the current name against searchString using fnmatch
     if (compareSearchStringAndFilename(searchString, shortFname.c_str()) != 0) {
         Utils::out(LOG_ERROR, "TranslatedDisk::appendFoundToFindStorage -- %s - %s does not match pattern %s", fullEntryPath.c_str(), shortFname.c_str(), searchString);
@@ -446,21 +442,23 @@ void DirTranslator::toUpperCaseString(std::string &st)
 /// Return 0 for a match, -1 for no match
 int DirTranslator::compareSearchStringAndFilename(const char *searchString, const char *filename)
 {
-    char ss1[16], ss2[16];
-    char fn1[16], fn2[16];
+    std::string sSearchString = searchString;
+    std::string ss1, ss2;
+    Utils::splitFilenameFromExt(sSearchString, ss1, ss2);
 
-    FilenameShortener::splitFilenameFromExtension(searchString, ss1, ss2);
-    FilenameShortener::splitFilenameFromExtension(filename, fn1, fn2);
+    std::string sFilename = filename;
+    std::string fn1, fn2;
+    Utils::splitFilenameFromExt(sFilename, fn1, fn2);
 
     // check if filename matches
-    int ires = fnmatch(ss1, fn1, FNM_PATHNAME);
+    int ires = fnmatch(ss1.c_str(), fn1.c_str(), FNM_PATHNAME);
 
     if(ires != 0) {
         return -1;
     }
 
     // check if extension matches
-    ires = fnmatch(ss2, fn2, FNM_PATHNAME);
+    ires = fnmatch(ss2.c_str(), fn2.c_str(), FNM_PATHNAME);
 
     if(ires != 0) {
         return -1;

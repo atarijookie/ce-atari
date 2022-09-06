@@ -24,8 +24,8 @@ bool FilenameShortener::longToShortFileName(const char *longFileName, char *shor
     static char fileName[MAX_FILENAME_LEN];
     static char fileExt[MAX_FILEEXT_LEN];
 
-    memset(fileName,    0, 10);
-    memset(fileExt,     0, 10);
+    memset(fileName, 0, 10);
+    memset(fileExt,  0, 10);
 
     // find out if we do have this long file name already
     std::map<std::string, std::string>::iterator it;
@@ -39,10 +39,15 @@ bool FilenameShortener::longToShortFileName(const char *longFileName, char *shor
     }
 
     // divide longFileName to filename and extension
-    splitFilenameFromExtension(longFileName, fileName, fileExt);
+    std::string sLongFileName = longFileName;
+    std::string sFilename, sFileExt;
+    Utils::splitFilenameFromExt(sLongFileName, sFilename, sFileExt);
 
-    replaceNonLetters(fileName);                                // fix bad characters
-    replaceNonLetters(fileExt);
+    replaceNonLetters(sFilename);                                // fix bad characters
+    replaceNonLetters(sFileExt);
+
+    strcpy(fileName, sFilename.c_str());
+    strcpy(fileExt, sFileExt.c_str());
 
     if(strlen(fileName) == 0 && strlen(fileExt) == 0) {         // if empty, fill with '_' - this shouldn't happen
         strcpy(fileName, "________");
@@ -86,80 +91,51 @@ bool FilenameShortener::longToShortFileName(const char *longFileName, char *shor
     }
 
     // create final short name
-    mergeFilenameAndExtension(shortName, shortExt, false, shortFileName);
+    std::string shortFn;
+    mergeFilenameAndExtension(shortName, shortExt, false, shortFn);
 
     // store the long to short filename as key - value
-    std::string longFn, shortFn;
-    longFn  = longFileName;
-    shortFn = shortFileName;
+    std::string longFn;
+    longFn = longFileName;
 
     mapFilenameWithExt.insert( std::pair<std::string, std::string>(longFn, shortFn) );  // store this key-value pair
     mapReverseFilename.insert( std::pair<std::string, std::string>(shortFn, longFn) );  // for reverse transformation
 
-    Utils::out(LOG_DEBUG, "FilenameShortener mapped %s <=> %s", shortFileName, longFileName);
+    Utils::out(LOG_DEBUG, "FilenameShortener mapped %s <=> %s", shortFn.c_str(), longFn.c_str());
     return true;
 }
 
-void FilenameShortener::mergeFilenameAndExtension(const char *shortFn, const char *shortExt, bool extendWithSpaces, char *merged)
+void FilenameShortener::mergeFilenameAndExtension(const std::string& shortFn, const std::string& shortExt, bool extendWithSpaces, std::string& merged)
 {
-    if(extendWithSpaces) {                                      // space extended - 'FILE    .C  '
-        memset(merged, ' ', 12);                                // clear the
-        merged[8]   = '.';
-        merged[12]  = 0;
+    std::string shortFn2 = shortFn, shortExt2 = shortExt;       // make copies so we don't modify originals
 
-        int lenFn = strlen(shortFn);
-        int lenEx = strlen(shortExt);
+    if(shortFn2.size() > 8)             // filename too long? shorten
+        shortFn2.resize(8);
 
-        lenFn = MIN(lenFn, 8);
-        lenEx = MIN(lenEx, 3);
+    if(shortExt2.size() > 3)            // file ext too long? shorten
+        shortExt2.resize(3);
 
-        memcpy(merged,     shortFn,    lenFn);                 // copy in the filename
-        memcpy(merged + 9, shortExt,   lenEx);                 // copy in the file extension
-    } else {                                                    // not extended - 'FILE.C'
-        memset(merged, 0, 13);                                  // clear the final string first
+    if(extendWithSpaces) {              // if should extend
+        if(shortFn2.size() < 8)         // filename too short? extend
+            shortFn2.resize(8, ' ');
 
-        strncpy(merged,     shortFn,    8);                     // copy in the filename
-
-        if(strlen(shortExt) != 0) {                             // if there is extension, merge the rest
-            strcat(merged,      ".");
-            strncat(merged,     shortExt,   3);                 // merge in the extension
-        }
+        if(shortExt2.size() < 3)        // extension too short? extend
+            shortExt2.resize(3, ' ');
     }
-}
 
-void FilenameShortener::removeSpaceExtension(const char *extendedFn, char *extRemovedFn)
-{
-    char fname[12];
-    char ext[4];
-
-    splitFilenameFromExtension(extendedFn, fname, ext);     // split 'FILE    .C  ' to 'FILE    ' and 'C  '
-    removeTrailingSpaces(fname);                            // convert 'FILE    ' to 'FILE'
-    removeTrailingSpaces(ext);                              // convert 'C  ' to 'C'
-
-    mergeFilenameAndExtension(fname, ext, false, extRemovedFn);
+    merged = shortFn2;                  // put in the filename
+    
+    if(shortExt2.size() > 0)            // if got extension, append extension
+        merged += std::string(".") + shortExt2;
 }
 
 void FilenameShortener::extendWithSpaces(const char *normalFname, char *extendedFn)
 {
-    char fname[12];
-    char ext[4];
-
-    splitFilenameFromExtension(normalFname, fname, ext);     // split 'FILE.C  ' to 'FILE' and 'C'
-    mergeFilenameAndExtension(fname, ext, true, extendedFn);
-}
-
-void FilenameShortener::removeTrailingSpaces(char *str)
-{
-    int i;
-    int len = strlen(str);
-
-    for(i=(len-1); i>=0; i--) {         // walk the string from back to front
-        if(str[i] == ' ') {             // if it's a space, replace it with zero
-            str[i] = 0;
-        } else {                        // if it's something different, quit
-            break;
-        }
-    }
+    std::string sLongFileName = normalFname;
+    std::string sFilename, sFileExt, sExtendedFn;
+    Utils::splitFilenameFromExt(sLongFileName, sFilename, sFileExt);    // split 'FILE.C' to 'FILE' and 'C'
+    mergeFilenameAndExtension(sFilename, sFileExt, true, sExtendedFn);  // extend and merge
+    strcpy(extendedFn, sExtendedFn.c_str());            // copy to char* buffer
 }
 
 const bool FilenameShortener::shortToLongFileName(const std::string& shortFileName, std::string& longFileName)
@@ -170,7 +146,7 @@ const bool FilenameShortener::shortToLongFileName(const std::string& shortFileNa
 
     // find out if we do have a long file name for this short filename
     std::map<std::string, std::string>::iterator it;
-    it = mapReverseFilename.find(shortFileName.c_str());        // try to find the string in the map
+    it = mapReverseFilename.find(shortFileName);                // try to find the string in the map
 
     if(it != mapReverseFilename.end()) {                        // if we have this fileName, return it
         longFileName = it->second;
@@ -194,50 +170,6 @@ const bool FilenameShortener::shortToLongFileName(const std::string& shortFileNa
     }
 
     return false;
-}
-
-int FilenameShortener::strrCharPos(const char *str, int maxLen, char ch)
-{
-    int i;
-
-    for(i = MIN((int)strlen(str), maxLen) - 1; i >= 0; i--) {       // find that char!
-        if(str[i] == ch) {          // that character found?
-            return i;
-        }
-    }
-
-    return -1;                      // not found
-}
-
-void FilenameShortener::splitFilenameFromExtension(const char *filenameWithExt, char *fileName, char *ext)
-{
-    int filenameLength = strlen(filenameWithExt);
-
-    if(filenameLength >= MAX_FILENAME_LEN) {                    // if the name is too long, use appropriate length
-        filenameLength = MAX_FILENAME_LEN - 1;
-    }
-
-    // initialize strings
-    memset(fileName, 0, 9);
-    memset(ext, 0, 4);
-
-    // divide longFileName to filename and extension
-    int dotPos = strrCharPos(filenameWithExt, filenameLength, '.'); // find name and extension separator
-
-    if(dotPos == -1) {                                          // not found?
-        strncpy(fileName, filenameWithExt, filenameLength + 1); // copy whole name to filename
-        ext[0] = 0;                                             // store no extension
-    } else {                                                    // separator found?
-        strncpy(fileName, filenameWithExt, dotPos);             // copy in the fileName
-
-        int extLen = strlen(filenameWithExt + dotPos + 1);      // find out the length of extension
-
-        if(extLen >= MAX_FILEEXT_LEN) {                         // if the extension would be too long, shorten the length
-            extLen = MAX_FILEEXT_LEN - 1;
-        }
-
-        strncpy(ext, filenameWithExt + dotPos + 1, extLen + 1);    // copy in the extension
-    }
 }
 
 const bool FilenameShortener::shortenName(const char *nLong, char *nShort)
@@ -274,22 +206,22 @@ const bool FilenameShortener::shortenName(const char *nLong, char *nShort)
 
 const bool FilenameShortener::shortenExtension(const char *shortFileName, const char *nLongExt, char *nShortExt)
 {
-     int ind = 1;
+    int ind = 1;
 
-     // first try to simply cut off the rest
-     char newName1[13];
-     mergeFilenameAndExtension(shortFileName, nLongExt, false, newName1);
+    // first try to simply cut off the rest
+    std::string newName1;
+    mergeFilenameAndExtension(shortFileName, nLongExt, false, newName1);
 
-     // if we don't have that SHORT filename in the list, this cut extension will work just fine
-     std::map<std::string, std::string>::iterator it;
-     it = mapReverseFilename.find(newName1);                // try to find the string in the map
+    // if we don't have that SHORT filename in the list, this cut extension will work just fine
+    std::map<std::string, std::string>::iterator it;
+    it = mapReverseFilename.find(newName1.c_str());        // try to find the string in the map
 
-     if(it == mapReverseFilename.end()) {                   // if we don't have this fileName already, use it!
-         strncpy(nShortExt, nLongExt, 3);                   // store the extension string
-         nShortExt[3] = 0;
+    if(it == mapReverseFilename.end()) {                   // if we don't have this fileName already, use it!
+        strncpy(nShortExt, nLongExt, 3);                   // store the extension string
+        nShortExt[3] = 0;
 
-         return true;
-     }
+        return true;
+    }
 
     // if we just can't cut the extension, try to shorten it with number
     char newExt[4];
@@ -335,10 +267,10 @@ const bool FilenameShortener::shortenNameUsingExt(const char *fileName, char *sh
     return shortenExtension(shortName, longExt, shortExt);
 }
 
-void FilenameShortener::replaceNonLetters(char *str)
+void FilenameShortener::replaceNonLetters(std::string &str)
 {
     int i, len, j;
-    len = strlen(str);
+    len = str.size();
 
     const char *allowed = "!#$%&'()~^@-_{}";
 
@@ -371,19 +303,6 @@ void FilenameShortener::replaceNonLetters(char *str)
         str[i] = '_';                           // not allowed char, fix it
      }
  }
-
-void FilenameShortener::extendToLenghtWithSpaces(char *str, int len)
-{
-    int i;
-
-    for(i=0; i<len; i++) {          // replace all zeros with space
-        if(str[i] == 0) {
-            str[i] = ' ';
-        }
-    }
-
-    str[len] = 0;                   // terminate with zero
-}
 
 // find oldFileName in long file names and replace it with newFileName
 void FilenameShortener::updateLongFileName(std::string oldFileName, std::string newFileName)

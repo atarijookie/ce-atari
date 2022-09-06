@@ -148,27 +148,24 @@ void Utils::mergeHostPaths(std::string &dest, const std::string &tail)
 
 void Utils::splitFilenameFromPath(const std::string &pathAndFile, std::string &path, std::string &file)
 {
-    size_t sepPos = pathAndFile.rfind(HOSTPATH_SEPAR_STRING);
-
-    if(sepPos == std::string::npos) {                   // not found?
-        path.clear();
-        file = pathAndFile;                                     // pretend we don't have path, just filename
-    } else {                                                    // separator found?
-        path    = pathAndFile.substr(0, sepPos + 1);            // path is before separator
-        file    = pathAndFile.substr(sepPos + 1);               // file is after separator
-    }
+    splitToTwoByDelim(pathAndFile, path, file, HOSTPATH_SEPAR_CHAR);
 }
 
 void Utils::splitFilenameFromExt(const std::string &filenameAndExt, std::string &filename, std::string &ext)
 {
-    size_t sepPos = filenameAndExt.rfind('.');
+    splitToTwoByDelim(filenameAndExt, filename, ext, '.');
+}
 
-    if(sepPos == std::string::npos) {                           // not found?
-        filename = filenameAndExt;                              // pretend we don't have extension, just filename
-        ext.clear();
-    } else {                                                    // separator found?
-        filename = filenameAndExt.substr(0, sepPos);            // filename is before separator
-        ext      = filenameAndExt.substr(sepPos + 1);           // extension is after separator
+void Utils::splitToTwoByDelim(const std::string &input, std::string &beforeDelim, std::string &afterDelim, char delim)
+{
+    size_t sepPos = input.rfind(delim);
+
+    if(sepPos == std::string::npos) {                           // delimiter not found? everything belongs to beforeDelim
+        beforeDelim = input;
+        afterDelim.clear();
+    } else {                                                    // delimiter found? split it to two parts
+        beforeDelim = input.substr(0, sepPos);
+        afterDelim = input.substr(sepPos + 1);
     }
 }
 
@@ -224,34 +221,9 @@ const char *Utils::getExtension(const char *fileName)
     return pExt;
 }
 
-void Utils::createPathWithOtherExtension(std::string &inPathWithOriginalExt, const char *otherExtension, std::string &outPathWithOtherExtension)
-{
-    outPathWithOtherExtension = inPathWithOriginalExt;  // first just copy the input path
-
-    const char *originalExt = Utils::getExtension(inPathWithOriginalExt.c_str());
-
-    if(originalExt == NULL) {                           // failed to find extension? fail
-        return;
-    }
-    int originalExtLen = strlen(originalExt);           // get length of original extension
-
-    if(outPathWithOtherExtension.size() < ((size_t) originalExtLen)) { // path shorter than extension? (how could this happen???) fail
-        return;
-    }
-
-    outPathWithOtherExtension.resize(outPathWithOtherExtension.size() - originalExtLen);    // remove original extension
-    outPathWithOtherExtension = outPathWithOtherExtension + std::string(otherExtension);    // append other extension
-}
-
 bool Utils::fileExists(std::string &hostPath)
 {
     int res = access(hostPath.c_str(), F_OK);
-    return (res != -1);     // if not error, file exists
-}
-
-bool Utils::fileExists(const char *hostPath)
-{
-    int res = access(hostPath, F_OK);
     return (res != -1);     // if not error, file exists
 }
 

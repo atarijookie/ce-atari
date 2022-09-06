@@ -22,5 +22,8 @@ int main(int argc, char**argv)
     printf("output: %s\n", lp.c_str());
 
     ldp_cleanup();
+
+    ldp_runCppTests();
+
     return 0;
 }

@@ -17,6 +17,8 @@ problems:
 
 class FilenameShortener
 {
+    friend class TestClass;
+
 public:
     FilenameShortener(const std::string &path);
 
@@ -27,11 +29,9 @@ public:
 
     void updateLongFileName(std::string oldFileName, std::string newFileName);    // find oldFileName in long file names and replace it with newFileName
 
-    static void mergeFilenameAndExtension(const char *shortFn, const char *shortExt, bool extendWithSpaces, char *merged);
+    static void mergeFilenameAndExtension(const std::string& shortFn, const std::string& shortExt, bool extendWithSpaces, std::string& merged);
 
-    static void removeSpaceExtension(const char *extendedFn, char *extRemovedFn); // 'FILE    .C  ' -> 'FILE.C'
     static void extendWithSpaces(const char *normalFname, char *extendedFn);      // 'FILE.C'       -> 'FILE    .C  '
-    static void splitFilenameFromExtension(const char *filenameWithExt, char *fileName, char *ext);
 
 private:
     std::string forWhichPath;
@@ -46,10 +46,7 @@ private:
     const bool shortenExtension(const char *shortFileName, const char *nLongExt, char *nShortExt);
     const bool shortenNameUsingExt(const char *fileName, char *shortName, char *shortExt);
 
-    static int  strrCharPos(const char *str, int maxLen, char ch);
-    static void replaceNonLetters(char *str);
-    static void extendToLenghtWithSpaces(char *str, int len);
-    static void removeTrailingSpaces(char *str);
+    static void replaceNonLetters(std::string &str);
 };
 
 #endif // FILENAMESHORTENER_H

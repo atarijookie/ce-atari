@@ -9,6 +9,7 @@
 #include "utils.h"
 
 #include "libexports.h"
+#include "libcpptests.h"
 
 DirTranslator* dt = NULL;
 
@@ -38,4 +39,13 @@ extern "C" void ldp_cleanup(void)
         delete dt;
         dt = NULL;
     }
+}
+
+extern "C" void ldp_runCppTests(void)
+{
+    TestClass *tc = new TestClass();
+
+    tc->runTests();
+
+    delete tc;
 }

@@ -8,6 +8,7 @@
 extern "C" {
     void ldp_shortToLongPath(const std::string &shortPath, std::string &longPath);
     void ldp_cleanup(void);
+    void ldp_runCppTests(void);
 }
 
 #endif

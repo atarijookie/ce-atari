@@ -18,6 +18,8 @@ extern "C" volatile sig_atomic_t sigintReceived;
 #endif
 
 class Utils {
+    friend class TestClass;
+
 public:
     static uint32_t getCurrentMs(void);
 
@@ -31,14 +33,13 @@ public:
     static void mergeHostPaths(std::string &dest, const std::string &tail);
     static void splitFilenameFromPath(const std::string &pathAndFile, std::string &path, std::string &file);
     static void splitFilenameFromExt(const std::string &filenameAndExt, std::string &filename, std::string &ext);
+    static void splitToTwoByDelim(const std::string &input, std::string &beforeDelim, std::string &afterDelim, char delim);
 
     static void splitString(const std::string &s, char delim, std::vector<std::string> &elems);
     static void joinStrings(std::vector<std::string> &elems, std::string& output, int count=-1);
 
     static const char *getExtension(const char *fileName);
-    static void createPathWithOtherExtension(std::string &inPathWithOriginalExt, const char *otherExtension, std::string &outPathWithOtherExtension);
     static bool fileExists(std::string &hostPath);
-    static bool fileExists(const char *hostPath);
 
     static void out(int logLevel, const char *format, ...);
 };

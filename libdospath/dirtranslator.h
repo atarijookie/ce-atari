@@ -27,6 +27,8 @@ public:
 
 class DirTranslator
 {
+    friend class TestClass;
+
 public:
     DirTranslator();
     ~DirTranslator();
