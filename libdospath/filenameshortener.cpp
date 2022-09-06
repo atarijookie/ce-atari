@@ -11,6 +11,11 @@ FilenameShortener::FilenameShortener(const std::string &path)
     this->forWhichPath = path;
 }
 
+FilenameShortener::~FilenameShortener()
+{
+    clear();
+}
+
 void FilenameShortener::clear(void)
 {
     mapFilenameWithExt.clear();
@@ -52,14 +57,13 @@ bool FilenameShortener::longToShortFileName(const std::string& longFileName, std
     shortenExtension(fileExt, shortExt);
 
     // create final short name
-    std::string shortFn;
-    mergeFilenameAndExtension(shortName, shortExt, false, shortFn);
+    mergeFilenameAndExtension(shortName, shortExt, false, shortFileName);
 
     // store the long to short filename as key - value
-    mapFilenameWithExt.insert( std::pair<std::string, std::string>(longFileName, shortFn) );  // store this key-value pair
-    mapReverseFilename.insert( std::pair<std::string, std::string>(shortFn, longFileName) );  // for reverse transformation
+    mapFilenameWithExt.insert( std::pair<std::string, std::string>(longFileName, shortFileName) );  // store this key-value pair
+    mapReverseFilename.insert( std::pair<std::string, std::string>(shortFileName, longFileName) );  // for reverse transformation
 
-    Utils::out(LOG_DEBUG, "FilenameShortener mapped %s <=> %s", shortFn.c_str(), longFileName.c_str());
+    Utils::out(LOG_DEBUG, "FilenameShortener mapped %s <=> %s", shortFileName.c_str(), longFileName.c_str());
     return true;
 }
 

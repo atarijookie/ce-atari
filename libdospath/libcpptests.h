@@ -10,6 +10,9 @@ class TestClass
 public:
     void runTests(void);
     
+    void splitPathAndFilename(void);
+    void testMerge(void);
+    void longToShortAndBack(void);
 };
 
 #endif

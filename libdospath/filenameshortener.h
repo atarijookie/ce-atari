@@ -21,6 +21,7 @@ class FilenameShortener
 
 public:
     FilenameShortener(const std::string &path);
+    ~FilenameShortener();
 
     void clear(void);                                                       // clear maps - e.g. on ST restart
 
