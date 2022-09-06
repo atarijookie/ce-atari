@@ -24,14 +24,14 @@ public:
 
     void clear(void);                                                       // clear maps - e.g. on ST restart
 
-    bool longToShortFileName(const char *longFileName, char *shortFileName);      // translates 'long file name' to 'long_f~1'
+    bool longToShortFileName(const std::string& longFileName, std::string& shortFileName);      // translates 'long file name' to 'long_f~1'
     const bool shortToLongFileName(const std::string& shortFileName, std::string& longFileName);      // translates 'long_f~1' to 'long file name'
 
     void updateLongFileName(std::string oldFileName, std::string newFileName);    // find oldFileName in long file names and replace it with newFileName
 
     static void mergeFilenameAndExtension(const std::string& shortFn, const std::string& shortExt, bool extendWithSpaces, std::string& merged);
 
-    static void extendWithSpaces(const char *normalFname, char *extendedFn);      // 'FILE.C'       -> 'FILE    .C  '
+    static void extendWithSpaces(const std::string& normalFname, std::string& extendedFn);      // 'FILE.C'       -> 'FILE    .C  '
 
 private:
     std::string forWhichPath;
@@ -40,13 +40,11 @@ private:
     std::map<std::string, std::string>  mapReverseFilename;                 // for file name conversion from short to long
 
     std::map<std::string, std::string> mapFilenameNoExt;                    // used by shortenName() to create unique file name with ~
-    bool allowExtUse;          // Allow use of Extension for shortening (if file without extension)
 
-    const bool shortenName(const char *nLong, char *nShort);
-    const bool shortenExtension(const char *shortFileName, const char *nLongExt, char *nShortExt);
-    const bool shortenNameUsingExt(const char *fileName, char *shortName, char *shortExt);
+    const bool shortenName(const std::string& nLong, std::string& nShort);
+    const void shortenExtension(const std::string& nLongExt, std::string& nShortExt);
 
-    static void replaceNonLetters(std::string &str);
+    static void replaceNonLettersAndToUpperCase(std::string &str);
 };
 
 #endif // FILENAMESHORTENER_H

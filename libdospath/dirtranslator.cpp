@@ -88,17 +88,7 @@ void DirTranslator::shortToLongPath(const std::string &shortPath, std::string &l
 bool DirTranslator::longToShortFilename(const std::string &longHostPath, const std::string &longFname, std::string &shortFname)
 {
     FilenameShortener *fs = getShortenerForPath(longHostPath);
-
-    char shortName[32];                             // try to shorten the name
-    bool res = fs->longToShortFileName(longFname.c_str(), shortName);   // try to convert the name from long to short
-
-    if(res) {                                       // name shortened - store it
-        shortFname = shortName;
-    } else {                                        // failed to shorten - clear it
-        shortFname.clear();
-    }
-
-    return res;
+    return fs->longToShortFileName(longFname, shortFname);          // try to convert the name from long to short
 }
 
 FilenameShortener *DirTranslator::getShortenerForPath(std::string path, bool createIfNotFound)
@@ -138,8 +128,6 @@ FilenameShortener *DirTranslator::createShortener(const std::string &path)
         return fs;
     }
 
-    char shortName[14];
-
     while(1) {                                                      // while there are more files, store them
         struct dirent *de = readdir(dir);                           // read the next directory entry
 
@@ -155,7 +143,8 @@ FilenameShortener *DirTranslator::createShortener(const std::string &path)
         if(strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
             continue;
 
-        fs->longToShortFileName(de->d_name, shortName);
+        std::string shortName;
+        fs->longToShortFileName(std::string(de->d_name), shortName);
     }
 
     closedir(dir);
