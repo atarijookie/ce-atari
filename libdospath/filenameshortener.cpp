@@ -8,12 +8,19 @@
 
 FilenameShortener::FilenameShortener(const std::string &path)
 {
-    this->forWhichPath = path;
+    forWhichPath = path;
+    lastAccessTime = Utils::getCurrentMs();
 }
 
 FilenameShortener::~FilenameShortener()
 {
     clear();
+}
+
+void FilenameShortener::touch(void)
+{
+    // touch this shortener and mark it as used just now
+    lastAccessTime = Utils::getCurrentMs();
 }
 
 void FilenameShortener::clear(void)
@@ -23,7 +30,7 @@ void FilenameShortener::clear(void)
     mapFilenameNoExt.clear();
 }
 
-bool FilenameShortener::longToShortFileName(const std::string& longFileName, std::string& shortFileName)
+bool FilenameShortener::longToShortFileName(const std::string& longFileName, std::string& shortFileName, bool* createdNotFound)
 {
     // find out if we do have this long file name already
     std::map<std::string, std::string>::iterator it;
@@ -32,8 +39,15 @@ bool FilenameShortener::longToShortFileName(const std::string& longFileName, std
     if(it != mapFilenameWithExt.end()) {                        // if we have this fileName already, use it!
         shortFileName = it->second;
         Utils::out(LOG_DEBUG, "FilenameShortener found mapping %s <=> %s", shortFileName.c_str(), longFileName.c_str());
+
+        if(createdNotFound) 
+            *createdNotFound = false;       // false == translation was found
+
         return true;
     }
+
+    if(createdNotFound) 
+        *createdNotFound = true;            // true == translation was created
 
     // divide longFileName to filename and extension
     std::string fileName, fileExt;

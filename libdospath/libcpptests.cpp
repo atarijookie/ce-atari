@@ -16,6 +16,7 @@ void TestClass::runTests(void)
     splitPathAndFilename();
     testMerge();
     longToShortAndBack();
+    testFeedingShortener();
 }
 
 void TestClass::splitPathAndFilename(void)
@@ -57,16 +58,18 @@ void TestClass::testMerge(void)
 
 void TestClass::longToShortAndBack(void)
 {
-    bool res;
+    bool res, created;
     std::string shortFn;
 
     printf("TEST: mergeFilenameAndExtension\n");
     FilenameShortener *fs = new FilenameShortener(std::string("/tmp"));
-    fs->longToShortFileName(std::string("LongFile Name A.extension"), shortFn);     // shorten unknown filename
+    fs->longToShortFileName(std::string("LongFile Name A.extension"), shortFn, &created);     // shorten unknown filename
     assert(shortFn == "LONGFI~1.EXT");
+    assert(created);        // short version was created
 
-    fs->longToShortFileName(std::string("LongFile Name A.extension"), shortFn);     // shorten same filename to same short filename
+    fs->longToShortFileName(std::string("LongFile Name A.extension"), shortFn, &created);     // shorten same filename to same short filename
     assert(shortFn == "LONGFI~1.EXT");
+    assert(!created);       // short version was found
 
     std::string longFileName;
     res = fs->shortToLongFileName(std::string("LONGFI~1.EXT"), longFileName);       // reverse translation on existing - success
@@ -76,11 +79,38 @@ void TestClass::longToShortAndBack(void)
     res = fs->shortToLongFileName(std::string("LONGFI~2.EXT"), longFileName);       // reverse translation on non-existing - fail
     assert(!res);        // not found!
 
-    fs->longToShortFileName(std::string("LongFile Name B.extension"), shortFn);     // shorten other filename, get increment in short name
+    fs->longToShortFileName(std::string("LongFile Name B.extension"), shortFn, &created);     // shorten other filename, get increment in short name
     assert(shortFn == "LONGFI~2.EXT");
+    assert(created);        // short version was created
 
     res = fs->shortToLongFileName(std::string("LONGFI~2.EXT"), longFileName);       // reverse translation now on 2nd existing - success
     assert(res);        // should be found
     assert(longFileName == "LongFile Name B.extension");
+}
+
+void TestClass::testFeedingShortener(void)
+{
+    printf("TEST: testFeedingShortener\n");
+    FilenameShortener *fs = new FilenameShortener(std::string("/tmp/f"));
+
+    int foundCount;
+
+    system("rm -rf /tmp/f");            // remove this test dir with all contents
+    system("mkdir -p /tmp/f/a /tmp/f/b /tmp/f/c");          // create 3 dirs
+    system("touch /tmp/f/m /tmp/f/n /tmp/f/o /tmp/f/p");    // create 4 files
+
+    DirTranslator* dt = new DirTranslator();
+    foundCount = dt->feedShortener(std::string("/tmp/f"), fs);
+    assert(foundCount == 7);            // find all the dirs and files
+
+    foundCount = dt->feedShortener(std::string("/tmp/f"), fs);
+    assert(foundCount == 0);            // feeding same dir will result in 0 new found items
+
+    system("mkdir -p /tmp/f/d");        // 1 new dirs
+    system("touch /tmp/f/q");           // 1 new file
+    foundCount = dt->feedShortener(std::string("/tmp/f"), fs);
+    assert(foundCount == 2);            // 2 new items should be found now!
+
+    delete dt;
 }
 

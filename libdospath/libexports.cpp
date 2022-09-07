@@ -12,6 +12,20 @@
 #include "libcpptests.h"
 
 DirTranslator* dt = NULL;
+extern bool logsEnabled;
+
+/*
+    Call this function to set other than default value to some lib param
+
+    paramNo     meaning                     paramVal
+    0           log to console on/off       0/1
+*/
+extern "C" void ldp_setParam(int paramNo, int paramVal)
+{
+    switch(paramNo) {
+        case 0:     logsEnabled = paramVal;     break;
+    }
+}
 
 /*
     functions which use short file names (e.g. fopen()) will call this function

@@ -56,6 +56,8 @@ private:
 
     FilenameShortener *getShortenerForPath(std::string path, bool createIfNotFound=true);
     FilenameShortener *createShortener(const std::string &path);
+    int feedShortener(const std::string &path, FilenameShortener *fs);
+
     static void splitFilenameFromPath(std::string &pathAndFile, std::string &path, std::string &file);
 
     void appendFoundToFindStorage(std::string &hostPath, const char *searchString, TFindStorage *fs, struct dirent *de, uint8_t findAttribs);

@@ -13,6 +13,7 @@ public:
     void splitPathAndFilename(void);
     void testMerge(void);
     void longToShortAndBack(void);
+    void testFeedingShortener(void);
 };
 
 #endif

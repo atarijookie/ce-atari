@@ -114,24 +114,42 @@ FilenameShortener *DirTranslator::getShortenerForPath(std::string path, bool cre
             fs = NULL;
         }
     }
+
+    if(fs) {        // if valid shortener was found or created, touch it
+        fs->touch();
+    }
+
     return fs;
 }
 
 FilenameShortener *DirTranslator::createShortener(const std::string &path)
 {
+    // create shortener for specified path and feed it with dir content
     FilenameShortener *fs = new FilenameShortener(path);
     mapPathToShortener.insert( std::pair<std::string, FilenameShortener *>(path, fs) );
+    
+    feedShortener(path, fs);    // feed the shortener to initialize it with dir content
 
-    DIR *dir = opendir(path.c_str());                       // try to open the dir
+    return fs;
+}
 
-    if(dir == NULL) {                                               // not found?
-        return fs;
+int DirTranslator::feedShortener(const std::string &path, FilenameShortener *fs)
+{
+    // Feed the shortener with content of the specified dir. 
+    // It's used when creating shornerer (initial feeding) and when refreshing shortener with new dir content
+
+    int createdCount = 0;       // count of items that were created. can be used to see if new items have been added to shortener
+
+    DIR *dir = opendir(path.c_str());               // try to open the dir
+
+    if(dir == NULL) {                               // not found?
+        return createdCount;
     }
 
-    while(1) {                                                      // while there are more files, store them
-        struct dirent *de = readdir(dir);                           // read the next directory entry
+    while(1) {                                      // while there are more files, store them
+        struct dirent *de = readdir(dir);           // read the next directory entry
 
-        if(de == NULL) {                                            // no more entries?
+        if(de == NULL) {                            // no more entries?
             break;
         }
 
@@ -143,12 +161,17 @@ FilenameShortener *DirTranslator::createShortener(const std::string &path)
         if(strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
             continue;
 
+        bool ok, created;
         std::string shortName;
-        fs->longToShortFileName(std::string(de->d_name), shortName);
+        ok = fs->longToShortFileName(std::string(de->d_name), shortName, &created);
+
+        if(ok && created) {     // if was able to come up with short name and it was created (not just found in dict), increment counter
+            createdCount++;
+        }
     }
 
     closedir(dir);
-    return fs;
+    return createdCount;
 }
 
 bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hostSearchPathAndWildcards, uint8_t findAttribs, bool isRootDir)

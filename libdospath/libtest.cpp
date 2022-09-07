@@ -9,6 +9,8 @@
 
 int main(int argc, char**argv)
 {
+    ldp_setParam(0, 1);     // enable logging
+
     mkdir("/tmp/test", S_IRUSR | S_IRGRP | S_IROTH);
     std::string sp = "/tmp/test";
     std::string lp;

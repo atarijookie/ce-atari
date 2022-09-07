@@ -21,6 +21,8 @@
 
 #include "defs.h"
 
+bool logsEnabled = false;
+
 uint32_t Utils::getCurrentMs(void)
 {
     struct timespec tp;
@@ -229,6 +231,10 @@ bool Utils::fileExists(std::string &hostPath)
 
 void Utils::out(int logLevel, const char *format, ...)
 {
+    if(!logsEnabled) {
+        return;
+    }
+
     va_list args;
     va_start(args, format);
 
