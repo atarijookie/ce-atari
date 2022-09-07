@@ -34,14 +34,20 @@ extern "C" void ldp_setParam(int paramNo, int paramVal)
 
     :param shortPath: incomming short path
     :param longPath: outgoing long path
+
+    :param refreshOnMiss: If true, then dict-miss (cache-miss) of short filename will trigger refresh of that dir translator.
+                          (use true if filename should exist - e.g. on open(), delete())
+
+                          If false, then dict-miss (cache-miss) of short filename will not try to do refresh of dir translator.
+                          (use false if filename probably doesn't exist - e.g. on fcreate(), mkdir())
 */
-extern "C" void ldp_shortToLongPath(const std::string &shortPath, std::string &longPath)
+extern "C" void ldp_shortToLongPath(const std::string &shortPath, std::string &longPath, bool refreshOnMiss)
 {
     if(!dt) {
         dt = new DirTranslator();
     }
 
-    dt->shortToLongPath(shortPath, longPath);
+    dt->shortToLongPath(shortPath, longPath, refreshOnMiss);
 }
 
 /*
@@ -55,6 +61,9 @@ extern "C" void ldp_cleanup(void)
     }
 }
 
+/*
+    this just runs the tests, not needed for normal usage
+*/
 extern "C" void ldp_runCppTests(void)
 {
     TestClass *tc = new TestClass();

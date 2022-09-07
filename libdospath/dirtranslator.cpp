@@ -54,7 +54,7 @@ void DirTranslator::updateFileName(std::string hostPath, std::string oldFileName
     }
 }
 
-void DirTranslator::shortToLongPath(const std::string &shortPath, std::string &longPath)
+void DirTranslator::shortToLongPath(const std::string& shortPath, std::string& longPath, bool refreshOnMiss)
 {
     std::string inPath = shortPath;
     Utils::toHostSeparators(inPath);                    // from dos/atari separators to host separators only
@@ -73,11 +73,21 @@ void DirTranslator::shortToLongPath(const std::string &shortPath, std::string &l
         FilenameShortener *fs = getShortenerForPath(subPath);       // find or create shortener for this path
 
         std::string longName;
+        bool ok;
 
-        if(fs->shortToLongFileName(shortPathParts[i], longName)) {  // try to convert the name
-            longPathParts.push_back(std::string(longName));         // if there was a long version of the file name, replace the short one
-        } else {
-            longPathParts.push_back(shortPathParts[i]);             // failed to find long path, use the original in this place
+        ok = fs->shortToLongFileName(shortPathParts[i], longName);  // try to convert short-to-long filename
+
+        if(!ok && refreshOnMiss) {          // if conversion from short-to-long failed, and we should do a refresh on dict-miss (cache-miss)
+            Utils::out(LOG_DEBUG, "DirTranslator::shortToLongPath - shortToLongFileName() failed for short name: %s , subPath=%s, but will do a refresh now!", shortPathParts[i].c_str(), subPath.c_str());
+
+            feedShortener(subPath, fs);     // feed shortener with possibly new filenames
+            ok = fs->shortToLongFileName(shortPathParts[i], longName);      // 2nd attempt to convert short-to-long filename (after refresh)
+        }
+
+        if(ok) {        // filename translation from short-to-long was successful - replace the short part with long part
+            longPathParts.push_back(std::string(longName));
+        } else {        // failed to find long path, use the original in this place
+            longPathParts.push_back(shortPathParts[i]);
             Utils::out(LOG_DEBUG, "DirTranslator::shortToLongPath - shortToLongFileName() failed for short name: %s , subPath=%s", shortPathParts[i].c_str(), subPath.c_str());
         }
     }

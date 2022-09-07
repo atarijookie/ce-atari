@@ -40,7 +40,7 @@ public:
     bool longToShortFilename(const std::string &longHostPath, const std::string &longFname, std::string &shortFname);
 
     // convert whole path from short to long
-    void shortToLongPath(const std::string &shortPath, std::string &longPath);    // convert 'long_p~1\\sub_fo~1\\anothe~1' to 'long path/sub folder/another one'
+    void shortToLongPath(const std::string& shortPath, std::string& longPath, bool refreshOnMiss);    // convert 'long_p~1\\sub_fo~1\\anothe~1' to 'long path/sub folder/another one'
 
     // call this for find first / find next for Gemdos
     bool buildGemdosFindstorageData(TFindStorage *fs, std::string hostSearchPathAndWildcards, uint8_t findAttribs, bool isRootDir);

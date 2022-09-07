@@ -135,6 +135,7 @@ const bool FilenameShortener::shortToLongFileName(const std::string& shortFileNa
     // for path: '/mnt/shared/ATARI/IMAGES' it's okay to use the part 'mnt' and 'shared' as long and short as they really exist there in that form, the rest needs translation
     if(Utils::fileExists(fullPath)) {
         // insert this filename to maps, so next time we won't have to investigate if the path really exists
+        // NOTE: having the shortFileName as KEY and also as VALUE is OK in this case!
         mapFilenameWithExt.insert( std::pair<std::string, std::string>(shortFileName, shortFileName) );  // store this key-value pair
         mapReverseFilename.insert( std::pair<std::string, std::string>(shortFileName, shortFileName) );  // for reverse transformation
 
