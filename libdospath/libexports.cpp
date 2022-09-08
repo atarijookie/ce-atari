@@ -13,17 +13,20 @@
 
 DirTranslator* dt = NULL;
 extern bool logsEnabled;
+extern int MAX_NAMES_IN_TRANSLATOR;
 
 /*
     Call this function to set other than default value to some lib param
 
-    paramNo     meaning                     paramVal
-    0           log to console on/off       0/1
+    paramNo     meaning                         paramVal
+    0           log to console on/off           0/1
+    1           maximum names stored in ram     0-max_int_value
 */
 extern "C" void ldp_setParam(int paramNo, int paramVal)
 {
     switch(paramNo) {
         case 0:     logsEnabled = paramVal;     break;
+        case 1:     MAX_NAMES_IN_TRANSLATOR = paramVal; break;
     }
 }
 

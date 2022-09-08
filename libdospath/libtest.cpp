@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <assert.h>
+#include <unistd.h>
 
 #include "libexports.h"
 
@@ -17,7 +18,6 @@ int main(int argc, char**argv)
     system("touch '/tmp/test/Long FileName 1.extension'");  // long filename
 
     std::string lp;
-
     printf("\n\nshortToLongPath -- 1st run\n");
     ldp_shortToLongPath(std::string("/tmp/test"), lp, false);                // first time - will create shorteners, feed them with dir content
     assert(lp == "/tmp/test");

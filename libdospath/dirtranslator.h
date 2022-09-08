@@ -5,25 +5,16 @@
 #include <map>
 
 #include <stdint.h>
+#include "findstorage.h"
+
+/*
+Memory usage:
+-------------
+Test with 1 million records, where each record was long filename with 20 characters and short filename was 12 characters (8.3) was done. 
+Memory usage with 1 million records was 433 MB, so 1 record was about 433 B.
+*/
 
 class FilenameShortener;
-
-class TFindStorage {
-public:
-    TFindStorage();
-    ~TFindStorage();
-
-    int getSize(void);
-    void clear(void);
-    void copyDataFromOther(TFindStorage *other);
-
-    uint32_t dta;
-
-    uint8_t *buffer;
-    uint16_t count;             // count of items found
-
-    uint16_t maxCount;          // maximum count of items that this buffer can hold
-};
 
 class DirTranslator
 {
@@ -50,6 +41,7 @@ public:
 
 private:
     std::map<std::string, FilenameShortener *>  mapPathToShortener;
+    uint32_t lastCleanUpCheck;
 
     TFindStorage    fsDirs;
     TFindStorage    fsFiles;
@@ -65,6 +57,9 @@ private:
     void appendFoundToFindStorage_dirUpDirCurr(std::string &hostPath, const char *searchString, TFindStorage *fs, struct dirent *de, uint8_t findAttribs);
 
     static int compareSearchStringAndFilename(const char *searchString, const char *filename);
+
+    int size(void);
+    int cleanUpShortenersIfNeeded(void);
 };
 
 #endif // DIRTRANSLATOR_H

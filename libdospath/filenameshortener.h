@@ -25,24 +25,22 @@ public:
 
     void clear(void);           // clear maps - e.g. on ST restart
     void touch(void);           // store current timestamp to lastAccessTime
+    uint32_t getLastAccessTime(void);   // return stored lastAccessTime
+    int size(void);             // get count of items in this shortener
 
     bool longToShortFileName(const std::string& longFileName, std::string& shortFileName, bool* createdNotFound=NULL);       // translates 'long file name' to 'long_f~1'
-    const bool shortToLongFileName(const std::string& shortFileName, std::string& longFileName);      // translates 'long_f~1' to 'long file name'
-
+    bool shortToLongFileName(const std::string& shortFileName, std::string& longFileName);      // translates 'long_f~1' to 'long file name'
     void updateLongFileName(std::string oldFileName, std::string newFileName);    // find oldFileName in long file names and replace it with newFileName
-
-    static void mergeFilenameAndExtension(const std::string& shortFn, const std::string& shortExt, bool extendWithSpaces, std::string& merged);
-
-    static void extendWithSpaces(const std::string& normalFname, std::string& extendedFn);      // 'FILE.C'       -> 'FILE    .C  '
 
 private:
     uint32_t lastAccessTime;        // holds timestamp when this shortener was used for translation (to detect shorteners that haven't been used for a time)
     std::string forWhichPath;
 
-    std::map<std::string, std::string>  mapFilenameWithExt;                 // for file name conversion from long to short
-    std::map<std::string, std::string>  mapReverseFilename;                 // for file name conversion from short to long
-
+    std::map<std::string, std::string> mapFilenameWithExt;                 // for file name conversion from long to short
+    std::map<std::string, std::string> mapReverseFilename;                 // for file name conversion from short to long
     std::map<std::string, std::string> mapFilenameNoExt;                    // used by shortenName() to create unique file name with ~
+
+    static void mergeFilenameAndExtension(const std::string& shortFn, const std::string& shortExt, bool extendWithSpaces, std::string& merged);
 
     const bool shortenName(const std::string& nLong, std::string& nShort);
     const void shortenExtension(const std::string& nLongExt, std::string& nShortExt);

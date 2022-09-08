@@ -14,6 +14,7 @@ public:
     void testMerge(void);
     void longToShortAndBack(void);
     void testFeedingShortener(void);
+    void testNamesCountLimiting(void);
 };
 
 #endif

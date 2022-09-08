@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <assert.h>
+#include <unistd.h>
 
 #include "dirtranslator.h"
 #include "filenameshortener.h"
@@ -11,12 +12,16 @@
 
 #include "libcpptests.h"
 
+extern bool logsEnabled;
+extern int MAX_NAMES_IN_TRANSLATOR;
+
 void TestClass::runTests(void)
 {
     splitPathAndFilename();
     testMerge();
     longToShortAndBack();
     testFeedingShortener();
+    testNamesCountLimiting();
 }
 
 void TestClass::splitPathAndFilename(void)
@@ -114,3 +119,72 @@ void TestClass::testFeedingShortener(void)
     delete dt;
 }
 
+void TestClass::testNamesCountLimiting(void)
+{
+    printf("TEST: testNamesCountLimiting\n");
+    int foundCount, removed;
+
+    system("rm -rf   /tmp/a   /tmp/b   /tmp/c   /tmp/d   /tmp/e   /tmp/f");            // remove this test dir with all contents
+    system("mkdir -p /tmp/a   /tmp/b   /tmp/c   /tmp/d   /tmp/e   /tmp/f");
+    system("touch    /tmp/a/a /tmp/b/b /tmp/c/c /tmp/d/d /tmp/e/e /tmp/f/f");
+
+    DirTranslator* dt = new DirTranslator();
+
+    // start with trying to get short names for 3 different dirs - this will internally create shorteners for thise dirs
+    std::string shortFname;
+    dt->longToShortFilename(std::string("/tmp/a"), std::string("a"), shortFname);
+    dt->longToShortFilename(std::string("/tmp/b"), std::string("b"), shortFname);
+    dt->longToShortFilename(std::string("/tmp/c"), std::string("c"), shortFname);
+    assert(dt->size() == 3);        // we got few shorteners with 3 files in it, so the total count is 3
+
+    int i;
+    FilenameShortener *fs1 = dt->getShortenerForPath("/tmp/a");
+    FilenameShortener *fs2 = dt->getShortenerForPath("/tmp/b");
+    FilenameShortener *fs3 = dt->getShortenerForPath("/tmp/c");
+
+    // add 30 items to each shortener, so 90 items, with the 3 items before we should end up with 93 items total
+    for(i=0; i<30; i++) {
+        char fn[32];
+        sprintf(fn, "%d.ext", i);       // generate fake file name
+        std::string shortFileName;
+
+        fs1->longToShortFileName(std::string(fn), shortFileName);
+        fs2->longToShortFileName(std::string(fn), shortFileName);
+        fs3->longToShortFileName(std::string(fn), shortFileName);
+    }
+    assert(dt->size() == 93);           // 3 previous + 90 new items = 93 items
+
+    // test if trying to clean too soon will not modify anything
+    MAX_NAMES_IN_TRANSLATOR = 65;       // this limit is lower than what we actually have, but not enough time has passed, so nothing should be removed
+    removed = dt->cleanUpShortenersIfNeeded();
+    assert(dt->size() == 93);           // same as previous
+    assert(removed == 0);               // no removed items
+
+    // set the new maximum of allowed items, check if cleanup will remove one oldest translator
+    MAX_NAMES_IN_TRANSLATOR = 65;
+    dt->lastCleanUpCheck = 0;       // make this some low value so we can pass the 'cleanup just recently' check
+    fs1->lastAccessTime = 2;        // set last access time of shorteners to some values which can be sorted
+    fs2->lastAccessTime = 3;
+    fs3->lastAccessTime = 1;
+
+    FilenameShortener *fs4 = dt->getShortenerForPath("/tmp/d");     // now this will try to create new shortener and also do the clean up
+    fs3 = NULL;                     // don't use this pointer, this shortener was just removed!
+
+    // now that the clean up happened, the shortener with lowest access time should be removed, the count should change from 93 - 31 + 1 = 63
+    assert(dt->size() == 63);           // 93 - 31 + 1 = 63
+
+    dt->lastCleanUpCheck = 0;           // make this some low value so we can pass the 'cleanup just recently' check
+    removed = dt->cleanUpShortenersIfNeeded();  // no items should be removed here, because we are below the MAX_NAMES_IN_TRANSLATOR limit
+    assert(dt->size() == 63);           // same as previous
+    assert(removed == 0);               // no removed items
+
+    MAX_NAMES_IN_TRANSLATOR = 10;
+    dt->lastCleanUpCheck = 0;           // make this some low value so we can pass the 'cleanup just recently' check
+    removed = dt->cleanUpShortenersIfNeeded();  // only the last shortener will be kept, 2 will be removed
+    assert(dt->size() == 1);            // last shortener has only 1 item
+    assert(removed == 2);               // 2 shorteners were removed
+
+    MAX_NAMES_IN_TRANSLATOR = 100000;   // back to initial large value
+
+    delete dt;
+}

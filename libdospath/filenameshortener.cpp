@@ -23,6 +23,11 @@ void FilenameShortener::touch(void)
     lastAccessTime = Utils::getCurrentMs();
 }
 
+uint32_t FilenameShortener::getLastAccessTime(void)
+{
+    return lastAccessTime;
+}
+
 void FilenameShortener::clear(void)
 {
     mapFilenameWithExt.clear();
@@ -32,6 +37,8 @@ void FilenameShortener::clear(void)
 
 bool FilenameShortener::longToShortFileName(const std::string& longFileName, std::string& shortFileName, bool* createdNotFound)
 {
+    touch();        // mark that this shortener has just been used
+
     // find out if we do have this long file name already
     std::map<std::string, std::string>::iterator it;
     it = mapFilenameWithExt.find(longFileName);                  // try to find the string in the map
@@ -105,15 +112,10 @@ void FilenameShortener::mergeFilenameAndExtension(const std::string& shortFn, co
         merged += std::string(".") + shortExt2;
 }
 
-void FilenameShortener::extendWithSpaces(const std::string& normalFname, std::string& extendedFn)
+bool FilenameShortener::shortToLongFileName(const std::string& shortFileName, std::string& longFileName)
 {
-    std::string sFilename, sFileExt;
-    Utils::splitFilenameFromExt(normalFname, sFilename, sFileExt);    // split 'FILE.C' to 'FILE' and 'C'
-    mergeFilenameAndExtension(sFilename, sFileExt, true, extendedFn);  // extend and merge
-}
+    touch();        // mark that this shortener has just been used
 
-const bool FilenameShortener::shortToLongFileName(const std::string& shortFileName, std::string& longFileName)
-{
     if(shortFileName.size() == 0) {      // empty short path? fail
         return false;
     }
@@ -229,6 +231,8 @@ void FilenameShortener::replaceNonLettersAndToUpperCase(std::string &str)
 // find oldFileName in long file names and replace it with newFileName
 void FilenameShortener::updateLongFileName(std::string oldFileName, std::string newFileName)
 {
+    touch();        // mark that this shortener has just been used
+
     // find out if we do have this long file name already
     std::map<std::string, std::string>::iterator it;
     it = mapFilenameWithExt.find(oldFileName);      // try to find the string in the map
@@ -256,4 +260,10 @@ void FilenameShortener::updateLongFileName(std::string oldFileName, std::string 
     }
 
     it->second = newFileName;                       // in the short-to-long map replace the oldFileName with newFileName
+}
+
+int FilenameShortener::size(void)
+{
+    // return how many items we got in this filename shortener
+    return mapFilenameWithExt.size();
 }

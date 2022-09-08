@@ -10,13 +10,21 @@
 #include <fcntl.h>
 #include <errno.h>
 
+#include <algorithm>    // std::sort
+#include <vector>       // std::vector
+
 #include <sys/ioctl.h>
 #include <linux/msdos_fs.h>
 
 #include "defs.h"
 #include "utils.h"
 #include "dirtranslator.h"
+#include "findstorage.h"
 #include "filenameshortener.h"
+
+// This value sets the maximum count of shortened names we will have in our shorteners, to limit ram usage.
+// With 1 name being around 433 B the limit of 100k names means about 43 MB of RAM used before cleanup happens.
+int MAX_NAMES_IN_TRANSLATOR = 100000;
 
 #define GEMDOS_FILE_MAXSIZE (2147483647)
 // TOS 1.x cannot display size with more than 8 digits
@@ -24,8 +32,9 @@
 
 DirTranslator::DirTranslator()
 {
-    fsDirs.count    = 0;
-    fsFiles.count   = 0;
+    fsDirs.count = 0;
+    fsFiles.count = 0;
+    lastCleanUpCheck = Utils::getCurrentMs();
 }
 
 DirTranslator::~DirTranslator()
@@ -134,7 +143,9 @@ FilenameShortener *DirTranslator::getShortenerForPath(std::string path, bool cre
 
 FilenameShortener *DirTranslator::createShortener(const std::string &path)
 {
-    // create shortener for specified path and feed it with dir content
+    // do clean up if going above maximum count, then create shortener for specified path and feed it with dir content
+    cleanUpShortenersIfNeeded();
+
     FilenameShortener *fs = new FilenameShortener(path);
     mapPathToShortener.insert( std::pair<std::string, FilenameShortener *>(path, fs) );
     
@@ -164,7 +175,7 @@ int DirTranslator::feedShortener(const std::string &path, FilenameShortener *fs)
         }
 
         if(de->d_type != DT_DIR && de->d_type != DT_REG) {          // not  a file, not a directory?
-            Utils::out(LOG_DEBUG, "TranslatedDisk::createShortener -- skipped %s because the type %d is not supported!", de->d_name, de->d_type);
+            Utils::out(LOG_DEBUG, "TranslatedDisk::feedShortener -- skipped %s because the type %d is not supported!", de->d_name, de->d_type);
             continue;
         }
 
@@ -489,32 +500,91 @@ int DirTranslator::compareSearchStringAndFilename(const char *searchString, cons
     return 0;
 }
 
-TFindStorage::TFindStorage()
+int DirTranslator::size(void)
 {
-    buffer = new uint8_t[getSize()];
-    clear();
+    // go through all the existing shorteners, sum up their size and return that sum
+    int cnt = 0;
+
+    std::map<std::string, FilenameShortener *>::iterator it;
+
+    for(it = mapPathToShortener.begin(); it != mapPathToShortener.end(); ++it) {        // go through the map
+        FilenameShortener *fs = it->second;                                             // get the filename shortener
+        cnt += fs->size();
+    }
+
+    return cnt;
 }
 
-TFindStorage::~TFindStorage()
+bool compareAccessTimeInPairs(std::pair<uint32_t, int> a, std::pair<uint32_t, int> b)
 {
-    delete []buffer;
+    // return if a < b (for their access time (their first value))
+    return a.first < b.first;
 }
 
-void TFindStorage::clear(void)
+int DirTranslator::cleanUpShortenersIfNeeded(void)
 {
-    maxCount    = getSize() / 23;
-    count       = 0;
-    dta         = 0;
-}
+    /*
+    This method should check if the total count of stored items is not above the MAX_NAMES_IN_TRANSLATOR value
+    and if it is, it should do a clean up - remove last few used filename shorteners, so we would be under this limit.
+    This method should be called only when new items or shortener is being added to the dir translator - no need to 
+    call it when just using the stored values (so call it only when memory usage is growing).
+    Also - it will skip doing check and clean up if last check and clean up were done just now - see the check against current time below.
+    */
 
-int TFindStorage::getSize(void)
-{
-    return (1024*1024);
-}
+    uint32_t now = Utils::getCurrentMs();
 
-void TFindStorage::copyDataFromOther(TFindStorage *other)
-{
-    dta     = other->dta;
-    count   = other->count;
-    memcpy(buffer, other->buffer, count * 23);
+    if((now - lastCleanUpCheck) < 1000) {   // too soon after last clean up? quit
+        Utils::out(LOG_DEBUG, "DirTranslator::cleanUpShortenersIfNeeded - too soon, ignoring");
+        return 0;
+    }
+
+    lastCleanUpCheck = now;     // store current time, so we won't try to clean up too soon after this
+
+    int currentSize = size();
+    if(currentSize < MAX_NAMES_IN_TRANSLATOR) {  // still not above the maximum limit? quit
+        Utils::out(LOG_DEBUG, "DirTranslator::cleanUpShortenersIfNeeded - still below the limit, ignoring");
+        return 0;
+    }
+
+    // get lastAccessTime vs shortener.size() for each shortener to vector
+    std::vector< std::pair<uint32_t, int> > accessVsSize;
+    std::map<std::string, FilenameShortener *>::iterator it;
+
+    for(it = mapPathToShortener.begin(); it != mapPathToShortener.end(); ++it) {        // go through the map
+        FilenameShortener *fs = it->second;                                             // get the filename shortener
+        std::pair<uint32_t, int> one = std::make_pair(fs->getLastAccessTime(), fs->size());
+        accessVsSize.push_back(one);
+    }
+
+    // sort items by lastAccessTime from oldest to newest
+    std::sort(accessVsSize.begin(), accessVsSize.end(), compareAccessTimeInPairs);
+
+    // go through the items from oldest, keep subtracting their size until newSize < MAX_NAMES_IN_TRANSLATOR, remember lastAccessTime as oldestAccessTime
+    int newSize = currentSize;                      // start with current size
+    uint32_t timeBoundary = 0;                      // we will try to find this time boundary
+
+    for(int i=0; i<accessVsSize.size(); i++) {     // go through the vector
+        newSize -= accessVsSize[i].second;         // subtract the size of this file shortener
+
+        if(newSize < MAX_NAMES_IN_TRANSLATOR) {     // if the new size is less allowed maximum, the last access time of this shortener will be our time boundary
+            timeBoundary = accessVsSize[i].first;   // use lastAccessTime if this file shortener
+            break;
+        }
+    }
+
+    // remove items with lastAccessTime <= oldestAccessTime
+    int removed = 0;
+    for(it = mapPathToShortener.begin(); it != mapPathToShortener.end(); /* no increment is intentional here */) {
+        bool shouldDelete = (it->second->getLastAccessTime() <= timeBoundary);
+
+        if (shouldDelete) {
+            removed++;
+            mapPathToShortener.erase(it++);
+        } else {
+            ++it;
+        }
+    }
+
+    Utils::out(LOG_DEBUG, "DirTranslator::cleanUpShortenersIfNeeded - removed %d items", removed);
+    return removed;
 }
