@@ -118,7 +118,7 @@ void testFindFirstAndNext(void)
     }
     assert(found == 2);
 
-    // TEST 4: match single file without wildcards
+    // TEST 5: match single file without wildcards
     printf("\n\nMATCH 1 FILE WITHOUT WILDCARDS\n");
     sp.internal = NULL;
     sp.path = "/tmp/t/THISIS~2.EXT";
@@ -133,7 +133,7 @@ void testFindFirstAndNext(void)
     assert(found == 1);
     printf("MATCH 1 FILE WITHOUT WILDCARDS - OK!\n");
 
-    // TEST 5: match single dir without wildcards
+    // TEST 6: match single dir without wildcards
     printf("\n\nMATCH 1 DIR WITHOUT WILDCARDS\n");
     sp.internal = NULL;
     sp.path = "/tmp/t/THISIS~1";
@@ -144,21 +144,45 @@ void testFindFirstAndNext(void)
         assert(di.name == "THISIS~1");
     }
     assert(found == 1);
+
+    // TEST 7: don't match anything with wildcards
+    printf("\n\nDON'T MATCH WITH WILDCARDS\n");
+    sp.internal = NULL;
+    sp.path = "/tmp/t/DOESNT*.*";
+
+    found = 0;
+    while(ldp_findFirstAndNext(sp, di)) {
+        found++;
+    }
+    assert(found == 0);
+
+    // TEST 8: don't match anything without wildcards
+    printf("\n\nDON'T MATCH WITHOUT WILDCARDS\n");
+    sp.internal = NULL;
+    sp.path = "/tmp/t/DOESNT~1.MTC";
+
+    found = 0;
+    while(ldp_findFirstAndNext(sp, di)) {
+        found++;
+    }
+    assert(found == 0);
 }
 
 int main(int argc, char**argv)
 {
     ldp_setParam(0, 1);     // enable logging
 
-    // testShortToLongName();
+    testShortToLongName();
 
     testFindFirstAndNext();
 
     printf("\n\nclean-up\n");
     ldp_cleanup();
 
-    // printf("\n\nC++ tests (on private methods)\n");
-    // ldp_runCppTests();
+    printf("\n\nC++ tests (on private methods)\n");
+    ldp_runCppTests();
+
+    printf("\n\nIf you are reading this, all tests have passed! Yay!\n\n");
 
     return 0;
 }

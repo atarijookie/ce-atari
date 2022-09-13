@@ -368,7 +368,7 @@ bool DirTranslator::findFirstAndNext(SearchParams& sp, DiskItem& di)
     // on the 1st call of this method do some things only once
     if(sp.internal == NULL) {
         sp.closeNow = false;                                // don't terminate the findFirstAndNext loop just yet
-        sp.internal = (void *) new SearchParamsInternal;    // allocate SearchParamsInternal struct
+        sp.internal = (void *) new SearchParamsInternal();  // allocate SearchParamsInternal struct
         Internal(sp)->isVFAT = true;           // start with assumption that this is a VFAT filesystem
         Utils::splitFilenameFromPath(sp.path, Internal(sp)->hostPath, Internal(sp)->searchString);
 
@@ -390,6 +390,8 @@ bool DirTranslator::findFirstAndNext(SearchParams& sp, DiskItem& di)
                 setDiskItem(sp, di, Internal(sp)->hostPath, Internal(sp)->searchString, justLongFname, S_ISDIR(attr.st_mode));
                 closeDirSetFlags(sp);
                 return true;        // got some valid item
+            } else {
+                Utils::out(LOG_DEBUG, "DirTranslator::findFirstAndNext - long path: %s doesn't exist, will try to find file one-by-one anyway", longPath.c_str());
             }
         }
 

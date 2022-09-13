@@ -36,12 +36,21 @@ typedef struct
 } DTAshort;
 
 // following struct is used internally by the findFirstAndNext() method
-typedef struct {
+class SearchParamsInternal
+{
+public:
+    SearchParamsInternal(){
+        hostPath = "";
+        searchString = "";
+        isVFAT = true;
+        dir = NULL;
+    }
+
     std::string hostPath;
     std::string searchString;
     bool        isVFAT;
     DIR*        dir;            // set to NULL before the 1st call, don't touch on subsequent calls - used for going through the directory
-} SearchParamsInternal;
+};
 
 typedef struct {
     std::string path;           // path where we should look for files, can contain wildcards (*, ?) or even name matching single file
