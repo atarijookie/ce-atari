@@ -341,6 +341,14 @@ void DirTranslator::closeDirSetFlags(SearchParams& sp)
     sp.internal = FF_FINISHED;      // mark this cycle as finished
 }
 
+void DirTranslator::clearDiskItem(DiskItem& di)
+{
+    di.attribs = 0;
+    memset(&di.datetime, 0, sizeof(di.datetime));
+    di.name = "";
+    di.size = 0;
+}
+
 bool DirTranslator::findFirstAndNext(SearchParams& sp, DiskItem& di)
 {
     // this is a subsequent method call, and the 1st call was exact match OR the whole findFirstAndNext cycle finished,
@@ -355,6 +363,8 @@ bool DirTranslator::findFirstAndNext(SearchParams& sp, DiskItem& di)
         return false;           // no item found
     }
 
+    clearDiskItem(di);          // clear disk item, so we won't have any remains from previous run
+
     // on the 1st call of this method do some things only once
     if(sp.internal == NULL) {
         sp.closeNow = false;                                // don't terminate the findFirstAndNext loop just yet
@@ -368,8 +378,16 @@ bool DirTranslator::findFirstAndNext(SearchParams& sp, DiskItem& di)
             struct stat attr;
             Utils::out(LOG_DEBUG, "DirTranslator::findFirstAndNext - no wildcard in %s, checking %s", Internal(sp)->searchString.c_str(), sp.path.c_str());
 
-            if (stat(sp.path.c_str(), &attr) == 0) {     // matching just one file and it exists? good!
-                setDiskItem(sp, di, Internal(sp)->hostPath, Internal(sp)->searchString, Internal(sp)->searchString, S_ISDIR(attr.st_mode));
+            // this might be a short filename, so try to translate it from short to long version
+            std::string longPath;
+            shortToLongPath(sp.path, longPath, false);
+            Utils::out(LOG_DEBUG, "DirTranslator::findFirstAndNext - translated possible short path: %s to long path: %s", sp.path.c_str(), longPath.c_str());
+
+            if (Utils::fileExists(longPath)) {      // matching just one file and it exists? good!
+                std::string justPath, justLongFname;
+                Utils::splitFilenameFromPath(longPath, justPath, justLongFname);       // extract just long filename from the long path
+
+                setDiskItem(sp, di, Internal(sp)->hostPath, Internal(sp)->searchString, justLongFname, S_ISDIR(attr.st_mode));
                 closeDirSetFlags(sp);
                 return true;        // got some valid item
             }
@@ -404,8 +422,15 @@ bool DirTranslator::findFirstAndNext(SearchParams& sp, DiskItem& di)
         }
 
         bool isDir = (de->d_type == DT_DIR);                // is this a directory?
+        bool wantDirs = (sp.attribs & FA_DIR) == FA_DIR;    // if FA_DIR bit is set in search param attribs, we want also dirs to be included
 
-        if(isDir && (sp.attribs & FA_DIR) == 0) {           // is dir, but not searching for dir
+        /* Note on next condition: 
+            - if FA_DIR is set, results wil contain FILES and DIRECTORIES
+            - if FA_DIR is clear, results will contain ONLY FILES
+           It seems there is no option to include ONLY DIRECTORIES without files - Atari Compendium states, 
+           that if you set FA_DIR bit, then should include subdirectories.
+        */
+        if(isDir && !wantDirs) {        // if is_dir but dont_want_dirs, skip it
             Utils::out(LOG_DEBUG, "TranslatedDisk::findFirstAndNext -- skipped %s because the it's a dir and we're not looking for dir now", de->d_name);
             continue;
         }
@@ -430,8 +455,8 @@ bool DirTranslator::setDiskItem(SearchParams& sp, DiskItem& di, const std::strin
 {
     bool isUpDir = isDir && (longFname == "." || longFname == "..");    // is this '.' or '..'?
 
-    di.attribs |= isDir ? FA_DIR : 0;                       // if it's a dir, add dir flag
-    di.attribs |= (longFname[0] == '.') ? FA_HIDDEN : 0;    // enforce Mac/Unix convention of hidding files startings with '.'
+    di.attribs |= (isDir ? FA_DIR : 0);                     // if it's a dir, add dir flag
+    di.attribs |= ((longFname[0] == '.') ? FA_HIDDEN : 0);  // enforce Mac/Unix convention of hidding files startings with '.'
 
     std::string fullEntryPath = hostPath;
     Utils::mergeHostPaths(fullEntryPath, longFname);
@@ -446,7 +471,12 @@ bool DirTranslator::setDiskItem(SearchParams& sp, DiskItem& di, const std::strin
     }
 
     di.datetime = *localtime(&attr.st_mtime);   // convert time_t to tm structure and store it
-    di.size = (attr.st_size > 0xffffffff) ? 0xffffffff : (uint32_t) attr.st_size;   // bigger than 4 GB? that won't fit into uint32_t, so set just max uint32_t value
+
+    if(!isDir) {        // file? store size
+        di.size = (attr.st_size > 0xffffffff) ? 0xffffffff : (uint32_t) attr.st_size;   // bigger than 4 GB? that won't fit into uint32_t, so set just max uint32_t value
+    } else {            // dir? store zero size
+        di.size = 0;
+    }
 
     std::string shortFname = longFname;     // init short name to original long name
 
@@ -462,8 +492,10 @@ bool DirTranslator::setDiskItem(SearchParams& sp, DiskItem& di, const std::strin
 
     // check the current name against searchString using fnmatch
     if (compareSearchStringAndFilename(searchString, shortFname) != 0) {
-        Utils::out(LOG_ERROR, "TranslatedDisk::setDiskItem -- %s - %s does not match pattern %s", fullEntryPath.c_str(), shortFname.c_str(), searchString);
+        Utils::out(LOG_ERROR, "TranslatedDisk::setDiskItem -- %s - %s does not match pattern %s", fullEntryPath.c_str(), shortFname.c_str(), searchString.c_str());
         return false;       // not matching? ignore this item
+    } else {
+        Utils::out(LOG_DEBUG, "TranslatedDisk::setDiskItem -- %s matches pattern %s", shortFname.c_str(), searchString.c_str());
     }
 
     // get MS-DOS VFAT attributes if this is a VFAT filesystem

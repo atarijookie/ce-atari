@@ -54,6 +54,7 @@ private:
     int size(void);
     int cleanUpShortenersIfNeeded(void);
 
+    static void clearDiskItem(DiskItem& di);
     bool setDiskItem(SearchParams& sp, DiskItem& di, const std::string &hostPath, const std::string& searchString, const std::string& lonFname, bool isDir);
     static void closeDirSetFlags(SearchParams& sp);
     static void toUpperCaseString(std::string &st);
