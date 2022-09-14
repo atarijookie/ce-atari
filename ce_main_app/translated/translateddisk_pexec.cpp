@@ -15,7 +15,6 @@
 #include "acsidatatrans.h"
 #include "translateddisk.h"
 #include "translatedhelper.h"
-#include "filenameshortener.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"
 #include "desktopcreator.h"
@@ -321,7 +320,7 @@ void TranslatedDisk::createDirEntry(bool isRoot, bool isDir, uint16_t date, uint
 
     // now convert the short 'FILE.C' to 'FILE    .C  '
     char deNameExtended[14];
-    FilenameShortener::extendWithSpaces(dirEntryName, deNameExtended);
+    Utils::extendWithSpaces(dirEntryName, deNameExtended);
 
     // and convert FILE    .C  ' to 'FILE       '
     char ext[3];

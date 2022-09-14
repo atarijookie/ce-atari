@@ -16,7 +16,7 @@
 #include <sys/ioctl.h>
 #include <linux/msdos_fs.h>
 
-#include "defs.h"
+#include "libdospath.h"
 #include "utils.h"
 #include "dirtranslator.h"
 #include "findstorage.h"
@@ -52,7 +52,7 @@ void DirTranslator::clear(void)
     mapPathToShortener.clear();
 }
 
-void DirTranslator::updateFileName(std::string hostPath, std::string oldFileName, std::string newFileName)
+void DirTranslator::updateFileName(const std::string& hostPath, const std::string& oldFileName, const std::string& newFileName)
 {
     FilenameShortener *fs = getShortenerForPath(hostPath, false);   // try to find a shortener for our path, but don't create it if not found
 

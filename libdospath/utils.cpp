@@ -19,7 +19,7 @@
 #include <dirent.h>
 #include <stdarg.h>
 
-#include "defs.h"
+#include "libdospath.h"
 
 bool logsEnabled = false;
 

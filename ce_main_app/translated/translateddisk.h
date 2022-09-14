@@ -6,9 +6,9 @@
 #include <string>
 #include <time.h>
 
-#include "dirtranslator.h"
 #include "../isettingsuser.h"
 #include "../settings.h"
+#include "findstorage.h"
 
 class ConfigService;
 class ScreencastService;
@@ -35,8 +35,6 @@ typedef struct {
     std::string currentAtariPath;           // what is the current path on this drive
 
     int         translatedType;             // normal / shared / config
-
-	DirTranslator	dirTranslator;			// used for translating long dir / file names to short ones
 } TranslatedConf;
 
 typedef struct {

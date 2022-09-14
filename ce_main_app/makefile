@@ -22,7 +22,7 @@ ifeq ($(ONPC),yes)
     OBJDIR = obj/onpc
     CFLAGS += -DONPC -I./
     TARGET = cosmosex_onpc
-    LDLIBS += -ldl
+    LDLIBS += -ldospath -ldl
 else
     LDLIBS	+= -lbcm2835
     CFLAGS += -I./
@@ -30,13 +30,13 @@ else
     ifeq ($(DISTRO),jessie)
         OBJDIR = obj/raspbian_jessie
         TARGET  =  cosmosex_raspbian_jessie
-        LDLIBS += -ldl
+        LDLIBS += -ldospath -ldl
         CFLAGS += -DDISTRO_RASPBIAN
         CFLAGS += -DDISTRO_JESSIE
     else
         OBJDIR = obj/raspbian_stretch
         TARGET =  cosmosex_raspbian_stretch
-        LDLIBS += -ldl
+        LDLIBS += -ldospath -ldl
         CFLAGS += -DDISTRO_RASPBIAN
         CFLAGS += -DDISTRO_STRETCH
     endif
@@ -72,7 +72,6 @@ SUBDIR1	= config
 SUBDIR2	= native
 SUBDIR3	= translated
 SUBDIR4	= floppy
-SUBDIR6	= lib/cjson-code-58
 SUBDIR7	= service
 SUBDIR8	= acsicommand
 SUBDIR10 = dir2fdd
@@ -87,7 +86,6 @@ SRCS += $(wildcard $(SUBDIR1)/*.cpp)
 SRCS += $(wildcard $(SUBDIR2)/*.cpp) 
 SRCS += $(wildcard $(SUBDIR3)/*.cpp)
 SRCS += $(wildcard $(SUBDIR4)/*.cpp)
-SRCS += $(wildcard $(SUBDIR6)/cJSON.c)
 SRCS += $(wildcard $(SUBDIR7)/*.cpp)
 SRCS += $(wildcard $(SUBDIR8)/*.cpp)
 SRCS += $(wildcard $(SUBDIR10)/*.cpp)
@@ -102,7 +100,6 @@ HDRS += $(wildcard $(SUBDIR1)/*.h)
 HDRS += $(wildcard $(SUBDIR2)/*.h)
 HDRS += $(wildcard $(SUBDIR3)/*.h)
 HDRS += $(wildcard $(SUBDIR4)/*.h)
-HDRS += $(wildcard $(SUBDIR6)/cJSON.h)
 HDRS += $(wildcard $(SUBDIR7)/*.h)
 HDRS += $(wildcard $(SUBDIR8)/*.h)
 HDRS += $(wildcard $(SUBDIR10)/*.h)
@@ -117,11 +114,17 @@ DEPS = $(patsubst %.o,%.d,$(OBJS))
 
 all:	$(TARGET)
 
-$(TARGET): $(OBJS) $(HDRS) $(LDLIBS)
+$(TARGET): $(LDLIBS) $(OBJS) $(HDRS)
 	$(CXX_LINK) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $@ $(LDLIBS)
 #	$(STRIP) -s $@
 
 print-%:	; @echo $* = $($*)
+
+-ldospath:	lib/libdospath.a
+
+lib/libdospath.a:
+	cd ../libdospath && $(MAKE) all
+	cp ../libdospath/libdospath.a ../libdospath/libdospath.h lib/
 
 .PHONY:	clean depclean
 

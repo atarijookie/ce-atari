@@ -6,7 +6,7 @@
 
 #include <stdint.h>
 #include "findstorage.h"
-#include "defs.h"
+#include "libdospath.h"
 
 /*
 Memory usage:
@@ -35,7 +35,7 @@ public:
     bool findFirstAndNext(SearchParams& sp, DiskItem& di);
     static void diskItemToAtariFindStorageItem(DiskItem& di, uint8_t* buf);
 
-    void updateFileName(std::string hostPath, std::string oldFileName, std::string newFileName);
+    void updateFileName(const std::string& hostPath, const std::string& oldFileName, const std::string& newFileName);
 
 private:
     std::map<std::string, FilenameShortener *>  mapPathToShortener;

@@ -6,7 +6,7 @@
 #include <assert.h>
 #include <unistd.h>
 
-#include "libexports.h"
+#include "libdospath.h"
 
 void testShortToLongName(void)
 {

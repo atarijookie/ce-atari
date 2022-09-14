@@ -31,6 +31,9 @@ public:
     static void mergeHostPaths(std::string &dest, const std::string &tail);
     static void splitFilenameFromPath(const std::string &pathAndFile, std::string &path, std::string &file);
     static void splitFilenameFromExt(const std::string &filenameAndExt, std::string &filename, std::string &ext);
+    static void splitToTwoByDelim(const std::string &input, std::string &beforeDelim, std::string &afterDelim, char delim);
+    static void mergeFilenameAndExtension(const std::string& shortFn, const std::string& shortExt, bool extendWithSpaces, std::string& merged);
+    static void extendWithSpaces(const char *normalFname, char *extendedFn);
 
     static void resetHansAndFranz(void);
     static void resetHans(void);
@@ -68,6 +71,7 @@ public:
     static void createPathWithOtherExtension(std::string &inPathWithOriginalExt, const char *otherExtension, std::string &outPathWithOtherExtension);
     static bool fileExists(std::string &hostPath);
     static bool fileExists(const char *hostPath);
+    static void toUpperCaseString(std::string &st);
 
     static int bcdToInt(int bcd);
 

@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "defs.h"
+#include "libdospath.h"
 #include "filenameshortener.h"
 #include "utils.h"
 

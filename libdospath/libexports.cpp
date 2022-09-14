@@ -8,7 +8,7 @@
 #include "dirtranslator.h"
 #include "utils.h"
 
-#include "libexports.h"
+#include "libdospath.h"
 #include "libcpptests.h"
 
 DirTranslator* dt = NULL;
@@ -51,6 +51,22 @@ extern "C" void ldp_shortToLongPath(const std::string &shortPath, std::string &l
     }
 
     dt->shortToLongPath(shortPath, longPath, refreshOnMiss);
+}
+
+/*
+    This function will rename / update single file name in the filename shortener. Call this when you rename a file from old to new name.
+    :param hostPath: path where the updated file is located
+    :param oldFileName: original filename from which we rename the file
+    :param newFileName: new file name to which we rename the file
+*/
+
+extern "C" void ldp_updateFileName(const std::string& hostPath, const std::string& oldFileName, const std::string& newFileName)
+{
+    if(!dt) {
+        dt = new DirTranslator();
+    }
+
+    dt->updateFileName(hostPath, oldFileName, newFileName);
 }
 
 /*

@@ -169,28 +169,59 @@ void Utils::mergeHostPaths(std::string &dest, const std::string &tail)
 
 void Utils::splitFilenameFromPath(const std::string &pathAndFile, std::string &path, std::string &file)
 {
-    size_t sepPos = pathAndFile.rfind(HOSTPATH_SEPAR_STRING);
-
-    if(sepPos == std::string::npos) {                   // not found?
-        path.clear();
-        file = pathAndFile;                                     // pretend we don't have path, just filename
-    } else {                                                    // separator found?
-        path    = pathAndFile.substr(0, sepPos + 1);            // path is before separator
-        file    = pathAndFile.substr(sepPos + 1);               // file is after separator
-    }
+    splitToTwoByDelim(pathAndFile, path, file, HOSTPATH_SEPAR_CHAR);
 }
 
 void Utils::splitFilenameFromExt(const std::string &filenameAndExt, std::string &filename, std::string &ext)
 {
-    size_t sepPos = filenameAndExt.rfind('.');
+    splitToTwoByDelim(filenameAndExt, filename, ext, '.');
+}
 
-    if(sepPos == std::string::npos) {                           // not found?
-        filename = filenameAndExt;                              // pretend we don't have extension, just filename
-        ext.clear();
-    } else {                                                    // separator found?
-        filename = filenameAndExt.substr(0, sepPos);            // filename is before separator
-        ext      = filenameAndExt.substr(sepPos + 1);           // extension is after separator
+void Utils::splitToTwoByDelim(const std::string &input, std::string &beforeDelim, std::string &afterDelim, char delim)
+{
+    size_t sepPos = input.rfind(delim);
+
+    if(sepPos == std::string::npos) {                           // delimiter not found? everything belongs to beforeDelim
+        beforeDelim = input;
+        afterDelim.clear();
+    } else {                                                    // delimiter found? split it to two parts
+        beforeDelim = input.substr(0, sepPos);
+        afterDelim = input.substr(sepPos + 1);
     }
+}
+
+void Utils::mergeFilenameAndExtension(const std::string& shortFn, const std::string& shortExt, bool extendWithSpaces, std::string& merged)
+{
+    std::string shortFn2 = shortFn, shortExt2 = shortExt;       // make copies so we don't modify originals
+
+    if(shortFn2.size() > 8)             // filename too long? shorten
+        shortFn2.resize(8);
+
+    if(shortExt2.size() > 3)            // file ext too long? shorten
+        shortExt2.resize(3);
+
+    if(extendWithSpaces) {              // if should extend
+        if(shortFn2.size() < 8)         // filename too short? extend
+            shortFn2.resize(8, ' ');
+
+        if(shortExt2.size() < 3)        // extension too short? extend
+            shortExt2.resize(3, ' ');
+    }
+
+    merged = shortFn2;                  // put in the filename
+    
+    if(shortExt2.size() > 0)            // if got extension, append extension
+        merged += std::string(".") + shortExt2;
+}
+
+void Utils::extendWithSpaces(const char *normalFname, char *extendedFn)
+{
+    std::string sNormalFname = normalFname, fname, ext, sExtendedFn;
+
+    Utils::splitFilenameFromExt(normalFname, fname, ext);               // split 'FILE.C' to 'FILE' and 'C'
+    Utils::mergeFilenameAndExtension(fname, ext, true, sExtendedFn);    // extend and merge, so will get 'FILE    .C  '
+
+    strcpy(extendedFn, sExtendedFn.c_str());
 }
 
 void Utils::sleepMs(uint32_t ms)
@@ -691,3 +722,14 @@ int Utils::bcdToInt(int bcd)
 
     return ((a * 10) + b);
 }
+
+void Utils::toUpperCaseString(std::string &st)
+{
+    int i, len;
+    len = st.length();
+
+    for(i=0; i<len; i++) {
+        st[i] = toupper(st[i]);
+    }
+}
+
