@@ -9,6 +9,7 @@
 #include "../isettingsuser.h"
 #include "../settings.h"
 #include "findstorage.h"
+#include "lib/libdospath.h"
 
 class ConfigService;
 class ScreencastService;
@@ -145,7 +146,6 @@ public:
 
     bool hostPathExists(std::string &hostPath, bool alsoCheckCaseInsensitive = false);
     bool hostPathExists_caseInsensitive(std::string hostPath, std::string &justPath, std::string &originalFileName, std::string &foundFileName);
-    void updateDirTranslators(std::string hostPath, std::string oldFileName, std::string newFileName);
 
     static void pathSeparatorAtariToHost(std::string &path);
 
@@ -221,6 +221,8 @@ private:
 //  void onFgetdta(uint8_t *cmd);                    // this function needs to be handled on ST only
     void onFsfirst(uint8_t *cmd);
     void onFsnext(uint8_t *cmd);
+    bool buildGemdosFindstorageData(TFindStorage& fs, const std::string& hostSearchString, uint8_t findAttribs, bool isRootDir);    // helper function, not called from ST directly
+    static void diskItemToAtariFindStorageItem(DiskItem& di, uint8_t* buf);
 
     // file and directory manipulation
     void onDfree(uint8_t *cmd);

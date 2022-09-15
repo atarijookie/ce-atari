@@ -1,6 +1,4 @@
 // vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
-#include "utils.h"
-
 #include <libgen.h>
 #include <cerrno>
 #include <cstdio>
@@ -19,11 +17,12 @@
 #include <dirent.h>
 #include <stdarg.h>
 
+#include "utilslib.h"
 #include "libdospath.h"
 
 bool logsEnabled = false;
 
-uint32_t Utils::getCurrentMs(void)
+uint32_t UtilsLib::getCurrentMs(void)
 {
     struct timespec tp;
     int res;
@@ -38,7 +37,7 @@ uint32_t Utils::getCurrentMs(void)
     return val;
 }
 
-void Utils::attributesHostToAtari(bool isReadOnly, bool isDir, uint8_t &attrAtari)
+void UtilsLib::attributesHostToAtari(bool isReadOnly, bool isDir, uint8_t &attrAtari)
 {
     attrAtari = 0;
 
@@ -65,7 +64,7 @@ void Utils::attributesHostToAtari(bool isReadOnly, bool isDir, uint8_t &attrAtar
 */
 }
 
-uint16_t Utils::fileTimeToAtariDate(struct tm *ptm)
+uint16_t UtilsLib::fileTimeToAtariDate(struct tm *ptm)
 {
     uint16_t atariDate = 0;
 
@@ -80,7 +79,7 @@ uint16_t Utils::fileTimeToAtariDate(struct tm *ptm)
     return atariDate;
 }
 
-uint16_t Utils::fileTimeToAtariTime(struct tm *ptm)
+uint16_t UtilsLib::fileTimeToAtariTime(struct tm *ptm)
 {
     uint16_t atariTime = 0;
 
@@ -95,7 +94,7 @@ uint16_t Utils::fileTimeToAtariTime(struct tm *ptm)
     return atariTime;
 }
 
-void Utils::fileDateTimeToHostTime(uint16_t atariDate, uint16_t atariTime, struct tm *ptm)
+void UtilsLib::fileDateTimeToHostTime(uint16_t atariDate, uint16_t atariTime, struct tm *ptm)
 {
     uint16_t year, month, day;
     uint16_t hours, minutes, seconds;
@@ -119,7 +118,7 @@ void Utils::fileDateTimeToHostTime(uint16_t atariDate, uint16_t atariTime, struc
                                 //  but can be up to 60 to allow for leap seconds.
 }
 
-void Utils::mergeHostPaths(std::string &dest, const std::string &tail)
+void UtilsLib::mergeHostPaths(std::string &dest, const std::string &tail)
 {
     if(dest.empty()) {      // if the 1st part is empty, then result is just the 2nd part
         dest = tail;
@@ -148,17 +147,17 @@ void Utils::mergeHostPaths(std::string &dest, const std::string &tail)
     dest = dest + tail;
 }
 
-void Utils::splitFilenameFromPath(const std::string &pathAndFile, std::string &path, std::string &file)
+void UtilsLib::splitFilenameFromPath(const std::string &pathAndFile, std::string &path, std::string &file)
 {
     splitToTwoByDelim(pathAndFile, path, file, HOSTPATH_SEPAR_CHAR);
 }
 
-void Utils::splitFilenameFromExt(const std::string &filenameAndExt, std::string &filename, std::string &ext)
+void UtilsLib::splitFilenameFromExt(const std::string &filenameAndExt, std::string &filename, std::string &ext)
 {
     splitToTwoByDelim(filenameAndExt, filename, ext, '.');
 }
 
-void Utils::splitToTwoByDelim(const std::string &input, std::string &beforeDelim, std::string &afterDelim, char delim)
+void UtilsLib::splitToTwoByDelim(const std::string &input, std::string &beforeDelim, std::string &afterDelim, char delim)
 {
     size_t sepPos = input.rfind(delim);
 
@@ -171,7 +170,7 @@ void Utils::splitToTwoByDelim(const std::string &input, std::string &beforeDelim
     }
 }
 
-void Utils::splitString(const std::string &s, char delim, std::vector<std::string> &elems)
+void UtilsLib::splitString(const std::string &s, char delim, std::vector<std::string> &elems)
 {
     std::stringstream ss;
     ss.str(s);
@@ -185,7 +184,7 @@ void Utils::splitString(const std::string &s, char delim, std::vector<std::strin
     }
 }
 
-void Utils::joinStrings(std::vector<std::string>& elems, std::string& output, int count)
+void UtilsLib::joinStrings(std::vector<std::string>& elems, std::string& output, int count)
 {
     // join string using path delimiter, but only 'count' parts of the input
     // if count == -1, join all parts
@@ -210,7 +209,7 @@ void Utils::joinStrings(std::vector<std::string>& elems, std::string& output, in
     }
 }
 
-const char *Utils::getExtension(const char *fileName)
+const char *UtilsLib::getExtension(const char *fileName)
 {
     const char *pExt;
     pExt = strrchr(fileName, '.');  // find last '.'
@@ -223,13 +222,13 @@ const char *Utils::getExtension(const char *fileName)
     return pExt;
 }
 
-bool Utils::fileExists(std::string &hostPath)
+bool UtilsLib::fileExists(std::string &hostPath)
 {
     int res = access(hostPath.c_str(), F_OK);
     return (res != -1);     // if not error, file exists
 }
 
-void Utils::out(int logLevel, const char *format, ...)
+void UtilsLib::out(int logLevel, const char *format, ...)
 {
     if(!logsEnabled) {
         return;
@@ -243,7 +242,7 @@ void Utils::out(int logLevel, const char *format, ...)
     va_end(args);
 }
 
-void Utils::toHostSeparators(std::string &path)
+void UtilsLib::toHostSeparators(std::string &path)
 {
     int len = path.length();
 

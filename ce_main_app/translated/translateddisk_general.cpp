@@ -58,6 +58,7 @@ void TranslatedDisk::deleteInstance(void)
 {
     delete instance;
     instance = NULL;
+    ldp_cleanup();          // clean up the LibDosPath internals
 }
 
 TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt)
@@ -750,7 +751,7 @@ bool TranslatedDisk::hostPathExists(std::string &hostPath, bool alsoCheckCaseIns
 
         if(hostPathExists_caseInsensitive(hostPath, justPath, originalFileName, foundFileName)) { // if found this file with case insensitive search
             // update dir translator: replace originalFileName with foundFileName
-            updateDirTranslators(justPath, originalFileName, foundFileName);
+            ldp_updateFileName(justPath, originalFileName, foundFileName);
 
             hostPath = justPath;    // justPath to hostPath, and we'll merge in new file name in the next step
             Utils::mergeHostPaths(hostPath, foundFileName);     // now the hostPath should contain newly found file
@@ -812,11 +813,6 @@ bool TranslatedDisk::hostPathExists_caseInsensitive(std::string hostPath, std::s
 
     closedir(dir);
     return res;
-}
-
-void TranslatedDisk::updateDirTranslators(std::string hostPath, std::string oldFileName, std::string newFileName)
-{
-    ldp_updateFileName(hostPath, oldFileName, newFileName);
 }
 
 bool TranslatedDisk::createFullAtariPathAndFullHostPath(const std::string &inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel)

@@ -5,7 +5,6 @@
 #include <map>
 
 #include <stdint.h>
-#include "findstorage.h"
 #include "libdospath.h"
 
 /*
@@ -33,7 +32,6 @@ public:
 
     // call this for find first / find next on host file system with filename shortening already in place
     bool findFirstAndNext(SearchParams& sp, DiskItem& di);
-    static void diskItemToAtariFindStorageItem(DiskItem& di, uint8_t* buf);
 
     void updateFileName(const std::string& hostPath, const std::string& oldFileName, const std::string& newFileName);
 

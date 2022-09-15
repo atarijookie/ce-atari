@@ -185,6 +185,60 @@ void TranslatedDisk::onDgetpath(uint8_t *cmd)
     dataTrans->setStatus(E_OK);
 }
 
+bool TranslatedDisk::buildGemdosFindstorageData(TFindStorage& fs, const std::string& hostSearchString, uint8_t findAttribs, bool isRootDir)
+{
+    fs.clear();                     // clear find storage
+
+    SearchParams sp;
+    DiskItem di;
+
+    // fill the search params with correct values
+    sp.internal = NULL;                     // set internal to null before 1st call
+    sp.path = hostSearchString;             // path to directory + some file matching pattern (*.* or exact filename or something similar)
+    sp.attribs = findAttribs;               // search only for items with these attributes
+    sp.addUpDir = !isRootDir;               // will add '.' and '..' if this is NOT root dir
+
+    // go through the dir, find all items, store them in buffer
+    uint8_t* bfr = fs.buffer;
+    while(ldp_findFirstAndNext(sp, di)) {   // try to find item
+        if(fs.count < fs.maxCount) {        // if still can fit in the buffer
+            diskItemToAtariFindStorageItem(di, bfr);    // disk item to this buffer position
+            bfr += 23;                      // pointer in buffer to next item
+            fs.count++;                     // count increment
+        }
+    }
+
+    return true;    // when should we return false? even empty dir might be a valid result
+}
+
+void TranslatedDisk::diskItemToAtariFindStorageItem(DiskItem& di, uint8_t* buf)
+{
+    uint16_t atariTime = Utils::fileTimeToAtariTime(&di.datetime);
+    uint16_t atariDate = Utils::fileTimeToAtariDate(&di.datetime);
+
+    // GEMDOS File Attributes
+    buf[0] = di.attribs;
+
+    // GEMDOS Time
+    buf[1] = atariTime >> 8;
+    buf[2] = atariTime &  0xff;
+
+    // GEMDOS Date
+    buf[3] = atariDate >> 8;
+    buf[4] = atariDate &  0xff;
+
+    // file size with respect to GEMDOS maximum file size
+    uint32_t size = (di.size > GEMDOS_FILE_MAXSIZE) ? GEMDOS_FILE_MAXSIZE : di.size;
+    buf[5] = (size >>  24) & 0xff;
+    buf[6] = (size >>  16) & 0xff;
+    buf[7] = (size >>   8) & 0xff;
+    buf[8] =  size         & 0xff;
+
+    // Filename -- d_fname[14]
+    memset(&buf[9], 0, 14);                             // first clear the mem
+    strncpy((char *) &buf[9], di.name.c_str(), 14);     // copy the filename - 'FILE.C'
+}
+
 void TranslatedDisk::onFsfirst(uint8_t *cmd)
 {
     bool res;
@@ -253,8 +307,7 @@ void TranslatedDisk::onFsfirst(uint8_t *cmd)
     }
 
     //now use the dir translator to get the dir content
-    DirTranslator *dt = &conf[atariDriveIndex].dirTranslator;
-    res = dt->buildGemdosFindstorageData(&tempFindStorage, hostSearchString, findAttribs, rootDir, useZipdirNotFileForThisSubDir);
+    res = buildGemdosFindstorageData(tempFindStorage, hostSearchString, findAttribs, rootDir);
 
     if(!res) {
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - host search string: %s -- failed to build gemdos find storage data", hostSearchString.c_str());
@@ -263,8 +316,7 @@ void TranslatedDisk::onFsfirst(uint8_t *cmd)
         return;
     }
 
-    if (tempFindStorage.count==0)
-    {
+    if (tempFindStorage.count == 0) {
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - host search string: %s 0 entries found", hostSearchString.c_str());
 
         dataTrans->setStatus(EFILNF);                               // file not found

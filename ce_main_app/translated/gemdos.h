@@ -1,6 +1,10 @@
 #ifndef GEMDOS_H
 #define GEMDOS_H
 
+#define GEMDOS_FILE_MAXSIZE (2147483647)
+// TOS 1.x cannot display size with more than 8 digits
+//#define GEMDOS_FILE_MAXSIZE (100*1000*1000-1)
+
 // path functions
 #define GEMDOS_Dsetdrv      0x0e
 /* ACSI/SCSI command arguments :

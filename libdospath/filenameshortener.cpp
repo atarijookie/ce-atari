@@ -4,12 +4,12 @@
 
 #include "libdospath.h"
 #include "filenameshortener.h"
-#include "utils.h"
+#include "utilslib.h"
 
 FilenameShortener::FilenameShortener(const std::string &path)
 {
     forWhichPath = path;
-    lastAccessTime = Utils::getCurrentMs();
+    lastAccessTime = UtilsLib::getCurrentMs();
 }
 
 FilenameShortener::~FilenameShortener()
@@ -20,7 +20,7 @@ FilenameShortener::~FilenameShortener()
 void FilenameShortener::touch(void)
 {
     // touch this shortener and mark it as used just now
-    lastAccessTime = Utils::getCurrentMs();
+    lastAccessTime = UtilsLib::getCurrentMs();
 }
 
 uint32_t FilenameShortener::getLastAccessTime(void)
@@ -45,7 +45,7 @@ bool FilenameShortener::longToShortFileName(const std::string& longFileName, std
 
     if(it != mapFilenameWithExt.end()) {                        // if we have this fileName already, use it!
         shortFileName = it->second;
-        Utils::out(LOG_DEBUG, "FilenameShortener found mapping %s <=> %s", shortFileName.c_str(), longFileName.c_str());
+        UtilsLib::out(LOG_DEBUG, "FilenameShortener found mapping %s <=> %s", shortFileName.c_str(), longFileName.c_str());
 
         if(createdNotFound) 
             *createdNotFound = false;       // false == translation was found
@@ -58,7 +58,7 @@ bool FilenameShortener::longToShortFileName(const std::string& longFileName, std
 
     // divide longFileName to filename and extension
     std::string fileName, fileExt;
-    Utils::splitFilenameFromExt(longFileName, fileName, fileExt);
+    UtilsLib::splitFilenameFromExt(longFileName, fileName, fileExt);
 
     replaceNonLettersAndToUpperCase(fileName);  // fix bad characters and capitalize chars
     replaceNonLettersAndToUpperCase(fileExt);
@@ -71,7 +71,7 @@ bool FilenameShortener::longToShortFileName(const std::string& longFileName, std
     std::string shortName, shortExt;
 
     if(!shortenName(fileName, shortName)) {
-        Utils::out(LOG_ERROR, "FilenameShortener::longToShortFileName failed to shortenName %s", fileName.c_str());
+        UtilsLib::out(LOG_ERROR, "FilenameShortener::longToShortFileName failed to shortenName %s", fileName.c_str());
         return false;
     }
 
@@ -84,7 +84,7 @@ bool FilenameShortener::longToShortFileName(const std::string& longFileName, std
     mapFilenameWithExt.insert( std::pair<std::string, std::string>(longFileName, shortFileName) );  // store this key-value pair
     mapReverseFilename.insert( std::pair<std::string, std::string>(shortFileName, longFileName) );  // for reverse transformation
 
-    Utils::out(LOG_DEBUG, "FilenameShortener mapped %s <=> %s", shortFileName.c_str(), longFileName.c_str());
+    UtilsLib::out(LOG_DEBUG, "FilenameShortener mapped %s <=> %s", shortFileName.c_str(), longFileName.c_str());
     return true;
 }
 
@@ -131,18 +131,18 @@ bool FilenameShortener::shortToLongFileName(const std::string& shortFileName, st
 
     // if short version was not found, check if the dir doesn't exist - if it does, just use it as is
     std::string fullPath = this->forWhichPath;
-    Utils::mergeHostPaths(fullPath, shortFileName);     // merge path to this folder with filename inside this folder (e.g. '/mnt/shared' + 'atari' -> '/mnt/shared/atari')
+    UtilsLib::mergeHostPaths(fullPath, shortFileName);     // merge path to this folder with filename inside this folder (e.g. '/mnt/shared' + 'atari' -> '/mnt/shared/atari')
 
     // if this file in this path exists, just add it as is - this might happen with start of path being native long and rest being short versions, e.g.:
     // for path: '/mnt/shared/ATARI/IMAGES' it's okay to use the part 'mnt' and 'shared' as long and short as they really exist there in that form, the rest needs translation
-    if(Utils::fileExists(fullPath)) {
+    if(UtilsLib::fileExists(fullPath)) {
         // insert this filename to maps, so next time we won't have to investigate if the path really exists
         // NOTE: having the shortFileName as KEY and also as VALUE is OK in this case!
         mapFilenameWithExt.insert( std::pair<std::string, std::string>(shortFileName, shortFileName) );  // store this key-value pair
         mapReverseFilename.insert( std::pair<std::string, std::string>(shortFileName, shortFileName) );  // for reverse transformation
 
         longFileName = shortFileName;
-        Utils::out(LOG_DEBUG, "FilenameShortener found that shortFileName %s exists as %s", shortFileName.c_str(), fullPath.c_str());
+        UtilsLib::out(LOG_DEBUG, "FilenameShortener found that shortFileName %s exists as %s", shortFileName.c_str(), fullPath.c_str());
         return true;
     }
 

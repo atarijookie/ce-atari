@@ -8,7 +8,7 @@
 
 #include "dirtranslator.h"
 #include "filenameshortener.h"
-#include "utils.h"
+#include "utilslib.h"
 
 #include "libcpptests.h"
 
@@ -29,14 +29,14 @@ void TestClass::splitPathAndFilename(void)
     //---------------------------
     printf("TEST: splitFilenameFromPath\n");
     std::string path, file;
-    Utils::splitFilenameFromPath(std::string("/this/is/some/path/filename.ext"), path, file);
+    UtilsLib::splitFilenameFromPath(std::string("/this/is/some/path/filename.ext"), path, file);
     assert(path == "/this/is/some/path");
     assert(file == "filename.ext");
 
     //---------------------------
     printf("TEST: splitFilenameFromExt\n");
     std::string filename, ext;
-    Utils::splitFilenameFromExt(std::string("filename.ext"), filename, ext);
+    UtilsLib::splitFilenameFromExt(std::string("filename.ext"), filename, ext);
     assert(filename == "filename");
     assert(ext == "ext");
 }

@@ -6,7 +6,7 @@
 #include <assert.h>
 
 #include "dirtranslator.h"
-#include "utils.h"
+#include "utilslib.h"
 
 #include "libdospath.h"
 #include "libcpptests.h"
@@ -90,16 +90,6 @@ extern "C" bool ldp_findFirstAndNext(SearchParams& sp, DiskItem& di)
     }
 
     return dt->findFirstAndNext(sp, di);
-}
-
-/*
-    This helper function transforms the disk item struct into sequence of bytes in format expected by Atari ST GEMDOS when doing fsFirst and fsNext.
-    :param di: input disk item, which will be converted to the sequence of bytes
-    :param buf: output buffer, which will receive the sequence of bytes
-*/
-extern "C" void ldp_diskItemToAtariFindStorageItem(DiskItem& di, uint8_t* buf)
-{
-    DirTranslator::diskItemToAtariFindStorageItem(di, buf);
 }
 
 /*

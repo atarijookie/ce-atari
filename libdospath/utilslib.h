@@ -17,7 +17,7 @@ extern "C" volatile sig_atomic_t sigintReceived;
     #define MAX(x, y)   (((x) > (y)) ? (x) : (y))
 #endif
 
-class Utils {
+class UtilsLib {
     friend class TestClass;
 
 public:

@@ -27,17 +27,6 @@
 
 #define FA_ALL          (0x3f)
 
-// struct used for Fsfirst and Fsnext - modified version without first 21 reserved bytes
-// now the struct has 23 bytes total, so a buffer of 512 bytes should contain 22 of these + 6 spare bytes
-typedef struct
-{
-    uint8_t     d_attrib;       // GEMDOS File Attributes
-    uint16_t    d_time;         // GEMDOS Time
-    uint16_t    d_date;         // GEMDOS Date
-    uint32_t    d_length;       // File Length
-    char        d_fname[14];    // Filename
-} DTAshort;
-
 // following struct is used internally by the findFirstAndNext() method
 class SearchParamsInternal
 {
@@ -76,7 +65,6 @@ extern "C" {
     void ldp_shortToLongPath(const std::string& shortPath, std::string& longPath, bool refreshOnMiss);
     void ldp_updateFileName(const std::string& hostPath, const std::string& oldFileName, const std::string& newFileName);
     bool ldp_findFirstAndNext(SearchParams& sp, DiskItem& di);
-    void ldp_diskItemToAtariFindStorageItem(DiskItem& di, uint8_t* buf);
     void ldp_cleanup(void);
     void ldp_runCppTests(void);
 }
