@@ -24,7 +24,7 @@
 #include "gemdos_errno.h"
 #include "desktopcreator.h"
 #include "../display/displaythread.h"
-#include "../lib/libdospath.h"
+#include "../../libdospath/libdospath.h"
 
 extern THwConfig hwConfig;
 extern InterProcessEvents events;

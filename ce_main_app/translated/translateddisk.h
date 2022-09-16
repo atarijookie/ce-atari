@@ -9,7 +9,7 @@
 #include "../isettingsuser.h"
 #include "../settings.h"
 #include "findstorage.h"
-#include "lib/libdospath.h"
+#include "../../libdospath/libdospath.h"
 
 class ConfigService;
 class ScreencastService;

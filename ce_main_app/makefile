@@ -16,13 +16,13 @@ DEPFLAGS = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
 
 VPATH = ./lib
 LDFLAGS	= -Llib $(CPU_FLAGS)
-LDLIBS = -lrt -lanl -lpthread -ldl -lutil
+LDLIBS = -ldospath -lrt -lanl -lpthread -ldl -lutil
 
 ifeq ($(ONPC),yes)
     OBJDIR = obj/onpc
     CFLAGS += -DONPC -I./
     TARGET = cosmosex_onpc
-    LDLIBS += -ldospath -ldl
+    LDLIBS += -ldl
 else
     LDLIBS	+= -lbcm2835
     CFLAGS += -I./
@@ -30,13 +30,13 @@ else
     ifeq ($(DISTRO),jessie)
         OBJDIR = obj/raspbian_jessie
         TARGET  =  cosmosex_raspbian_jessie
-        LDLIBS += -ldospath -ldl
+        LDLIBS += -ldl
         CFLAGS += -DDISTRO_RASPBIAN
         CFLAGS += -DDISTRO_JESSIE
     else
         OBJDIR = obj/raspbian_stretch
         TARGET =  cosmosex_raspbian_stretch
-        LDLIBS += -ldospath -ldl
+        LDLIBS += -ldl
         CFLAGS += -DDISTRO_RASPBIAN
         CFLAGS += -DDISTRO_STRETCH
     endif
@@ -108,6 +108,7 @@ HDRS += $(wildcard $(SUBDIR13)/*.h)
 HDRS += $(wildcard $(SUBDIR14)/*.h)
 HDRS += $(wildcard $(SUBDIR15)/*.h)
 HDRS += $(wildcard $(SUBDIR16)/*.h)
+HDRS += ../libdospath/libdospath.h
 
 OBJS = $(addprefix $(OBJDIR)/, $(patsubst %.cpp,%.o,$(SRCS:.c=.o)))
 DEPS = $(patsubst %.o,%.d,$(OBJS))
@@ -123,12 +124,14 @@ print-%:	; @echo $* = $($*)
 -ldospath:	lib/libdospath.a
 
 lib/libdospath.a:
+	@echo "-> Entering libdospath and making libdospath"
 	cd ../libdospath && $(MAKE) all
-	cp ../libdospath/libdospath.a ../libdospath/libdospath.h lib/
+	cp ../libdospath/libdospath.a lib/
+	@echo "<- Leaving libdospath"
 
 .PHONY:	clean depclean
 
-clean:	depclean
+clean: depclean
 	$(AT)$(RM) $(OBJS)
 	$(AT)$(RM) *.o *~ $(TARGET)
 
