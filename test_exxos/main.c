@@ -1,5 +1,6 @@
 //--------------------------------------------------
 #include <mint/osbind.h> 
+#include <mint/sysvars.h>
 #include <mint/linea.h> 
 #include <stdio.h>
 
@@ -24,6 +25,8 @@ BYTE deviceID;
 BYTE readBuffer [254 * 512 + 4];
 BYTE writeBuffer[254 * 512 + 4];
 BYTE *rBuffer, *wBuffer;
+uint16_t* pZeroInTos;
+uint8_t readZerosWhileWait;
 
 void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
 int  getIntFromUser(void);
@@ -33,6 +36,52 @@ int  getIntFromUser(void);
 
 void writeReadAbove100MB(BYTE acsiId);
 void justWriteKnownData256sectors(BYTE acsiId);
+
+static long get_tos_header(void)
+{
+    return *_sysbase;
+}
+
+void findAddressToZeroInTos(void)
+{
+    OSHEADER* tos_header;
+    uintptr_t tos_base;
+    uint16_t tos_version;
+    size_t tos_size = 0;
+
+    // get TOS pointer and size retrieving - taken from https://github.com/mikrosk/uDump/blob/master/udump.c
+    tos_header = (OSHEADER*)(Supexec(get_tos_header));
+    tos_base = (uintptr_t)tos_header;
+    tos_version = tos_header->os_version;
+
+    if (tos_version < 0x0106) {
+        tos_size = 192 * 1024;
+    } else {
+        tos_size = 256 * 1024;
+    }
+
+    // find location in TOS with zero value
+    pZeroInTos = (uint16_t*) tos_base;
+    uint8_t found = 0;
+    size_t i;
+    for(i=0; i<tos_size; i++) {         // go through the TOS addresses
+        uint16_t val = *pZeroInTos;     // read value from TOS
+
+        if(val == 0) {                  // it's 0 as we wanted, good
+             (void) Cconws("TOS location with zero found.\r\n");
+             found = 1;
+             break;
+        }
+
+        pZeroInTos++;                   // to next address
+    }
+
+    // it zero not found in TOS, show warning
+    if(!found) {
+        (void) Cconws("TOS location with zero NOT found!\r\n");
+        pZeroInTos = (uint16_t*) tos_base;
+    }
+}
 
 //--------------------------------------------------
 int main(void)
@@ -49,6 +98,7 @@ int main(void)
             break;
         }
     }
+
     //----------------------
     hdd_if_select(IF_ACSI);
     hdIf.maxRetriesCount = 0;
@@ -72,6 +122,8 @@ int main(void)
 
     Clear_home();
     VT52_Wrap_on();
+
+    findAddressToZeroInTos();
 
     (void) Cconws("\33pDestructive continous R/W test.\33q\r\n");
     (void) Cconws("This will corrupt data on drive!!!\r\n");
@@ -100,6 +152,7 @@ int main(void)
     //-------------
     (void) Cconws("\r\n\33pChoose test type :\33q\r\n");
     (void) Cconws("\33pL\33q - write-read-verify loop\r\n");
+    (void) Cconws("\33pZ\33q - like L but reading 0s during wait\r\n");
     (void) Cconws("\33pC\33q - fill first 256 sectors with counter\r\n");
     (void) Cconws("\33pQ\33q - quit\r\n\r\n");
 
@@ -107,11 +160,20 @@ int main(void)
         key = Cnecin();
 
         if(key == 'l' || key == 'L') {
+            readZerosWhileWait = 0;
             writeReadAbove100MB(acsiId);
             break;
         }
 
+        if(key == 'z' || key == 'Z') {
+            readZerosWhileWait = 1;
+            writeReadAbove100MB(acsiId);
+            readZerosWhileWait = 0;
+            break;
+        }
+
         if(key == 'c' || key == 'C') {
+            readZerosWhileWait = 0;
             justWriteKnownData256sectors(acsiId);
             break;
         }

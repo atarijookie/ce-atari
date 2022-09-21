@@ -5,6 +5,9 @@
 #include "hdd_if.h"
 #include "stdlib.h"
 
+extern uint16_t* pZeroInTos;
+extern uint8_t readZerosWhileWait;
+
 // -------------------------------------- 
 void acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
 {
@@ -139,11 +142,22 @@ BYTE wait_dma_cmpl(DWORD t_ticks)
 {
 	DWORD now, until;
 	BYTE gpip;
- 
+
+	// read zeros here only if requested by global var and this is the wait for end of cmd (long timeout)
+	BYTE readZeros = (readZerosWhileWait && (t_ticks == LTIMEOUT));
+
 	now = *HZ_200;
 	until = t_ticks + now;              // calc value timer must get to 
 
 	while(1) {
+		if(readZeros) {					// if should read zeros during wait
+			uint16_t i;
+			uint16_t val;
+			for(i=0; i<1000; i++) {		// read the address pointing to zero multiple times in a row
+				val = *pZeroInTos;
+			}
+		}
+
 		gpip = *mfpGpip;
 		
 		if ((gpip & IO_DINT) == 0) {    // Poll DMA IRQ interrupt 
