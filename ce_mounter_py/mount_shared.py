@@ -84,7 +84,7 @@ def mount_shared():
 
     mount_shared_cmd_last = cmd             # store this cmd
 
-    cmd += " > /tmp/ce/mount.log 2>&1 "     # append writing of stdout and stderr to file
+    cmd += f" > {shared.MOUNT_LOG_FILE} 2>&1 "     # append writing of stdout and stderr to file
 
     # command changed, we should execute it
     os.makedirs(mount_path, exist_ok=True)  # create dir if not exist
@@ -101,6 +101,6 @@ def mount_shared():
 
     if not good:        # mount failed, copy mount log
         try:
-            shutil.copy('/tmp/ce/mount.log', mount_path)
+            shutil.copy(shared.MOUNT_LOG_FILE, mount_path)
         except Exception as exc:
             print_and_log(logging.INFO, f'mount_shared: copy of log file failed : {str(exc)}')

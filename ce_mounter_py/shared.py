@@ -14,9 +14,12 @@ settings_default = {'DRIVELETTER_FIRST': 'C', 'MOUNT_RAW_NOT_TRANS': 0, 'SHARED_
 
 settings = {}
 
-MOUNT_COMMANDS_DIR = '/tmp/ce/cmds'
-MOUNT_DIR_RAW = '/tmp/ce/raw'
-MOUNT_DIR_TRANS = '/tmp/ce/trans'
+LOG_DIR = '/var/log/ce/'
+DATA_DIR = '/var/run/ce/'
+MOUNT_LOG_FILE = os.path.join(LOG_DIR, 'mount.log')
+MOUNT_COMMANDS_DIR = os.path.join(DATA_DIR, 'cmds')
+MOUNT_DIR_RAW = os.path.join(DATA_DIR, 'raw')
+MOUNT_DIR_TRANS = os.path.join(DATA_DIR, 'trans')
 LETTER_SHARED = 'N'                     # Network drive on N
 LETTER_CONFIG = 'O'                     # cOnfig drive on O
 LETTER_ZIP = 'P'                        # ziP file drive on P
@@ -27,7 +30,7 @@ DEV_DISK_DIR = '/dev/disk/by-path'
 def log_config():
     log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
 
-    my_handler = RotatingFileHandler('/tmp/ce_mounter.log', mode='a', maxBytes=1024 * 1024, backupCount=1)
+    my_handler = RotatingFileHandler(f'{LOG_DIR}/ce_mounter.log', mode='a', maxBytes=1024 * 1024, backupCount=1)
     my_handler.setFormatter(log_formatter)
     my_handler.setLevel(logging.DEBUG)
 

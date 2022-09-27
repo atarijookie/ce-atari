@@ -4,7 +4,7 @@ import subprocess
 import logging
 from shared import print_and_log, setting_get_bool, setting_get_int, \
     get_drives_bitno_from_settings, get_mount_path_for_letter, get_free_letters, delete_files,\
-    DEV_DISK_DIR, MOUNT_DIR_RAW
+    DEV_DISK_DIR, MOUNT_DIR_RAW, MOUNT_LOG_FILE
 
 
 def get_usb_devices():
@@ -223,7 +223,7 @@ def mount_device_translated(mounts, device):
 
     os.makedirs(path, exist_ok=True)  # make mount dir if it doesn't exist
 
-    logfile = "/tmp/mount.log"  # define log files, delete them before mount
+    logfile = MOUNT_LOG_FILE
     logfile2 = os.path.join(path, os.path.basename(logfile))
     delete_files([logfile, logfile2])
 
