@@ -20,6 +20,9 @@ MOUNT_LOG_FILE = os.path.join(LOG_DIR, 'mount.log')
 MOUNT_COMMANDS_DIR = os.path.join(DATA_DIR, 'cmds')
 MOUNT_DIR_RAW = os.path.join(DATA_DIR, 'raw')
 MOUNT_DIR_TRANS = os.path.join(DATA_DIR, 'trans')
+MOUNT_SHARED_CMD_LAST = os.path.join(DATA_DIR, 'mount_shared_cmd_last')
+CONFIG_PATH_SOURCE = "/ce/app/configdrive"
+CONFIG_PATH_COPY = os.path.join(DATA_DIR, 'configdrive')
 LETTER_SHARED = 'N'                     # Network drive on N
 LETTER_CONFIG = 'O'                     # cOnfig drive on O
 LETTER_ZIP = 'P'                        # ziP file drive on P
@@ -28,6 +31,8 @@ DEV_DISK_DIR = '/dev/disk/by-path'
 
 
 def log_config():
+    os.makedirs(LOG_DIR, exist_ok=True)
+
     log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
 
     my_handler = RotatingFileHandler(f'{LOG_DIR}/ce_mounter.log', mode='a', maxBytes=1024 * 1024, backupCount=1)
@@ -147,7 +152,7 @@ def letter_to_bitno(drive_letter):
     return bitno
 
 
-def get_mount_path_for_letter(letter):
+def get_symlink_path_for_letter(letter):
     path = os.path.join(MOUNT_DIR_TRANS, letter)  # construct path where the drive letter should be mounted
     return path
 
@@ -169,7 +174,7 @@ def get_free_letters(mounts_in):
         letter = chr(97 + i)                # bit number to ascii char
 
         # check if position at id_ is used or not
-        path = get_mount_path_for_letter(letter)    # construct path where the drive letter should be mounted
+        path = get_symlink_path_for_letter(letter)    # construct path where the drive letter should be mounted
 
         if not os.path.exists(path):        # if mount point doesn't exist, it's free
             letters_out.append(letter)

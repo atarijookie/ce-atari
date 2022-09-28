@@ -3,7 +3,7 @@ import shutil
 import subprocess
 import logging
 from shared import print_and_log, setting_get_bool, setting_get_int, \
-    get_drives_bitno_from_settings, get_mount_path_for_letter, get_free_letters, delete_files,\
+    get_drives_bitno_from_settings, get_symlink_path_for_letter, get_free_letters, delete_files,\
     DEV_DISK_DIR, MOUNT_DIR_RAW, MOUNT_LOG_FILE
 
 
@@ -75,7 +75,7 @@ def get_symlinked_mount_folders():
         letter = chr(97 + i)                # bit number to ascii char
 
         # check if position at id_ is used or not
-        path = get_mount_path_for_letter(letter)    # construct path where the drive letter should be mounted
+        path = get_symlink_path_for_letter(letter)    # construct path where the drive letter should be mounted
 
         if not os.path.exists(path):        # if mount point doesn't exist, skip it
             continue
@@ -144,7 +144,7 @@ def get_not_mounted_devices(devs, mounts_in):
     return devices_not_mounted
 
 
-def get_mount_path_for_id(id_):
+def get_symlink_path_for_id(id_):
     path = os.path.join(MOUNT_DIR_RAW, str(id_))  # construct path where the id_ should be mounted
     return path
 
@@ -162,7 +162,7 @@ def get_free_ids():
             continue
 
         # check if position at id_ is used or not
-        path = get_mount_path_for_id(id_)
+        path = get_symlink_path_for_id(id_)
 
         if not os.path.exists(path):        # file/link doesn't exist or it's broken? it's free
             ids.append(id_)
@@ -178,7 +178,7 @@ def get_free_ids():
 def is_raw_device_linked(device):
     """ check if this device is already symlinked or not """
     for id_ in range(8):
-        path = get_mount_path_for_id(id_)
+        path = get_symlink_path_for_id(id_)
 
         if not os.path.exists(path) or not os.path.islink(path):    # path doesn't exist or not a link, skip rest
             continue
@@ -200,7 +200,7 @@ def link_raw_device(device):
         return False
 
     id_ = ids[0]  # get 0th available id
-    path = get_mount_path_for_id(id_)  # create mount path for this id
+    path = get_symlink_path_for_id(id_)  # create mount path for this id
 
     # create symlink from device to ACSI slot
     print_and_log(logging.DEBUG, f"mount_device as RAW: {device} -> {path}")
@@ -216,7 +216,7 @@ def mount_device_translated(mounts, device):
         return False
 
     letter = letters[0]  # get 0th letter
-    path = get_mount_path_for_letter(letter)  # construct path where the drive letter should be mounted
+    path = get_symlink_path_for_letter(letter)  # construct path where the drive letter should be mounted
 
     # mount device to expected path
     print_and_log(logging.DEBUG, f"mount_device as TRANSLATED: {device} -> {path}")
@@ -245,12 +245,41 @@ def symlink_dir(mounts, mountdir):
         return False
 
     letter = letters[0]  # get 0th letter
-    path = get_mount_path_for_letter(letter)  # construct path where the drive letter should be mounted
+    path = get_symlink_path_for_letter(letter)  # construct path where the drive letter should be mounted
 
     print_and_log(logging.DEBUG, f"symlink_dir: {mountdir} -> {path}")
 
     # symlink mounted dir into our atari mount path
     os.symlink(mountdir, path)
+
+
+def find_and_mount_raw(root_devs):
+    root_devs = [dev for dev in root_devs if not is_raw_device_linked(dev)]  # keep only not symlinked devices
+
+    for device in root_devs:  # mount all the found partition devices, if possible
+        link_raw_device(device)
+
+
+def find_and_mount_translated(root_devs, part_devs):
+    mounts = get_mounts()  # get devices and their mount points
+    print_and_log(logging.INFO, f'mounts: {mounts}')
+
+    symlinked = get_symlinked_mount_folders()  # get folders which are already symlinked
+    link_these = to_be_linked(mounts, symlinked)  # get folders which should be symlinked
+
+    root_devs_not_mounted = get_not_mounted_devices(root_devs, mounts)  # filter out devices which are already mounted
+    print_and_log(logging.INFO, f'not mounted: {root_devs_not_mounted}')
+
+    # from root device get device for partition (e.g. from sdd -> sdd1, sdd2)
+    for root_dev in root_devs_not_mounted:  # go through the not-mounted devices and try to mount them
+        devices = [part_dev for part_dev in part_devs if root_dev in part_dev]
+        print_and_log(logging.DEBUG, f"for root device {root_dev} found partition devices {devices}")
+
+        for device in devices:  # mount all the found partition devices, if possible
+            mount_device_translated(mounts, device)
+
+    for mountdir in link_these:  # link these mount dirs into atari mount path
+        symlink_dir(mounts, mountdir)
 
 
 def find_and_mount_devices():
@@ -262,27 +291,6 @@ def find_and_mount_devices():
     print_and_log(logging.INFO, f'devices: {root_devs}')
 
     if mount_raw_not_trans:         # for raw mount, check if symlinked
-        root_devs = [dev for dev in root_devs if not is_raw_device_linked(dev)]     # keep only not symlinked devices
-
-        for device in root_devs:    # mount all the found partition devices, if possible
-            link_raw_device(device)
+        find_and_mount_raw(root_devs)
     else:                           # for translated mounts
-        mounts = get_mounts()                               # get devices and their mount points
-        print_and_log(logging.INFO, f'mounts: {mounts}')
-
-        symlinked = get_symlinked_mount_folders()           # get folders which are already symlinked
-        link_these = to_be_linked(mounts, symlinked)        # get folders which should be symlinked
-
-        root_devs_not_mounted = get_not_mounted_devices(root_devs, mounts)  # filter out devices which are already mounted
-        print_and_log(logging.INFO, f'not mounted: {root_devs_not_mounted}')
-
-        # from root device get device for partition (e.g. from sdd -> sdd1, sdd2)
-        for root_dev in root_devs_not_mounted:          # go through the not-mounted devices and try to mount them
-            devices = [part_dev for part_dev in part_devs if root_dev in part_dev]
-            print_and_log(logging.DEBUG, f"for root device {root_dev} found partition devices {devices}")
-
-            for device in devices:      # mount all the found partition devices, if possible
-                mount_device_translated(mounts, device)
-
-        for mountdir in link_these:  # link these mount dirs into atari mount path
-            symlink_dir(mounts, mountdir)
+        find_and_mount_translated(root_devs, part_devs)

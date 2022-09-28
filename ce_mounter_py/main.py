@@ -4,7 +4,8 @@ import asyncio
 from setproctitle import setproctitle
 import logging
 from shared import print_and_log, log_config, settings_load, DEV_DISK_DIR, MOUNT_DIR_RAW, MOUNT_COMMANDS_DIR, \
-    SETTINGS_PATH, MOUNT_DIR_TRANS
+    SETTINGS_PATH, MOUNT_DIR_TRANS, LETTER_SHARED, LETTER_ZIP, LETTER_CONFIG, CONFIG_PATH_SOURCE, CONFIG_PATH_COPY, \
+    get_symlink_path_for_letter
 from mount_usb import find_and_mount_devices
 from mount_on_cmd import mount_on_command
 from mount_shared import mount_shared
@@ -69,6 +70,67 @@ def my_process_event(event):
             event_source[path_] = True      # mark this event source
 
 
+def copy_and_symlink_config_dir():
+    """ create a copy of configdir, then symlink it to right place """
+    if not os.path.exists(CONFIG_PATH_SOURCE):
+        print_and_log(logging.WARNING, f"Config drive origin folder doesn't exist! ( {CONFIG_PATH_SOURCE} )")
+        return
+
+    os.makedirs(CONFIG_PATH_COPY, exist_ok=True)                    # create dir for copy
+    os.system(f"cp -r {CONFIG_PATH_SOURCE}/* {CONFIG_PATH_COPY}")   # copy original config dir to copy dir
+
+    symlink_path = get_symlink_path_for_letter(LETTER_CONFIG)
+
+    if os.path.exists(symlink_path):
+        os.unlink(symlink_path)
+
+    os.symlink(CONFIG_PATH_COPY, symlink_path)                      # symlink copy to correct mount dir
+    print_and_log(logging.INFO, f"Config drive was symlinked to: {symlink_path}")
+
+
+def get_dir_usage(name):
+    """ turn folder name (drive letter) into what is this folder used for - config / shared / usb / zip drive """
+    name_to_usage = {LETTER_SHARED: "shared drive", LETTER_CONFIG: "config drive", LETTER_ZIP: "ZIP file drive"}
+    return name_to_usage.get(name, "USB drive")
+
+
+def show_symlinked_dirs():
+    """ prints currently mounted / symlinked dirs """
+
+    # first show translated drives
+    print_and_log(logging.INFO, "\nlist of current translated drives:")
+    cnt = 0
+    for name in os.listdir(MOUNT_DIR_TRANS):            # go through the translated mount dir
+        fullpath = os.path.join(MOUNT_DIR_TRANS, name)
+
+        if os.path.isfile(fullpath):     # skip files
+            continue
+
+        print_and_log(logging.INFO, f" * {name} ({get_dir_usage(name)})")
+        cnt += 1
+
+    if cnt == 0:
+        print_and_log(logging.INFO, f" (none)")
+
+    # then show RAW drives
+    print_and_log(logging.INFO, "\nlist of current RAW drives:")
+    cnt = 0
+
+    for name in os.listdir(MOUNT_DIR_RAW):            # go through the translated mount dir
+        fullpath = os.path.join(MOUNT_DIR_RAW, name)
+
+        if os.path.isfile(fullpath):     # skip files
+            continue
+
+        print_and_log(logging.INFO, f" * {name}")
+        cnt += 1
+
+    if cnt == 0:
+        print_and_log(logging.INFO, f" (none)")
+
+    print_and_log(logging.INFO, " ")
+
+
 if __name__ == "__main__":
     setproctitle("ce_mounter")      # set process title
 
@@ -84,20 +146,23 @@ if __name__ == "__main__":
 
     settings_load()                 # load settings from disk
 
+    print_and_log(logging.INFO, f"MOUNT_COMMANDS_DIR: {MOUNT_COMMANDS_DIR}")
+    print_and_log(logging.INFO, f"MOUNT_DIR_RAW     : {MOUNT_DIR_RAW}")
+    print_and_log(logging.INFO, f"MOUNT_DIR_TRANS   : {MOUNT_DIR_TRANS}")
+
     print_and_log(logging.INFO, f'On start will look for not mounted devices - they might be already connected')
 
     # try to mount what we can on start
+    copy_and_symlink_config_dir()
     mount_shared()
     find_and_mount_devices()
+
+    show_symlinked_dirs()                       # show dirs we now got
 
     for handler in watched_paths.values():      # call all handlers before doing them only on event
         task_queue.put(handler)
 
     threading.Thread(target=worker, daemon=True).start()        # start the task queue worker
-
-    # TODO: remove broken linked devices / mounts on removal
-
-    # TODO: if drive letters / raw IDs change, we should umount + unlink all, then re-mount + re-link
 
     # watch the dev_disk_dir folder, on changes look for devices and mount them
     wm = pyinotify.WatchManager()
