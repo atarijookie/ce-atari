@@ -240,3 +240,29 @@ def options_to_string(opts: dict):
         return options
 
     return None         # no valid options found
+
+
+def text_to_file(text, filename):
+    # write text to file for later use
+    try:
+        with open(filename, 'wt') as f:
+            f.write(text)
+    except Exception as ex:
+        print_and_log(logging.WARNING, f"mount_shared: failed to write to {filename}: {str(ex)}")
+
+
+def text_from_file(filename):
+    # get text from file
+    text = None
+
+    if not os.path.exists(filename):    # no file like this exists? quit
+        return None
+
+    try:
+        with open(filename, 'rt') as f:
+            text = f.read()
+            text = text.strip()         # remove whitespaces
+    except Exception as ex:
+        print_and_log(logging.WARNING, f"mount_shared: failed to read {filename}: {str(ex)}")
+
+    return text

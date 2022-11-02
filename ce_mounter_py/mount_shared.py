@@ -4,7 +4,7 @@ import subprocess
 from pythonping import ping
 import logging
 from shared import print_and_log, setting_get_bool, get_symlink_path_for_letter, umount_if_mounted, \
-    options_to_string, LETTER_SHARED
+    options_to_string, LETTER_SHARED, text_to_file, text_from_file
 import shared
 
 
@@ -27,28 +27,6 @@ def is_shared_mounted(shared_mount_path):
 
     # shared mount point wasn't found, shared drive not mounted
     return False
-
-
-def text_to_file(text, filename):
-    # write text to file for later use
-    try:
-        with open(filename, 'wt') as f:
-            f.write(text)
-    except Exception as ex:
-        print_and_log(logging.WARNING, f"mount_shared: failed to write to {filename}: {str(ex)}")
-
-
-def text_from_file(filename):
-    # get text from file
-    text = None
-
-    try:
-        with open(filename, 'rt') as f:
-            text = f.read()
-    except Exception as ex:
-        print_and_log(logging.WARNING, f"mount_shared: failed to read {filename}: {str(ex)}")
-
-    return text
 
 
 def mount_shared():
@@ -90,6 +68,8 @@ def mount_shared():
     else:                   # cifs / samba / windows share
         options = options_to_string({'username': user, 'password': pswd})
         cmd = f'mount -t cifs {options} //{addr}/{path_} {mount_path}'
+
+    cmd = cmd.strip()       # remove trailing and leading whitespaces
 
     # check if shared is mounted, if not mounted, do mount anyway, even if cmd is the same below
     is_mounted = is_shared_mounted(mount_path)
