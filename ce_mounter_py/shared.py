@@ -27,6 +27,9 @@ LETTER_SHARED = 'N'                     # Network drive on N
 LETTER_CONFIG = 'O'                     # cOnfig drive on O
 LETTER_ZIP = 'P'                        # ziP file drive on P
 
+FILE_MOUNT_CMD_SAMBA = os.path.join(SETTINGS_PATH, 'mount_cmd_samba.txt')
+FILE_MOUNT_CMD_NFS = os.path.join(SETTINGS_PATH, 'mount_cmd_nfs.txt')
+
 DEV_DISK_DIR = '/dev/disk/by-path'
 
 

@@ -29,6 +29,38 @@ def is_shared_mounted(shared_mount_path):
     return False
 
 
+def get_shared_mount_command(nfs_not_samba):
+    """ Function will get the formatted mount command based on share type it will be used for.
+        It will create or just read the mount command from /ce/settings/mount_cmd_...txt file,
+        where user has the option to modify this command if his shared folder requires additional / different
+        parameters than the default ones.
+    """
+
+    # get the right mount command file for this share type
+    mount_cmd_file = shared.FILE_MOUNT_CMD_NFS if nfs_not_samba else shared.FILE_MOUNT_CMD_SAMBA
+
+    print_and_log(logging.DEBUG, f"get_shared_mount_command: mount_cmd_file is: {mount_cmd_file}")
+
+    if not os.path.exists(mount_cmd_file):      # if the file doesn't exist, write default command in that file
+        if nfs_not_samba:   # NFS shared drive
+            default_cmd = ('mount -t nfs -o username={username},password={password},vers=3 '
+                           '{server_address}:/{path_on_server} {mount_path}')
+        else:               # cifs / samba / windows share
+            default_cmd = ('mount -t cifs -o username={username},password={password} '
+                           '//{server_address}/{path_on_server} {mount_path}')
+
+        print_and_log(logging.DEBUG, f"get_shared_mount_command: mount_cmd_file {mount_cmd_file} does not exist")
+        print_and_log(logging.DEBUG, f"get_shared_mount_command: will write this cmd in that file: {default_cmd}")
+
+        # write the default mount command to file
+        text_to_file(default_cmd, mount_cmd_file)
+
+    # get the mount command from file - either the default value, or user customized value
+    mount_cmd = text_from_file(mount_cmd_file)
+    print_and_log(logging.DEBUG, f"get_shared_mount_command: will use this mount_cmd: {mount_cmd}")
+    return mount_cmd
+
+
 def mount_shared():
     """ this function checks for shared drive settings, mounts drive if needed """
     shared_enabled = setting_get_bool('SHARED_ENABLED')
@@ -61,14 +93,8 @@ def mount_shared():
         return
 
     nfs_not_samba = setting_get_bool('SHARED_NFS_NOT_SAMBA')
-
-    if nfs_not_samba:       # NFS shared drive
-        options = options_to_string({'username': user, 'password': pswd, 'vers': 3})
-        cmd = f'mount -t nfs {options} {addr}:/{path_} {mount_path}'
-    else:                   # cifs / samba / windows share
-        options = options_to_string({'username': user, 'password': pswd})
-        cmd = f'mount -t cifs {options} //{addr}/{path_} {mount_path}'
-
+    cmd = get_shared_mount_command(nfs_not_samba)       # get the default / customized mount command and format it
+    cmd = cmd.format(username=user, password=pswd, server_address=addr, path_on_server=path_, mount_path=mount_path)
     cmd = cmd.strip()       # remove trailing and leading whitespaces
 
     # check if shared is mounted, if not mounted, do mount anyway, even if cmd is the same below
