@@ -3,7 +3,7 @@ import shutil
 import subprocess
 from pythonping import ping
 import logging
-import timeout_decorator
+from wrapt_timeout_decorator import timeout
 from shared import print_and_log, setting_get_bool, get_symlink_path_for_letter, umount_if_mounted, \
     LETTER_SHARED, text_to_file, text_from_file
 import shared
@@ -62,7 +62,7 @@ def get_shared_mount_command(nfs_not_samba):
     return mount_cmd
 
 
-@timeout_decorator.timeout(10, use_signals=False)   # limit execution time of this function
+@timeout(10)
 def mount_shared():
     """ this function checks for shared drive settings, mounts drive if needed """
     shared_enabled = setting_get_bool('SHARED_ENABLED')

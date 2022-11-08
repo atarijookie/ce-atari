@@ -30,6 +30,9 @@ LETTER_ZIP = 'P'                        # ziP file drive on P
 FILE_MOUNT_CMD_SAMBA = os.path.join(SETTINGS_PATH, 'mount_cmd_samba.txt')
 FILE_MOUNT_CMD_NFS = os.path.join(SETTINGS_PATH, 'mount_cmd_nfs.txt')
 
+FILE_MOUNT_USER = os.path.join(SETTINGS_PATH, 'mount_user.txt')         # user custom mounts in settings dir
+FILE_MOUNT_USER_LAST = os.path.join(DATA_DIR, 'mount_user_last.txt')    # last user custom mounts we've used
+
 DEV_DISK_DIR = '/dev/disk/by-path'
 
 
@@ -78,10 +81,13 @@ def settings_load():
         if not os.path.isfile(path):            # if it's not a file, skip it
             continue
 
-        with open(path, "r") as file:           # read the file into value in dictionary
-            value = file.readline()
-            value = re.sub('[\n\r\t]', '', value)
-            settings[f] = value
+        try:
+            with open(path, "r") as file:           # read the file into value in dictionary
+                value = file.readline()
+                value = re.sub('[\n\r\t]', '', value)
+                settings[f] = value
+        except Exception as ex:
+            print_and_log(logging.WARNING, f"failed to read file {path} with exception: {str(ex)}")
 
     # find out if setting groups changed
     changed_usb = setting_changed_on_keys(
@@ -179,22 +185,8 @@ def get_free_letters(mounts_in):
         # check if position at id_ is used or not
         path = get_symlink_path_for_letter(letter)    # construct path where the drive letter should be mounted
 
-        if not os.path.exists(path):        # if mount point doesn't exist, it's free
+        if not os.path.exists(path):        # if mount point doesn't exist or symlink broken, it's free
             letters_out.append(letter)
-        else:                               # mount point exists, but it might not be used
-            found = False
-
-            for _, mnt_point in mounts_in:  # list of devices and mounts, e.g. ('/dev/sdd1', '/media/drive')
-                if path == mnt_point:       # if this path is one of the mounted paths, mark that we found it
-                    found = True
-                    break
-
-                if os.path.islink(path) and os.path.exists(path):       # if this is a link and it's not broken
-                    found = True
-                    break
-
-            if not found:                   # not found? use it
-                letters_out.append(letter)
 
     return letters_out
 

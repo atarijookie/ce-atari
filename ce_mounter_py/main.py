@@ -4,13 +4,14 @@ import asyncio
 import logging
 import threading, queue
 from setproctitle import setproctitle
-import timeout_decorator
+from wrapt_timeout_decorator import timeout
 from shared import print_and_log, log_config, settings_load, DEV_DISK_DIR, MOUNT_DIR_RAW, MOUNT_COMMANDS_DIR, \
     SETTINGS_PATH, MOUNT_DIR_TRANS, LETTER_SHARED, LETTER_ZIP, LETTER_CONFIG, CONFIG_PATH_SOURCE, CONFIG_PATH_COPY, \
     get_symlink_path_for_letter
 from mount_usb import find_and_mount_devices
 from mount_on_cmd import mount_on_command
 from mount_shared import mount_shared
+from mount_user import mount_user_custom_folders
 
 task_queue = queue.Queue()
 
@@ -21,7 +22,7 @@ def worker():
 
         try:
             funct()
-        except timeout_decorator.timeout_decorator.TimeoutError:
+        except TimeoutError:
             print_and_log(logging.INFO, f'The function {funct} was terminated with TimeoutError')
         except Exception as ex:
             print_and_log(logging.INFO, f'The function {funct} has crashed with exception: {str(ex)}')
@@ -39,10 +40,12 @@ def handle_read_callback(ntfr):
             task_queue.put(handler)                 # call the handler
 
 
-@timeout_decorator.timeout(10, use_signals=False)   # limit execution time of this function
+@timeout(10)
 def reload_settings_mount_shared():
     """ this handler gets called when settings change, reload settings and try mounting
     if settings for mounts changed """
+
+    mount_user_custom_folders()     # mount user custom folders if they changed
 
     changed_usb, changed_shared = settings_load()
 
@@ -60,7 +63,7 @@ def reload_settings_mount_shared():
         print_and_log(logging.INFO, 'USB drive related settings NOT changed')
 
 
-# following two will help us to determine who caused the event
+# following two will help us to determine who caused the event and what function should handle it
 event_source = {}
 watched_paths = {SETTINGS_PATH: reload_settings_mount_shared,
                  MOUNT_COMMANDS_DIR: mount_on_command,
@@ -164,7 +167,7 @@ if __name__ == "__main__":
     print_and_log(logging.INFO, f'On start will look for not mounted devices - they might be already connected')
 
     # try to mount what we can on start
-    for func in [copy_and_symlink_config_dir, find_and_mount_devices, mount_shared,
+    for func in [copy_and_symlink_config_dir, mount_user_custom_folders, find_and_mount_devices, mount_shared,
                  mount_on_command, show_symlinked_dirs]:
         task_queue.put(func)        # put these functions in the test queue, execute them in the worker
 

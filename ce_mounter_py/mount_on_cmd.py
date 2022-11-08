@@ -1,6 +1,6 @@
 import os
 import logging
-import timeout_decorator
+from wrapt_timeout_decorator import timeout
 from shared import print_and_log, get_symlink_path_for_letter, umount_if_mounted, MOUNT_COMMANDS_DIR, LETTER_ZIP, \
     text_from_file
 
@@ -57,7 +57,7 @@ def unmount_folder(unmount_path):
         print_and_log(logging.WARNING, f'unmount_folder: failed with exception: {str(ex)}')
 
 
-@timeout_decorator.timeout(10, use_signals=False)
+@timeout(10)
 def mount_on_command():
     """ go through list of expected commands from CE main app and execute all the found ones """
     if not os.path.exists(MOUNT_COMMANDS_DIR):              # if dir for commands doesn't exist, create it
