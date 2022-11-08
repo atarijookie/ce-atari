@@ -1,23 +1,31 @@
 import os
 import pyinotify
 import asyncio
-from setproctitle import setproctitle
 import logging
+import threading, queue
+from setproctitle import setproctitle
+import timeout_decorator
 from shared import print_and_log, log_config, settings_load, DEV_DISK_DIR, MOUNT_DIR_RAW, MOUNT_COMMANDS_DIR, \
     SETTINGS_PATH, MOUNT_DIR_TRANS, LETTER_SHARED, LETTER_ZIP, LETTER_CONFIG, CONFIG_PATH_SOURCE, CONFIG_PATH_COPY, \
     get_symlink_path_for_letter
 from mount_usb import find_and_mount_devices
 from mount_on_cmd import mount_on_command
 from mount_shared import mount_shared
-import threading, queue
 
 task_queue = queue.Queue()
 
 
 def worker():
     while True:
-        fnct = task_queue.get()
-        fnct()
+        funct = task_queue.get()
+
+        try:
+            funct()
+        except timeout_decorator.timeout_decorator.TimeoutError:
+            print_and_log(logging.INFO, f'The function {funct} was terminated with TimeoutError')
+        except Exception as ex:
+            print_and_log(logging.INFO, f'The function {funct} has crashed with exception: {str(ex)}')
+
         task_queue.task_done()
 
 
@@ -31,6 +39,7 @@ def handle_read_callback(ntfr):
             task_queue.put(handler)                 # call the handler
 
 
+@timeout_decorator.timeout(10, use_signals=False)   # limit execution time of this function
 def reload_settings_mount_shared():
     """ this handler gets called when settings change, reload settings and try mounting
     if settings for mounts changed """
@@ -136,13 +145,15 @@ if __name__ == "__main__":
 
     log_config()
 
-    os.makedirs(MOUNT_DIR_RAW, exist_ok=True)
-    os.makedirs(MOUNT_DIR_TRANS, exist_ok=True)
-
     # check if running as root, fail and quit if not
     if os.geteuid() != 0:           # If not root user, fail
         print_and_log(logging.INFO, "\nYou must run this app as root, otherwise mount / umount won't work!")
         exit(1)
+
+    # make dirs which might not exist (some might require root access)
+    os.makedirs(MOUNT_DIR_RAW, exist_ok=True)
+    os.makedirs(MOUNT_DIR_TRANS, exist_ok=True)
+    os.makedirs(MOUNT_COMMANDS_DIR, exist_ok=True)
 
     settings_load()                 # load settings from disk
 
@@ -153,14 +164,9 @@ if __name__ == "__main__":
     print_and_log(logging.INFO, f'On start will look for not mounted devices - they might be already connected')
 
     # try to mount what we can on start
-    copy_and_symlink_config_dir()
-    mount_shared()
-    find_and_mount_devices()
-
-    show_symlinked_dirs()                       # show dirs we now got
-
-    for handler in watched_paths.values():      # call all handlers before doing them only on event
-        task_queue.put(handler)
+    for func in [copy_and_symlink_config_dir, find_and_mount_devices, mount_shared,
+                 mount_on_command, show_symlinked_dirs]:
+        task_queue.put(func)        # put these functions in the test queue, execute them in the worker
 
     threading.Thread(target=worker, daemon=True).start()        # start the task queue worker
 

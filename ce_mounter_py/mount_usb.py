@@ -2,6 +2,7 @@ import os
 import shutil
 import subprocess
 import logging
+import timeout_decorator
 from shared import print_and_log, setting_get_bool, setting_get_int, \
     get_drives_bitno_from_settings, get_symlink_path_for_letter, get_free_letters, delete_files,\
     DEV_DISK_DIR, MOUNT_DIR_RAW, MOUNT_LOG_FILE
@@ -282,6 +283,7 @@ def find_and_mount_translated(root_devs, part_devs):
         symlink_dir(mounts, mountdir)
 
 
+@timeout_decorator.timeout(10, use_signals=False)
 def find_and_mount_devices():
     """ look for USB devices, find those which are not mounted yet, find a mount point for them, mount them """
     mount_raw_not_trans = setting_get_bool('MOUNT_RAW_NOT_TRANS')

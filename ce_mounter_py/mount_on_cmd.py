@@ -1,5 +1,6 @@
 import os
 import logging
+import timeout_decorator
 from shared import print_and_log, get_symlink_path_for_letter, umount_if_mounted, MOUNT_COMMANDS_DIR, LETTER_ZIP, \
     text_from_file
 
@@ -56,19 +57,22 @@ def unmount_folder(unmount_path):
         print_and_log(logging.WARNING, f'unmount_folder: failed with exception: {str(ex)}')
 
 
+@timeout_decorator.timeout(10, use_signals=False)
 def mount_on_command():
-    """ endless loop to mount things from CE main app on request """
+    """ go through list of expected commands from CE main app and execute all the found ones """
     if not os.path.exists(MOUNT_COMMANDS_DIR):              # if dir for commands doesn't exist, create it
         os.makedirs(MOUNT_COMMANDS_DIR, exist_ok=True)
 
-    # command to mount ZIP?
-    zip_file_path = get_cmd_by_name('mount_zip')
+    # dictionary for commands vs their handling functions
+    cmd_name_vs_handling_function = {'mount_zip': mount_zip_file, 'unmount': unmount_folder}
 
-    if zip_file_path:       # should mount ZIP?
-        mount_zip_file(zip_file_path)
+    # go through the supported commands and handle them if needed
+    for cmd_name, handling_fun in cmd_name_vs_handling_function.items():
+        cmd_args = get_cmd_by_name(cmd_name)        # try to fetch cmd args for this command
 
-    # command to unmount folder / drive?
-    unmount_cmd = get_cmd_by_name('unmount')
+        if cmd_args:                    # got cmd args? then we should execute handling function
+            print_and_log(logging.INFO, f"mount_on_command: for command {cmd_name} found args: {cmd_args}, will handle")
+            handling_fun(cmd_args)
+        else:
+            print_and_log(logging.INFO, f"mount_on_command: skipping command {cmd_name}")
 
-    if unmount_cmd:
-        unmount_folder(unmount_cmd)
