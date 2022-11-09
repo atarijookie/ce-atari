@@ -2,10 +2,8 @@ import os
 import shutil
 import subprocess
 import logging
-from wrapt_timeout_decorator import timeout
-from shared import print_and_log, setting_get_bool, setting_get_int, \
-    get_drives_bitno_from_settings, get_symlink_path_for_letter, get_free_letters, delete_files,\
-    DEV_DISK_DIR, MOUNT_DIR_RAW, MOUNT_LOG_FILE
+from shared import print_and_log, get_drives_bitno_from_settings, get_symlink_path_for_letter, \
+    get_free_letters, delete_files, DEV_DISK_DIR, MOUNT_LOG_FILE
 
 
 def get_usb_devices():
@@ -145,69 +143,6 @@ def get_not_mounted_devices(devs, mounts_in):
     return devices_not_mounted
 
 
-def get_symlink_path_for_id(id_):
-    path = os.path.join(MOUNT_DIR_RAW, str(id_))  # construct path where the id_ should be mounted
-    return path
-
-
-def get_free_ids():
-    """ Check which device IDs have RAW type (2) selected, check which of those are already used by some device
-    and return only those which are free and can be used. """
-    ids = []
-
-    for id_ in range(8):
-        key = f'ACSI_DEVTYPE_{id_}'
-
-        # if id_ is not RAW, skip it
-        if setting_get_int(key) != 2:
-            continue
-
-        # check if position at id_ is used or not
-        path = get_symlink_path_for_id(id_)
-
-        if not os.path.exists(path):        # file/link doesn't exist or it's broken? it's free
-            ids.append(id_)
-
-            try:
-                os.unlink(path)             # try to delete it if it exists (e.g. if broken)
-            except Exception as exc:
-                print_and_log(logging.DEBUG, f"unlink {path} failed (might be ok): {str(exc)}")
-
-    return ids
-
-
-def is_raw_device_linked(device):
-    """ check if this device is already symlinked or not """
-    for id_ in range(8):
-        path = get_symlink_path_for_id(id_)
-
-        if not os.path.exists(path) or not os.path.islink(path):    # path doesn't exist or not a link, skip rest
-            continue
-
-        source = os.readlink(path)  # get link source
-
-        if device == source:        # this device is source of this link, we got this device
-            return True
-
-    return False
-
-
-def link_raw_device(device):
-    # find which ACSI slots are configured as RAW and are free
-    ids = get_free_ids()
-
-    if not ids:
-        print_and_log(logging.WARNING, f"No free RAW IDs found, cannot mount device: {device}")
-        return False
-
-    id_ = ids[0]  # get 0th available id
-    path = get_symlink_path_for_id(id_)  # create mount path for this id
-
-    # create symlink from device to ACSI slot
-    print_and_log(logging.DEBUG, f"mount_device as RAW: {device} -> {path}")
-    os.symlink(device, path)
-
-
 def mount_device_translated(mounts, device):
     # find empty device letters
     letters = get_free_letters(mounts)
@@ -254,13 +189,6 @@ def symlink_dir(mounts, mountdir):
     os.symlink(mountdir, path)
 
 
-def find_and_mount_raw(root_devs):
-    root_devs = [dev for dev in root_devs if not is_raw_device_linked(dev)]  # keep only not symlinked devices
-
-    for device in root_devs:  # mount all the found partition devices, if possible
-        link_raw_device(device)
-
-
 def find_and_mount_translated(root_devs, part_devs):
     mounts = get_mounts()  # get devices and their mount points
     print_and_log(logging.INFO, f'mounts: {mounts}')
@@ -282,17 +210,3 @@ def find_and_mount_translated(root_devs, part_devs):
     for mountdir in link_these:  # link these mount dirs into atari mount path
         symlink_dir(mounts, mountdir)
 
-
-@timeout(10)
-def find_and_mount_devices():
-    """ look for USB devices, find those which are not mounted yet, find a mount point for them, mount them """
-    mount_raw_not_trans = setting_get_bool('MOUNT_RAW_NOT_TRANS')
-    print_and_log(logging.INFO, f"MOUNT mode: {'RAW' if mount_raw_not_trans else 'TRANS'}")
-
-    root_devs, part_devs = get_usb_devices()            # get attached USB devices
-    print_and_log(logging.INFO, f'devices: {root_devs}')
-
-    if mount_raw_not_trans:         # for raw mount, check if symlinked
-        find_and_mount_raw(root_devs)
-    else:                           # for translated mounts
-        find_and_mount_translated(root_devs, part_devs)

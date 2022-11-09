@@ -7,8 +7,9 @@ from setproctitle import setproctitle
 from wrapt_timeout_decorator import timeout
 from shared import print_and_log, log_config, settings_load, DEV_DISK_DIR, MOUNT_DIR_RAW, MOUNT_COMMANDS_DIR, \
     SETTINGS_PATH, MOUNT_DIR_TRANS, LETTER_SHARED, LETTER_ZIP, LETTER_CONFIG, CONFIG_PATH_SOURCE, CONFIG_PATH_COPY, \
-    get_symlink_path_for_letter
-from mount_usb import find_and_mount_devices
+    get_symlink_path_for_letter, setting_get_bool
+from mount_usb_trans import get_usb_devices, find_and_mount_translated
+from mount_usb_raw import find_and_mount_raw
 from mount_on_cmd import mount_on_command
 from mount_shared import mount_shared
 from mount_user import mount_user_custom_folders
@@ -61,6 +62,21 @@ def reload_settings_mount_shared():
         find_and_mount_devices()
     else:
         print_and_log(logging.INFO, 'USB drive related settings NOT changed')
+
+
+@timeout(10)
+def find_and_mount_devices():
+    """ look for USB devices, find those which are not mounted yet, find a mount point for them, mount them """
+    mount_raw_not_trans = setting_get_bool('MOUNT_RAW_NOT_TRANS')
+    print_and_log(logging.INFO, f"MOUNT mode: {'RAW' if mount_raw_not_trans else 'TRANS'}")
+
+    root_devs, part_devs = get_usb_devices()            # get attached USB devices
+    print_and_log(logging.INFO, f'devices: {root_devs}')
+
+    if mount_raw_not_trans:         # for raw mount, check if symlinked
+        find_and_mount_raw(root_devs)
+    else:                           # for translated mounts
+        find_and_mount_translated(root_devs, part_devs)
 
 
 # following two will help us to determine who caused the event and what function should handle it

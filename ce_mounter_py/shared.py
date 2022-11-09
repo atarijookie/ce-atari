@@ -180,7 +180,7 @@ def get_free_letters(mounts_in):
         if i in [shared, config, zip_]:     # skip these special drives
             continue
 
-        letter = chr(97 + i)                # bit number to ascii char
+        letter = chr(65 + i)                # bit number to ascii char
 
         # check if position at id_ is used or not
         path = get_symlink_path_for_letter(letter)    # construct path where the drive letter should be mounted
