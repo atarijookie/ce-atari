@@ -162,16 +162,20 @@ def letter_to_bitno(drive_letter):
 
 
 def get_symlink_path_for_letter(letter):
+    letter = letter.upper()
     path = os.path.join(MOUNT_DIR_TRANS, letter)  # construct path where the drive letter should be mounted
     return path
 
 
-def get_free_letters(mounts_in):
-    """ Check which Atari drive letters are free and return them. """
+def get_free_letters():
+    """ Check which Atari drive letters are free and return them, also deletes broken links """
     letters_out = []
+    sources_out = []
 
     # get letters from config, convert them to bit numbers
     first, shared, config, zip_ = get_drives_bitno_from_settings()
+
+    # TODO: also get custom user mount letters, so they could be skipped below
 
     for i in range(16):                     # go through available drive letters - from 0 to 15
         if i < first:                       # below first char? skip it
@@ -188,7 +192,18 @@ def get_free_letters(mounts_in):
         if not os.path.exists(path):        # if mount point doesn't exist or symlink broken, it's free
             letters_out.append(letter)
 
-    return letters_out
+            try:                            # try to delete the symlink
+                os.unlink(path)
+            except FileNotFoundError:       # if it doesn't really exist, just ignore this exception (it's ok)
+                pass
+            except Exception as ex:         # if it existed (e.g. broken link) but failed to remove, log error
+                print_and_log(logging.warning, f'get_free_letters: failed to unlink folder {path}')
+        else:                               # mount point exists
+            if os.path.islink(path):        # and it's a symlink, read source and append it to list of sources
+                source_path = os.readlink(path)
+                sources_out.append(source_path)
+
+    return letters_out, set(sources_out)
 
 
 def delete_files(files):

@@ -3,6 +3,7 @@ import pyinotify
 import asyncio
 import logging
 import threading, queue
+import traceback
 from setproctitle import setproctitle
 from wrapt_timeout_decorator import timeout
 from shared import print_and_log, log_config, settings_load, DEV_DISK_DIR, MOUNT_DIR_RAW, MOUNT_COMMANDS_DIR, \
@@ -26,7 +27,9 @@ def worker():
         except TimeoutError:
             print_and_log(logging.INFO, f'The function {funct} was terminated with TimeoutError')
         except Exception as ex:
-            print_and_log(logging.INFO, f'The function {funct} has crashed with exception: {str(ex)}')
+            print_and_log(logging.WARNING, f'The function {funct} has crashed with exception: {str(ex)}')
+            tb = traceback.format_exc()
+            print_and_log(logging.WARNING, tb)
 
         task_queue.task_done()
 
@@ -58,7 +61,7 @@ def reload_settings_mount_shared():
 
     if changed_usb:         # if settings for usb drive changed, try u/mount sub drive
         print_and_log(logging.INFO, 'USB drive related settings changed, will call find_and_mount_devices()')
-        # TODO: possibly umount all
+        # TODO: unlink all usb devices
         find_and_mount_devices()
     else:
         print_and_log(logging.INFO, 'USB drive related settings NOT changed')
