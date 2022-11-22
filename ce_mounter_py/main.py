@@ -119,10 +119,39 @@ def copy_and_symlink_config_dir():
     print_and_log(logging.INFO, f"Config drive was symlinked to: {symlink_path}")
 
 
-def get_dir_usage(name):
+def get_dir_usage(search_dir, name):
     """ turn folder name (drive letter) into what is this folder used for - config / shared / usb / zip drive """
     name_to_usage = {LETTER_SHARED: "shared drive", LETTER_CONFIG: "config drive", LETTER_ZIP: "ZIP file drive"}
-    return name_to_usage.get(name, "USB drive")
+    usage = name_to_usage.get(name, "USB drive")
+
+    fullpath = os.path.join(search_dir, name)       # create full path to this dir
+
+    if os.path.islink(fullpath):                    # if this is a link, read source of the link
+        fullpath = os.readlink(fullpath)
+
+    res = f"({usage})".ljust(20) + fullpath
+    return res
+
+
+def get_and_show_symlinks(search_dir, fun_on_each_found):
+    dirs = []
+
+    for name in os.listdir(search_dir):         # go through the dir
+        fullpath = os.path.join(search_dir, name)
+
+        if os.path.isfile(fullpath):            # skip files
+            continue
+
+        dirs.append(name)                       # append to list of found
+
+    if dirs:                                    # something was found?
+        dirs = sorted(dirs)                     # sort results
+
+        for one_dir in dirs:
+            desc = '' if not fun_on_each_found else fun_on_each_found(search_dir, one_dir)  # get description if got function
+            print_and_log(logging.INFO, f" * {one_dir} {desc}")
+    else:                                       # nothing was found
+        print_and_log(logging.INFO, f" (none)")
 
 
 def show_symlinked_dirs():
@@ -130,34 +159,11 @@ def show_symlinked_dirs():
 
     # first show translated drives
     print_and_log(logging.INFO, "\nlist of current translated drives:")
-    cnt = 0
-    for name in os.listdir(MOUNT_DIR_TRANS):            # go through the translated mount dir
-        fullpath = os.path.join(MOUNT_DIR_TRANS, name)
-
-        if os.path.isfile(fullpath):     # skip files
-            continue
-
-        print_and_log(logging.INFO, f" * {name} ({get_dir_usage(name)})")
-        cnt += 1
-
-    if cnt == 0:
-        print_and_log(logging.INFO, f" (none)")
+    get_and_show_symlinks(MOUNT_DIR_TRANS, get_dir_usage)
 
     # then show RAW drives
     print_and_log(logging.INFO, "\nlist of current RAW drives:")
-    cnt = 0
-
-    for name in os.listdir(MOUNT_DIR_RAW):            # go through the translated mount dir
-        fullpath = os.path.join(MOUNT_DIR_RAW, name)
-
-        if os.path.isfile(fullpath):     # skip files
-            continue
-
-        print_and_log(logging.INFO, f" * {name}")
-        cnt += 1
-
-    if cnt == 0:
-        print_and_log(logging.INFO, f" (none)")
+    get_and_show_symlinks(MOUNT_DIR_RAW, None)
 
     print_and_log(logging.INFO, " ")
 

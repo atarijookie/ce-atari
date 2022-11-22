@@ -107,8 +107,16 @@ def mount_shared():
     # (but if not mounted, proceed with mounting, even if the command hasn't changed)
     mount_shared_cmd_last = text_from_file(shared.MOUNT_SHARED_CMD_LAST)
 
-    if is_mounted and cmd == mount_shared_cmd_last:
+    if is_mounted and cmd == mount_shared_cmd_last:     # if is mounted and command not changed, don't remount
         print_and_log(logging.INFO, f"mount_shared: mount command not changed, not mounting")
+
+        if not os.path.exists(symlink_path):            # symlink doesn't seem to exist? create it
+            try:
+                print_and_log(logging.INFO, f'mount_shared: just creating symlink {mount_path} -> {symlink_path}')
+                os.symlink(mount_path, symlink_path)    # symlink from mount path to symlink path
+            except Exception as exc:
+                print_and_log(logging.INFO, f'mount_shared: creating symlink failed : {str(exc)}')
+
         return
 
     text_to_file(cmd, shared.MOUNT_SHARED_CMD_LAST)     # store this cmd

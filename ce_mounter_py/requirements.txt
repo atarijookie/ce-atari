@@ -2,3 +2,4 @@ setproctitle
 pyinotify
 pythonping
 wrapt_timeout_decorator
+psutil

@@ -1,5 +1,5 @@
 import os
-import subprocess
+import psutil
 import logging
 from shared import print_and_log, get_symlink_path_for_letter, \
     get_free_letters, DEV_DISK_DIR, LOG_DIR
@@ -37,18 +37,32 @@ def get_usb_devices():
 
 def get_mounts():
     """ See what devices are already mounted in this system, return them as tuples of device + mount point. """
-    result = subprocess.run(['mount'], stdout=subprocess.PIPE)        # run 'mount' command
-    result = result.stdout.decode('utf-8')  # get output as string
-    lines = result.split('\n')              # split whole result to lines
 
+    # I'm using psutil to get mounts here instead of just running mount command in subprocess because
+    # some mount points have spaces in them, and that is harder to parse out of the mount command output,
+    # while it's easy to get it from psutil.
+    # Example of such mount - my usb drive under xubuntu: '/media/miro/d-live 11.3.0 st i386'
+
+    partitions = psutil.disk_partitions()
     mounts = []
 
-    for line in lines:                      # go through lines
-        if not line.startswith('/dev/'):    # not a /dev mount? skip it
+    for part in partitions:
+        if not part.device.startswith('/dev/'):    # not a /dev mount? skip it
             continue
 
-        parts = line.split(' ')             # split '/dev/sda1 on /mnt/drive type ...' to items
-        dev_dir = parts[0], parts[2]        # get device and mount point
+        # also skip these things
+        if part.device.startswith('/dev/loop') or part.mountpoint.startswith('/snap/'):
+            continue
+
+        # if mount point is root of filesystem ('/'), then ignore this mount
+        if part.mountpoint == '/':
+            continue
+
+        # if mount point starts with any of the ignored paths, skip this mount
+        if any(part.mountpoint.startswith(ignored) for ignored in ['/boot', '/run']):
+            continue
+
+        dev_dir = part.device, part.mountpoint  # get device and mount point
         mounts.append(dev_dir)
 
     # return the mounts
@@ -133,6 +147,9 @@ def symlink_not_linked(mounted_all):
 
     letters, sources_existing = get_free_letters()          # get free letters, also removes dead symlinks
     sources_not_linked = mounted_all - sources_existing     # get only not linked sources
+    print_and_log(logging.DEBUG, f'mounted_all       : {mounted_all}')
+    print_and_log(logging.DEBUG, f'sources_existing  : {sources_existing}')
+    print_and_log(logging.DEBUG, f'sources_not_linked: {sources_not_linked}')
 
     # find out if we're able to symlink all the mounts
     len_letters = len(letters)
@@ -155,7 +172,11 @@ def symlink_not_linked(mounted_all):
         print_and_log(logging.DEBUG, f"symlink_not_linked: {source} -> {path}")
 
         try:
-            os.symlink(source, path)
+            os.symlink(source, path)        # try to create symlink, but in some cases it doesn't fail
+
+            if not os.path.exists(path):    # check if created symlink exists and it's not broken
+                print_and_log(logging.WARNING, f"symlink_not_linked: symlink {source} -> {path} created but broken!")
+                os.unlink(path)             # delete the broken symlink
         except Exception as ex:
             print_and_log(logging.WARNING, f"symlink_not_linked: failed to symlink {source} -> {path}: {str(ex)}")
 
@@ -174,12 +195,15 @@ def find_and_mount_translated(root_devs, part_devs):
 
     # mount every device that is not mounted yet to /mnt/ folder
     mounted_new = mount_not_mounted_devices(root_devs, part_devs, mounts)
+    print_and_log(logging.DEBUG, f'mounted_new: {mounted_new}')
 
     # get just mount points for the old (existing) mounts
     mounted_old = [mount[1] for mount in mounts]
+    print_and_log(logging.DEBUG, f'mounted_old: {mounted_old}')
 
     # all the mounted folders (e.g. [/mnt/sda1, /mnt/sdb])
     mounted_all = set(mounted_old + mounted_new)
+    print_and_log(logging.DEBUG, f'mounted_all: {mounted_all}')
 
     # now symlink everything that is not symlinked yet
     symlink_not_linked(mounted_all)
