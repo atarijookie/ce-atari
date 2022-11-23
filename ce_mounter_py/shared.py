@@ -31,7 +31,6 @@ FILE_MOUNT_CMD_SAMBA = os.path.join(SETTINGS_PATH, 'mount_cmd_samba.txt')
 FILE_MOUNT_CMD_NFS = os.path.join(SETTINGS_PATH, 'mount_cmd_nfs.txt')
 
 FILE_MOUNT_USER = os.path.join(SETTINGS_PATH, 'mount_user.txt')         # user custom mounts in settings dir
-FILE_MOUNT_USER_LAST = os.path.join(DATA_DIR, 'mount_user_last.txt')    # last user custom mounts we've used
 
 DEV_DISK_DIR = '/dev/disk/by-path'
 
@@ -167,15 +166,33 @@ def get_symlink_path_for_letter(letter):
     return path
 
 
-def get_free_letters():
-    """ Check which Atari drive letters are free and return them, also deletes broken links """
-    letters_out = []
-    sources_out = []
+def unlink_without_fail(path):
+    # try to delete the symlink
+    try:
+        os.unlink(path)
+        return True
+    except FileNotFoundError:   # if it doesn't really exist, just ignore this exception (it's ok)
+        pass
+    except Exception as ex:     # if it existed (e.g. broken link) but failed to remove, log error
+        print_and_log(logging.WARNING, f'failed to unlink {path} - exception: {str(ex)}')
+
+    return False
+
+
+def get_usb_drive_letters():
+    """ Get all the drive letters which can be used for USB drives, if they are free.
+    This list holds also the occupied letters.
+    We create this list by skipping shared drive, config drive, zip drive, custom drives.
+    """
+
+    usb_drive_letters = []
 
     # get letters from config, convert them to bit numbers
     first, shared, config, zip_ = get_drives_bitno_from_settings()
 
-    # TODO: also get custom user mount letters, so they could be skipped below
+    # get custom user mount letters, so they could be skipped below
+    from mount_user import get_user_custom_mounts_letters
+    custom_letters = get_user_custom_mounts_letters()
 
     for i in range(16):                     # go through available drive letters - from 0 to 15
         if i < first:                       # below first char? skip it
@@ -184,20 +201,44 @@ def get_free_letters():
         if i in [shared, config, zip_]:     # skip these special drives
             continue
 
-        letter = chr(65 + i)                # bit number to ascii char
+        letter = chr(65 + i)                # number to ascii char
+
+        if letter in custom_letters:        # skip custom letters as they are not free
+            continue
+
+        usb_drive_letters.append(letter)    # this letter can be used for USB drives
+
+    return usb_drive_letters
+
+
+def unlink_all_usb_drives():
+    """ go through all the possible USB drive letters and unlink them """
+
+    drive_letters = get_usb_drive_letters()  # get all the possible USB drive letters (including the occupied ones)
+
+    for letter in drive_letters:                    # go through drive letters which can be used for USB drives
+        path = get_symlink_path_for_letter(letter)  # construct path where the drive letter should be mounted
+        good = unlink_without_fail(path)            # unlink if possible
+
+        if good:
+            print_and_log(logging.DEBUG, f'unlink_all_usb_drives - unlinked {path}')
+
+
+def get_free_letters():
+    """ Check which Atari drive letters are free and return them, also deletes broken links """
+    letters_out = []
+    sources_out = []
+
+    drive_letters = get_usb_drive_letters()     # get all the possible USB drive letters (including the occupied ones)
+
+    for letter in drive_letters:            # go through drive letters which can be used for USB drives
 
         # check if position at id_ is used or not
         path = get_symlink_path_for_letter(letter)    # construct path where the drive letter should be mounted
 
         if not os.path.exists(path):        # if mount point doesn't exist or symlink broken, it's free
             letters_out.append(letter)
-
-            try:                            # try to delete the symlink
-                os.unlink(path)
-            except FileNotFoundError:       # if it doesn't really exist, just ignore this exception (it's ok)
-                pass
-            except Exception as ex:         # if it existed (e.g. broken link) but failed to remove, log error
-                print_and_log(logging.warning, f'get_free_letters: failed to unlink folder {path}')
+            unlink_without_fail(path)       # try to delete the symlink
         else:                               # mount point exists
             if os.path.islink(path):        # and it's a symlink, read source and append it to list of sources
                 source_path = os.readlink(path)

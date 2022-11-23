@@ -8,7 +8,7 @@ from setproctitle import setproctitle
 from wrapt_timeout_decorator import timeout
 from shared import print_and_log, log_config, settings_load, DEV_DISK_DIR, MOUNT_DIR_RAW, MOUNT_COMMANDS_DIR, \
     SETTINGS_PATH, MOUNT_DIR_TRANS, LETTER_SHARED, LETTER_ZIP, LETTER_CONFIG, CONFIG_PATH_SOURCE, CONFIG_PATH_COPY, \
-    get_symlink_path_for_letter, setting_get_bool
+    get_symlink_path_for_letter, setting_get_bool, unlink_all_usb_drives
 from mount_usb_trans import get_usb_devices, find_and_mount_translated
 from mount_usb_raw import find_and_mount_raw
 from mount_on_cmd import mount_on_command
@@ -61,7 +61,7 @@ def reload_settings_mount_shared():
 
     if changed_usb:         # if settings for usb drive changed, try u/mount sub drive
         print_and_log(logging.INFO, 'USB drive related settings changed, will call find_and_mount_devices()')
-        # TODO: unlink all usb devices
+        unlink_all_usb_drives()         # unlink all usb devices
         find_and_mount_devices()
     else:
         print_and_log(logging.INFO, 'USB drive related settings NOT changed')
