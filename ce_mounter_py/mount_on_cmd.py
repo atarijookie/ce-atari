@@ -1,8 +1,8 @@
 import os
 import logging
 from wrapt_timeout_decorator import timeout
-from shared import print_and_log, get_symlink_path_for_letter, umount_if_mounted, MOUNT_COMMANDS_DIR, LETTER_ZIP, \
-    text_from_file
+from shared import print_and_log, get_symlink_path_for_letter, umount_if_mounted, MOUNT_COMMANDS_DIR, \
+    text_from_file, settings_letter
 
 
 def get_cmd_by_name(cmd_name):
@@ -28,7 +28,8 @@ def mount_zip_file(zip_file_path):
     if not os.path.exists(zip_file_path):  # got path, but it doesn't exist?
         return
 
-    mount_path = get_symlink_path_for_letter(LETTER_ZIP)  # get where it should be mounted
+    letter_zip = settings_letter('DRIVELETTER_ZIP')
+    mount_path = get_symlink_path_for_letter(letter_zip)  # get where it should be mounted
     umount_if_mounted(mount_path)           # umount dir if it's mounted
     os.makedirs(mount_path, exist_ok=True)  # create mount dir
 

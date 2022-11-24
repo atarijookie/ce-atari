@@ -8,7 +8,9 @@ app_log = logging.getLogger()
 
 SETTINGS_PATH = "/ce/settings"          # path to settings dir
 
-settings_default = {'DRIVELETTER_FIRST': 'C', 'MOUNT_RAW_NOT_TRANS': 0, 'SHARED_ENABLED': 0, 'SHARED_NFS_NOT_SAMBA': 0,
+settings_default = {'DRIVELETTER_FIRST': 'C', 'DRIVELETTER_CONFDRIVE': 'O', 'DRIVELETTER_SHARED': 'N',
+                    'DRIVELETTER_ZIP': 'P',
+                    'MOUNT_RAW_NOT_TRANS': 0, 'SHARED_ENABLED': 0, 'SHARED_NFS_NOT_SAMBA': 0,
                     'ACSI_DEVTYPE_0': 0, 'ACSI_DEVTYPE_1': 1, 'ACSI_DEVTYPE_2': 0, 'ACSI_DEVTYPE_3': 0,
                     'ACSI_DEVTYPE_4': 0, 'ACSI_DEVTYPE_5': 0, 'ACSI_DEVTYPE_6': 0, 'ACSI_DEVTYPE_7': 0}
 
@@ -23,9 +25,6 @@ MOUNT_DIR_TRANS = os.path.join(DATA_DIR, 'trans')
 MOUNT_SHARED_CMD_LAST = os.path.join(DATA_DIR, 'mount_shared_cmd_last')
 CONFIG_PATH_SOURCE = "/ce/app/configdrive"
 CONFIG_PATH_COPY = os.path.join(DATA_DIR, 'configdrive')
-LETTER_SHARED = 'N'                     # Network drive on N
-LETTER_CONFIG = 'O'                     # cOnfig drive on O
-LETTER_ZIP = 'P'                        # ziP file drive on P
 
 FILE_MOUNT_CMD_SAMBA = os.path.join(SETTINGS_PATH, 'mount_cmd_samba.txt')
 FILE_MOUNT_CMD_NFS = os.path.join(SETTINGS_PATH, 'mount_cmd_nfs.txt')
@@ -50,6 +49,12 @@ def log_config():
 
 def print_and_log(loglevel, message):
     """ print to console and store to log """
+    if loglevel in [logging.WARNING, logging.ERROR]:        # highlight messages with issues
+        message = f"!!! {message} <<<"
+
+    loglevel_string = logging.getLevelName(loglevel).ljust(8)
+    message = loglevel_string + " " + message               # add log level to message
+
     print(message)
     app_log.log(loglevel, message)
 
@@ -75,6 +80,9 @@ def settings_load():
     os.makedirs(SETTINGS_PATH, exist_ok=True)
 
     for f in os.listdir(SETTINGS_PATH):         # go through the settings dir
+        if f.startswith("."):                   # if it's a hidden file, skip it, because it might be nano .swp file
+            continue
+
         path = os.path.join(SETTINGS_PATH, f)   # create full path
 
         if not os.path.isfile(path):            # if it's not a file, skip it
@@ -85,8 +93,10 @@ def settings_load():
                 value = file.readline()
                 value = re.sub('[\n\r\t]', '', value)
                 settings[f] = value
+        except UnicodeDecodeError:
+            print_and_log(logging.WARNING, f"failed to read file {path} - binary data in text file?")
         except Exception as ex:
-            print_and_log(logging.WARNING, f"failed to read file {path} with exception: {str(ex)}")
+            print_and_log(logging.WARNING, f"failed to read file {path} with exception: {type(ex).__name__} - {str(ex)}")
 
     # find out if setting groups changed
     changed_usb = setting_changed_on_keys(
@@ -96,10 +106,14 @@ def settings_load():
 
     changed_shared = setting_changed_on_keys(
         ['SHARED_ENABLED', 'SHARED_NFS_NOT_SAMBA', 'SHARED_ADDRESS', 'SHARED_PATH', 'SHARED_USERNAME',
-         'SHARED_PASSWORD'],
+         'SHARED_PASSWORD', 'DRIVELETTER_SHARED'],
         settings_old, settings)
 
-    return changed_usb, changed_shared
+    changed_letters = setting_changed_on_keys(
+        ['DRIVELETTER_SHARED', 'DRIVELETTER_CONFDRIVE', 'DRIVELETTER_ZIP', 'DRIVELETTER_FIRST'],
+        settings_old, settings)
+
+    return changed_letters, changed_usb, changed_shared
 
 
 def setting_get_bool(setting_name):
@@ -134,11 +148,18 @@ def get_drives_bitno_from_settings():
     """ get letters from config, convert them to bit numbers """
 
     first = settings_letter_to_bitno('DRIVELETTER_FIRST')
-    shared = letter_to_bitno(LETTER_SHARED)     # network drive
-    config = letter_to_bitno(LETTER_CONFIG)     # config drive
-    zip_ = letter_to_bitno(LETTER_ZIP)          # ZIP file drive
+    shared = settings_letter_to_bitno('DRIVELETTER_SHARED')     # network drive
+    config = settings_letter_to_bitno('DRIVELETTER_CONFDRIVE')  # config drive
+    zip_ = settings_letter_to_bitno('DRIVELETTER_ZIP')          # ZIP file drive
 
     return first, shared, config, zip_
+
+
+def settings_letter(setting_name):
+    """ get the letter from setting and return it """
+    bitno = settings_letter_to_bitno(setting_name)
+    letter = chr(65 + bitno)    # number to ascii char
+    return letter
 
 
 def settings_letter_to_bitno(setting_name):
@@ -179,10 +200,13 @@ def unlink_without_fail(path):
     return False
 
 
-def get_usb_drive_letters():
+def get_usb_drive_letters(all_letters):
     """ Get all the drive letters which can be used for USB drives, if they are free.
     This list holds also the occupied letters.
     We create this list by skipping shared drive, config drive, zip drive, custom drives.
+
+    :param all_letters: if true, return all usb drives - from C to P
+                        if false, return usb drives from FIRST drive letter, e.g. from G to P
     """
 
     usb_drive_letters = []
@@ -194,10 +218,9 @@ def get_usb_drive_letters():
     from mount_user import get_user_custom_mounts_letters
     custom_letters = get_user_custom_mounts_letters()
 
-    for i in range(16):                     # go through available drive letters - from 0 to 15
-        if i < first:                       # below first char? skip it
-            continue
+    start = 2 if all_letters else first     # if all then start from drive #2 (C), else from first drive letter
 
+    for i in range(start, 16):              # go through available drive letters - from 0 to 15
         if i in [shared, config, zip_]:     # skip these special drives
             continue
 
@@ -211,17 +234,28 @@ def get_usb_drive_letters():
     return usb_drive_letters
 
 
-def unlink_all_usb_drives():
-    """ go through all the possible USB drive letters and unlink them """
-
-    drive_letters = get_usb_drive_letters()  # get all the possible USB drive letters (including the occupied ones)
+def unlink_drives_from_list(drive_letters):
+    """ go through the list of drive letters and try to unlink them """
+    print_and_log(logging.DEBUG, f'unlink_drives_from_list - will unlink these if they exist: {drive_letters}')
 
     for letter in drive_letters:                    # go through drive letters which can be used for USB drives
         path = get_symlink_path_for_letter(letter)  # construct path where the drive letter should be mounted
         good = unlink_without_fail(path)            # unlink if possible
 
         if good:
-            print_and_log(logging.DEBUG, f'unlink_all_usb_drives - unlinked {path}')
+            print_and_log(logging.DEBUG, f'unlink_drives_from_list - unlinked {path}')
+
+
+def unlink_everything():
+    """ go through all the possible drive letters and unlink them """
+    all_drive_letters = [chr(65 + i) for i in range(2, 16)]         # generate drive letters from C to P
+    unlink_drives_from_list(all_drive_letters)
+
+
+def unlink_all_usb_drives():
+    """ go through all the possible USB drive letters and unlink them """
+    drive_letters = get_usb_drive_letters(True)  # get all the possible USB drive letters (including the occupied ones)
+    unlink_drives_from_list(drive_letters)
 
 
 def get_free_letters():
@@ -229,7 +263,7 @@ def get_free_letters():
     letters_out = []
     sources_out = []
 
-    drive_letters = get_usb_drive_letters()     # get all the possible USB drive letters (including the occupied ones)
+    drive_letters = get_usb_drive_letters(False)  # get all the possible USB drive letters (including the occupied ones)
 
     for letter in drive_letters:            # go through drive letters which can be used for USB drives
 

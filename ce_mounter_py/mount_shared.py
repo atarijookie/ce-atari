@@ -5,7 +5,7 @@ from pythonping import ping
 import logging
 from wrapt_timeout_decorator import timeout
 from shared import print_and_log, setting_get_bool, get_symlink_path_for_letter, umount_if_mounted, \
-    LETTER_SHARED, text_to_file, text_from_file
+    text_to_file, text_from_file, settings_letter
 import shared
 
 
@@ -67,7 +67,8 @@ def mount_shared():
     """ this function checks for shared drive settings, mounts drive if needed """
     shared_enabled = setting_get_bool('SHARED_ENABLED')
     mount_path = "/mnt/shared"              # get where it should be mounted
-    symlink_path = get_symlink_path_for_letter(LETTER_SHARED)       # where the shared drive will be symlinked
+    letter_shared = settings_letter('DRIVELETTER_SHARED')
+    symlink_path = get_symlink_path_for_letter(letter_shared)       # where the shared drive will be symlinked
 
     if not shared_enabled:                  # if shared drive not enabled, don't do rest, possibly umount
         text_to_file('', shared.MOUNT_SHARED_CMD_LAST)     # clear the mount command

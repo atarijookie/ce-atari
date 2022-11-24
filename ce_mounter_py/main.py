@@ -7,8 +7,8 @@ import traceback
 from setproctitle import setproctitle
 from wrapt_timeout_decorator import timeout
 from shared import print_and_log, log_config, settings_load, DEV_DISK_DIR, MOUNT_DIR_RAW, MOUNT_COMMANDS_DIR, \
-    SETTINGS_PATH, MOUNT_DIR_TRANS, LETTER_SHARED, LETTER_ZIP, LETTER_CONFIG, CONFIG_PATH_SOURCE, CONFIG_PATH_COPY, \
-    get_symlink_path_for_letter, setting_get_bool, unlink_all_usb_drives
+    SETTINGS_PATH, MOUNT_DIR_TRANS, CONFIG_PATH_SOURCE, CONFIG_PATH_COPY, \
+    get_symlink_path_for_letter, setting_get_bool, unlink_all_usb_drives, unlink_everything, settings_letter
 from mount_usb_trans import get_usb_devices, find_and_mount_translated
 from mount_usb_raw import find_and_mount_raw
 from mount_on_cmd import mount_on_command
@@ -25,9 +25,9 @@ def worker():
         try:
             funct()
         except TimeoutError:
-            print_and_log(logging.INFO, f'The function {funct} was terminated with TimeoutError')
+            print_and_log(logging.WARNING, f'The function {funct} was terminated with TimeoutError')
         except Exception as ex:
-            print_and_log(logging.WARNING, f'The function {funct} has crashed with exception: {str(ex)}')
+            print_and_log(logging.WARNING, f'The function {funct} has crashed: {type(ex).__name__} - {str(ex)}')
             tb = traceback.format_exc()
             print_and_log(logging.WARNING, tb)
 
@@ -49,22 +49,17 @@ def reload_settings_mount_shared():
     """ this handler gets called when settings change, reload settings and try mounting
     if settings for mounts changed """
 
+    changed_letters, changed_usb, changed_shared = settings_load()
+
+    if changed_letters:             # if drive letters changed, unlink everything
+        unlink_everything()
+
     mount_user_custom_folders()     # mount user custom folders if they changed
+    copy_and_symlink_config_dir()   # possibly symlink config drive
+    mount_shared()                  # either remount shared drive or just symlink it
+    find_and_mount_devices()        # mount and/or symlink USB devices
 
-    changed_usb, changed_shared = settings_load()
-
-    if changed_shared:      # if settings for shared drive changed, try u/mount shared drive
-        print_and_log(logging.INFO, 'shared drive settings changed, will call mount_shared()')
-        mount_shared()
-    else:
-        print_and_log(logging.INFO, 'shared drive settings NOT changed')
-
-    if changed_usb:         # if settings for usb drive changed, try u/mount sub drive
-        print_and_log(logging.INFO, 'USB drive related settings changed, will call find_and_mount_devices()')
-        unlink_all_usb_drives()         # unlink all usb devices
-        find_and_mount_devices()
-    else:
-        print_and_log(logging.INFO, 'USB drive related settings NOT changed')
+    show_symlinked_dirs()           # show the mounts after possible remounts
 
 
 @timeout(10)
@@ -107,21 +102,28 @@ def copy_and_symlink_config_dir():
         print_and_log(logging.WARNING, f"Config drive origin folder doesn't exist! ( {CONFIG_PATH_SOURCE} )")
         return
 
-    os.makedirs(CONFIG_PATH_COPY, exist_ok=True)                    # create dir for copy
-    os.system(f"cp -r {CONFIG_PATH_SOURCE}/* {CONFIG_PATH_COPY}")   # copy original config dir to copy dir
+    try:
+        os.makedirs(CONFIG_PATH_COPY, exist_ok=True)                    # create dir for copy
+        os.system(f"cp -r {CONFIG_PATH_SOURCE}/* {CONFIG_PATH_COPY}")   # copy original config dir to copy dir
 
-    symlink_path = get_symlink_path_for_letter(LETTER_CONFIG)
+        letter_config = settings_letter('DRIVELETTER_CONFDRIVE')
+        symlink_path = get_symlink_path_for_letter(letter_config)
 
-    if os.path.exists(symlink_path):
-        os.unlink(symlink_path)
+        if os.path.exists(symlink_path):
+            os.unlink(symlink_path)
 
-    os.symlink(CONFIG_PATH_COPY, symlink_path)                      # symlink copy to correct mount dir
-    print_and_log(logging.INFO, f"Config drive was symlinked to: {symlink_path}")
+        os.symlink(CONFIG_PATH_COPY, symlink_path)                      # symlink copy to correct mount dir
+        print_and_log(logging.INFO, f"Config drive was symlinked to: {symlink_path}")
+    except Exception as ex:
+        print_and_log(logging.WARNING, f'copy_and_symlink_config_dir: failed with: {type(ex).__name__} - {str(ex)}')
 
 
 def get_dir_usage(search_dir, name):
     """ turn folder name (drive letter) into what is this folder used for - config / shared / usb / zip drive """
-    name_to_usage = {LETTER_SHARED: "shared drive", LETTER_CONFIG: "config drive", LETTER_ZIP: "ZIP file drive"}
+    name_to_usage = {settings_letter('DRIVELETTER_SHARED'): "shared drive",
+                     settings_letter('DRIVELETTER_CONFDRIVE'): "config drive",
+                     settings_letter('DRIVELETTER_ZIP'): "ZIP file drive"}
+
     usage = name_to_usage.get(name, "USB drive")
 
     fullpath = os.path.join(search_dir, name)       # create full path to this dir
@@ -192,8 +194,8 @@ if __name__ == "__main__":
     print_and_log(logging.INFO, f'On start will look for not mounted devices - they might be already connected')
 
     # try to mount what we can on start
-    for func in [copy_and_symlink_config_dir, mount_user_custom_folders, find_and_mount_devices, mount_shared,
-                 mount_on_command, show_symlinked_dirs]:
+    for func in [unlink_everything, copy_and_symlink_config_dir, mount_user_custom_folders, find_and_mount_devices,
+                 mount_shared, mount_on_command, show_symlinked_dirs]:
         task_queue.put(func)        # put these functions in the test queue, execute them in the worker
 
     threading.Thread(target=worker, daemon=True).start()        # start the task queue worker
