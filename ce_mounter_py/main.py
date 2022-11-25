@@ -4,11 +4,12 @@ import asyncio
 import logging
 import threading, queue
 import traceback
+from functools import partial
 from setproctitle import setproctitle
 from wrapt_timeout_decorator import timeout
 from shared import print_and_log, log_config, settings_load, DEV_DISK_DIR, MOUNT_DIR_RAW, MOUNT_COMMANDS_DIR, \
     SETTINGS_PATH, MOUNT_DIR_TRANS, CONFIG_PATH_SOURCE, CONFIG_PATH_COPY, \
-    get_symlink_path_for_letter, setting_get_bool, unlink_all_usb_drives, unlink_everything, settings_letter
+    get_symlink_path_for_letter, setting_get_bool, unlink_everything, letter_confdrive, letter_shared, letter_zip
 from mount_usb_trans import get_usb_devices, find_and_mount_translated
 from mount_usb_raw import find_and_mount_raw
 from mount_on_cmd import mount_on_command
@@ -16,6 +17,10 @@ from mount_shared import mount_shared
 from mount_user import mount_user_custom_folders
 
 task_queue = queue.Queue()
+
+
+# TODO: mount HDDIMAGE
+# TODO: test / fix mount raw
 
 
 def worker():
@@ -44,12 +49,12 @@ def handle_read_callback(ntfr):
             task_queue.put(handler)                 # call the handler
 
 
-@timeout(10)
-def reload_settings_mount_shared():
+#@timeout(10)
+def reload_settings_mount_everything():
     """ this handler gets called when settings change, reload settings and try mounting
     if settings for mounts changed """
 
-    changed_letters, changed_usb, changed_shared = settings_load()
+    changed_letters = settings_load()
 
     if changed_letters:             # if drive letters changed, unlink everything
         unlink_everything()
@@ -79,7 +84,7 @@ def find_and_mount_devices():
 
 # following two will help us to determine who caused the event and what function should handle it
 event_source = {}
-watched_paths = {SETTINGS_PATH: reload_settings_mount_shared,
+watched_paths = {SETTINGS_PATH: reload_settings_mount_everything,
                  MOUNT_COMMANDS_DIR: mount_on_command,
                  DEV_DISK_DIR: find_and_mount_devices}
 
@@ -106,8 +111,7 @@ def copy_and_symlink_config_dir():
         os.makedirs(CONFIG_PATH_COPY, exist_ok=True)                    # create dir for copy
         os.system(f"cp -r {CONFIG_PATH_SOURCE}/* {CONFIG_PATH_COPY}")   # copy original config dir to copy dir
 
-        letter_config = settings_letter('DRIVELETTER_CONFDRIVE')
-        symlink_path = get_symlink_path_for_letter(letter_config)
+        symlink_path = get_symlink_path_for_letter(letter_confdrive())
 
         if os.path.exists(symlink_path):
             os.unlink(symlink_path)
@@ -118,11 +122,14 @@ def copy_and_symlink_config_dir():
         print_and_log(logging.WARNING, f'copy_and_symlink_config_dir: failed with: {type(ex).__name__} - {str(ex)}')
 
 
-def get_dir_usage(search_dir, name):
+def get_dir_usage(custom_letters, search_dir, name):
     """ turn folder name (drive letter) into what is this folder used for - config / shared / usb / zip drive """
-    name_to_usage = {settings_letter('DRIVELETTER_SHARED'): "shared drive",
-                     settings_letter('DRIVELETTER_CONFDRIVE'): "config drive",
-                     settings_letter('DRIVELETTER_ZIP'): "ZIP file drive"}
+    name_to_usage = {letter_shared(): "shared drive",
+                     letter_confdrive(): "config drive",
+                     letter_zip(): "ZIP file drive"}
+
+    for c_letter in custom_letters:                             # insert custom letters into name_to_usage
+        name_to_usage[c_letter] = "custom drive"
 
     usage = name_to_usage.get(name, "USB drive")
 
@@ -159,9 +166,12 @@ def get_and_show_symlinks(search_dir, fun_on_each_found):
 def show_symlinked_dirs():
     """ prints currently mounted / symlinked dirs """
 
+    from mount_user import get_user_custom_mounts_letters
+    custom_letters = get_user_custom_mounts_letters()           # fetch all the user custom letters
+
     # first show translated drives
     print_and_log(logging.INFO, "\nlist of current translated drives:")
-    get_and_show_symlinks(MOUNT_DIR_TRANS, get_dir_usage)
+    get_and_show_symlinks(MOUNT_DIR_TRANS, partial(get_dir_usage, custom_letters))
 
     # then show RAW drives
     print_and_log(logging.INFO, "\nlist of current RAW drives:")

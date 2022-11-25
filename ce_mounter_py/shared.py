@@ -8,8 +8,13 @@ app_log = logging.getLogger()
 
 SETTINGS_PATH = "/ce/settings"          # path to settings dir
 
-settings_default = {'DRIVELETTER_FIRST': 'C', 'DRIVELETTER_CONFDRIVE': 'O', 'DRIVELETTER_SHARED': 'N',
-                    'DRIVELETTER_ZIP': 'P',
+KEY_LETTER_FIRST = 'DRIVELETTER_FIRST'
+KEY_LETTER_CONFDRIVE = 'DRIVELETTER_CONFDRIVE'
+KEY_LETTER_SHARED = 'DRIVELETTER_SHARED'
+KEY_LETTER_ZIP = 'DRIVELETTER_ZIP'
+
+settings_default = {KEY_LETTER_FIRST: 'C', KEY_LETTER_CONFDRIVE: 'O', KEY_LETTER_SHARED: 'N',
+                    KEY_LETTER_ZIP: 'P',
                     'MOUNT_RAW_NOT_TRANS': 0, 'SHARED_ENABLED': 0, 'SHARED_NFS_NOT_SAMBA': 0,
                     'ACSI_DEVTYPE_0': 0, 'ACSI_DEVTYPE_1': 1, 'ACSI_DEVTYPE_2': 0, 'ACSI_DEVTYPE_3': 0,
                     'ACSI_DEVTYPE_4': 0, 'ACSI_DEVTYPE_5': 0, 'ACSI_DEVTYPE_6': 0, 'ACSI_DEVTYPE_7': 0}
@@ -34,6 +39,18 @@ FILE_MOUNT_USER = os.path.join(SETTINGS_PATH, 'mount_user.txt')         # user c
 DEV_DISK_DIR = '/dev/disk/by-path'
 
 
+def letter_shared():
+    return settings_letter(KEY_LETTER_SHARED)
+
+
+def letter_confdrive():
+    return settings_letter(KEY_LETTER_CONFDRIVE)
+
+
+def letter_zip():
+    return settings_letter(KEY_LETTER_ZIP)
+
+
 def log_config():
     os.makedirs(LOG_DIR, exist_ok=True)
 
@@ -50,13 +67,31 @@ def log_config():
 def print_and_log(loglevel, message):
     """ print to console and store to log """
     if loglevel in [logging.WARNING, logging.ERROR]:        # highlight messages with issues
-        message = f"!!! {message} <<<"
+        message = f"!!! {message} !!!"
 
     loglevel_string = logging.getLevelName(loglevel).ljust(8)
     message = loglevel_string + " " + message               # add log level to message
 
     print(message)
     app_log.log(loglevel, message)
+
+
+def log_all_changed_settings(settings1: dict, settings2: dict):
+    """ go through the supplied list of keys and log changed keys """
+
+    cnt = 0
+    print_and_log(logging.DEBUG, f"Changed keys:")
+
+    for key in settings1.keys():        # go through all the keys, compare values
+        v1 = settings1.get(key)
+        v2 = settings2.get(key)
+
+        if v1 != v2:  # compare values for key from both dicts - not equal? changed!
+            print_and_log(logging.DEBUG, f"    {key}: {v1} -> {v2}")
+            cnt += 1
+
+    if not cnt:                         # nothing changed?
+        print_and_log(logging.DEBUG, f"    (none)")
 
 
 def setting_changed_on_keys(keys: list, settings1: dict, settings2: dict):
@@ -98,22 +133,15 @@ def settings_load():
         except Exception as ex:
             print_and_log(logging.WARNING, f"failed to read file {path} with exception: {type(ex).__name__} - {str(ex)}")
 
+    log_all_changed_settings(settings_old, settings)
+
     # find out if setting groups changed
-    changed_usb = setting_changed_on_keys(
-        ['DRIVELETTER_FIRST', 'MOUNT_RAW_NOT_TRANS', 'ACSI_DEVTYPE_0', 'ACSI_DEVTYPE_1', 'ACSI_DEVTYPE_2',
-         'ACSI_DEVTYPE_3', 'ACSI_DEVTYPE_4', 'ACSI_DEVTYPE_5', 'ACSI_DEVTYPE_6', 'ACSI_DEVTYPE_7'],
-        settings_old, settings)
-
-    changed_shared = setting_changed_on_keys(
-        ['SHARED_ENABLED', 'SHARED_NFS_NOT_SAMBA', 'SHARED_ADDRESS', 'SHARED_PATH', 'SHARED_USERNAME',
-         'SHARED_PASSWORD', 'DRIVELETTER_SHARED'],
-        settings_old, settings)
-
     changed_letters = setting_changed_on_keys(
-        ['DRIVELETTER_SHARED', 'DRIVELETTER_CONFDRIVE', 'DRIVELETTER_ZIP', 'DRIVELETTER_FIRST'],
+        [KEY_LETTER_SHARED, KEY_LETTER_CONFDRIVE, KEY_LETTER_ZIP, KEY_LETTER_FIRST],
         settings_old, settings)
 
-    return changed_letters, changed_usb, changed_shared
+    print_and_log(logging.DEBUG, f"settings_load - changed_letters: {changed_letters}")
+    return changed_letters
 
 
 def setting_get_bool(setting_name):
@@ -147,10 +175,10 @@ def setting_get_int(setting_name):
 def get_drives_bitno_from_settings():
     """ get letters from config, convert them to bit numbers """
 
-    first = settings_letter_to_bitno('DRIVELETTER_FIRST')
-    shared = settings_letter_to_bitno('DRIVELETTER_SHARED')     # network drive
-    config = settings_letter_to_bitno('DRIVELETTER_CONFDRIVE')  # config drive
-    zip_ = settings_letter_to_bitno('DRIVELETTER_ZIP')          # ZIP file drive
+    first = settings_letter_to_bitno(KEY_LETTER_FIRST)
+    shared = settings_letter_to_bitno(KEY_LETTER_SHARED)     # network drive
+    config = settings_letter_to_bitno(KEY_LETTER_CONFDRIVE)  # config drive
+    zip_ = settings_letter_to_bitno(KEY_LETTER_ZIP)          # ZIP file drive
 
     return first, shared, config, zip_
 
