@@ -5,7 +5,7 @@ from pythonping import ping
 import logging
 from wrapt_timeout_decorator import timeout
 from shared import print_and_log, setting_get_bool, get_symlink_path_for_letter, umount_if_mounted, \
-    text_to_file, text_from_file, letter_shared
+    text_to_file, text_from_file, letter_shared, unlink_without_fail
 import shared
 
 
@@ -125,7 +125,7 @@ def mount_shared():
 
     # command changed, we should execute it
     if os.path.exists(symlink_path):        # remove symlink if it exists
-        os.unlink(symlink_path)
+        unlink_without_fail(symlink_path)
 
     os.makedirs(mount_path, exist_ok=True)  # create dir if not exist
     umount_if_mounted(mount_path)           # possibly umount

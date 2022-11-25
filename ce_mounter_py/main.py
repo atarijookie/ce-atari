@@ -9,7 +9,8 @@ from setproctitle import setproctitle
 from wrapt_timeout_decorator import timeout
 from shared import print_and_log, log_config, settings_load, DEV_DISK_DIR, MOUNT_DIR_RAW, MOUNT_COMMANDS_DIR, \
     SETTINGS_PATH, MOUNT_DIR_TRANS, CONFIG_PATH_SOURCE, CONFIG_PATH_COPY, \
-    get_symlink_path_for_letter, setting_get_bool, unlink_everything, letter_confdrive, letter_shared, letter_zip
+    get_symlink_path_for_letter, setting_get_bool, unlink_everything_translated, letter_confdrive, letter_shared, \
+    letter_zip, unlink_without_fail, unlink_everything_raw
 from mount_usb_trans import get_usb_devices, find_and_mount_translated
 from mount_usb_raw import find_and_mount_raw
 from mount_on_cmd import mount_on_command
@@ -19,7 +20,7 @@ from mount_user import mount_user_custom_folders
 task_queue = queue.Queue()
 
 
-# TODO: mount HDDIMAGE
+# TODO: mount HDDIMAGE - hdd image resolution?
 # TODO: test / fix mount raw
 
 
@@ -49,15 +50,18 @@ def handle_read_callback(ntfr):
             task_queue.put(handler)                 # call the handler
 
 
-#@timeout(10)
+@timeout(10)
 def reload_settings_mount_everything():
     """ this handler gets called when settings change, reload settings and try mounting
     if settings for mounts changed """
 
-    changed_letters = settings_load()
+    changed_letters, changed_ids = settings_load()
 
-    if changed_letters:             # if drive letters changed, unlink everything
-        unlink_everything()
+    if changed_letters:             # if drive letters changed, unlink everything translated
+        unlink_everything_translated()
+
+    if changed_ids:                 # if ACSI ID types changed, unlink linked raw devices
+        unlink_everything_raw()
 
     mount_user_custom_folders()     # mount user custom folders if they changed
     copy_and_symlink_config_dir()   # possibly symlink config drive
@@ -114,7 +118,7 @@ def copy_and_symlink_config_dir():
         symlink_path = get_symlink_path_for_letter(letter_confdrive())
 
         if os.path.exists(symlink_path):
-            os.unlink(symlink_path)
+            unlink_without_fail(symlink_path)
 
         os.symlink(CONFIG_PATH_COPY, symlink_path)                      # symlink copy to correct mount dir
         print_and_log(logging.INFO, f"Config drive was symlinked to: {symlink_path}")
@@ -139,6 +143,16 @@ def get_dir_usage(custom_letters, search_dir, name):
         fullpath = os.readlink(fullpath)
 
     res = f"({usage})".ljust(20) + fullpath
+    return res
+
+
+def get_symlink_source(search_dir, name):
+    fullpath = os.path.join(search_dir, name)       # create full path to this dir
+
+    if os.path.islink(fullpath):                    # if this is a link, read source of the link
+        fullpath = os.readlink(fullpath)
+
+    res = f" ".ljust(20) + fullpath
     return res
 
 
@@ -175,7 +189,7 @@ def show_symlinked_dirs():
 
     # then show RAW drives
     print_and_log(logging.INFO, "\nlist of current RAW drives:")
-    get_and_show_symlinks(MOUNT_DIR_RAW, None)
+    get_and_show_symlinks(MOUNT_DIR_RAW, get_symlink_source)
 
     print_and_log(logging.INFO, " ")
 
@@ -204,7 +218,7 @@ if __name__ == "__main__":
     print_and_log(logging.INFO, f'On start will look for not mounted devices - they might be already connected')
 
     # try to mount what we can on start
-    for func in [unlink_everything, copy_and_symlink_config_dir, mount_user_custom_folders, find_and_mount_devices,
+    for func in [unlink_everything_translated, copy_and_symlink_config_dir, mount_user_custom_folders, find_and_mount_devices,
                  mount_shared, mount_on_command, show_symlinked_dirs]:
         task_queue.put(func)        # put these functions in the test queue, execute them in the worker
 

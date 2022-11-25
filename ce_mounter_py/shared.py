@@ -13,11 +13,17 @@ KEY_LETTER_CONFDRIVE = 'DRIVELETTER_CONFDRIVE'
 KEY_LETTER_SHARED = 'DRIVELETTER_SHARED'
 KEY_LETTER_ZIP = 'DRIVELETTER_ZIP'
 
+DEV_TYPE_OFF = 0
+DEV_TYPE_SD = 1
+DEV_TYPE_RAW = 2
+DEV_TYPE_CEDD = 3
+
 settings_default = {KEY_LETTER_FIRST: 'C', KEY_LETTER_CONFDRIVE: 'O', KEY_LETTER_SHARED: 'N',
                     KEY_LETTER_ZIP: 'P',
                     'MOUNT_RAW_NOT_TRANS': 0, 'SHARED_ENABLED': 0, 'SHARED_NFS_NOT_SAMBA': 0,
-                    'ACSI_DEVTYPE_0': 0, 'ACSI_DEVTYPE_1': 1, 'ACSI_DEVTYPE_2': 0, 'ACSI_DEVTYPE_3': 0,
-                    'ACSI_DEVTYPE_4': 0, 'ACSI_DEVTYPE_5': 0, 'ACSI_DEVTYPE_6': 0, 'ACSI_DEVTYPE_7': 0}
+                    'ACSI_DEVTYPE_0': DEV_TYPE_OFF, 'ACSI_DEVTYPE_1': DEV_TYPE_CEDD, 'ACSI_DEVTYPE_2': DEV_TYPE_OFF,
+                    'ACSI_DEVTYPE_3': DEV_TYPE_OFF, 'ACSI_DEVTYPE_4': DEV_TYPE_OFF, 'ACSI_DEVTYPE_5': DEV_TYPE_OFF,
+                    'ACSI_DEVTYPE_6': DEV_TYPE_OFF, 'ACSI_DEVTYPE_7': DEV_TYPE_OFF}
 
 settings = {}
 
@@ -136,12 +142,18 @@ def settings_load():
     log_all_changed_settings(settings_old, settings)
 
     # find out if setting groups changed
+
+    # check if ACSI translated drive letters changed
     changed_letters = setting_changed_on_keys(
         [KEY_LETTER_SHARED, KEY_LETTER_CONFDRIVE, KEY_LETTER_ZIP, KEY_LETTER_FIRST],
         settings_old, settings)
 
-    print_and_log(logging.DEBUG, f"settings_load - changed_letters: {changed_letters}")
-    return changed_letters
+    # check if ACSI RAW IDs changed
+    setting_keys_acsi_ids = [f'ACSI_DEVTYPE_{id_}' for id_ in range(8)]
+    changed_ids = setting_changed_on_keys(setting_keys_acsi_ids, settings_old, settings)
+
+    print_and_log(logging.DEBUG, f"settings_load - changed_letters: {changed_letters}, changed_ids: {changed_ids}")
+    return changed_letters, changed_ids
 
 
 def setting_get_bool(setting_name):
@@ -274,7 +286,16 @@ def unlink_drives_from_list(drive_letters):
             print_and_log(logging.DEBUG, f'unlink_drives_from_list - unlinked {path}')
 
 
-def unlink_everything():
+def unlink_everything_raw():
+    """ go through all the ACSI ID paths and unlink them """
+    from mount_usb_raw import get_symlink_path_for_id
+
+    for id_ in range(8):
+        symlink_path = get_symlink_path_for_id(id_)
+        unlink_without_fail(symlink_path)            # unlink if possible
+
+
+def unlink_everything_translated():
     """ go through all the possible drive letters and unlink them """
     all_drive_letters = [chr(65 + i) for i in range(2, 16)]         # generate drive letters from C to P
     unlink_drives_from_list(all_drive_letters)
@@ -311,10 +332,7 @@ def get_free_letters():
 
 def delete_files(files):
     for file in files:
-        try:
-            os.unlink(file)
-        except Exception as exc:
-            print_and_log(logging.WARNING, f'failed to delete {file} : {str(exc)}')
+        unlink_without_fail(file)
 
 
 def umount_if_mounted(mount_dir, delete=False):

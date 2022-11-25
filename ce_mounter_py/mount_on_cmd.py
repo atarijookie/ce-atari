@@ -2,7 +2,7 @@ import os
 import logging
 from wrapt_timeout_decorator import timeout
 from shared import print_and_log, get_symlink_path_for_letter, umount_if_mounted, MOUNT_COMMANDS_DIR, \
-    text_from_file, letter_zip
+    text_from_file, letter_zip, unlink_without_fail
 
 
 def get_cmd_by_name(cmd_name):
@@ -14,12 +14,7 @@ def get_cmd_by_name(cmd_name):
         return None
 
     path_in_cmd = text_from_file(path_)     # read content of file
-
-    try:
-        os.unlink(path_)                    # delete command file after reading
-    except Exception as ex:
-        print_and_log(logging.WARNING, f'get_cmd_by_name: failed to unlink {path_}: {str(ex)}')
-
+    unlink_without_fail(path_)              # delete command file after reading
     return path_in_cmd                      # return file path
 
 
@@ -49,7 +44,7 @@ def unmount_folder(unmount_path):
 
         if os.path.exists(unmount_path):            # if the path exists
             source = os.readlink(unmount_path)      # get where the symlink is pointing
-            os.unlink(unmount_path)                 # remove symlink
+            unlink_without_fail(unmount_path)                 # remove symlink
 
         if source and os.path.exists(source):       # if the symlink source exists
             umount_if_mounted(unmount_path)
