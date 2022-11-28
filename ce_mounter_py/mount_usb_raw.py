@@ -1,6 +1,6 @@
 import os
 import logging
-from shared import print_and_log, setting_get_int, MOUNT_DIR_RAW, unlink_without_fail, DEV_TYPE_RAW, settings
+from shared import print_and_log, setting_get_int, MOUNT_DIR_RAW, unlink_without_fail, DEV_TYPE_RAW
 
 
 def get_symlink_path_for_id(id_):
@@ -55,29 +55,8 @@ def link_raw_device(device, acsi_id):
     os.symlink(device, path)
 
 
-def get_hddimage_path():
-    """ get hdd image path from settings, check if the file exists, return it if it exists """
-    hdd_image = settings.get('HDDIMAGE')    # get value from settings
-
-    if not hdd_image:                       # no hdd image in settings? just quit
-        return None
-
-    # TODO: maybe do path resolution here?
-
-    if not os.path.exists(hdd_image):       # if te file doesn't exist, return None
-        return None
-
-    return hdd_image            # return path to file
-
-
 def find_and_mount_raw(root_devs):
-    """ symlink all the RAW devices (including the HDD image) to configured ACSI slots """
-
-    hdd_image_path = get_hddimage_path()        # get path to hdd image
-
-    if hdd_image_path:                          # got path?
-        root_devs.append(hdd_image_path)        # add hdd image path to list of devices which need to be linked
-
+    """ symlink all the RAW devices to configured ACSI slots """
     root_devs = [dev for dev in root_devs if not is_raw_device_linked(dev)]  # keep only not symlinked devices
 
     if not root_devs:           # no devices? quit

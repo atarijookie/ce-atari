@@ -7,20 +7,19 @@ import traceback
 from functools import partial
 from setproctitle import setproctitle
 from wrapt_timeout_decorator import timeout
-from shared import print_and_log, log_config, settings_load, DEV_DISK_DIR, MOUNT_DIR_RAW, MOUNT_COMMANDS_DIR, \
+from shared import print_and_log, log_config, DEV_DISK_DIR, MOUNT_DIR_RAW, MOUNT_COMMANDS_DIR, \
     SETTINGS_PATH, MOUNT_DIR_TRANS, CONFIG_PATH_SOURCE, CONFIG_PATH_COPY, \
     get_symlink_path_for_letter, setting_get_bool, unlink_everything_translated, letter_confdrive, letter_shared, \
-    letter_zip, unlink_without_fail, unlink_everything_raw
+    letter_zip, unlink_without_fail, unlink_everything_raw, settings_load
 from mount_usb_trans import get_usb_devices, find_and_mount_translated
 from mount_usb_raw import find_and_mount_raw
+from mount_hdd_image import mount_hdd_image
 from mount_on_cmd import mount_on_command
 from mount_shared import mount_shared
 from mount_user import mount_user_custom_folders
 
 task_queue = queue.Queue()
 
-
-# TODO: mount HDDIMAGE - hdd image resolution?
 # TODO: test / fix mount raw
 
 
@@ -84,6 +83,8 @@ def find_and_mount_devices():
         find_and_mount_raw(root_devs)
     else:                           # for translated mounts
         find_and_mount_translated(root_devs, part_devs)
+
+    mount_hdd_image()               # also try to mount HDD image
 
 
 # following two will help us to determine who caused the event and what function should handle it
@@ -160,11 +161,6 @@ def get_and_show_symlinks(search_dir, fun_on_each_found):
     dirs = []
 
     for name in os.listdir(search_dir):         # go through the dir
-        fullpath = os.path.join(search_dir, name)
-
-        if os.path.isfile(fullpath):            # skip files
-            continue
-
         dirs.append(name)                       # append to list of found
 
     if dirs:                                    # something was found?
@@ -209,7 +205,7 @@ if __name__ == "__main__":
     os.makedirs(MOUNT_DIR_TRANS, exist_ok=True)
     os.makedirs(MOUNT_COMMANDS_DIR, exist_ok=True)
 
-    settings_load()                 # load settings from disk
+    settings_load()                  # load settings from disk
 
     print_and_log(logging.INFO, f"MOUNT_COMMANDS_DIR: {MOUNT_COMMANDS_DIR}")
     print_and_log(logging.INFO, f"MOUNT_DIR_RAW     : {MOUNT_DIR_RAW}")

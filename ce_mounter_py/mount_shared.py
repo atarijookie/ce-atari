@@ -5,8 +5,8 @@ from pythonping import ping
 import logging
 from wrapt_timeout_decorator import timeout
 from shared import print_and_log, setting_get_bool, get_symlink_path_for_letter, umount_if_mounted, \
-    text_to_file, text_from_file, letter_shared, unlink_without_fail
-import shared
+    text_to_file, text_from_file, letter_shared, unlink_without_fail, FILE_MOUNT_CMD_SAMBA, FILE_MOUNT_CMD_NFS, \
+    MOUNT_SHARED_CMD_LAST, load_one_setting, MOUNT_LOG_FILE
 
 
 def is_shared_mounted(shared_mount_path):
@@ -38,7 +38,7 @@ def get_shared_mount_command(nfs_not_samba):
     """
 
     # get the right mount command file for this share type
-    mount_cmd_file = shared.FILE_MOUNT_CMD_NFS if nfs_not_samba else shared.FILE_MOUNT_CMD_SAMBA
+    mount_cmd_file = FILE_MOUNT_CMD_NFS if nfs_not_samba else FILE_MOUNT_CMD_SAMBA
 
     print_and_log(logging.DEBUG, f"get_shared_mount_command: mount_cmd_file is: {mount_cmd_file}")
 
@@ -70,7 +70,7 @@ def mount_shared():
     symlink_path = get_symlink_path_for_letter(letter_shared())       # where the shared drive will be symlinked
 
     if not shared_enabled:                  # if shared drive not enabled, don't do rest, possibly umount
-        text_to_file('', shared.MOUNT_SHARED_CMD_LAST)     # clear the mount command
+        text_to_file('', MOUNT_SHARED_CMD_LAST)     # clear the mount command
         print_and_log(logging.DEBUG, f"mount_shared: SHARED_ENABLED={shared_enabled}, not mounting")
 
         if os.path.exists(mount_path):      # got the mount path? do the umount
@@ -78,10 +78,10 @@ def mount_shared():
 
         return
 
-    addr = shared.settings.get('SHARED_ADDRESS')
-    path_ = shared.settings.get('SHARED_PATH')
-    user = shared.settings.get('SHARED_USERNAME')
-    pswd = shared.settings.get('SHARED_PASSWORD')
+    addr = load_one_setting('SHARED_ADDRESS')
+    path_ = load_one_setting('SHARED_PATH')
+    user = load_one_setting('SHARED_USERNAME')
+    pswd = load_one_setting('SHARED_PASSWORD')
 
     if not addr or not path_:   # address or path not provided? don't do the rest
         print_and_log(logging.DEBUG, f"mount_shared: addr={addr}, path={path_}. not mounting")
@@ -105,7 +105,7 @@ def mount_shared():
 
     # if already mounted AND no change in the created command, nothing to do here
     # (but if not mounted, proceed with mounting, even if the command hasn't changed)
-    mount_shared_cmd_last = text_from_file(shared.MOUNT_SHARED_CMD_LAST)
+    mount_shared_cmd_last = text_from_file(MOUNT_SHARED_CMD_LAST)
 
     if is_mounted and cmd == mount_shared_cmd_last:     # if is mounted and command not changed, don't remount
         print_and_log(logging.INFO, f"mount_shared: mount command not changed, not mounting")
@@ -119,9 +119,9 @@ def mount_shared():
 
         return
 
-    text_to_file(cmd, shared.MOUNT_SHARED_CMD_LAST)     # store this cmd
+    text_to_file(cmd, MOUNT_SHARED_CMD_LAST)     # store this cmd
 
-    cmd += f" > {shared.MOUNT_LOG_FILE} 2>&1 "     # append writing of stdout and stderr to file
+    cmd += f" > {MOUNT_LOG_FILE} 2>&1 "     # append writing of stdout and stderr to file
 
     # command changed, we should execute it
     if os.path.exists(symlink_path):        # remove symlink if it exists
@@ -143,6 +143,6 @@ def mount_shared():
 
     if not good:        # mount failed, copy mount log
         try:
-            shutil.copy(shared.MOUNT_LOG_FILE, mount_path)
+            shutil.copy(MOUNT_LOG_FILE, mount_path)
         except Exception as exc:
             print_and_log(logging.INFO, f'mount_shared: copy of log file failed : {str(exc)}')

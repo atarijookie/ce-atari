@@ -2,6 +2,7 @@ from copy import deepcopy
 import os
 import re
 import logging
+import json
 from logging.handlers import RotatingFileHandler
 
 app_log = logging.getLogger()
@@ -25,8 +26,6 @@ settings_default = {KEY_LETTER_FIRST: 'C', KEY_LETTER_CONFDRIVE: 'O', KEY_LETTER
                     'ACSI_DEVTYPE_3': DEV_TYPE_OFF, 'ACSI_DEVTYPE_4': DEV_TYPE_OFF, 'ACSI_DEVTYPE_5': DEV_TYPE_OFF,
                     'ACSI_DEVTYPE_6': DEV_TYPE_OFF, 'ACSI_DEVTYPE_7': DEV_TYPE_OFF}
 
-settings = {}
-
 LOG_DIR = '/var/log/ce/'
 DATA_DIR = '/var/run/ce/'
 MOUNT_LOG_FILE = os.path.join(LOG_DIR, 'mount.log')
@@ -41,6 +40,8 @@ FILE_MOUNT_CMD_SAMBA = os.path.join(SETTINGS_PATH, 'mount_cmd_samba.txt')
 FILE_MOUNT_CMD_NFS = os.path.join(SETTINGS_PATH, 'mount_cmd_nfs.txt')
 
 FILE_MOUNT_USER = os.path.join(SETTINGS_PATH, 'mount_user.txt')         # user custom mounts in settings dir
+FILE_HDDIMAGE_RESOLVED = os.path.join(DATA_DIR, 'HDDIMAGE_RESOLVED')    # where the resolved HDDIMAGE will end up
+FILE_OLD_SETTINGS = os.path.join(DATA_DIR, 'settings_old.json')         # where the old settings in json are
 
 DEV_DISK_DIR = '/dev/disk/by-path'
 
@@ -111,12 +112,51 @@ def setting_changed_on_keys(keys: list, settings1: dict, settings2: dict):
     return False
 
 
+def load_old_settings():
+    """ Load the old settings from .json file. We want to load the old settings so we can see which settings changed
+    compared to the current ones. We cannot keep them in simple global variable because the settings loading
+    will happen in threads and global vars from threads seem to get lost. """
+
+    settings_json = text_from_file(FILE_OLD_SETTINGS)
+    try:
+        settinx = json.loads(settings_json)
+    except TypeError:       # on fail to decode json, just return empty dict
+        return {}
+
+    return settinx
+
+
+def save_old_settings(settinx):
+    """ save the old settings to .json file. """
+    settings_json = json.dumps(settinx)
+    text_to_file(settings_json, FILE_OLD_SETTINGS)
+    return settinx
+
+
+def load_one_setting(setting_name, default_value=None):
+    """ load one setting from file and return it """
+    path = os.path.join(SETTINGS_PATH, setting_name)    # create full path
+
+    if not os.path.isfile(path):  # if it's not a file, skip it
+        return default_value
+
+    try:
+        with open(path, "r") as file:  # read the file into value in dictionary
+            value = file.readline()
+            value = re.sub('[\n\r\t]', '', value)
+            return value
+    except UnicodeDecodeError:
+        print_and_log(logging.WARNING, f"failed to read file {path} - binary data in text file?")
+    except Exception as ex:
+        print_and_log(logging.WARNING, f"failed to read file {path} with exception: {type(ex).__name__} - {str(ex)}")
+
+    return default_value
+
+
 def settings_load():
     """ load all the present settings from the settings dir """
 
-    global settings
-    settings_old = deepcopy(settings)           # make copy of previous settings before loading new ones
-    settings = deepcopy(settings_default)       # fill settings with default values before loading
+    settinx = deepcopy(settings_default)       # fill settings with default values before loading
 
     os.makedirs(SETTINGS_PATH, exist_ok=True)
 
@@ -124,43 +164,32 @@ def settings_load():
         if f.startswith("."):                   # if it's a hidden file, skip it, because it might be nano .swp file
             continue
 
-        path = os.path.join(SETTINGS_PATH, f)   # create full path
+        settinx[f] = load_one_setting(f)        # load this setting from file
 
-        if not os.path.isfile(path):            # if it's not a file, skip it
-            continue
-
-        try:
-            with open(path, "r") as file:           # read the file into value in dictionary
-                value = file.readline()
-                value = re.sub('[\n\r\t]', '', value)
-                settings[f] = value
-        except UnicodeDecodeError:
-            print_and_log(logging.WARNING, f"failed to read file {path} - binary data in text file?")
-        except Exception as ex:
-            print_and_log(logging.WARNING, f"failed to read file {path} with exception: {type(ex).__name__} - {str(ex)}")
-
-    log_all_changed_settings(settings_old, settings)
+    settings_old = load_old_settings()          # load old settings from json
+    log_all_changed_settings(settings_old, settinx)
 
     # find out if setting groups changed
 
     # check if ACSI translated drive letters changed
     changed_letters = setting_changed_on_keys(
         [KEY_LETTER_SHARED, KEY_LETTER_CONFDRIVE, KEY_LETTER_ZIP, KEY_LETTER_FIRST],
-        settings_old, settings)
+        settings_old, settinx)
 
     # check if ACSI RAW IDs changed
     setting_keys_acsi_ids = [f'ACSI_DEVTYPE_{id_}' for id_ in range(8)]
-    changed_ids = setting_changed_on_keys(setting_keys_acsi_ids, settings_old, settings)
+    setting_keys_acsi_ids.append('HDDIMAGE')    # if hdd image changes, report this as ID change as we need to relink
+    changed_ids = setting_changed_on_keys(setting_keys_acsi_ids, settings_old, settinx)
+
+    save_old_settings(settinx)                  # save the current settings to json file
 
     print_and_log(logging.DEBUG, f"settings_load - changed_letters: {changed_letters}, changed_ids: {changed_ids}")
     return changed_letters, changed_ids
 
 
 def setting_get_bool(setting_name):
-    global settings
-
     value = False
-    value_raw = settings.get(setting_name)
+    value_raw = load_one_setting(setting_name)  # load this setting from file
 
     try:
         value = bool(int(value_raw))
@@ -171,10 +200,8 @@ def setting_get_bool(setting_name):
 
 
 def setting_get_int(setting_name):
-    global settings
-
     value = 0
-    value_raw = settings.get(setting_name)
+    value_raw = load_one_setting(setting_name)  # load this setting from file
 
     try:
         value = int(value_raw)
@@ -206,7 +233,7 @@ def settings_letter_to_bitno(setting_name):
     """ get setting by setting name, convert it to integer and then to drive bit number for Atari, e.g. 
     'a' is 0, 'b' is 1, 'p' is 15 """
 
-    drive_letter = settings.get(setting_name, 'c')
+    drive_letter = load_one_setting(setting_name, 'c')  # load this setting from file
     return letter_to_bitno(drive_letter)
 
 
