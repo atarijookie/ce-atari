@@ -4,6 +4,7 @@ import re
 import logging
 import json
 from logging.handlers import RotatingFileHandler
+from wrapt_timeout_decorator import timeout
 
 app_log = logging.getLogger()
 
@@ -83,6 +84,7 @@ def print_and_log(loglevel, message):
     app_log.log(loglevel, message)
 
 
+@timeout(1)
 def log_all_changed_settings(settings1: dict, settings2: dict):
     """ go through the supplied list of keys and log changed keys """
 
@@ -112,6 +114,7 @@ def setting_changed_on_keys(keys: list, settings1: dict, settings2: dict):
     return False
 
 
+@timeout(1)
 def load_old_settings():
     """ Load the old settings from .json file. We want to load the old settings so we can see which settings changed
     compared to the current ones. We cannot keep them in simple global variable because the settings loading
@@ -126,6 +129,7 @@ def load_old_settings():
     return settinx
 
 
+@timeout(1)
 def save_old_settings(settinx):
     """ save the old settings to .json file. """
     settings_json = json.dumps(settinx)
@@ -153,9 +157,8 @@ def load_one_setting(setting_name, default_value=None):
     return default_value
 
 
-def settings_load():
-    """ load all the present settings from the settings dir """
-
+@timeout(1)
+def load_current_settings():
     settinx = deepcopy(settings_default)       # fill settings with default values before loading
 
     os.makedirs(SETTINGS_PATH, exist_ok=True)
@@ -166,25 +169,36 @@ def settings_load():
 
         settinx[f] = load_one_setting(f)        # load this setting from file
 
-    settings_old = load_old_settings()          # load old settings from json
-    log_all_changed_settings(settings_old, settinx)
+    return settinx
 
+
+@timeout(1)
+def detect_settings_change(settings_current, settings_old):
     # find out if setting groups changed
 
     # check if ACSI translated drive letters changed
     changed_letters = setting_changed_on_keys(
         [KEY_LETTER_SHARED, KEY_LETTER_CONFDRIVE, KEY_LETTER_ZIP, KEY_LETTER_FIRST],
-        settings_old, settinx)
+        settings_old, settings_current)
 
     # check if ACSI RAW IDs changed
     setting_keys_acsi_ids = [f'ACSI_DEVTYPE_{id_}' for id_ in range(8)]
     setting_keys_acsi_ids.append('HDDIMAGE')    # if hdd image changes, report this as ID change as we need to relink
-    changed_ids = setting_changed_on_keys(setting_keys_acsi_ids, settings_old, settinx)
+    changed_ids = setting_changed_on_keys(setting_keys_acsi_ids, settings_old, settings_current)
 
+    return changed_letters, changed_ids
+
+
+def settings_load():
+    """ load all the present settings from the settings dir """
+    settinx = load_current_settings()
+    settings_old = load_old_settings()          # load old settings from json
+    log_all_changed_settings(settings_old, settinx)
+    changed = detect_settings_change(settinx, settings_old)
     save_old_settings(settinx)                  # save the current settings to json file
 
-    print_and_log(logging.DEBUG, f"settings_load - changed_letters: {changed_letters}, changed_ids: {changed_ids}")
-    return changed_letters, changed_ids
+    print_and_log(logging.DEBUG, f"settings_load - changed_letters: {changed[0]}, changed_ids: {changed[1]}")
+    return changed
 
 
 def setting_get_bool(setting_name):

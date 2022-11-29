@@ -69,9 +69,9 @@ def get_hddimage_path():
     # do path resolution here
     hdd_image = resolve_hddimage_path(hdd_image)
 
-    if not os.path.exists(hdd_image):               # if te file doesn't exist, return None
+    if not hdd_image or not os.path.exists(hdd_image):  # if te file doesn't exist, return None
         print_and_log(logging.DEBUG, f"resolve_hddimage_path: file {hdd_image} doesn't exist")
-        text_to_file("", FILE_HDDIMAGE_RESOLVED)    # store nothing to resolved hdd image file
+        text_to_file("FAIL", FILE_HDDIMAGE_RESOLVED)        # store nothing to resolved hdd image file
         return None
 
     print_and_log(logging.DEBUG, f"resolve_hddimage_path: file {hdd_image} exist, will use it")

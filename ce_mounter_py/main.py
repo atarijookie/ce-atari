@@ -20,22 +20,28 @@ from mount_user import mount_user_custom_folders
 
 task_queue = queue.Queue()
 
-# TODO: test / fix mount raw
+# TODO: test / fix together with ce_conf_py - investigate lagging
 
 
 def worker():
+    lock = threading.Lock()
+
     while True:
         funct = task_queue.get()
+        lock.acquire()
+        print_and_log(logging.INFO, f'')
+        print_and_log(logging.INFO, f'EXECUTING: {funct.__name__}()')
 
         try:
             funct()
         except TimeoutError:
-            print_and_log(logging.WARNING, f'The function {funct} was terminated with TimeoutError')
+            print_and_log(logging.WARNING, f'The function {funct.__name__} was terminated with TimeoutError')
         except Exception as ex:
-            print_and_log(logging.WARNING, f'The function {funct} has crashed: {type(ex).__name__} - {str(ex)}')
+            print_and_log(logging.WARNING, f'The function {funct.__name__} has crashed: {type(ex).__name__} - {str(ex)}')
             tb = traceback.format_exc()
             print_and_log(logging.WARNING, tb)
 
+        lock.release()
         task_queue.task_done()
 
 
@@ -45,16 +51,20 @@ def handle_read_callback(ntfr):
     for path_, handler in watched_paths.items():    # go through the watched paths
         if event_source.get(path_):                 # if this one did change
             event_source[path_] = False             # clear this flag
-            print_and_log(logging.INFO, f'will now call: {handler}')
+            print_and_log(logging.INFO, f'adding handler to task queue: {handler.__name__}()')
             task_queue.put(handler)                 # call the handler
 
 
-@timeout(10)
 def reload_settings_mount_everything():
     """ this handler gets called when settings change, reload settings and try mounting
     if settings for mounts changed """
 
-    changed_letters, changed_ids = settings_load()
+    changed_letters, changed_ids = None, None
+
+    try:
+        changed_letters, changed_ids = settings_load()
+    except Exception as ex:
+        print_and_log(logging.ERROR, f'settings_load excepsion: {str(ex)}')
 
     if changed_letters:             # if drive letters changed, unlink everything translated
         unlink_everything_translated()
@@ -66,7 +76,6 @@ def reload_settings_mount_everything():
     copy_and_symlink_config_dir()   # possibly symlink config drive
     mount_shared()                  # either remount shared drive or just symlink it
     find_and_mount_devices()        # mount and/or symlink USB devices
-
     show_symlinked_dirs()           # show the mounts after possible remounts
 
 

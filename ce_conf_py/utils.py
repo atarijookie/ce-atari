@@ -47,6 +47,23 @@ def setting_get_merged(setting_name):
     return shared.settings.get(setting_name)            # get value from stored settings
 
 
+def setting_load_one(setting_name, default_value=None):
+    path = os.path.join(settings_path, setting_name)  # create full path
+
+    if not os.path.isfile(path):  # if it's not a file, skip it
+        return default_value
+
+    try:
+        with open(path, "r") as file:  # read the file into value in dictionary
+            value = file.readline()
+            value = re.sub('[\n\r\t]', '', value)
+            return value
+    except Exception as ex:
+        app_log.debug(f"setting_load_one: failed to load {setting_name} - exception: {str(ex)}")
+
+    return default_value
+
+
 def settings_load():
     """ load all the present settings from the settings dir """
 
@@ -55,16 +72,7 @@ def settings_load():
     shared.settings = copy.deepcopy(settings_default)  # fill settings with default values before loading
 
     for f in os.listdir(settings_path):         # go through the settings dir
-        path = os.path.join(settings_path, f)   # create full path
-
-        if not os.path.isfile(path):            # if it's not a file, skip it
-            continue
-
-        with open(path, "r") as file:           # read the file into value in dictionary
-            value = file.readline()
-            value = re.sub('[\n\r\t]', '', value)
-            shared.settings[f] = value
-            #app_log.debug(f"settings_load: settings[{f}] = {value}")
+        shared.settings[f] = setting_load_one(f)
 
 
 def settings_save():
@@ -130,3 +138,29 @@ def delete_update_files():
     """ delete all update chceck files """
     for path in [FILE_STATUS, FILE_PENDING_YES, FILE_PENDING_NO]:
         delete_file(path)
+
+
+def text_to_file(text, filename):
+    # write text to file for later use
+    try:
+        with open(filename, 'wt') as f:
+            f.write(text)
+    except Exception as ex:
+        app_log.warning(logging.WARNING, f"mount_shared: failed to write to {filename}: {str(ex)}")
+
+
+def text_from_file(filename):
+    # get text from file
+    text = None
+
+    if not os.path.exists(filename):    # no file like this exists? quit
+        return None
+
+    try:
+        with open(filename, 'rt') as f:
+            text = f.read()
+            text = text.strip()         # remove whitespaces
+    except Exception as ex:
+        app_log.warning(logging.WARNING, f"mount_shared: failed to read {filename}: {str(ex)}")
+
+    return text

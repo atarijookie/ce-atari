@@ -1,15 +1,17 @@
 import os
-import re
-import subprocess
-import glob
 import urwid
 import logging
+from time import sleep
 from urwid_helpers import create_my_button, create_header_footer, create_edit, dialog, dialog_yes_no
-from utils import settings_load, settings_save, on_cancel, back_to_main_menu, setting_get_str, on_editline_changed
+from utils import settings_load, settings_save, on_cancel, back_to_main_menu, setting_get_str, on_editline_changed, \
+    text_from_file, delete_file, setting_load_one
 import shared
 
 app_log = logging.getLogger()
 edit_imgpath = None
+
+DATA_DIR = '/var/run/ce/'
+FILE_HDDIMAGE_RESOLVED = os.path.join(DATA_DIR, 'HDDIMAGE_RESOLVED')    # where the resolved HDDIMAGE will end up
 
 
 def hdd_image_create(button):
@@ -59,108 +61,53 @@ def hdd_img_clear(button):
     shared.settings_changed['HDDIMAGE'] = ''    # changed settings to empty string
 
 
-def find_usb_or_shared(path_in):
-    app_log.debug(f"find_usb_or_shared: starts with usb or shared: {path_in}")
-
-    path_is_usb = path_in.startswith('usb')  # if True, starts with usb, if False starts with shared
-
-    result = subprocess.run(['mount'], stdout=subprocess.PIPE)  # run mount command, ger output
-    output = result.stdout.decode('utf-8')  # get output to var
-    mounts = re.findall("(/mnt/\S*)", output)  # find anything starts with /mnt/
-
-    offset = 3 if path_is_usb else 6  # how much we need to cut of - 3 for 'usb', 6 for 'shared'
-    sub_path = path_in[offset:]  # get just the part after 'usb' / 'shared' start
-
-    # if the sub-path starts with '/' we must remove it, otherwise it would resolve to root of filesystem
-    if sub_path.startswith('/'):
-        sub_path = sub_path[1:]
-
-    app_log.debug(f"path_is_usb: {path_is_usb}")
-    app_log.debug(f"mounts: {mounts}")
-    app_log.debug(f"sub_path: {sub_path}")
-
-    # go through mounts
-    for mount in mounts:
-        mount_is_shared = '/mnt/shared' in mount  # if True, this mount is for shared folder
-
-        # if we're looking for usb/shared drive, but the mount is shared/usb, skip it
-        if (path_is_usb and mount_is_shared) or (not path_is_usb and not mount_is_shared):
-            app_log.debug(f"path_is_usb: {path_is_usb}, mount_is_shared: {mount_is_shared} -- ignoring")
-            continue
-
-        path = os.path.join(mount, sub_path)  # create full path
-        app_log.debug(f"mount: {mount} + sub_path: {sub_path} = {path}")
-
-        if os.path.exists(path) and os.path.isfile(path):   # if path exists, return it
-            app_log.debug(f"path exists: {path}")
-            return path
-
-        app_log.debug(f"path does not exist: {path}")
-
-        # let's check if we have wildcard in the path and then possibly try to resolve it
-        if '*' in path:
-            app_log.debug(f"path has wildcard that we will resolve: {path}")
-            path2 = find_path_with_wildcard(path)
-
-            if path2:     # found something existing, return it
-                return path2
-
-    return None     # no existing path found
-
-
-def find_path_with_wildcard(path_in):
-    app_log.debug("find_path_with_wildcard: will try to find pattern: {}".format(path_in))
-    matches = glob.glob(path_in)  # try unix style pathname pattern expansion
-
-    for match in matches:  # go through all the found matches
-        if os.path.exists(match) and os.path.isfile(match):
-            return match
-
-    return None
-
-
 def hdd_img_save(button):
     app_log.debug(f"shared_drive_save: {shared.settings_changed}")
 
-    path_image = setting_get_str('HDDIMAGE')
+    path_image_current = setting_load_one('HDDIMAGE')
+    path_image_new = setting_get_str('HDDIMAGE')
 
-    # if clear path is specified (user wants to remove hdd image), just save it
-    if not path_image:
+    # if clear path is specified (user wants to remove hdd image) OR no path change, just save it and return to menu
+    if not path_image_new or (path_image_new == path_image_current):
         settings_save()
         back_to_main_menu(None)
         return
 
-    path_out = None
-    path_resolved = False           # becomes true if some additional logic resolved input to final path
+    delete_file(FILE_HDDIMAGE_RESOLVED)     # delete the resolved image file, so we won't respond to existing file
 
-    if path_image.startswith('usb') or path_image.startswith('shared'):     # starts with usb or shared?
-        path_out = find_usb_or_shared(path_image)
-        path_resolved = True
-    elif '*' in path_image:                 # wildcard in path found?
-        path_out = find_path_with_wildcard(path_image)
-        path_resolved = True
-    else:       # not usb/shared path, and no wildcard? just check if it exists
-        if os.path.exists(path_image) and os.path.isfile(path_image):   # path exists and it's a file? use it
-            path_out = path_image
+    settings_save()                 # save the value to file, let mounter try to resolve it
+    did_resolve = False
+    exists = False
 
-    # no valid path was found? show message and don't save
-    if not path_out:
-        dialog(shared.main_loop, shared.current_body, f"The path is invalid:\n{path_image}")
+    for i in range(20):             # for some time try to see if mounter was able to resolve the HDD image filename
+        sleep(0.1)
+        resolved_filename = text_from_file(FILE_HDDIMAGE_RESOLVED)
+
+        if not resolved_filename:       # still not resolved, try again
+            continue
+
+        exists = os.path.exists(resolved_filename)
+        did_resolve = True
+        break
+
+    if not did_resolve:
+        dialog(shared.main_loop, shared.current_body, f"Image filename not resolved.\nIs mounter running?")
         return
 
-    # store the new path to changed settings
-    shared.settings_changed['HDDIMAGE'] = path_out
+    # no valid path was found? show message and don't save
+    if not exists:
+        dialog(shared.main_loop, shared.current_body, f"The path is invalid:\n{path_image_new}")
+        return
 
     # path is pointing to shared drive? warn user
-    if "/mnt/shared/" in path_out:
+    if path_image_new.startswith("shared/"):
         dialog_yes_no(shared.main_loop, shared.current_body,
                       "It is not safe to mount HDD image from network.\nAre you sure?", call_on_answer=on_user_answer)
         return
 
     # if the input path was resolved to something else, show it
-    if path_resolved:
-        dialog_yes_no(shared.main_loop, shared.current_body,
-                      f"Your path was resolved to:\n{path_out}\nIs this ok?", call_on_answer=on_user_answer)
+    dialog_yes_no(shared.main_loop, shared.current_body,
+                  f"Your path was resolved to:\n{resolved_filename}\nIs this ok?", call_on_answer=on_user_answer)
 
 
 def on_user_answer(yes_pressed):
