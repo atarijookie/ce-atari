@@ -2,7 +2,7 @@ import os
 import psutil
 import logging
 from shared import print_and_log, get_symlink_path_for_letter, \
-    get_free_letters, DEV_DISK_DIR, LOG_DIR, unlink_without_fail
+    get_free_letters, DEV_DISK_DIR, LOG_DIR, unlink_without_fail, symlink_if_needed
 
 
 def get_usb_devices():
@@ -172,7 +172,7 @@ def symlink_not_linked(mounted_all):
         print_and_log(logging.DEBUG, f"symlink_not_linked: {source} -> {path}")
 
         try:
-            os.symlink(source, path)        # try to create symlink, but in some cases it doesn't fail
+            symlink_if_needed(source, path)
 
             if not os.path.exists(path):    # check if created symlink exists and it's not broken
                 print_and_log(logging.WARNING, f"symlink_not_linked: symlink {source} -> {path} created but broken!")

@@ -1,33 +1,11 @@
 import os
 import shutil
-import subprocess
 from pythonping import ping
 import logging
 from wrapt_timeout_decorator import timeout
 from shared import print_and_log, setting_get_bool, get_symlink_path_for_letter, umount_if_mounted, \
     text_to_file, text_from_file, letter_shared, unlink_without_fail, FILE_MOUNT_CMD_SAMBA, FILE_MOUNT_CMD_NFS, \
-    MOUNT_SHARED_CMD_LAST, load_one_setting, MOUNT_LOG_FILE
-
-
-def is_shared_mounted(shared_mount_path):
-    """ see if shared drive is already mounted or not  """
-    result = subprocess.run(['mount'], stdout=subprocess.PIPE)        # run 'mount' command
-    result = result.stdout.decode('utf-8')  # get output as string
-    lines = result.split('\n')              # split whole result to lines
-
-    for line in lines:                      # go through lines
-        parts = line.split(' ')             # split '/dev/sda1 on /mnt/drive type ...' to items
-
-        if len(parts) < 3:                  # some line, which couldn't been split to at least 3 parts? skip it
-            continue
-
-        mount_dir = parts[2]                # get mount point
-
-        if mount_dir == shared_mount_path:  # if this existing mount point is shared mount path, then shared is mounted
-            return True
-
-    # shared mount point wasn't found, shared drive not mounted
-    return False
+    MOUNT_SHARED_CMD_LAST, load_one_setting, MOUNT_LOG_FILE, MOUNT_DIR_SHARED, is_shared_mounted, symlink_if_needed
 
 
 def get_shared_mount_command(nfs_not_samba):
@@ -66,7 +44,7 @@ def get_shared_mount_command(nfs_not_samba):
 def mount_shared():
     """ this function checks for shared drive settings, mounts drive if needed """
     shared_enabled = setting_get_bool('SHARED_ENABLED')
-    mount_path = "/mnt/shared"              # get where it should be mounted
+    mount_path = MOUNT_DIR_SHARED              # get where it should be mounted
     symlink_path = get_symlink_path_for_letter(letter_shared())       # where the shared drive will be symlinked
 
     if not shared_enabled:                  # if shared drive not enabled, don't do rest, possibly umount
@@ -100,7 +78,7 @@ def mount_shared():
     cmd = cmd.strip()       # remove trailing and leading whitespaces
 
     # check if shared is mounted, if not mounted, do mount anyway, even if cmd is the same below
-    is_mounted = is_shared_mounted(mount_path)
+    is_mounted = is_shared_mounted()
     print_and_log(logging.INFO, f"mount_shared: shared drive is_mounted: {is_mounted}")
 
     # if already mounted AND no change in the created command, nothing to do here
@@ -109,14 +87,7 @@ def mount_shared():
 
     if is_mounted and cmd == mount_shared_cmd_last:     # if is mounted and command not changed, don't remount
         print_and_log(logging.INFO, f"mount_shared: mount command not changed, not mounting")
-
-        if not os.path.exists(symlink_path):            # symlink doesn't seem to exist? create it
-            try:
-                print_and_log(logging.INFO, f'mount_shared: just creating symlink {mount_path} -> {symlink_path}')
-                os.symlink(mount_path, symlink_path)    # symlink from mount path to symlink path
-            except Exception as exc:
-                print_and_log(logging.INFO, f'mount_shared: creating symlink failed : {str(exc)}')
-
+        symlink_if_needed(mount_path, symlink_path)     # create symlink, but only if needed
         return
 
     text_to_file(cmd, MOUNT_SHARED_CMD_LAST)     # store this cmd
@@ -137,7 +108,7 @@ def mount_shared():
         good = status == 0              # good if status is 0
         print_and_log(logging.INFO, f'mount_shared: good={good}')
 
-        os.symlink(mount_path, symlink_path)        # symlink from mount path to symlink path
+        symlink_if_needed(mount_path, symlink_path)     # create symlink, but only if needed
     except Exception as exc:
         print_and_log(logging.INFO, f'mount_shared: mount failed : {str(exc)}')
 

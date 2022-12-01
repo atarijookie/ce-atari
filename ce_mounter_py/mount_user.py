@@ -2,7 +2,7 @@ import os
 import logging
 from wrapt_timeout_decorator import timeout
 from shared import print_and_log, get_symlink_path_for_letter, \
-    text_from_file, FILE_MOUNT_USER, unlink_without_fail
+    text_from_file, FILE_MOUNT_USER, symlink_if_needed
 
 
 def get_user_custom_mount_settings():
@@ -59,25 +59,4 @@ def mount_user_custom_folders():
         drive, custom_path = mnt                        # split tuple to vars
 
         symlink_path = get_symlink_path_for_letter(drive)       # create path where we should symlink the user folder
-
-        try:
-            relink = False
-
-            # if the destination exists and it's a link
-            if os.path.exists(symlink_path) and os.path.islink(symlink_path):
-                src_path = os.readlink(symlink_path)    # get source path
-
-                if src_path != custom_path:             # if the link path doesn't match what should be linked here
-                    relink = True
-            else:           # path doesn't exist or the link is broken, try to relink
-                relink = True
-
-            if relink:                                  # if we should relink this custom mount
-                unlink_without_fail(symlink_path)       # try to unlink, but expect it might fail
-
-                os.symlink(custom_path, symlink_path)   # symlink custom path
-                print_and_log(logging.DEBUG, f"mount_user_custom_folders: symlinked drive: {drive}, path: {custom_path} to {symlink_path}")
-            else:                                       # should not re-link, just log message
-                print_and_log(logging.DEBUG, f"mount_user_custom_folders: not re-linking {symlink_path}")
-        except Exception as ex:
-            print_and_log(logging.WARNING, f"mount_user_custom_folders: failed on drive: {drive}, path: {custom_path}, exception: {str(ex)}")
+        symlink_if_needed(custom_path, symlink_path)            # create symlink, but only if needed

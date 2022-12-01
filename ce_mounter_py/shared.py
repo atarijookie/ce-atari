@@ -3,6 +3,8 @@ import os
 import re
 import logging
 import json
+import psutil
+from functools import partial
 from logging.handlers import RotatingFileHandler
 from wrapt_timeout_decorator import timeout
 
@@ -45,6 +47,9 @@ FILE_HDDIMAGE_RESOLVED = os.path.join(DATA_DIR, 'HDDIMAGE_RESOLVED')    # where 
 FILE_OLD_SETTINGS = os.path.join(DATA_DIR, 'settings_old.json')         # where the old settings in json are
 
 DEV_DISK_DIR = '/dev/disk/by-path'
+
+MOUNT_DIR_SHARED = "/mnt/shared"            # where the shared drive will be mounted == shared drive symlink source
+MOUNT_DIR_ZIP_FILE = "/mnt/zip_file"        # where the ZIP file will be mounted == ZIP file symlink source
 
 
 def letter_shared():
@@ -342,12 +347,6 @@ def unlink_everything_translated():
     unlink_drives_from_list(all_drive_letters)
 
 
-def unlink_all_usb_drives():
-    """ go through all the possible USB drive letters and unlink them """
-    drive_letters = get_usb_drive_letters(True)  # get all the possible USB drive letters (including the occupied ones)
-    unlink_drives_from_list(drive_letters)
-
-
 def get_free_letters():
     """ Check which Atari drive letters are free and return them, also deletes broken links """
     letters_out = []
@@ -371,11 +370,6 @@ def get_free_letters():
     return letters_out, set(sources_out)
 
 
-def delete_files(files):
-    for file in files:
-        unlink_without_fail(file)
-
-
 def umount_if_mounted(mount_dir, delete=False):
     """ check if this dir is mounted and if it is, then umount it """
 
@@ -393,25 +387,6 @@ def umount_if_mounted(mount_dir, delete=False):
         print_and_log(logging.INFO, f'umount_if_mounted: umounted {mount_dir}')
     except Exception as exc:
         print_and_log(logging.INFO, f'umount_if_mounted: failed to umount {mount_dir} : {str(exc)}')
-
-
-def options_to_string(opts: dict):
-    """ turn dictionary of options into single string """
-
-    opts_strs = []
-
-    for key, value in opts.items():     # go through all the dict items
-        if not value:                   # value not provided? skip adding
-            continue
-
-        opt = f'{key}={value}'          # from key, value create 'key=value' string
-        opts_strs.append(opt)
-
-    if opts_strs:       # if got some options, merge them, prepend with -o
-        options = '-o ' + ','.join(opts_strs)
-        return options
-
-    return None         # no valid options found
 
 
 def text_to_file(text, filename):
@@ -438,3 +413,127 @@ def text_from_file(filename):
         print_and_log(logging.WARNING, f"mount_shared: failed to read {filename}: {str(ex)}")
 
     return text
+
+
+def get_dir_usage(custom_letters, search_dir, name):
+    """ turn folder name (drive letter) into what is this folder used for - config / shared / usb / zip drive """
+    name_to_usage = {letter_shared(): "shared drive",
+                     letter_confdrive(): "config drive",
+                     letter_zip(): "ZIP file drive"}
+
+    for c_letter in custom_letters:                             # insert custom letters into name_to_usage
+        name_to_usage[c_letter] = "custom drive"
+
+    usage = name_to_usage.get(name, "USB drive")
+
+    fullpath = os.path.join(search_dir, name)       # create full path to this dir
+
+    if os.path.islink(fullpath):                    # if this is a link, read source of the link
+        fullpath = os.readlink(fullpath)
+
+    res = f"({usage})".ljust(20) + fullpath
+    return res
+
+
+def get_symlink_source(search_dir, name):
+    fullpath = os.path.join(search_dir, name)       # create full path to this dir
+
+    if os.path.islink(fullpath):                    # if this is a link, read source of the link
+        fullpath = os.readlink(fullpath)
+
+    res = f" ".ljust(20) + fullpath
+    return res
+
+
+def get_and_show_symlinks(search_dir, fun_on_each_found):
+    dirs = []
+
+    for name in os.listdir(search_dir):         # go through the dir
+        dirs.append(name)                       # append to list of found
+
+    if dirs:                                    # something was found?
+        dirs = sorted(dirs)                     # sort results
+
+        for one_dir in dirs:
+            desc = '' if not fun_on_each_found else fun_on_each_found(search_dir, one_dir)  # get description if got function
+            print_and_log(logging.INFO, f" * {one_dir} {desc}")
+    else:                                       # nothing was found
+        print_and_log(logging.INFO, f" (none)")
+
+
+def show_symlinked_dirs():
+    """ prints currently mounted / symlinked dirs """
+
+    from mount_user import get_user_custom_mounts_letters
+    custom_letters = get_user_custom_mounts_letters()           # fetch all the user custom letters
+
+    # first show translated drives
+    print_and_log(logging.INFO, "\nlist of current translated drives:")
+    get_and_show_symlinks(MOUNT_DIR_TRANS, partial(get_dir_usage, custom_letters))
+
+    # then show RAW drives
+    print_and_log(logging.INFO, "\nlist of current RAW drives:")
+    get_and_show_symlinks(MOUNT_DIR_RAW, get_symlink_source)
+
+    print_and_log(logging.INFO, " ")
+
+
+def is_mountpoint_mounted(mountpoint):
+    """ go through all the mounted disks and see if the specified mountpoint is present in the mounts or not """
+    partitions = psutil.disk_partitions(True)
+
+    for part in partitions:
+        if part.mountpoint == mountpoint:       # mountpoint found, return True
+            return True
+
+    return False        # mountpoint not found
+
+
+def is_zip_mounted():
+    """ ZIP file mounted? """
+    return is_mountpoint_mounted(MOUNT_DIR_ZIP_FILE)
+
+
+def is_shared_mounted():
+    """ shared drive mounted? """
+    return is_mountpoint_mounted(MOUNT_DIR_SHARED)
+
+
+def symlink_if_needed(mount_dir, symlink_dir):
+    """ This function creates symlink from mount_dir to symlink_dir, but tries to do it smart, e.g.:
+        - checks if the source really exists, doesn't try if it doesn't
+        - if the symlink doesn't exist, it will symlink it
+        - if the symlink does exist, it checks where the link points, and when the link is what it should be, then it
+          doesn't symlink anything, so it links only in cases where the link is wrong
+    """
+
+    # check if the source (mount) dir exists, fail if it doesn't
+    if not os.path.exists(mount_dir):
+        print_and_log(logging.WARNING, f"symlink_if_needed: mount_dir {mount_dir} does not exists!")
+        return
+
+    symlink_it = False
+
+    if not os.path.exists(symlink_dir):     # symlink dir doesn't exist - symlink it
+        symlink_it = True
+    else:                                   # symlink dir does exist - check if it's pointing to right source
+        if os.path.islink(symlink_dir):             # if it's a symlink
+            source_dir = os.readlink(symlink_dir)   # read symlink
+
+            if source_dir != mount_dir:             # source of this link is not our mount dir
+                symlink_it = True
+        else:       # not a symlink - delete it, symlink it
+            symlink_it = True
+
+    # sym linking not needed? quit
+    if not symlink_it:
+        return
+
+    # should symlink now
+    unlink_without_fail(symlink_dir)        # try to delete it
+
+    try:
+        os.symlink(mount_dir, symlink_dir)  # symlink from mount path to symlink path
+        print_and_log(logging.DEBUG, f'symlink_if_needed: symlinked {mount_dir} -> {symlink_dir}')
+    except Exception as ex:
+        print_and_log(logging.WARNING, f'symlink_if_needed: failed with: {type(ex).__name__} - {str(ex)}')

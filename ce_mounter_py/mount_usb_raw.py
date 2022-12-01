@@ -1,6 +1,7 @@
 import os
 import logging
-from shared import print_and_log, setting_get_int, MOUNT_DIR_RAW, unlink_without_fail, DEV_TYPE_RAW
+from shared import print_and_log, setting_get_int, MOUNT_DIR_RAW, unlink_without_fail, DEV_TYPE_RAW, \
+    symlink_if_needed
 
 
 def get_symlink_path_for_id(id_):
@@ -52,7 +53,7 @@ def link_raw_device(device, acsi_id):
 
     # create symlink from device to ACSI slot
     print_and_log(logging.DEBUG, f"mount_device as RAW: {device} -> {path}")
-    os.symlink(device, path)
+    symlink_if_needed(device, path)  # create symlink, but only if needed
 
 
 def find_and_mount_raw(root_devs):

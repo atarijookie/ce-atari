@@ -4,13 +4,13 @@ import asyncio
 import logging
 import threading, queue
 import traceback
-from functools import partial
 from setproctitle import setproctitle
 from wrapt_timeout_decorator import timeout
 from shared import print_and_log, log_config, DEV_DISK_DIR, MOUNT_DIR_RAW, MOUNT_COMMANDS_DIR, \
     SETTINGS_PATH, MOUNT_DIR_TRANS, CONFIG_PATH_SOURCE, CONFIG_PATH_COPY, \
-    get_symlink_path_for_letter, setting_get_bool, unlink_everything_translated, letter_confdrive, letter_shared, \
-    letter_zip, unlink_without_fail, unlink_everything_raw, settings_load
+    get_symlink_path_for_letter, setting_get_bool, unlink_everything_translated, letter_confdrive, \
+    unlink_without_fail, unlink_everything_raw, settings_load, show_symlinked_dirs, is_zip_mounted, \
+    MOUNT_DIR_ZIP_FILE, letter_zip, symlink_if_needed
 from mount_usb_trans import get_usb_devices, find_and_mount_translated
 from mount_usb_raw import find_and_mount_raw
 from mount_hdd_image import mount_hdd_image
@@ -19,8 +19,6 @@ from mount_shared import mount_shared
 from mount_user import mount_user_custom_folders
 
 task_queue = queue.Queue()
-
-# TODO: test / fix together with ce_conf_py - investigate lagging
 
 
 def worker():
@@ -74,6 +72,7 @@ def reload_settings_mount_everything():
 
     mount_user_custom_folders()     # mount user custom folders if they changed
     copy_and_symlink_config_dir()   # possibly symlink config drive
+    symlink_zip_drive_if_mounted()  # possibly symlink ZIP drive
     mount_shared()                  # either remount shared drive or just symlink it
     find_and_mount_devices()        # mount and/or symlink USB devices
     show_symlinked_dirs()           # show the mounts after possible remounts
@@ -127,76 +126,20 @@ def copy_and_symlink_config_dir():
 
         symlink_path = get_symlink_path_for_letter(letter_confdrive())
 
-        if os.path.exists(symlink_path):
-            unlink_without_fail(symlink_path)
-
-        os.symlink(CONFIG_PATH_COPY, symlink_path)                      # symlink copy to correct mount dir
+        symlink_if_needed(CONFIG_PATH_COPY, symlink_path)               # create symlink, but only if needed
         print_and_log(logging.INFO, f"Config drive was symlinked to: {symlink_path}")
     except Exception as ex:
         print_and_log(logging.WARNING, f'copy_and_symlink_config_dir: failed with: {type(ex).__name__} - {str(ex)}')
 
 
-def get_dir_usage(custom_letters, search_dir, name):
-    """ turn folder name (drive letter) into what is this folder used for - config / shared / usb / zip drive """
-    name_to_usage = {letter_shared(): "shared drive",
-                     letter_confdrive(): "config drive",
-                     letter_zip(): "ZIP file drive"}
+def symlink_zip_drive_if_mounted():
+    """ when we unlink all translated drives, use this to re-link zip drive """
+    if not is_zip_mounted():        # zip drive not mounted? nothing to do
+        return
 
-    for c_letter in custom_letters:                             # insert custom letters into name_to_usage
-        name_to_usage[c_letter] = "custom drive"
-
-    usage = name_to_usage.get(name, "USB drive")
-
-    fullpath = os.path.join(search_dir, name)       # create full path to this dir
-
-    if os.path.islink(fullpath):                    # if this is a link, read source of the link
-        fullpath = os.readlink(fullpath)
-
-    res = f"({usage})".ljust(20) + fullpath
-    return res
-
-
-def get_symlink_source(search_dir, name):
-    fullpath = os.path.join(search_dir, name)       # create full path to this dir
-
-    if os.path.islink(fullpath):                    # if this is a link, read source of the link
-        fullpath = os.readlink(fullpath)
-
-    res = f" ".ljust(20) + fullpath
-    return res
-
-
-def get_and_show_symlinks(search_dir, fun_on_each_found):
-    dirs = []
-
-    for name in os.listdir(search_dir):         # go through the dir
-        dirs.append(name)                       # append to list of found
-
-    if dirs:                                    # something was found?
-        dirs = sorted(dirs)                     # sort results
-
-        for one_dir in dirs:
-            desc = '' if not fun_on_each_found else fun_on_each_found(search_dir, one_dir)  # get description if got function
-            print_and_log(logging.INFO, f" * {one_dir} {desc}")
-    else:                                       # nothing was found
-        print_and_log(logging.INFO, f" (none)")
-
-
-def show_symlinked_dirs():
-    """ prints currently mounted / symlinked dirs """
-
-    from mount_user import get_user_custom_mounts_letters
-    custom_letters = get_user_custom_mounts_letters()           # fetch all the user custom letters
-
-    # first show translated drives
-    print_and_log(logging.INFO, "\nlist of current translated drives:")
-    get_and_show_symlinks(MOUNT_DIR_TRANS, partial(get_dir_usage, custom_letters))
-
-    # then show RAW drives
-    print_and_log(logging.INFO, "\nlist of current RAW drives:")
-    get_and_show_symlinks(MOUNT_DIR_RAW, get_symlink_source)
-
-    print_and_log(logging.INFO, " ")
+    mount_path = MOUNT_DIR_ZIP_FILE  # get where ZIP file is mounted
+    symlink_path = get_symlink_path_for_letter(letter_zip())  # get where it should be symlinked
+    symlink_if_needed(mount_path, symlink_path)     # create symlink, but only if needed
 
 
 if __name__ == "__main__":
@@ -223,8 +166,9 @@ if __name__ == "__main__":
     print_and_log(logging.INFO, f'On start will look for not mounted devices - they might be already connected')
 
     # try to mount what we can on start
-    for func in [unlink_everything_translated, copy_and_symlink_config_dir, mount_user_custom_folders, find_and_mount_devices,
-                 mount_shared, mount_on_command, show_symlinked_dirs]:
+    for func in [unlink_everything_translated, copy_and_symlink_config_dir, symlink_zip_drive_if_mounted,
+                 mount_user_custom_folders, find_and_mount_devices, mount_shared, mount_on_command,
+                 show_symlinked_dirs]:
         task_queue.put(func)        # put these functions in the test queue, execute them in the worker
 
     threading.Thread(target=worker, daemon=True).start()        # start the task queue worker
