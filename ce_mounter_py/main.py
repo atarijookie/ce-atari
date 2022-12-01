@@ -74,12 +74,12 @@ def reload_settings_mount_everything():
     copy_and_symlink_config_dir()   # possibly symlink config drive
     symlink_zip_drive_if_mounted()  # possibly symlink ZIP drive
     mount_shared()                  # either remount shared drive or just symlink it
-    find_and_mount_devices()        # mount and/or symlink USB devices
+    find_and_mount_devices(True)    # mount and/or symlink USB devices
     show_symlinked_dirs()           # show the mounts after possible remounts
 
 
 @timeout(10)
-def find_and_mount_devices():
+def find_and_mount_devices(dont_show_symlinked_dirs=False):
     """ look for USB devices, find those which are not mounted yet, find a mount point for them, mount them """
     mount_raw_not_trans = setting_get_bool('MOUNT_RAW_NOT_TRANS')
     print_and_log(logging.INFO, f"MOUNT mode: {'RAW' if mount_raw_not_trans else 'TRANS'}")
@@ -93,6 +93,9 @@ def find_and_mount_devices():
         find_and_mount_translated(root_devs, part_devs)
 
     mount_hdd_image()               # also try to mount HDD image
+
+    if not dont_show_symlinked_dirs:
+        show_symlinked_dirs()       # show the mounts after possible remounts
 
 
 # following two will help us to determine who caused the event and what function should handle it

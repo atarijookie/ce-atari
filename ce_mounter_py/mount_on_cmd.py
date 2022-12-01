@@ -25,13 +25,16 @@ def mount_zip_file(zip_file_path):
     if not os.path.exists(zip_file_path):  # got path, but it doesn't exist?
         return
 
-    print_and_log(logging.INFO, f'mount_zip_file: is some ZIP already mounted? {is_zip_mounted()}')
+    mounted = is_zip_mounted()
+    print_and_log(logging.INFO, f'mount_zip_file: is some ZIP already mounted? {mounted}')
 
-    mount_path = MOUNT_DIR_ZIP_FILE         # get where it should be mounted
-    symlink_path = get_symlink_path_for_letter(letter_zip())  # get where it should be mounted
+    mount_path = MOUNT_DIR_ZIP_FILE                             # get where it should be mounted
+    symlink_path = get_symlink_path_for_letter(letter_zip())    # get where it should be symlinked
 
-    umount_if_mounted(mount_path)       # umount dir if it's mounted
-    unlink_without_fail(symlink_path)   # unlink symlink if it exists
+    unlink_without_fail(symlink_path)       # unlink symlink if it exists
+
+    if mounted:
+        umount_if_mounted(mount_path)       # umount dir if it's mounted
 
     os.makedirs(mount_path, exist_ok=True)  # create mount dir
 

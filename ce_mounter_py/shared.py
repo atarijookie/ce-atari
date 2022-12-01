@@ -378,7 +378,7 @@ def umount_if_mounted(mount_dir, delete=False):
             print_and_log(logging.INFO, f'umount_if_mounted: path {mount_dir} does not exists, not doing umount')
             return
 
-        cmd = f'umount {mount_dir}'     # construct umount command
+        cmd = f'umount "{mount_dir}"'     # construct umount command
         os.system(cmd)                  # execute umount command
 
         if delete:                      # if should also delete folder
