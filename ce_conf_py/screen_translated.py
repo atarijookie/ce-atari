@@ -20,23 +20,31 @@ def translated_create(button):
     def create_drive_row(label, setting_name):
         col1 = 25
         col2 = 5
+        pad = (40 - (col1 + col2)) // 2
 
         edit_one = create_edit_one(setting_name, on_edit_changed)
 
         cols = urwid.Columns([
+            ('fixed', pad, urwid.Text(' ')),
             ('fixed', col1, urwid.Text(label)),
             ('fixed', col2, edit_one)],
             dividechars=0)
 
         return cols
 
+    def add_drive_letter_row(body_list, label, setting_name):
+        trans_row = create_drive_row(label, setting_name)
+        body_list.append(trans_row)
+        body_list.append(urwid.Divider())
+
     # translated drive letter
     body.append(urwid.Divider())
-    trans_first = create_drive_row("First translated drive", 'DRIVELETTER_FIRST')
-    body.append(trans_first)
-    body.append(urwid.Divider())
 
-    body.append(urwid.Divider())
+    add_drive_letter_row(body, 'First translated drive', 'DRIVELETTER_FIRST')
+    add_drive_letter_row(body, 'Config drive', 'DRIVELETTER_CONFDRIVE')
+    add_drive_letter_row(body, 'Shared drive', 'DRIVELETTER_SHARED')
+    add_drive_letter_row(body, 'ZIP file drive', 'DRIVELETTER_ZIP')
+
     body.append(urwid.AttrMap(urwid.Text('Options', align='center'), 'reversed'))
     body.append(urwid.Divider())
 
@@ -98,15 +106,35 @@ def on_edit_changed(button, state, data):
     app_log.debug(f"on_edit_changed: {key} -> {state}")
 
 
+def get_drive_letter(setting_name):
+    letter = setting_get_merged(setting_name).upper()
+
+    if len(letter) > 1:
+        letter = letter[0]
+
+    letter_int = ord(letter)
+    return letter_int
+
+
 def translated_save(button):
     app_log.debug(f"translated_save: {shared.settings_changed}")
 
     # translated settings verification before saving here
-    a = setting_get_merged('DRIVELETTER_FIRST')
+    first_letter = get_drive_letter('DRIVELETTER_FIRST')
+    config_letter = get_drive_letter('DRIVELETTER_CONFDRIVE')
+    shared_letter = get_drive_letter('DRIVELETTER_SHARED')
+    zip_letter = get_drive_letter('DRIVELETTER_ZIP')
 
-    # if some shared letters is the same, warn and don't save
-    if a.upper() in ['N', 'O', 'P']:
-        dialog(shared.main_loop, shared.current_body, "You must specify different drive letter than N, O, P!")
+    letters_list = [first_letter, config_letter, shared_letter, zip_letter]
+    letters_set = set(letters_list)
+
+    for letter in letters_list:
+        if letter < 67 or letter > 80:      # one of the letters is less than 'C' or grater than 'P', fail
+            dialog(shared.main_loop, shared.current_body, "Only drive letters from C to P are allowed.")
+            return
+
+    if len(letters_set) != len(letters_list):
+        dialog(shared.main_loop, shared.current_body, "The specified drive letters must be different.")
         return
 
     settings_save()
