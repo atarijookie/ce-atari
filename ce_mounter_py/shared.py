@@ -481,7 +481,7 @@ def show_symlinked_dirs():
 
 def is_mountpoint_mounted(mountpoint):
     """ go through all the mounted disks and see if the specified mountpoint is present in the mounts or not """
-    partitions = psutil.disk_partitions(True)
+    partitions = get_disk_partitions()
 
     for part in partitions:
         if part.mountpoint == mountpoint:       # mountpoint found, return True
@@ -569,3 +569,36 @@ def other_instance_running():
     print_and_log(logging.DEBUG, f'other_instance_running: PID from file not running, so other instance not running')
     text_to_file(str(pid_current), PID_FILE)        # write our PID to file
     return False            # no other instance running
+
+
+# This class serves as a result from get_disk_partitions(), so you can then access the paths in results with
+# result.device and result.mountpoint, just like you would with psutil.disk_partitions()
+class PartResult:
+    def __init__(self, device, mountpoint):
+        self.device = device
+        self.mountpoint = mountpoint
+
+
+def get_disk_partitions():
+    # This function is a replacement for psutil.disk_partitions(True), which seemed like a perfect thing to use,
+    # but it hangs on Raspberry Pi (on Raspbian) for like 12 seconds, so I've made this simpler version, which reads
+    # from /proc/mounts . The 1st version used mount command in subprocess, but that doesn't work well with mount
+    # points with spaces in it.
+    # Example of such mount - my usb drive under xubuntu: '/media/miro/d-live 11.3.0 st i386'
+
+    results = []
+
+    with open("/proc/mounts") as file:      # read mounts file
+        for line in file:
+            pieces = line.split(' ', 2)     # split to device, mountpoint and rest
+
+            if len(pieces) != 3:            # not 3 parts? probably bad line, skip it
+                continue
+
+            # in /proc/mounts the spaces inside device or path are represented with '\040',
+            # so turn them back to spaces after splitting
+            device = pieces[0].replace('\\040', ' ')
+            mountpoint = pieces[1].replace('\\040', ' ')
+            results.append(PartResult(device, mountpoint))
+
+    return results

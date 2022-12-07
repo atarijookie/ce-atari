@@ -2,7 +2,7 @@ import os
 import psutil
 import logging
 from shared import print_and_log, get_symlink_path_for_letter, \
-    get_free_letters, DEV_DISK_DIR, LOG_DIR, unlink_without_fail, symlink_if_needed
+    get_free_letters, DEV_DISK_DIR, LOG_DIR, unlink_without_fail, symlink_if_needed, get_disk_partitions
 
 
 def get_usb_devices():
@@ -41,12 +41,7 @@ def get_usb_devices():
 def get_mounts():
     """ See what devices are already mounted in this system, return them as tuples of device + mount point. """
 
-    # I'm using psutil to get mounts here instead of just running mount command in subprocess because
-    # some mount points have spaces in them, and that is harder to parse out of the mount command output,
-    # while it's easy to get it from psutil.
-    # Example of such mount - my usb drive under xubuntu: '/media/miro/d-live 11.3.0 st i386'
-
-    partitions = psutil.disk_partitions()
+    partitions = get_disk_partitions()
     mounts = []
     root_fs = None                      # which device is mounted as root filesystem?
 
