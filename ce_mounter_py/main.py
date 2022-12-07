@@ -9,8 +9,8 @@ from wrapt_timeout_decorator import timeout
 from shared import print_and_log, log_config, DEV_DISK_DIR, MOUNT_DIR_RAW, MOUNT_COMMANDS_DIR, \
     SETTINGS_PATH, MOUNT_DIR_TRANS, CONFIG_PATH_SOURCE, CONFIG_PATH_COPY, \
     get_symlink_path_for_letter, setting_get_bool, unlink_everything_translated, letter_confdrive, \
-    unlink_without_fail, unlink_everything_raw, settings_load, show_symlinked_dirs, is_zip_mounted, \
-    MOUNT_DIR_ZIP_FILE, letter_zip, symlink_if_needed
+    unlink_everything_raw, settings_load, show_symlinked_dirs, is_zip_mounted, \
+    MOUNT_DIR_ZIP_FILE, letter_zip, symlink_if_needed, other_instance_running
 from mount_usb_trans import get_usb_devices, find_and_mount_translated
 from mount_usb_raw import find_and_mount_raw
 from mount_hdd_image import mount_hdd_image
@@ -152,7 +152,12 @@ if __name__ == "__main__":
 
     # check if running as root, fail and quit if not
     if os.geteuid() != 0:           # If not root user, fail
-        print_and_log(logging.INFO, "\nYou must run this app as root, otherwise mount / umount won't work!")
+        print_and_log(logging.INFO, "You must run this app as root, otherwise mount / umount won't work!")
+        exit(1)
+
+    # check if other instance is running, quit if it is
+    if other_instance_running():
+        print_and_log(logging.INFO, "Other instance is running, this instance won't run!")
         exit(1)
 
     # make dirs which might not exist (some might require root access)

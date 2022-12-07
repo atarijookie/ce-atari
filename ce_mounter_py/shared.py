@@ -31,6 +31,7 @@ settings_default = {KEY_LETTER_FIRST: 'C', KEY_LETTER_CONFDRIVE: 'O', KEY_LETTER
 
 LOG_DIR = '/var/log/ce/'
 DATA_DIR = '/var/run/ce/'
+PID_FILE = os.path.join(DATA_DIR, 'mount.pid')
 MOUNT_LOG_FILE = os.path.join(LOG_DIR, 'mount.log')
 MOUNT_COMMANDS_DIR = os.path.join(DATA_DIR, 'cmds')
 MOUNT_DIR_RAW = os.path.join(DATA_DIR, 'raw')
@@ -537,3 +538,34 @@ def symlink_if_needed(mount_dir, symlink_dir):
         print_and_log(logging.DEBUG, f'symlink_if_needed: symlinked {mount_dir} -> {symlink_dir}')
     except Exception as ex:
         print_and_log(logging.WARNING, f'symlink_if_needed: failed with: {type(ex).__name__} - {str(ex)}')
+
+
+def other_instance_running():
+    """ check if other instance of this app is running, return True if yes """
+    pid_current = os.getpid()
+    print_and_log(logging.INFO, f'PID of this process: {pid_current}')
+
+    # read PID from file and convert to int
+    pid_from_file = -1
+    try:
+        pff = text_from_file(PID_FILE)
+        pid_from_file = int(pff) if pff else -1
+    except TypeError:       # we're expecting this on no text from file
+        pass
+    except Exception as ex:
+        print_and_log(logging.WARNING, f'other_instance_running: getting int PID from file failed: {type(ex).__name__} - {str(ex)}')
+
+    # our and other PID match? no other instance
+    if pid_current == pid_from_file:
+        print_and_log(logging.DEBUG, f'other_instance_running: PID from file is ours, so other instance not running.')
+        return False        # no other instance running
+
+    # some other PID than ours was found in file
+    if psutil.pid_exists(pid_from_file):
+        print_and_log(logging.WARNING, f'other_instance_running: Other mounter with PID {pid_from_file} is running!')
+        return True         # other instance is running
+
+    # other PID doesn't exist, no other instance running
+    print_and_log(logging.DEBUG, f'other_instance_running: PID from file not running, so other instance not running')
+    text_to_file(str(pid_current), PID_FILE)        # write our PID to file
+    return False            # no other instance running
