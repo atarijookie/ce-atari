@@ -58,6 +58,13 @@ def link_raw_device(device, acsi_id):
 
 def find_and_mount_raw(root_devs):
     """ symlink all the RAW devices to configured ACSI slots """
+    from mount_usb_trans import get_mounts
+    _, dev_root_fs = get_mounts()       # get which device is mounted
+
+    if dev_root_fs in root_devs:        # if the root fs device is reported in root devs, just remove it
+        root_devs.remove(dev_root_fs)
+        print_and_log(logging.DEBUG, f"find_and_mount_raw: ignoring {dev_root_fs} which is mounted as '/' on linux")
+
     root_devs = [dev for dev in root_devs if not is_raw_device_linked(dev)]  # keep only not symlinked devices
 
     if not root_devs:           # no devices? quit
