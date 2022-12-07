@@ -4,6 +4,7 @@ import asyncio
 import logging
 import threading, queue
 import traceback
+from datetime import datetime
 from setproctitle import setproctitle
 from wrapt_timeout_decorator import timeout
 from shared import print_and_log, log_config, DEV_DISK_DIR, MOUNT_DIR_RAW, MOUNT_COMMANDS_DIR, \
@@ -29,6 +30,7 @@ def worker():
         lock.acquire()
         print_and_log(logging.INFO, f'')
         print_and_log(logging.INFO, f'EXECUTING: {funct.__name__}()')
+        start = datetime.now()
 
         try:
             funct()
@@ -38,6 +40,9 @@ def worker():
             print_and_log(logging.WARNING, f'The function {funct.__name__} has crashed: {type(ex).__name__} - {str(ex)}')
             tb = traceback.format_exc()
             print_and_log(logging.WARNING, tb)
+
+        duration = (datetime.now() - start).total_seconds()
+        print_and_log(logging.INFO, f'TASK: {funct.__name__}() TOOK {duration:.1f} s')
 
         lock.release()
         task_queue.task_done()
