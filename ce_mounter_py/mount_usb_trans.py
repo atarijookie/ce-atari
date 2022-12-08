@@ -47,15 +47,16 @@ def get_mounts():
     mounts = []
 
     for part in partitions:
-        if not part.device.startswith('/dev/'):    # not a /dev mount? skip it
+        # not a /dev mount? skip it
+        if not part.device.startswith('/dev/'):
             continue
 
-        # also skip these things
-        if part.device.startswith('/dev/loop') or part.mountpoint.startswith('/snap/') or part.mountpoint == '/':
+        # ignore devices starting with these DEVICE paths
+        if any(part.device.startswith(ignored) for ignored in ['/dev/loop', '/snap/', dev_root_fs]):
             continue
 
-        # if mount point starts with any of the ignored paths, skip this mount
-        if any(part.mountpoint.startswith(ignored) for ignored in ['/boot', '/run', dev_root_fs]):
+        # ignore devices starting with these MOUNT POINTS
+        if any(part.mountpoint.startswith(ignored) for ignored in ['/boot', '/run']):
             continue
 
         dev_dir = part.device, part.mountpoint  # get device and mount point
