@@ -12,6 +12,8 @@ def get_usb_devices():
          - the individual partitions (e.g. /dev/sda1) - for mounting them as TRANSLATED
     """
 
+    dev_root_fs = get_root_fs_device()              # get device which is used for root fs on this linux box
+
     if not os.path.exists(DEV_DISK_DIR):            # the dir doesn't exist? quit now
         return set()
 
@@ -30,6 +32,9 @@ def get_usb_devices():
         dev_path = os.path.join(DEV_DISK_DIR, dev_path)  # ../../sda1 -> /dev/disk/by-id/../../sda1
         dev_path = os.path.abspath(dev_path)        # /dev/disk/by-id/../../sda1 -> /dev/sda1
 
+        if dev_path.startswith(dev_root_fs):        # don't report any partition of device which is used for root fs
+            continue
+
         if any(char.isdigit() for char in dev_path):     # pointing to partition (e.g. sda1), add to part devices?
             part_devs.add(dev_path)
         else:                                       # pointing to root device? (e.g. sda) add to root devices
@@ -47,8 +52,8 @@ def get_mounts():
     mounts = []
 
     for part in partitions:
-        # not a /dev mount? skip it
-        if not part.device.startswith('/dev/'):
+        # not a /dev mount or root fs mount? skip it
+        if not part.device.startswith('/dev/') or part.mountpoint == '/':
             continue
 
         # ignore devices starting with these DEVICE paths
@@ -74,6 +79,8 @@ def get_not_mounted_devices(devs, mounts_in):
     :param mounts_in: list of tuples, each tuple being device and its mount point
     :return: list of not mounted devices (== subset of devs)
     """
+    print_and_log(logging.DEBUG, f"get_not_mounted_devices: devs: {devs}, mounts_in: {mounts_in}")
+
     devices_not_mounted = []
 
     for device in devs:                     # set of devices, e.g. '/dev/sdd'

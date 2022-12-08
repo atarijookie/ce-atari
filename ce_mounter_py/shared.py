@@ -624,7 +624,7 @@ def get_root_fs_device():
     dev_root_fs = text_from_file(FILE_ROOT_DEV)
 
     if dev_root_fs:         # if already got dev_root_fs figured out, just return it
-        print_and_log(logging.DEBUG, f'get_root_fs_device: returning cached root filesystem device: {dev_root_fs}')
+        #print_and_log(logging.DEBUG, f'get_root_fs_device: returning cached root filesystem device: {dev_root_fs}')
         return dev_root_fs
 
     # run the mount command in subprocess, get output
@@ -647,6 +647,6 @@ def get_root_fs_device():
     while root_dev[-1].isnumeric():             # last char is a number?
         root_dev = root_dev[:-1]                # remove last char
 
-    print_and_log(logging.DEBUG, f'get_root_fs_device: root filesystem device: {root_dev}')
+    #print_and_log(logging.DEBUG, f'get_root_fs_device: root filesystem device: {root_dev}')
     text_to_file(root_dev, FILE_ROOT_DEV)       # cache this value to file
     return root_dev
