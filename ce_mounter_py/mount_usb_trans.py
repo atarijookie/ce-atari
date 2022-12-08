@@ -1,8 +1,8 @@
 import os
-import subprocess
 import logging
 from shared import print_and_log, get_symlink_path_for_letter, \
-    get_free_letters, DEV_DISK_DIR, LOG_DIR, unlink_without_fail, symlink_if_needed, get_disk_partitions
+    get_free_letters, DEV_DISK_DIR, LOG_DIR, unlink_without_fail, symlink_if_needed, get_disk_partitions, \
+    get_root_fs_device
 
 
 def get_usb_devices():
@@ -41,7 +41,9 @@ def get_usb_devices():
 def get_mounts():
     """ See what devices are already mounted in this system, return them as tuples of device + mount point. """
 
-    partitions = get_disk_partitions()
+    dev_root_fs = get_root_fs_device()              # get device which is used for root fs on this linux box
+
+    partitions = get_disk_partitions()              # get existing mounted partitions
     mounts = []
 
     for part in partitions:
@@ -53,7 +55,7 @@ def get_mounts():
             continue
 
         # if mount point starts with any of the ignored paths, skip this mount
-        if any(part.mountpoint.startswith(ignored) for ignored in ['/boot', '/run']):
+        if any(part.mountpoint.startswith(ignored) for ignored in ['/boot', '/run', dev_root_fs]):
             continue
 
         dev_dir = part.device, part.mountpoint  # get device and mount point

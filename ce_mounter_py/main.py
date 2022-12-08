@@ -11,7 +11,7 @@ from shared import print_and_log, log_config, DEV_DISK_DIR, MOUNT_DIR_RAW, MOUNT
     SETTINGS_PATH, MOUNT_DIR_TRANS, CONFIG_PATH_SOURCE, CONFIG_PATH_COPY, \
     get_symlink_path_for_letter, setting_get_bool, unlink_everything_translated, letter_confdrive, \
     unlink_everything_raw, settings_load, show_symlinked_dirs, is_zip_mounted, \
-    MOUNT_DIR_ZIP_FILE, letter_zip, symlink_if_needed, other_instance_running
+    MOUNT_DIR_ZIP_FILE, letter_zip, symlink_if_needed, other_instance_running, unlink_without_fail, FILE_ROOT_DEV
 from mount_usb_trans import get_usb_devices, find_and_mount_translated
 from mount_usb_raw import find_and_mount_raw
 from mount_hdd_image import mount_hdd_image
@@ -169,6 +169,8 @@ if __name__ == "__main__":
     os.makedirs(MOUNT_DIR_RAW, exist_ok=True)
     os.makedirs(MOUNT_DIR_TRANS, exist_ok=True)
     os.makedirs(MOUNT_COMMANDS_DIR, exist_ok=True)
+
+    unlink_without_fail(FILE_ROOT_DEV)          # delete this file to make get_root_fs_device() execute at least once
 
     settings_load()                  # load settings from disk
 

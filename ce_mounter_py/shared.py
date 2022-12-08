@@ -47,6 +47,7 @@ FILE_MOUNT_CMD_NFS = os.path.join(SETTINGS_PATH, 'mount_cmd_nfs.txt')
 FILE_MOUNT_USER = os.path.join(SETTINGS_PATH, 'mount_user.txt')         # user custom mounts in settings dir
 FILE_HDDIMAGE_RESOLVED = os.path.join(DATA_DIR, 'HDDIMAGE_RESOLVED')    # where the resolved HDDIMAGE will end up
 FILE_OLD_SETTINGS = os.path.join(DATA_DIR, 'settings_old.json')         # where the old settings in json are
+FILE_ROOT_DEV = os.path.join(DATA_DIR, 'root_dev.txt')                  # what device holds root file system
 
 DEV_DISK_DIR = '/dev/disk/by-path'
 
@@ -470,11 +471,13 @@ def show_symlinked_dirs():
     custom_letters = get_user_custom_mounts_letters()           # fetch all the user custom letters
 
     # first show translated drives
-    print_and_log(logging.INFO, "\nlist of current translated drives:")
+    print_and_log(logging.INFO, " ")
+    print_and_log(logging.INFO, "list of current translated drives:")
     get_and_show_symlinks(MOUNT_DIR_TRANS, partial(get_dir_usage, custom_letters))
 
     # then show RAW drives
-    print_and_log(logging.INFO, "\nlist of current RAW drives:")
+    print_and_log(logging.INFO, " ")
+    print_and_log(logging.INFO, "list of current RAW drives:")
     get_and_show_symlinks(MOUNT_DIR_RAW, get_symlink_source)
 
     print_and_log(logging.INFO, " ")
@@ -617,6 +620,14 @@ def get_root_fs_device():
         - mount command shows this correctly as '/dev/sda2'
     """
 
+    # try to get cached value from file
+    dev_root_fs = text_from_file(FILE_ROOT_DEV)
+
+    if dev_root_fs:         # if already got dev_root_fs figured out, just return it
+        print_and_log(logging.DEBUG, f'get_root_fs_device: returning cached root filesystem device: {dev_root_fs}')
+        return dev_root_fs
+
+    # run the mount command in subprocess, get output
     output = subprocess.Popen("mount", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).stdout.read()
     output = output.decode('utf-8')
     lines = output.splitlines()
@@ -633,8 +644,9 @@ def get_root_fs_device():
             break
 
     # if the device has numbers at the end, cut them off and leave only device name, e.g. /dev/sda2 -> /dev/sda
-    while root_dev[-1].isnumeric():      # last char is a number?
-        root_dev = root_dev[:-1]          # remove last char
+    while root_dev[-1].isnumeric():             # last char is a number?
+        root_dev = root_dev[:-1]                # remove last char
 
     print_and_log(logging.DEBUG, f'get_root_fs_device: root filesystem device: {root_dev}')
+    text_to_file(root_dev, FILE_ROOT_DEV)       # cache this value to file
     return root_dev
