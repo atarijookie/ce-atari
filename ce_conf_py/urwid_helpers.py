@@ -219,3 +219,35 @@ def reset_layout(button):
     """ resets the console UI to the previous layout """
     main_loop_original.widget = current_body_original
     main_loop_original.draw_screen()
+
+
+def create_radio_button_options_rows(label_width, label, options_list, setting_name, total_width=40):
+    """ read setting with setting_name from settings, then create few radio buttons based on
+    options_list, where each options_list should have 'value' and 'text' """
+
+    is_bool = isinstance(options_list[0]['value'], bool)      # are provided values provided bools?
+
+    from utils import setting_get_bool, setting_get_int, on_option_changed
+    value = setting_get_bool(setting_name) if is_bool else setting_get_int(setting_name)
+
+    bgroup = []  # button group
+    cols = []
+
+    for idx, option in enumerate(options_list):
+        mrb = MyRadioButton(
+            bgroup, '', on_state_change=on_option_changed,
+            user_data={'id': setting_name, 'value': option['value']})
+
+        if option['value'] == value:        # if the value of this option matches the one from settings, it's selected
+            mrb.set_state(True)
+
+        width_rest = total_width - 6 - label_width
+        text_for_row = label if idx == 0 else ''
+        col = urwid.Columns([
+            ('fixed', label_width, urwid.Text(text_for_row)),
+            ('fixed', 6, mrb),
+            ('fixed', width_rest, urwid.Text(option['text']))],
+            dividechars=0)
+        cols.append(col)
+
+    return cols

@@ -31,8 +31,6 @@ def create_main_menu():
     body = []
     header, footer = create_header_footer('CE Config - main menu')
 
-    body.append(urwid.Divider())
-
     menu_items = [('ACSI IDs', acsi_ids_create),
                   ('Translated disks', translated_create),
                   ('Hard Disk Image', hdd_image_create),

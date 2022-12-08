@@ -26,14 +26,26 @@ def setting_get_str(setting_name):
     return value_raw        # not None, return as is
 
 
-def setting_get_bool(setting_name):
-    value = False
-    value_raw = setting_get_merged(setting_name)
+def setting_get_int(setting_name):
+    value = 0
 
     try:
-        value = bool(int(value_raw))
+        value_raw = setting_get_merged(setting_name)
+        value = int(value_raw)
     except Exception as exc:
-        app_log.warning(f"failed to convert {value} to bool: {str(exc)}")
+        app_log.warning(f"failed to convert {value_raw} to int: {str(exc)}")
+
+    return value
+
+
+def setting_get_bool(setting_name):
+    value = False
+
+    try:
+        value_raw = setting_get_int(setting_name)
+        value = bool(value_raw)
+    except Exception as exc:
+        app_log.warning(f"failed to convert {value_raw} to bool: {str(exc)}")
 
     return value
 

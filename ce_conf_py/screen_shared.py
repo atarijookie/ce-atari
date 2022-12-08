@@ -1,12 +1,14 @@
 import urwid
 import logging
 from IPy import IP
-from urwid_helpers import create_my_button, create_header_footer, create_edit, MyRadioButton, MyCheckBox, dialog
+from urwid_helpers import create_my_button, create_header_footer, create_edit, MyCheckBox, dialog, \
+    create_radio_button_options_rows
 from utils import settings_load, settings_save, on_cancel, back_to_main_menu, setting_get_bool, setting_get_str, \
-    on_option_changed, on_checkbox_changed, on_editline_changed
+    on_checkbox_changed, on_editline_changed
 import shared
 
 app_log = logging.getLogger()
+
 
 def shared_drive_create(button):
     settings_load()
@@ -31,37 +33,13 @@ def shared_drive_create(button):
 
     # shared drive protocol (NFS or samba)
     body.append(urwid.Divider())
-    body.append(urwid.Text('Sharing protocol', align='left'))
 
-    bgrp = []  # button group
-    b1 = MyRadioButton(
-            bgrp, u'', on_state_change=on_option_changed,
-            user_data={'id': 'SHARED_NFS_NOT_SAMBA', 'value': 0})       # samba / cifs
-
-    b2 = MyRadioButton(
-            bgrp, u'', on_state_change=on_option_changed,
-            user_data={'id': 'SHARED_NFS_NOT_SAMBA', 'value': 1})       # NFS
-
-    value = setting_get_bool('SHARED_NFS_NOT_SAMBA')
-
-    if value:  # 1st option should be selected?
-        b2.set_state(True)
-    else:  # 2nd option should be selected?
-        b1.set_state(True)
-
-    cols = urwid.Columns([              # NFS option row
-        ('fixed', 10, urwid.Text('')),
-        ('fixed', 7, b1),
-        ('fixed', 22, urwid.Text('Samba / cifs / windows'))],
-        dividechars=0)
-    body.append(cols)
-
-    cols = urwid.Columns([              # samba / cifs option row
-        ('fixed', 10, urwid.Text('')),
-        ('fixed', 7, b2),
-        ('fixed', 22, urwid.Text('NFS'))],
-        dividechars=0)
-    body.append(cols)
+    cols = create_radio_button_options_rows(
+        10, "Protocol",
+        [{'value': False, 'text': 'Samba / cifs / windows'},
+         {'value': True, 'text': 'NFS'}],
+        "SHARED_NFS_NOT_SAMBA")
+    body.extend(cols)
     body.append(urwid.Divider())
 
     # IP of machine sharing info

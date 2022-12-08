@@ -1,7 +1,7 @@
 import logging
 import urwid
-from urwid_helpers import create_my_button, create_header_footer, MyRadioButton, MyCheckBox
-from utils import settings_load, settings_save, on_cancel, back_to_main_menu, setting_get_bool, on_option_changed, \
+from urwid_helpers import create_my_button, create_header_footer, MyCheckBox, create_radio_button_options_rows
+from utils import settings_load, settings_save, on_cancel, back_to_main_menu, setting_get_bool, \
     on_checkbox_changed
 import shared
 
@@ -16,8 +16,9 @@ def floppy_create(button):
     body = []
     body.append(urwid.Divider())
 
-    col1w = 17
+    col1w = 16
     colw = 5
+    total_width = 23
 
     # enabling / disabling floppy
     btn_enabled = MyCheckBox('', on_state_change=on_enabled_changed)
@@ -29,39 +30,15 @@ def floppy_create(button):
         dividechars=0)
 
     body.append(cols)
-    body.append(urwid.Divider())
+    body.extend([urwid.Divider(), urwid.Divider()])
 
     # row with drive IDs - 0/1
-    cols = urwid.Columns([
-        ('fixed', col1w-2, urwid.Text('')),
-        ('fixed', colw, urwid.Text('0', align=urwid.CENTER)),
-        ('fixed', colw, urwid.Text('1', align=urwid.CENTER))],
-        dividechars=2)
-    body.append(cols)
-
-    # drive ID selection row
-    bgrp = []  # button group
-    b1 = MyRadioButton(
-            bgrp, u'', on_state_change=on_option_changed,
-            user_data={'id': 'FLOPPYCONF_DRIVEID', 'value': 0})       # drive ID 0
-
-    b2 = MyRadioButton(
-            bgrp, u'', on_state_change=on_option_changed,
-            user_data={'id': 'FLOPPYCONF_DRIVEID', 'value': 1})       # drive ID 1
-
-    value = setting_get_bool('FLOPPYCONF_DRIVEID')
-
-    if not value:   # ID 0?
-        b1.set_state(True)
-    else:           # ID 1?
-        b2.set_state(True)
-
-    cols = urwid.Columns([
-        ('fixed', col1w-2, urwid.Text('Drive ID')),
-        ('fixed', colw, b1),               # drive ID 0
-        ('fixed', colw, b2)],              # drive ID 1
-        dividechars=2)
-    body.append(cols)
+    cols = create_radio_button_options_rows(
+        col1w, "Drive ID",
+        [{'value': 0, 'text': '0'},
+         {'value': 1, 'text': '1'}],
+        "FLOPPYCONF_DRIVEID", total_width)
+    body.extend(cols)
     body.extend([urwid.Divider(), urwid.Divider()])
 
     # write protected floppy
@@ -92,7 +69,7 @@ def floppy_create(button):
     buttons = urwid.GridFlow([button_save, button_cancel], 10, 1, 1, 'center')
     body.append(buttons)
 
-    w_body = urwid.Padding(urwid.ListBox(urwid.SimpleFocusListWalker(body)), 'center', 30)
+    w_body = urwid.Padding(urwid.ListBox(urwid.SimpleFocusListWalker(body)), 'center', total_width)
     shared.main.original_widget = urwid.Frame(w_body, header=header, footer=footer)
 
 
