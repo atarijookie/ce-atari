@@ -54,6 +54,8 @@ DEV_DISK_DIR = '/dev/disk/by-path'
 MOUNT_DIR_SHARED = "/mnt/shared"            # where the shared drive will be mounted == shared drive symlink source
 MOUNT_DIR_ZIP_FILE = "/mnt/zip_file"        # where the ZIP file will be mounted == ZIP file symlink source
 
+DOWNLOAD_STORAGE_DIR = os.path.join(DATA_DIR, 'download_storage')
+
 
 def letter_shared():
     return settings_letter(KEY_LETTER_SHARED)

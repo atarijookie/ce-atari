@@ -11,7 +11,8 @@ from shared import print_and_log, log_config, DEV_DISK_DIR, MOUNT_DIR_RAW, MOUNT
     SETTINGS_PATH, MOUNT_DIR_TRANS, CONFIG_PATH_SOURCE, CONFIG_PATH_COPY, \
     get_symlink_path_for_letter, setting_get_bool, unlink_everything_translated, letter_confdrive, \
     unlink_everything_raw, settings_load, show_symlinked_dirs, is_zip_mounted, \
-    MOUNT_DIR_ZIP_FILE, letter_zip, symlink_if_needed, other_instance_running, unlink_without_fail, FILE_ROOT_DEV
+    MOUNT_DIR_ZIP_FILE, letter_zip, symlink_if_needed, other_instance_running, unlink_without_fail, FILE_ROOT_DEV, \
+    load_one_setting, get_drives_bitno_from_settings, DOWNLOAD_STORAGE_DIR
 from mount_usb_trans import get_usb_devices, find_and_mount_translated
 from mount_usb_raw import find_and_mount_raw
 from mount_hdd_image import mount_hdd_image
@@ -80,6 +81,7 @@ def reload_settings_mount_everything():
     symlink_zip_drive_if_mounted()  # possibly symlink ZIP drive
     mount_shared()                  # either remount shared drive or just symlink it
     find_and_mount_devices(True)    # mount and/or symlink USB devices
+    symlink_download_storage()      # symlink download storage dir
     show_symlinked_dirs()           # show the mounts after possible remounts
 
 
@@ -150,6 +152,45 @@ def symlink_zip_drive_if_mounted():
     symlink_if_needed(mount_path, symlink_path)     # create symlink, but only if needed
 
 
+def symlink_download_storage():
+    """
+    Find out where the download storage should point, based on our settings, and create symlink to expected path.
+    This makes finding the download storage path easier for any other service (e.g. floppy downloader tool),
+    so the search for the download storage doesn't have to be implemented in multiple tools.
+    """
+    download_storage_type = load_one_setting('DOWNLOAD_STORAGE_TYPE')
+
+    try:
+        download_storage_type = int(download_storage_type)
+    except TypeError:  # we're expecting this on no text from file
+        download_storage_type = 0
+    except Exception as ex:
+        print_and_log(logging.WARNING, f'symlink_download_storage: failed to convert {download_storage_type} to int: {type(ex).__name__} - {str(ex)}')
+
+    # get letters from config, convert them to bit numbers
+    first, shared, _, _ = get_drives_bitno_from_settings()
+
+    drive_letter = 'C'
+    if download_storage_type == 0:      # USB? use first letter
+        drive_letter = chr(65 + first)
+    elif download_storage_type == 1:    # SHARED? use shared letter
+        drive_letter = chr(65 + shared)
+    elif download_storage_type == 2:    # CUSTOM? get first custom letter
+        from mount_user import get_user_custom_mounts_letters
+        custom_letters = get_user_custom_mounts_letters()       # get all the custom letters
+        if len(custom_letters) > 0:                     # some custom letters are present?
+            drive_letter = custom_letters[0]            # use 0th custom letter
+
+    # construct path where the drive letter should be mounted
+    download_storage = get_symlink_path_for_letter(drive_letter)
+
+    if not os.path.exists(download_storage):        # this drive doesn't exists? use /tmp then
+        download_storage = '/tmp'
+
+    print_and_log(logging.INFO, f"symlink_download_storage: {download_storage} -> {DOWNLOAD_STORAGE_DIR}")
+    symlink_if_needed(download_storage, DOWNLOAD_STORAGE_DIR)
+
+
 if __name__ == "__main__":
     setproctitle("ce_mounter")      # set process title
 
@@ -183,7 +224,7 @@ if __name__ == "__main__":
     # try to mount what we can on start
     for func in [unlink_everything_translated, copy_and_symlink_config_dir, symlink_zip_drive_if_mounted,
                  mount_user_custom_folders, find_and_mount_devices, mount_shared, mount_on_command,
-                 show_symlinked_dirs]:
+                 symlink_download_storage, show_symlinked_dirs]:
         task_queue.put(func)        # put these functions in the test queue, execute them in the worker
 
     threading.Thread(target=worker, daemon=True).start()        # start the task queue worker
