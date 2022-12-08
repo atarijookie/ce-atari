@@ -1,5 +1,5 @@
 import os
-import psutil
+import subprocess
 import logging
 from shared import print_and_log, get_symlink_path_for_letter, \
     get_free_letters, DEV_DISK_DIR, LOG_DIR, unlink_without_fail, symlink_if_needed, get_disk_partitions
@@ -43,19 +43,13 @@ def get_mounts():
 
     partitions = get_disk_partitions()
     mounts = []
-    root_fs = None                      # which device is mounted as root filesystem?
 
     for part in partitions:
         if not part.device.startswith('/dev/'):    # not a /dev mount? skip it
             continue
 
         # also skip these things
-        if part.device.startswith('/dev/loop') or part.mountpoint.startswith('/snap/'):
-            continue
-
-        # if mount point is root of filesystem ('/'), then ignore this mount
-        if part.mountpoint == '/':
-            root_fs = part.device       # store which device is mounted as root filesystem
+        if part.device.startswith('/dev/loop') or part.mountpoint.startswith('/snap/') or part.mountpoint == '/':
             continue
 
         # if mount point starts with any of the ignored paths, skip this mount
@@ -65,12 +59,8 @@ def get_mounts():
         dev_dir = part.device, part.mountpoint  # get device and mount point
         mounts.append(dev_dir)
 
-    if root_fs:                             # if root fs device was found
-        while root_fs[-1].isnumeric():      # last char is a number?
-            root_fs = root_fs[:-1]          # remove last char
-
     # return the mounts
-    return mounts, root_fs
+    return mounts
 
 
 def get_not_mounted_devices(devs, mounts_in):
@@ -194,7 +184,7 @@ def find_and_mount_translated(root_devs, part_devs):
     :param part_devs: set of partition devices (e.g. /dev/sda1) - those which point to partition in device
     """
 
-    mounts, _ = get_mounts()        # get devices and their mount points
+    mounts = get_mounts()        # get devices and their mount points
     print_and_log(logging.INFO, f'mounts: {mounts}')
 
     # mount every device that is not mounted yet to /mnt/ folder

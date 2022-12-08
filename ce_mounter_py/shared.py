@@ -4,6 +4,7 @@ import re
 import logging
 import json
 import psutil
+import subprocess
 from functools import partial
 from logging.handlers import RotatingFileHandler
 from wrapt_timeout_decorator import timeout
@@ -545,6 +546,8 @@ def other_instance_running():
     pid_current = os.getpid()
     print_and_log(logging.INFO, f'PID of this process: {pid_current}')
 
+    os.makedirs(os.path.split(PID_FILE)[0], exist_ok=True)     # create dir for PID file if it doesn't exist
+
     # read PID from file and convert to int
     pid_from_file = -1
     try:
@@ -602,3 +605,36 @@ def get_disk_partitions():
             results.append(PartResult(device, mountpoint))
 
     return results
+
+
+def get_root_fs_device():
+    """
+    Function gets device which is mounted to '/' on this linux box.
+    It uses running mount command in subprocess, because:
+        - psutil.disk_partitions() hangs on Raspbian 10
+        - the content of /proc/mounts for mountpoint '/' on Raspbian shows device '/dev/root' and this
+          doesn't exist
+        - mount command shows this correctly as '/dev/sda2'
+    """
+
+    output = subprocess.Popen("mount", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).stdout.read()
+    output = output.decode('utf-8')
+    lines = output.splitlines()
+
+    root_dev = '/dev/null'      # report this when no real device found
+
+    for line in lines:
+        chunks = line.split(' ', maxsplit=3)    # split line to 4 pieces - 'device', 'on', 'mountpoint', 'rest'
+        device = chunks[0]
+        mountpoint = chunks[2]
+
+        if mountpoint == '/':                   # found root mount point? use this device
+            root_dev = device
+            break
+
+    # if the device has numbers at the end, cut them off and leave only device name, e.g. /dev/sda2 -> /dev/sda
+    while root_dev[-1].isnumeric():      # last char is a number?
+        root_dev = root_dev[:-1]          # remove last char
+
+    print_and_log(logging.DEBUG, f'get_root_fs_device: root filesystem device: {root_dev}')
+    return root_dev

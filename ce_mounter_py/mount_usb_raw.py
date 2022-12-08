@@ -1,7 +1,7 @@
 import os
 import logging
 from shared import print_and_log, setting_get_int, MOUNT_DIR_RAW, unlink_without_fail, DEV_TYPE_RAW, \
-    symlink_if_needed
+    symlink_if_needed, get_root_fs_device
 
 
 def get_symlink_path_for_id(id_):
@@ -58,8 +58,7 @@ def link_raw_device(device, acsi_id):
 
 def find_and_mount_raw(root_devs):
     """ symlink all the RAW devices to configured ACSI slots """
-    from mount_usb_trans import get_mounts
-    _, dev_root_fs = get_mounts()       # get which device is mounted
+    dev_root_fs = get_root_fs_device()
 
     if dev_root_fs in root_devs:        # if the root fs device is reported in root devs, just remove it
         root_devs.remove(dev_root_fs)
