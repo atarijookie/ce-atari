@@ -9,7 +9,7 @@ import shared
 app_log = logging.getLogger()
 
 settings_path = "/ce/settings"          # path to settings dir
-settings_default = {'DRIVELETTER_FIRST': 'C',
+settings_default = {'DRIVELETTER_FIRST': 'C', 'DRIVELETTER_CONFDRIVE': 'O', 'DRIVELETTER_SHARED': 'N', 'DRIVELETTER_ZIP': 'P',
                     'MOUNT_RAW_NOT_TRANS': 0, 'SHARED_ENABLED': 0, 'SHARED_NFS_NOT_SAMBA': 0, 'FLOPPYCONF_ENABLED': 1,
                     'FLOPPYCONF_DRIVEID': 0, 'FLOPPYCONF_WRITEPROTECTED': 0, 'FLOPPYCONF_SOUND_ENABLED': 1,
                     'ACSI_DEVTYPE_0': 0, 'ACSI_DEVTYPE_1': 1, 'ACSI_DEVTYPE_2': 0, 'ACSI_DEVTYPE_3': 0,

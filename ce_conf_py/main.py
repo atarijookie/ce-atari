@@ -1,3 +1,4 @@
+import os
 import urwid
 from setproctitle import setproctitle
 import logging
@@ -15,6 +16,9 @@ from screen_update import update_create
 import shared
 from utils import delete_update_files
 
+
+LOG_DIR = '/var/log/ce/'
+SETTINGS_PATH = '/ce/settings'
 
 def alarm_callback(loop=None, data=None):
     """ this gets called on alarm """
@@ -66,9 +70,12 @@ def exit_program(button):
 if __name__ == "__main__":
     setproctitle("ce_config")  # set process title
 
+    os.makedirs(LOG_DIR, exist_ok=True)
+    os.makedirs(SETTINGS_PATH, exist_ok=True)
+
     log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
 
-    my_handler = RotatingFileHandler('/var/log/ce/ce_conf_py.log', mode='a', maxBytes=1024 * 1024, backupCount=1)
+    my_handler = RotatingFileHandler(f'{LOG_DIR}/ce_conf_py.log', mode='a', maxBytes=1024 * 1024, backupCount=1)
     my_handler.setFormatter(log_formatter)
     my_handler.setLevel(logging.DEBUG)
 
