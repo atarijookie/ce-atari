@@ -4,6 +4,7 @@ from urwid_helpers import dialog
 import subprocess
 import codecs
 import logging
+from logging.handlers import RotatingFileHandler
 from zipfile import ZipFile
 
 app_log = logging.getLogger()
@@ -20,8 +21,15 @@ main_loop = None
 current_body = None
 should_run = True
 
-PATH_VAR = '/var/run/ce'
-FILE_SLOTS = PATH_VAR + '/slots.txt'
+LOG_DIR = '/var/log/ce/'
+LOG_FILE = os.path.join(LOG_DIR, 'ce_fdd_py.log')
+
+DATA_DIR = '/var/run/ce/'
+FILE_SLOTS = os.path.join(DATA_DIR, 'slots.txt')
+
+core_sock_name = os.path.join(DATA_DIR, 'core.sock')
+
+DOWNLOAD_STORAGE_DIR = os.path.join(DATA_DIR, 'download_storage')
 
 PATH_TO_LISTS = "/ce/lists/"                                    # where the lists are stored locally
 BASE_URL = "http://joo.kie.sk/cosmosex/update/"                 # base url where the lists will be stored online
@@ -105,6 +113,7 @@ def can_write_to_storage(path):
 
 
 def get_storage_path():
+    """ Find the storage path and return it. Use cached value if possible. """
     global last_storage_path
 
     last_storage_exists = last_storage_path is not None and os.path.exists(last_storage_path)  # path still valid?
@@ -112,51 +121,22 @@ def get_storage_path():
     if last_storage_exists:  # while the last storage exists, keep returning it
         return last_storage_path
 
-    # last returned path doesn't exist, check current mounts
-    result = subprocess.run(['mount'], stdout=subprocess.PIPE)
-    result = codecs.decode(result.stdout)
-    mounts = result.split("\n")
+    storage_path = None
 
-    storages = []
-    storage_shared = None  # holds path to shared drive
-    storage_drive = None  # holds path to first USB storage drive
+    # does this symlink exist?
+    if os.path.exists(DOWNLOAD_STORAGE_DIR) and os.path.islink(DOWNLOAD_STORAGE_DIR):
+        storage_path = os.readlink(DOWNLOAD_STORAGE_DIR)    # read the symlink
 
-    for mount in mounts:  # go through the mount lines
-        if '/mnt/' not in mount:  # if this whole line does not contain /mnt/ , skip it
-            continue
+        if not os.path.exists(storage_path):                # symlink source doesn't exist? reset path to None
+            storage_path = None
 
-        mount_parts = mount.split(' ')  # split line into parts
+    if storage_path:    # if storage path was found, append subdir to it
+        storage_path = os.path.join(storage_path, "fdd_imgs")
+        os.makedirs(storage_path, exist_ok=True)
 
-        for part in mount_parts:  # find the part that contains the '/mnt/' part
-            if '/mnt/' not in part:  # if this is NOT the /mnt/ part, skip it
-                continue
-
-            part = os.path.join(part, "floppy_images")  # add floppy images dir to path part (might not exist yet)
-            storages.append(part)
-
-            if '/mnt/shared' in part:  # is this a shared mount? remember this path
-                storage_shared = part
-            else:  # this is a USB drive mount
-                if not storage_drive:  # don't have first drive yet? remember this path
-                    storage_drive = part
-
-    if not storages:  # no storage found? fail here
-        last_storage_path = None
-        return None
-
-    # if we got here, we definitelly have some storages, but we might not have the required subdir
-    # so first check if any of the found storages has the subdir already, and if it does, then use it
-    for storage in storages:  # go through the storages and check if the floppy_images subdir exists
-        if os.path.exists(storage):  # found storage with existing subdir, use it
-            last_storage_path = storage
-            return storage
-
-    # if we got here, we got some storages, but none of them has floppy_images subdir, so create one and return path
-    storage_use = storage_drive if storage_drive else storage_shared  # use USB drive first if available, otherwise use shared drive
-
-    subprocess.run(['mkdir', '-p', storage_use])  # create the subdir
-    last_storage_path = storage_use  # remember what we've returned
-    return storage_use  # return it
+    # store the found storage path and return it
+    last_storage_path = storage_path
+    return storage_path
 
 
 def load_list_from_csv(csv_filename):
@@ -242,3 +222,16 @@ def file_seems_to_be_image(path_to_image, check_if_exists):
         app_log.warning(f"file_seems_to_be_image failed: {str(ex)}")
 
     return False, "No valid image found in ZIP file"
+
+
+def log_config():
+    log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
+
+    os.makedirs(LOG_DIR, exist_ok=True)
+    my_handler = RotatingFileHandler(LOG_FILE, mode='a', maxBytes=1024 * 1024, backupCount=1)
+    my_handler.setFormatter(log_formatter)
+    my_handler.setLevel(logging.DEBUG)
+
+    app_log = logging.getLogger()
+    app_log.setLevel(logging.DEBUG)
+    app_log.addHandler(my_handler)

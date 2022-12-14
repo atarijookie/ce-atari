@@ -26,7 +26,11 @@ def alarm_callback_refresh(loop=None, data=None):
     if not screen_shown:        # this screen is already hidden, don't do the rest
         return
 
-    slots_mod_time = os.path.getmtime(shared.FILE_SLOTS)    # get modification time
+    slots_mod_time = 0
+    try:
+        slots_mod_time = os.path.getmtime(shared.FILE_SLOTS)    # get modification time
+    except Exception as ex:
+        app_log.warning(f"slots_mod_time - failed: {str(ex)}")
 
     if slots_mod_time != last_slots_mod_time:               # modification time changed?
         app_log.debug('alarm_callback_refresh - reloading!')
@@ -103,7 +107,12 @@ def on_show_image_slots(button):
     body.append(urwid.Divider())
 
     global txt_image_name, widget_image_name, txt_image_content, widget_image_content, last_slots_mod_time
-    last_slots_mod_time = os.path.getmtime(shared.FILE_SLOTS)
+
+    try:
+        last_slots_mod_time = 0
+        last_slots_mod_time = os.path.getmtime(shared.FILE_SLOTS)
+    except Exception as ex:
+        app_log.warning(f"last_slots_mod_time - failed: {str(ex)}")
 
     for i in range(3):
         app_log.debug(f'index {i}')

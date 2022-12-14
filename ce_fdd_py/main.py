@@ -7,14 +7,11 @@ import urllib3
 import socket
 import threading
 from setproctitle import setproctitle
-from logging.handlers import RotatingFileHandler
 from downloader import DownloaderView
 from image_slots import on_show_image_slots
 import shared
 from urwid_helpers import create_my_button, create_header_footer
 import bson
-
-core_sock_name = '/var/run/ce/core.sock'
 
 app_log = logging.getLogger('root')
 
@@ -238,7 +235,7 @@ def send_to_core_worker():
             b_item = bson.dumps(item)                # dict to bson encoded blob
 
             sckt = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            sckt.connect(core_sock_name)
+            sckt.connect(shared.core_sock_name)
             sckt.send(b_item)
             sckt.close()
 
@@ -283,15 +280,10 @@ def create_main_menu():
 if __name__ == "__main__":
     setproctitle("ce_fdd_py")  # set process title
 
-    log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
+    for dir in [shared.PATH_TO_LISTS, shared.DATA_DIR, shared.LOG_DIR]:
+        os.makedirs(dir, exist_ok=True)
 
-    my_handler = RotatingFileHandler('/var/log/ce/ce_fdd_py.log', mode='a', maxBytes=1024 * 1024, backupCount=1)
-    my_handler.setFormatter(log_formatter)
-    my_handler.setLevel(logging.DEBUG)
-
-    app_log = logging.getLogger()
-    app_log.setLevel(logging.DEBUG)
-    app_log.addHandler(my_handler)
+    shared.log_config()
 
     shared.terminal_cols, terminal_rows = urwid.raw_display.Screen().get_cols_rows()
     shared.items_per_page = terminal_rows - 4
