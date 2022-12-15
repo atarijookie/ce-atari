@@ -13,6 +13,7 @@
 #include <sys/wait.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/stat.h>
 #include <limits.h>
 
 /*
@@ -355,6 +356,9 @@ int openSocket(void)
     if (listen(sfd, BACKLOG) == -1) {
         return -1;
     }
+
+    // allow for group and other to read and write to this sock
+    chmod(pathSocket, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
 
     // return listening socket. we need to listen and accept on it.
     return sfd;

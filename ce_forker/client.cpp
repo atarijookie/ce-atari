@@ -17,13 +17,11 @@
 
 struct termios ctrlOriginal;
 
-#define SOCK_PATH       "/tmp/ce_"
-
 // Link with -lutil
 
 //----------------------------------------------------
 void startProcesses(void);
-int openSocket(const char *name);
+int openSocket(const char *fullSockPath);
 void closeFd(int& fd);
 volatile sig_atomic_t sigintReceived = 0;
 bool lowRes = false;            // if true, show low resolution, if false show mid resolution (starts default in mid res)
@@ -106,13 +104,13 @@ ssize_t forwardData(int& fdIn, int& fdOut, char* bfr, int bfrLen, bool fromSock)
 
 int main(int argc, char *argv[])
 {
-    const char* serviceName = "term";
+    const char* fullSockPath = "/var/run/ce/app0.sock";
 
     if(argc > 1) {
-        serviceName = argv[1];
+        fullSockPath = argv[1];
     }
 
-    printf("\n\nWill connect to service: %s\n", serviceName);
+    printf("\n\nWill connect to socket: %s\n", fullSockPath);
 
     if(signal(SIGINT, sigint_handler) == SIG_ERR) {         // register SIGINT handler
         printf("Cannot register SIGINT handler!\n");
@@ -125,7 +123,7 @@ int main(int argc, char *argv[])
     int fd = 0;
     while(fd <= 0 && !sigintReceived) {     // while not connected
         printf("Connecting...\n");
-        fd = openSocket(serviceName);       // connect to server
+        fd = openSocket(fullSockPath);      // connect to server
 
         if(fd <= 0) {
             sleep(3);
@@ -158,14 +156,9 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-int openSocket(const char *name)
+int openSocket(const char *fullSockPath)
 {
-    char fullname[128];
-
     // construct filename for socket
-    strcpy(fullname, SOCK_PATH);        // start with path
-    strcat(fullname, name);             // add socket name
-
     struct sockaddr_un addr;
     ssize_t numRead;
 
@@ -179,7 +172,7 @@ int openSocket(const char *name)
     // Construct server address, and make the connection.
     memset(&addr, 0, sizeof(struct sockaddr_un));
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, fullname, sizeof(addr.sun_path) - 1);
+    strncpy(addr.sun_path, fullSockPath, sizeof(addr.sun_path) - 1);
 
     if (connect(sfd, (struct sockaddr *) &addr, sizeof(struct sockaddr_un)) == -1) {
         return -1;
