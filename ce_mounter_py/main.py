@@ -207,9 +207,8 @@ if __name__ == "__main__":
         exit(1)
 
     # make dirs which might not exist (some might require root access)
-    os.makedirs(MOUNT_DIR_RAW, exist_ok=True)
-    os.makedirs(MOUNT_DIR_TRANS, exist_ok=True)
-    os.makedirs(MOUNT_COMMANDS_DIR, exist_ok=True)
+    for one_dir in [MOUNT_DIR_RAW, MOUNT_DIR_TRANS, MOUNT_COMMANDS_DIR]:
+        os.makedirs(one_dir, exist_ok=True)
 
     unlink_without_fail(FILE_ROOT_DEV)          # delete this file to make get_root_fs_device() execute at least once
 

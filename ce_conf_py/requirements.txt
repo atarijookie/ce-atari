@@ -4,3 +4,4 @@ urwid
 IPy
 netifaces
 dnspython
+psutil

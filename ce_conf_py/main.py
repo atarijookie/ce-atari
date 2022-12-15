@@ -2,7 +2,6 @@ import os
 import urwid
 from setproctitle import setproctitle
 import logging
-from logging.handlers import RotatingFileHandler
 from urwid_helpers import create_my_button, create_header_footer
 from screen_license import license_create
 from screen_ids import acsi_ids_create
@@ -14,11 +13,10 @@ from screen_network import network_create
 from screen_ikbd import ikbd_create
 from screen_update import update_create
 import shared
-from utils import delete_update_files
+from utils import delete_update_files, log_config, other_instance_running
 
+app_log = logging.getLogger()
 
-LOG_DIR = '/var/log/ce/'
-SETTINGS_PATH = '/ce/settings'
 
 def alarm_callback(loop=None, data=None):
     """ this gets called on alarm """
@@ -70,18 +68,16 @@ def exit_program(button):
 if __name__ == "__main__":
     setproctitle("ce_config")  # set process title
 
-    os.makedirs(LOG_DIR, exist_ok=True)
-    os.makedirs(SETTINGS_PATH, exist_ok=True)
+    log_config()
 
-    log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
+    for one_dir in [shared.LOG_DIR, shared.SETTINGS_PATH]:
+        os.makedirs(one_dir, exist_ok=True)
 
-    my_handler = RotatingFileHandler(f'{LOG_DIR}/ce_conf_py.log', mode='a', maxBytes=1024 * 1024, backupCount=1)
-    my_handler.setFormatter(log_formatter)
-    my_handler.setLevel(logging.DEBUG)
-
-    app_log = logging.getLogger()
-    app_log.setLevel(logging.DEBUG)
-    app_log.addHandler(my_handler)
+    # check if other instance is running, quit if it is
+    if other_instance_running():
+        print("Other instance is running, this instance won't run!")
+        app_log.info("Other instance is running, this instance won't run!")
+        exit(1)
 
     delete_update_files()
 
