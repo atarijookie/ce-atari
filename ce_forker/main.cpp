@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <string>
 #include <signal.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -32,16 +33,10 @@
 struct termios ctrlOriginal;
 
 //----------------------------------------------------
-typedef struct {
-    volatile int pid;   // PID of child if running
-
-    int fdPty;          // fd of the PTY which the process as input + output
-
-    int fdListen;       // fd of the socked which listens for new incoming connections
-    int fdClient;       // fd of the socket which is used for sending + receiving data to CE main app
-} ForkedProc;
-
-ForkedProc fProc;
+volatile int fProcPid;  // PID of child if running
+int fdPty;              // fd of the PTY which the process as input + output
+int fdListen;           // fd of the socked which listens for new incoming connections
+int fdClient;           // fd of the socket which is used for sending + receiving data to CE main app
 
 char pathPid[256];
 char pathSocket[256];
@@ -51,7 +46,7 @@ char command[256];
 
 //----------------------------------------------------
 void startProcess(void);
-void terminateAllChildren(void);
+void terminateAllChildren(uint32_t sleepTime);
 void closeAllFds(void);
 void forkLinuxTerminal(void);
 void forkCommand(void);
@@ -59,6 +54,8 @@ void openListeningSockets(void);
 int openSocket(void);
 void closeFd(int& fd);
 bool otherInstanceIsRunning(void);
+uint32_t getCurrentMs(void);
+uint32_t getEndTime(uint32_t offsetFromNow);
 
 volatile sig_atomic_t sigintReceived = 0;
 
@@ -66,7 +63,7 @@ void handlerSIGCHLD(int sig)
 {
     pid_t childPid = wait(NULL);
     printf("child terminated: %d\n", childPid);
-    fProc.pid = 0;                  // we don't have child with this PID anymore
+    fProcPid = 0;                  // we don't have child with this PID anymore
 }
 
 void sigint_handler(int sig)
@@ -77,13 +74,19 @@ void sigint_handler(int sig)
 
 #define MIN(X, Y)   ((X) < (Y) ? (X) : (Y))
 
-size_t forwardData(int& fdIn, int& fdOut, char* bfr, int bfrLen, bool fromSock)
+void forwardData(int& fdIn, int& fdOut, char* bfr, int bfrLen, bool fromSock)
 {
     int bytesAvailable = 0;
     int ires = ioctl(fdIn, FIONREAD, &bytesAvailable);       // how many bytes we can read?
 
     if(ires == -1 || bytesAvailable < 1) {
-        return 0;
+        if(fromSock && ires == 0 && bytesAvailable == 0) {  // when reading from socket, ioctl succeeded, but bytes that can be read are 0, client has disconnected
+            printf("Client disconnected, closed input socket.\n");
+            closeFd(fdIn);              // close this socket
+            terminateAllChildren(100);  // also terminate the child app - to get new app session next time client connects
+        }
+
+        return;
     }
 
     size_t bytesRead = MIN(bytesAvailable, bfrLen); // how many bytes can we read into buffer?
@@ -97,7 +100,7 @@ size_t forwardData(int& fdIn, int& fdOut, char* bfr, int bfrLen, bool fromSock)
 
     if(sres < 0 && errno == EPIPE) {            // close fd when socket was closed
         closeFd(fdIn);
-        return 0;
+        return;
     }
 
     if(fromSock) {                              // if data comes from sock, we should check if it isn't one of the commands
@@ -106,7 +109,7 @@ size_t forwardData(int& fdIn, int& fdOut, char* bfr, int bfrLen, bool fromSock)
                 winsize ws;
                 ws.ws_col = (bfr[i] == 0xfa) ? 40 : 80; // 40 cols for LOW, 80 cols for MED resolution
                 ws.ws_row = 23;                         // 23 rows
-                ioctl(fProc.fdPty, TIOCSWINSZ, &ws);
+                ioctl(fdPty, TIOCSWINSZ, &ws);
                 bfr[i] = ' ';                           // replace with space
             }
         }
@@ -120,10 +123,8 @@ size_t forwardData(int& fdIn, int& fdOut, char* bfr, int bfrLen, bool fromSock)
 
     if(sres < 0 && errno == EPIPE) {            // close fd when socket was closed
         closeFd(fdOut);
-        return 0;
+        return;
     }
-
-    return sres;
 }
 
 int main(int argc, char *argv[])
@@ -179,17 +180,17 @@ int main(int argc, char *argv[])
         timeout.tv_usec = 0;
 
         // set all valid FDs to set
-        if(fProc.fdListen > 0)  FD_SET(fProc.fdListen, &fdSet);     // check for new connections
+        if(fdListen > 0)  FD_SET(fdListen, &fdSet);     // check for new connections
 
-        if(fProc.fdClient > 0) {                // if got some client connected
-            FD_SET(fProc.fdClient, &fdSet);     // wait for data from client
+        if(fdClient > 0) {                // if got some client connected
+            FD_SET(fdClient, &fdSet);     // wait for data from client
 
-            if(fProc.pid <= 0) {                // don't have PID?
+            if(fProcPid <= 0) {                 // don't have PID?
                 startProcess();                 // fork process and get handle to pty
             }
 
-            if(fProc.fdPty > 0) {               // hopefully we got the fd now
-                FD_SET(fProc.fdPty, &fdSet);
+            if(fdPty > 0) {                     // hopefully we got the fd now
+                FD_SET(fdPty, &fdSet);
             }
         }
 
@@ -200,24 +201,24 @@ int main(int argc, char *argv[])
 
         // find out which FD is ready and handle it
         // first try to accept all new connections
-        if(fProc.fdListen > 0) {
-            if(FD_ISSET(fProc.fdListen, &fdSet)) {  // listening socket ready?
-                closeFd(fProc.fdClient);              // close communication socket if open
-                fProc.fdClient = accept(fProc.fdListen, (struct sockaddr *)&client_sockaddr, (socklen_t*)&client_sockaddr);  // accept new connection
+        if(fdListen > 0) {
+            if(FD_ISSET(fdListen, &fdSet)) {            // listening socket ready?
+                closeFd(fdClient);                      // close communication socket if open
+                fdClient = accept(fdListen, (struct sockaddr *)&client_sockaddr, (socklen_t*)&client_sockaddr);  // accept new connection
                 printf("Accepted connection from client.\n");
             }
         }
 
-        if(fProc.fdClient > 0 && FD_ISSET(fProc.fdClient, &fdSet)) {        // got data waiting in sock?
-            forwardData(fProc.fdClient, fProc.fdPty, bfr, sizeof(bfr), true);       // from socket to pty
+        if(fdClient > 0 && FD_ISSET(fdClient, &fdSet)) {        // got data waiting in sock?
+            forwardData(fdClient, fdPty, bfr, sizeof(bfr), true);       // from socket to pty
         }
 
-        if(fProc.fdPty > 0 && FD_ISSET(fProc.fdPty, &fdSet)) {              // got data waiting in pty?
-            forwardData(fProc.fdPty, fProc.fdClient, bfr, sizeof(bfr), false);     // from pty to socket
+        if(fdPty > 0 && FD_ISSET(fdPty, &fdSet)) {              // got data waiting in pty?
+            forwardData(fdPty, fdClient, bfr, sizeof(bfr), false);     // from pty to socket
         }
     }
 
-    terminateAllChildren();
+    terminateAllChildren(1000);
     closeAllFds();
 
     printf("Terminated...\n");
@@ -226,21 +227,22 @@ int main(int argc, char *argv[])
 
 void openListeningSockets(void)
 {
-    if(fProc.fdListen != 0) {           // already got listening socket? skip it
+    if(fdListen != 0) {           // already got listening socket? skip it
         return;
     }
 
     // TODO: get sockName
-    fProc.fdListen = openSocket();      // create listening socket
+    fdListen = openSocket();      // create listening socket
 }
 
 void startProcess(void)
 {
-    closeFd(fProc.fdPty);               // close fd to pty if exists
+    closeFd(fdPty);               // close fd to pty if exists
 
-    if(fProc.pid > 0) {                 // kill process by PID if exists
-        kill(fProc.pid, SIGKILL);
-        fProc.pid = 0;
+    if(fProcPid > 0) {                 // kill process by PID if exists
+        printf("startProcess - will kill PID: %d\n", fProcPid);
+        kill(fProcPid, SIGKILL);
+        fProcPid = 0;
     }
 
     if(strcasecmp(command, "term") == 0) {      // if command is just term, then fork linux terminal
@@ -257,7 +259,7 @@ void forkLinuxTerminal(void)
 {
     printf("fork() linux terminal\n");
 
-    int childPid = forkpty(&fProc.fdPty, NULL, NULL, NULL);
+    int childPid = forkpty(&fdPty, NULL, NULL, NULL);
 
     if(childPid == 0) {                             // code executed only by child
         const char *shell = "/bin/sh";              // default shell
@@ -273,20 +275,21 @@ void forkLinuxTerminal(void)
     }
 
     // parent continues here
-    fProc.pid = childPid;          // store PID
+    fProcPid = childPid;          // store PID
+    printf("child PID: %d\n", childPid);
 
     // set terminal size
     winsize ws;
     ws.ws_col = 80;                 // start with 80 cols for MED resolution
     ws.ws_row = 23;                 // 23 rows
-    ioctl(fProc.fdPty, TIOCSWINSZ, &ws);
+    ioctl(fdPty, TIOCSWINSZ, &ws);
 }
 
 void forkCommand(void)
 {
     printf("fork() command: %s\n", command);
 
-    int childPid = forkpty(&fProc.fdPty, NULL, NULL, NULL);
+    int childPid = forkpty(&fdPty, NULL, NULL, NULL);
 
     if(childPid == 0) {                             // code executed only by child
         execlp(command, command, (char *) NULL);
@@ -294,34 +297,51 @@ void forkCommand(void)
     }
 
     // parent continues here
-    fProc.pid = childPid;          // store PID
+    fProcPid = childPid;          // store PID
+    printf("child PID: %d\n", childPid);
 
     // set terminal size
     winsize ws;
     ws.ws_col = 80;                 // start with 80 cols for MED resolution
     ws.ws_row = 23;                 // 23 rows
-    ioctl(fProc.fdPty, TIOCSWINSZ, &ws);    
+    ioctl(fdPty, TIOCSWINSZ, &ws);    
 }
 
 void closeAllFds(void)
 {
-    closeFd(fProc.fdPty);
-    closeFd(fProc.fdListen);
-    closeFd(fProc.fdClient);
+    closeFd(fdPty);
+    closeFd(fdListen);
+    closeFd(fdClient);
 }
 
-void terminateAllChildren(void)
+void terminateAllChildren(uint32_t sleepTime)
 {
-    if(!fProc.pid) {                    // no pid? skip
+    if(fProcPid <= 0) {                 // no pid? skip
         return;
     }
 
-    kill(fProc.pid, SIGTERM);           // ask child to terminate - nicely
+    printf("will kill PID: %d with SIGTERM\n", fProcPid);
 
-    sleep(1);                           // give children some time to terminate
+    kill(fProcPid, SIGTERM);           // ask child to terminate - nicely
 
-    kill(fProc.pid, SIGKILL);           // ask child to terminate - this instant
-    fProc.pid = 0;                      // forget the pid
+    uint32_t endTime = getEndTime(sleepTime);
+
+    while(true) {                       // wait for the specified time between SIGTERM and SIGKILL
+        if(getpgid(fProcPid) < 0) {    // other process not running? quit now
+            break;
+        }
+
+        if(getCurrentMs() >= endTime) { // time out? quit now
+            break;
+        }
+    }
+
+    if(fProcPid > 0 && getpgid(fProcPid) >= 0) {    // other process still running?
+        printf("will kill PID: %d with SIGKILL\n", fProcPid);
+        kill(fProcPid, SIGKILL);       // ask child to terminate - this instant
+    }
+
+    fProcPid = 0;                      // forget the pid
 }
 
 int openSocket(void)
@@ -383,6 +403,8 @@ bool otherInstanceIsRunning(void)
     strcat(pathPid, ".pid");
 
     self_pid = getpid();
+    printf("Main process PID: %d\n", self_pid);
+
     f = fopen(pathPid, "r");
 
     if(f) {                 // if file opened
@@ -412,5 +434,32 @@ bool otherInstanceIsRunning(void)
         printf("\nFailed to write PID to file: %s\n", pathPid);
     }
 
+    // allow for group and other to read and write to this pid file
+    chmod(pathPid, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
+
     return false;
+}
+
+uint32_t getCurrentMs(void)
+{
+    struct timespec tp;
+    int res;
+
+    res = clock_gettime(CLOCK_MONOTONIC, &tp);                  // get current time
+
+    if(res != 0) {                                              // if failed, fail
+        return 0;
+    }
+
+    uint32_t val = (tp.tv_sec * 1000) + (tp.tv_nsec / 1000000);    // convert to milli seconds
+    return val;
+}
+
+uint32_t getEndTime(uint32_t offsetFromNow)
+{
+    uint32_t val;
+
+    val = getCurrentMs() + offsetFromNow;
+
+    return val;
 }
