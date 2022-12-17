@@ -1,0 +1,159 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html lang="en">
+    <head>
+        <meta http-equiv="content-type" content="text/html; charset=utf-8">
+		    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
+        <title>CosmosEx Virtual Mouse / Keyboard</title>
+		<script type="text/javascript" src="js/log.js"></script> 
+        <script>
+        var version="141116";
+        document.write('<link rel="stylesheet" type="text/css" href="css/combined.css?'+version+'">');
+        //unfortunately we have to support IE<10, so decide on zepto/jquery here
+		document.write('<script type="text/javascript" src=js/' +
+		('__proto__' in {} ? 'zepto' : 'jquery') +
+		'-combined.js?'+version+'><\/script>');
+		document.write('<script type="text/javascript"">var jQuery=Zepto;<\/script>');
+		/*document.write('<script type="text/javascript" src="js/jquery.doubletap.js"><\/script>');
+		document.write('<script type="text/javascript" src="js/actual.js"><\/script>');
+		document.write('<script type="text/javascript" src="js/script.js"><\/script>'); */
+		</script>
+    <!-- scale hack to show whole keyboard even on small devices -->
+    <script>if ($(window).width() < 768) { $('meta[name=viewport]').attr('content','initial-scale='+$(window).width()/768+', maximum-scale='+$(window).width()/768+', user-scalable=0'); }</script>
+		<!-- <script type="text/javascript" src="js/keylinux.js"></script> -->
+    <script>
+		$(document).ready(function () {
+		 	CosmosEx.Remote.init();
+		});
+    </script>
+
+
+    </head>
+    <body class="background">
+    <noscript>
+    <h1>Please use a modern broser with javascript.</h1>
+    Like <a href="http://www.opera.com/">Opera</a>, <a href="https://www.mozilla.org/en/firefox/new/">Firefox</a>, <a href="https://download-chromium.appspot.com/">Chromium</a>.
+    <style>
+    #content{
+    display:none;
+    }    
+    </style>
+    </noscript>
+    <div id="content">
+    <div>
+		<div>
+		<a href="/" id="back" class="btn" title="Back to CosmosEx main page">&lt;</a>
+        <strong class="heading">CosmosEx Virtual Mouse / Keyboard</strong>
+		<button id="showkeyboard" class="btn">Toggle system keyboard</button>
+		<button id="showstkeyboard" class="btn">Toggle ST keyboard</button>
+		<button id="lockpointer" class="btn">Grab mouse</button>
+		<button id="keyctrlaltdel" class="btn">CTRL+ALT+DEL</button>
+		<button id="screencast" class="btn">Start Screencast</button>
+		<button id="help" class="btn">Help!</button>
+    </div>
+    </div>
+<div id="demo_placeholder"></div>   
+    <div id="info-features" class="hidden alert alert-warning">
+        <a class="close">×</a>
+    		<p><strong>You are missing out on features!</strong> We can't grab your mouse pointer with your current browser, so you are likely to leave the window with your mouse and disrupt mouse movement. Please use <a href="https://www.mozilla.org/en/firefox/new/" target="_blank">Firefox</a> or <a href="https://download-chromium.appspot.com/" target="_blank">Chromium</a> for mouse grab support.</p>
+    </div>
+    <div class="alert alert-info hidden touch help">
+        <a class="close">×</a>
+    		<p><strong>Welcome!</strong></p>
+        <p>Please double check that you have installed the <a href="http://joo.kie.sk/?page_id=415" target="_blank">IKBD Injector</a> in your ST as well as the keyboard injection cable from CosmosEx to the ST.</p>
+        <p>Now you can remote control your ST with this webapp.</p>
+        <ul class="list-disc">
+        <li>move your finger on this webpage to move your STs mouse</li>
+        <li>double tap with one finger to left click on the ST</li>
+        <li>double tap with two fingers to doubleclick on the ST</li>
+        <li>right mouse button is not supported yet on touch devices</li>
+        <li>use the ST Keyboard image to type. Just tap the Key you want to enter. You can tap multiple keys (e.g. CTRL ALT DEL for reset if your TOS supports it)</li>
+        <li>hide ST keyboard with "Toggle ST Keyboard"</li>
+        <li>show the touch devices keyboard with "Toggle system keyboard"</li>
+        <li>recieve a screencast from ST (you must have started ce_cast.prg on the ST) by tapping "Start Screencast"</li>
+        </ul>
+        <p>
+        There is now Joystick support in this remote.
+        </p>
+        <p>
+        <strong>ST Screencast</strong>
+        </p>
+        <p>
+        This is a highly experimental feature and will cause instabilities with older software. You will need a bleeding edge browser for this (read: Chrome or Safari). It only works with "clean" ST software, it will not work with games or demos. Do not start ce_cast.prg in your AUTO folder.
+        </p>
+        <p>
+        Problems? Read <a href="http://joo.kie.sk/?page_id=529" target="_blank">this</a>. If this doesn't solve the issue, send a <a href="mailto:ce_remote@absent.de">mail</a>!
+        </p>
+    </div>
+    <div class="alert alert-info hidden desktop help">
+        <a class="close">×</a>
+    		<p><strong>Welcome!</strong></p>
+        <p>Please double check that you have installed the <a href="http://joo.kie.sk/?page_id=415" target="_blank">IKBD Injector</a> in your ST as well as the keyboard injection cable from CosmosEx to the ST.</p>
+        <p>Now you can remote control your ST with this webapp.</p>
+        <ul class="list-disc">
+        <li>move your mouse on this webpage to move your STs mouse</li>
+        <li>left click in the browser to left click on the ST</li>
+        <li>right click in the browser to right click on the ST</li>
+        <li>click "Grab mouse" (if available in your browser) to attach your mouse to the browser, so you won't leave its boundaries. Press ESC to leave this mode.</li>
+        <li>use your PCs keyboard to type</li>
+        <li>for Special Keys you can click "Toggle ST keyboard" to show a ST Keyboard. Just click the Key you want to enter</li>
+        <li>recieve a screencast from ST (you must have started ce_cast.prg on the ST) by clicking "Start Screencast"</li>
+        </ul>
+        <p>
+        There is now Joystick support in this remote.
+        </p>
+        <p>
+        <strong>ST Screencast</strong>
+        </p>
+        <p>
+        This is a highly experimental feature and will cause instabilities with older software. You will need a bleeding edge browser for this (read: Chromium or Chrome). It only works with "clean" ST software, it will not work with games or demos. It will only work with the most current HDDRIVER. Do not start ce_cast.prg in your AUTO folder.
+        </p>
+        <p>
+        Problems? Read <a href="http://joo.kie.sk/?page_id=529" target="_blank">this</a>. If this doesn't solve the issue, send a <a href="mailto:ce_remote@absent.de">mail</a>!
+        </p>
+    </div>
+		<input type="text" id="keyboardtrigger">
+		<canvas id="canvas">Please use a better browser! </canvas>
+
+    <div id="keyboardlayer">
+		<img src="img/Scancode.gif" id="keyboard" alt="" usemap="#Map" />
+		<map name="Map" id="Map">
+		    <area id="a_f1" alt="" title="" href="#" shape="poly" data-linuxcodes="59" coords="46,31,18,59,68,60,92,32" />
+		    <area id="a_f2" alt="" title="" href="#" shape="poly" data-linuxcodes="60" coords="95,32,70,61,117,63,141,32" />
+		    <area id="a_f3" alt="" title="" href="#" shape="poly" data-linuxcodes="61" coords="145,32,120,61,169,62,192,32" />
+		    <area id="a_f4" alt="" title="" href="#" shape="poly" data-linuxcodes="62" oords="194,31,171,61,219,64,244,31" />
+		    <area id="a_f5" alt="" title="" href="#" shape="poly" data-linuxcodes="63" coords="246,33,222,62,267,59,294,31" />
+		    <area id="a_f6" alt="" title="" href="#" shape="poly" data-linuxcodes="64" coords="295,33,269,64,319,60,344,32" />
+		    <area id="a_f7" alt="" title="" href="#" shape="poly" data-linuxcodes="65" coords="345,34,321,61,370,60,395,31" />
+		    <area id="a_f8" alt="" title="" href="#" shape="poly" data-linuxcodes="66" coords="397,32,372,62,419,61,443,33" />
+		    <area id="a_f9" alt="" title="" href="#" shape="poly" data-linuxcodes="67" coords="446,33,419,64,468,64,493,32" />
+		    <area id="a_f10" alt="" title="" href="#" shape="poly" data-linuxcodes="68" coords="495,33,470,63,517,63,546,32" />
+		    <area id="a_esc_row14" alt="" title="" href="#" shape="rect" data-count="14" data-linuxcodes="1,2,3,4,5,6,7,8,9,10,11,12,13,0" coords="18,80,464,110" />
+		    <area id="a_q_row12" alt="" title="" href="#" shape="rect" data-count="12" data-linuxcodes="16,17,18,19,20,21,22,23,24,25" coords="65,112,449,144" />
+		    <area id="a_a_row11" alt="" title="" href="#" shape="rect" data-count="11" data-linuxcodes="30,31,32,33,34,35,36,37,38,39,40" coords="73,143,425,175" />
+		    <area id="a_pipez_row11" alt="" title="" href="#" shape="rect" data-count="11" data-linuxcodes="43,44,45,46,47,48,49,50,51,52,53" coords="58,178,409,207" />
+		    <area id="a_space" alt="" title="" href="#" shape="rect" data-linuxcodes="57" coords="106,210,391,240" />
+		    <area id="a_tab" alt="" title="" href="#" shape="rect" data-linuxcodes="15" coords="18,112,64,142" />
+		    <area id="a_ctrl" alt="" title="" href="#" shape="rect" data-linuxcodes="29" coords="18,145,72,174" />
+		    <area id="a_shiftl" alt="" title="" href="#" shape="rect" data-linuxcodes="42" coords="18,177,56,208" />
+		    <area id="a_alt" alt="" title="" href="#" shape="rect" data-linuxcodes="56" coords="58,209,105,240" />
+		    <area id="a_back" alt="" title="" href="#" shape="rect" data-linuxcodes="14" coords="465,81,512,111" />
+	        <area id="a_del" alt="" title="" href="#" shape="rect" data-linuxcodes="111" coords="482,112,512,143" />
+		    <area id="a_hash" alt="" title="" href="#" shape="rect" data-linuxcodes="0" coords="482,146,512,176" />
+		    <area id="a_return" alt="" title="" href="#" shape="poly" data-linuxcodes="28" coords="450,114,450,144,426,145,426,176,481,174,481,112" />
+		    <area id="a_shiftr" alt="" title="" href="#" shape="rect" data-linuxcodes="54" coords="410,177,456,207" />
+		    <area id="a_caps" alt="" title="" href="#" shape="rect" data-linuxcodes="58" coords="393,209,441,240" />
+		    <area id="a_helpundo_row2" alt="" title="" href="#" shape="rect" data-count="2" data-linuxcodes="102,104" coords="522,81,616,110" />
+		    <area id="a_insert_row3" alt="" title="" href="#" shape="rect" data-count="3" data-linuxcodes="110,103,109" coords="522,112,616,144" />
+		    <area id="a_left_row3" alt="" title="" href="#" shape="rect" data-count="3" data-linuxcodes="105,108,106" coords="522,145,617,175" />
+	      	<area id="a_kpbracket_row4" alt="" title="" href="#" shape="rect" data-count="4" data-linuxcodes="26,27,98,55" coords="625,80,753,111" />
+			<area id="a_kp7_row4" alt="" title="" href="#" shape="rect" data-count="4" data-linuxcodes="71,72,73,74" coords="625,112,752,143" />
+			<area id="a_kp4_row4" alt="" title="" href="#" shape="rect" data-count="4" data-linuxcodes="75,76,77,78" coords="625,144,752,175" />
+			<area id="a_kp1_row3" alt="" title="" href="#" shape="rect" data-count="3" data-linuxcodes="79,80,81" coords="625,177,721,207" />
+			<area id="a_kp0" alt="" title="" href="#" shape="rect" data-linuxcodes="82" coords="626,208,688,239" />
+			<area id="a_kpdot" alt="" title="" href="#" shape="rect" data-linuxcodes="83" coords="690,210,721,240" />
+			<area id="a_kpenter" alt="" title="" href="#" shape="rect" data-linuxcodes="96" coords="722,177,753,240" />
+		</map>
+    </div>
+    </div>
+    </body>
+</html>

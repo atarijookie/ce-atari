@@ -1,0 +1,67 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html lang="en">
+    <head>
+        <meta http-equiv="content-type" content="text/html; charset=utf-8">
+	    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
+        <title>CosmosEx Configuration</title>
+        <!-- 
+        -->
+        <link rel="stylesheet" type="text/css" href="css/bootstrap.light.css">
+        <link rel="stylesheet" type="text/css" href="css/style.css">
+		    <script type="text/javascript" src="js/modernizr.custom.50426.js"></script>
+        <script type="text/javascript"> 
+        var version="160416";
+        //unfortunately we have to support IE<10, so decide on zepto/jquery here
+    		document.write('<script type="text/javascript" src=js/jquery.js?'+version+'><\/script>');
+//        document.write('<link rel="stylesheet" type="text/css" href="css/combined.css?'+version+'">');
+    		</script>
+        <script type="text/javascript" src="js/term.js"></script> 
+        <script type="text/javascript"> 
+    		document.write('<script type="text/javascript" src=js/config.js?'+version+'><\/script>');
+    		</script>
+      	<script language="Javascript">
+    		$(document).ready(function () {
+    		  	CosmosEx.ConfigTerminal.init();
+    		});
+  		  </script>    
+        <style>
+          #term {
+            float: left;
+            border: #000 solid 5px;
+            font-family: "DejaVu Sans Mono", "Liberation Mono", monospace;
+            font-size: 11px;
+            color: #ffffff;
+            background: #000;
+            cursor:none;
+          }
+        </style> 
+      </head>
+    <body>
+    <div class="container">
+        <div class="row">
+            <div class="span10">
+                <ul class="nav nav-pills">
+                    <li><a href="/?v=6">Home</a></li>
+                    <li><a href="http://joo.kie.sk/?page_id=415">Manual</a></li>
+                    <li><a href="/floppy.html?v=6">Floppy</a></li>
+                    <li><a href="/download.html?v=6">Download</a></li>
+                    <li><a href="/remote.html?v=6">Remote</a></li>
+                    <li><a href="/screenshots.html?v=6">Screenshots</a></li>
+                    <li class="active"><a href="/config.html?v=6">Config</a></li>
+                    <li><a href="/app/status/?v=6">Status</a></li>
+                </ul>
+        <h3>Configuration</h3>
+        <p>This is the CosmosEx configuration terminal. Use Cursor Keys to navigate.</p>
+            </div>
+            <div class="span2">
+                <img class="logo" src="img/ce_logo.png">
+            </div>
+        </div>
+        <div class="row">
+            <div class="span10">
+            <div id="term" class="terminal" style=""></div>
+            </div>
+            </div>
+    </div>
+    </body>
+</html>
