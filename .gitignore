@@ -21,3 +21,5 @@ ce_forker/appviasock
 ce_forker/client
 **/.idea/
 **/venv/
+__pychache__/
+**/__pycachec__/
