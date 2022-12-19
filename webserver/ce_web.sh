@@ -1,5 +1,11 @@
 #!/bin/sh
 
+# check if running as root, and if not, execute this script with sudo
+if [ $(id -u) != 0 ]; then
+  sudo $0 "$@"
+  exit 0
+fi
+
 check_if_pid_running()
 {
     # Function checks if the supplied PID from file in $1 is running.
