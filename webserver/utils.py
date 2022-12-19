@@ -37,6 +37,7 @@ def text_from_file(filename):
 
 
 def log_config():
+    os.makedirs(LOG_DIR, exist_ok=True)
     log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
 
     my_handler = RotatingFileHandler(f'{LOG_DIR}/ce_webserver.log', mode='a', maxBytes=1024 * 1024, backupCount=1)

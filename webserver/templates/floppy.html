@@ -6,16 +6,15 @@
         <title>CosmosEx Floppy Emulation</title>
         <!-- 
         -->
-        <link rel="stylesheet" type="text/css" href="css/bootstrap.light.css">
-		    <script type="text/javascript" src="js/modernizr.custom.50426.js"></script>
+        <link rel="stylesheet" type="text/css" href="static/css/bootstrap.light.css">
+		    <script type="text/javascript" src="static/js/modernizr.custom.50426.js"></script>
         <script type="text/javascript"> 
-        var version="160125";
         //unfortunately we have to support IE<10, so decide on zepto/jquery here
-    		document.write('<script type="text/javascript" src=js/' + ('__proto__' in {} ? 'zepto' : 'jquery') + '.js?'+version+'><\/script>');
+    		document.write('<script type="text/javascript" src=static/js/' + ('__proto__' in {} ? 'zepto' : 'jquery') + '.js'><\/script>');
     		document.write('<script type="text/javascript"">var jQuery=Zepto;<\/script>');
-    		document.write('<script type="text/javascript" src=js/floppy.js?'+version+'><\/script>');
-//        document.write('<link rel="stylesheet" type="text/css" href="css/combined.css?'+version+'">');
-        document.write('<link rel="stylesheet" type="text/css" href="css/style.css?'+version+'">');
+    		document.write('<script type="text/javascript" src=static/js/floppy.js><\/script>');
+//        document.write('<link rel="stylesheet" type="text/css" href="static/css/combined.css">');
+        document.write('<link rel="stylesheet" type="text/css" href="static/css/style.css">');
     		</script>
       	<script language="Javascript">
     		$(document).ready(function () {
@@ -28,20 +27,20 @@
         <div class="row">
             <div class="span10">
                 <ul class="nav nav-pills">
-                    <li><a href="/?v=6">Home</a></li>
+                    <li><a href="/">Home</a></li>
                     <li><a href="http://joo.kie.sk/?page_id=415">Manual</a></li>
-                    <li class="active"><a href="/floppy.html?v=6">Floppy</a></li>
-                    <li><a href="/download.html?v=6">Download</a></li>
-                    <li><a href="/remote.html?v=6">Remote</a></li>
-                    <li><a href="/screenshots.html?v=6">Screenshots</a></li>
-                    <li><a href="/config.html?v=6">Config</a></li>
-                    <li><a href="/app/status/?v=6">Status</a></li>
+                    <li class="active"><a href="/floppy">Floppy</a></li>
+                    <li><a href="/download">Download</a></li>
+                    <li><a href="/remote">Remote</a></li>
+                    <li><a href="/screenshots">Screenshots</a></li>
+                    <li><a href="/config">Config</a></li>
+                    <li><a href="/status">Status</a></li>
                 </ul>
         <h3>Floppy emulation</h3>
         <p>Select a disk image (*.ST, *.MSA) and upload it to your CosmosEx. </p>
             </div>
             <div class="span2">
-                <img class="logo" src="img/ce_logo.png">
+                <img class="logo" src="static/img/ce_logo.png">
             </div>
         </div>
         

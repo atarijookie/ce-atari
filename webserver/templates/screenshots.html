@@ -4,14 +4,12 @@
         <meta http-equiv="content-type" content="text/html; charset=utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
         <title>CosmosEx Screenshots interface</title>
-		<script type="text/javascript" src="js/log.js"></script> 
+		<script type="text/javascript" src="static/js/log.js"></script>
         <script>
-            var version="160125";
-            document.write('<link rel="stylesheet" type="text/css" href="css/combined.css?'+version+'">');
+            document.write('<link rel="stylesheet" type="text/css" href="static/css/combined.css">');
             //unfortunately we have to support IE<10, so decide on zepto/jquery here
-            document.write('<script type="text/javascript" src=js/' +
-            ('__proto__' in {} ? 'zepto' : 'jquery') +
-            '-combined.js?'+version+'><\/script>');
+            document.write('<script type="text/javascript" src=static/js/' +
+            ('__proto__' in {} ? 'zepto' : 'jquery') + '-combined.js><\/script>');
             document.write('<script type="text/javascript"">var jQuery=Zepto;<\/script>');
 		</script>
 
@@ -145,7 +143,7 @@
 	        <div class="span1">
 	        </div>
 			<div class="span10">
-				<a href="/?v=3" id="back" class="btn" title="Back to CosmosEx main page">&lt;</a>
+				<a href="/" id="back" class="btn" title="Back to CosmosEx main page">&lt;</a>
 		        <strong class="heading">CosmosEx Screenshots interface</strong>
             </div>
 	        <div class="span1">

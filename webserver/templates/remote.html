@@ -4,22 +4,20 @@
         <meta http-equiv="content-type" content="text/html; charset=utf-8">
 		    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
         <title>CosmosEx Virtual Mouse / Keyboard</title>
-		<script type="text/javascript" src="js/log.js"></script> 
+		<script type="text/javascript" src="static/js/log.js"></script>
         <script>
-        var version="141116";
-        document.write('<link rel="stylesheet" type="text/css" href="css/combined.css?'+version+'">');
+        document.write('<link rel="stylesheet" type="text/css" href="static/css/combined.css?'+version+'">');
         //unfortunately we have to support IE<10, so decide on zepto/jquery here
-		document.write('<script type="text/javascript" src=js/' +
-		('__proto__' in {} ? 'zepto' : 'jquery') +
-		'-combined.js?'+version+'><\/script>');
+		document.write('<script type="text/javascript" src=static/js/' +
+		('__proto__' in {} ? 'zepto' : 'jquery') + '-combined.js><\/script>');
 		document.write('<script type="text/javascript"">var jQuery=Zepto;<\/script>');
-		/*document.write('<script type="text/javascript" src="js/jquery.doubletap.js"><\/script>');
-		document.write('<script type="text/javascript" src="js/actual.js"><\/script>');
-		document.write('<script type="text/javascript" src="js/script.js"><\/script>'); */
+		/*document.write('<script type="text/javascript" src="static/js/jquery.doubletap.js"><\/script>');
+		document.write('<script type="text/javascript" src="static/js/actual.js"><\/script>');
+		document.write('<script type="text/javascript" src="static/js/script.js"><\/script>'); */
 		</script>
     <!-- scale hack to show whole keyboard even on small devices -->
     <script>if ($(window).width() < 768) { $('meta[name=viewport]').attr('content','initial-scale='+$(window).width()/768+', maximum-scale='+$(window).width()/768+', user-scalable=0'); }</script>
-		<!-- <script type="text/javascript" src="js/keylinux.js"></script> -->
+		<!-- <script type="text/javascript" src="static/js/keylinux.js"></script> -->
     <script>
 		$(document).ready(function () {
 		 	CosmosEx.Remote.init();
@@ -115,7 +113,7 @@
 		<canvas id="canvas">Please use a better browser! </canvas>
 
     <div id="keyboardlayer">
-		<img src="img/Scancode.gif" id="keyboard" alt="" usemap="#Map" />
+		<img src="static/img/Scancode.gif" id="keyboard" alt="" usemap="#Map" />
 		<map name="Map" id="Map">
 		    <area id="a_f1" alt="" title="" href="#" shape="poly" data-linuxcodes="59" coords="46,31,18,59,68,60,92,32" />
 		    <area id="a_f2" alt="" title="" href="#" shape="poly" data-linuxcodes="60" coords="95,32,70,61,117,63,141,32" />

@@ -29,7 +29,7 @@ img#keyboard{
   padding: 10px;
 }
 .background{
-  background-image: url(../img/260520st.jpg);
+  background-image: url(../static/img/260520st.jpg);
   background-size: 100%;
 }
 .hidden{
@@ -56,7 +56,7 @@ img#keyboard{
 	margin-right: auto;
 }
 .disk{
-  background-image:url("../img/35dd.jpg?2");
+  background-image:url("../img/35dd.jpg");
   height: 309px;
   width: 300px;
   margin-bottom: 20px;
