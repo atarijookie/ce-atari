@@ -1,9 +1,7 @@
-import copy
 import os
-import re
 import logging
 from logging.handlers import RotatingFileHandler
-import shared
+from flask import render_template
 from shared import PID_FILE, LOG_DIR
 
 
@@ -80,3 +78,32 @@ def other_instance_running():
     app_log.debug(f'other_instance_running: PID from file not running, so other instance not running')
     text_to_file(str(pid_current), PID_FILE)        # write our PID to file
     return False            # no other instance running
+
+
+def template_renderer(app):
+    def register_template_endpoint(name):
+        @app.route('/' + name, endpoint=name)
+        def route_handler():
+            return render_template(name + '.html')
+    return register_template_endpoint
+
+
+def generate_routes_for_templates(app):
+    app.logger.info("Generating routes for templates (for each worker)")
+
+    web_dir = os.path.dirname(os.path.abspath(__file__))
+    web_dir = os.path.join(web_dir, 'templates')
+    app.logger.info(f'Will look for templates in dir: {web_dir}')
+    register_template_endpoint = template_renderer(app)
+
+    for filename in os.listdir(web_dir):                            # go through templates dir
+        full_path = os.path.join(web_dir, filename)                 # construct full path
+
+        fname_wo_ext, ext = os.path.splitext(filename)              # split to filename and extension
+
+        # if it's not a file or doesn't end with htm / html, skip it
+        if not os.path.isfile(full_path) or ext not in['.htm', '.html']:    # not a file or not supported extension?
+            continue
+
+        app.logger.info(f'Added route /{fname_wo_ext} for template {filename}')
+        register_template_endpoint(fname_wo_ext)

@@ -20,9 +20,11 @@
     		</script>
       	<script language="Javascript">
     		$(document).ready(function () {
-    		  	CosmosEx.ConfigTerminal.init();
+    		  	CosmosEx.configInit();
     		});
-  		  </script>    
+
+  		    setInterval(CosmosEx.configGetData, 1000);
+  		  </script>
         <style>
           #term {
             float: left;

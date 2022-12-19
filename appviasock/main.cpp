@@ -83,7 +83,6 @@ void forwardData(int& fdIn, int& fdOut, char* bfr, int bfrLen, bool fromSock)
         if(fromSock && ires == 0 && bytesAvailable == 0) {  // when reading from socket, ioctl succeeded, but bytes that can be read are 0, client has disconnected
             printf("Client disconnected, closed input socket.\n");
             closeFd(fdIn);              // close this socket
-            terminateAllChildren(100);  // also terminate the child app - to get new app session next time client connects
         }
 
         return;
@@ -164,6 +163,11 @@ int main(int argc, char *argv[])
 
     openListeningSockets();     // open listening socket for all processes with defined types
 
+    if(fdListen < 0) {
+        printf("This app has no use without running listening socket, so terminating!\n\n");
+        return 0;
+    }
+
     fd_set fdSet;               // fd flags
     struct timeval timeout;
 
@@ -172,6 +176,19 @@ int main(int argc, char *argv[])
 
     printf("Entering main loop...\n");
 
+    /*
+    Two different parts of the system will use this app in a slight different way:
+       - CE core app will connect to appviasock and hold the connection while CE conf tool will be requesting data from
+         the app running under appviasock (So 1 connect, then long transfer of data (minutes), then disconnect).
+       - Webserver will have to fetch data from appviasock using endless loop of requests, each taking about
+         1 second (long poll), so it will do connect-fetch-disconnect, connect-fetch-disconnect, ...
+    But we also want to terminate the child app when there's no connected socket, so when the client connects after
+    longer time, it will see fresh new child app, not part of last screen. That's why we're storing time when client is
+    connected and also calculating time since the client was connected, and if longer time has passed, then terminate
+    the child app (it will be started next time a new client connects later).
+    */
+    uint32_t timeWhenConnected = getCurrentMs();
+
     char bfr[512];
     while(!sigintReceived) {
         FD_ZERO(&fdSet);        // clear flags
@@ -179,11 +196,21 @@ int main(int argc, char *argv[])
         timeout.tv_sec = 1;
         timeout.tv_usec = 0;
 
-        // set all valid FDs to set
-        if(fdListen > 0)  FD_SET(fdListen, &fdSet);     // check for new connections
+        // time since there was connection from client - if this goes above some threshold, terminate child app
+        uint32_t timeSinceValidClientConnection = (getCurrentMs() - timeWhenConnected) / 1000;
 
-        if(fdClient > 0) {                // if got some client connected
-            FD_SET(fdClient, &fdSet);     // wait for data from client
+        if(timeSinceValidClientConnection > 5 && fProcPid > 0) {    // client disconnected too long? terminate child app
+            printf("Client didn't reconnect soon after disconnect, terminating child app.\n");
+            terminateAllChildren(100);  // terminate the child app - to get new app session next time client connects
+        }
+
+        // set all valid FDs to set
+        if(fdListen > 0) FD_SET(fdListen, &fdSet);     // check for new connections
+
+        // Only if got some client connected, wait for data from client and from PTY.
+        // If client not connected, don't check for data from PTY and let them wait there until some client connects.
+        if(fdClient > 0) {
+            FD_SET(fdClient, &fdSet);           // wait for data from client
 
             if(fProcPid <= 0) {                 // don't have PID?
                 startProcess();                 // fork process and get handle to pty
@@ -192,6 +219,8 @@ int main(int argc, char *argv[])
             if(fdPty > 0) {                     // hopefully we got the fd now
                 FD_SET(fdPty, &fdSet);
             }
+
+            timeWhenConnected = getCurrentMs(); // update time when we're connected
         }
 
         // wait for some FD to be ready for reading
@@ -231,8 +260,11 @@ void openListeningSockets(void)
         return;
     }
 
-    // TODO: get sockName
     fdListen = openSocket();      // create listening socket
+
+    if(fdListen < 0) {
+        printf("Failed to create listening socket!\n");
+    }
 }
 
 void startProcess(void)
@@ -379,6 +411,7 @@ int openSocket(void)
 
     // allow for group and other to read and write to this sock
     chmod(pathSocket, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
+    printf("Listening socket now at: %s\n", pathSocket);
 
     // return listening socket. we need to listen and accept on it.
     return sfd;
