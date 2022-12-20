@@ -2,6 +2,7 @@ import os
 import socket
 from flask import Flask, render_template, abort, url_for, make_response, request, json
 from utils import log_config, generate_routes_for_templates
+from shared import SOCK_PATH_CONFIG, SOCK_PATH_FLOPPY, SOCK_PATH_TERMINAL
 
 log_config()
 app = Flask(__name__,  template_folder='templates', static_folder='static')
@@ -31,7 +32,7 @@ def read_from_unix_sock(sock_path):
 
     data = ''
     try:
-        data = sock.recv(2048)
+        data = sock.recv(16384)
         data = data.decode('utf-8')
     except socket.timeout:
         # app.logger.debug(f"recv data timeout")
@@ -65,17 +66,46 @@ def write_to_unix_sock(sock_path, data):
     return ''
 
 
+# GET config stream
+@app.route('/stream/config', methods=['GET'])
+def config_get():
+    return read_from_unix_sock(SOCK_PATH_CONFIG)
+
+
+# POST config stream
+@app.route('/stream/config', methods=['POST'])
+def config_post():
+    data_dict = request.get_json(force=True)
+    data = data_dict.get('data')
+    return write_to_unix_sock(SOCK_PATH_CONFIG + '.wo', data)
+
+
+# GET floppy stream
+@app.route('/stream/floppy', methods=['GET'])
+def floppy_get():
+    return read_from_unix_sock(SOCK_PATH_FLOPPY)
+
+
+# POST floppy stream
+@app.route('/stream/floppy', methods=['POST'])
+def floppy_post():
+    data_dict = request.get_json(force=True)
+    data = data_dict.get('data')
+    return write_to_unix_sock(SOCK_PATH_FLOPPY + '.wo', data)
+
+
+# GET terminal stream
 @app.route('/stream/terminal', methods=['GET'])
 def terminal_get():
-    return read_from_unix_sock('/var/run/ce/app2.sock')
+    return read_from_unix_sock(SOCK_PATH_TERMINAL)
 
 
+# POST terminal stream
 @app.route('/stream/terminal', methods=['POST'])
 def terminal_post():
     data_dict = request.get_json(force=True)
     data = data_dict.get('data')
-    app.logger.warning(f"request: {request}, data_dict: {data_dict}, data: {data}")
-    return write_to_unix_sock('/var/run/ce/app2.sock', data)
+    return write_to_unix_sock(SOCK_PATH_TERMINAL + '.wo', data)
 
 
 @app.route('/status', methods=['GET'])

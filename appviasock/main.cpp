@@ -35,8 +35,11 @@ struct termios ctrlOriginal;
 //----------------------------------------------------
 volatile int fProcPid;  // PID of child if running
 int fdPty;              // fd of the PTY which the process as input + output
-int fdListen;           // fd of the socked which listens for new incoming connections
-int fdClient;           // fd of the socket which is used for sending + receiving data to CE main app
+int fdListenRW;         // fd of the socked which listens for new incoming Read-Write connections
+int fdClientRW;         // fd of the socket which is used for sending + receiving data to CE main app
+
+int fdListenWO;         // fd of the socked which listens for new incoming Write-only connections
+int fdClientWO;         // fd of the socket which is used for sending to CE main app only
 
 char pathPid[256];
 char pathSocket[256];
@@ -51,7 +54,8 @@ void closeAllFds(void);
 void forkLinuxTerminal(void);
 void forkCommand(void);
 void openListeningSockets(void);
-int openSocket(void);
+void openListeningSocket(int& fdListening, char* socketPath);
+int openSocket(char* socketPath);
 void closeFd(int& fd);
 bool otherInstanceIsRunning(void);
 uint32_t getCurrentMs(void);
@@ -81,7 +85,12 @@ void forwardData(int& fdIn, int& fdOut, char* bfr, int bfrLen, bool fromSock)
 
     if(ires == -1 || bytesAvailable < 1) {
         if(fromSock && ires == 0 && bytesAvailable == 0) {  // when reading from socket, ioctl succeeded, but bytes that can be read are 0, client has disconnected
-            printf("Client disconnected, closed input socket.\n");
+            if(fdIn == fdClientRW) {
+                printf("RW-socket client disconnected.\n");
+            } else {
+                printf("WO-socket client disconnected.\n");
+            }
+
             closeFd(fdIn);              // close this socket
         }
 
@@ -126,6 +135,29 @@ void forwardData(int& fdIn, int& fdOut, char* bfr, int bfrLen, bool fromSock)
     }
 }
 
+void acceptConnectionIfWaiting(int& fdListening, fd_set* fdSet, int& fdOfClient, bool mainNotWriteOnly)
+{
+    if(fdListening <= 0) {      // no listening socket? quit here
+        return;
+    }
+
+    struct sockaddr_un client_sockaddr;
+    memset(&client_sockaddr, 0, sizeof(struct sockaddr_un));
+
+    if(!FD_ISSET(fdListening, fdSet)) {            // listening socket not ready? quit
+        return;
+    }
+
+    closeFd(fdOfClient);                            // close communication socket if open
+    fdOfClient = accept(fdListening, (struct sockaddr *) &client_sockaddr, (socklen_t*) &client_sockaddr);  // accept new connection
+
+    if(mainNotWriteOnly) {  // main socket? (read-write)
+        printf("RW-socket client connected.\n");
+    } else {                // helper socket? (write-only)
+        printf("WO-socket client connected.\n");
+    }
+}
+
 int main(int argc, char *argv[])
 {
     // make sure the correct number of arguments is specified
@@ -163,7 +195,7 @@ int main(int argc, char *argv[])
 
     openListeningSockets();     // open listening socket for all processes with defined types
 
-    if(fdListen < 0) {
+    if(fdListenRW < 0) {
         printf("This app has no use without running listening socket, so terminating!\n\n");
         return 0;
     }
@@ -205,12 +237,14 @@ int main(int argc, char *argv[])
         }
 
         // set all valid FDs to set
-        if(fdListen > 0) FD_SET(fdListen, &fdSet);     // check for new connections
+        if(fdListenRW > 0) FD_SET(fdListenRW, &fdSet);      // check for new MAIN connection
+        if(fdListenWO > 0) FD_SET(fdListenWO, &fdSet);      // check for new WRITE-ONLY connection
+        if(fdClientWO > 0) FD_SET(fdClientWO, &fdSet);      // check for data from WRITE-ONLY connection
 
         // Only if got some client connected, wait for data from client and from PTY.
         // If client not connected, don't check for data from PTY and let them wait there until some client connects.
-        if(fdClient > 0) {
-            FD_SET(fdClient, &fdSet);           // wait for data from client
+        if(fdClientRW > 0) {
+            FD_SET(fdClientRW, &fdSet);           // wait for data from client
 
             if(fProcPid <= 0) {                 // don't have PID?
                 startProcess();                 // fork process and get handle to pty
@@ -229,21 +263,19 @@ int main(int argc, char *argv[])
         }
 
         // find out which FD is ready and handle it
-        // first try to accept all new connections
-        if(fdListen > 0) {
-            if(FD_ISSET(fdListen, &fdSet)) {            // listening socket ready?
-                closeFd(fdClient);                      // close communication socket if open
-                fdClient = accept(fdListen, (struct sockaddr *)&client_sockaddr, (socklen_t*)&client_sockaddr);  // accept new connection
-                printf("Accepted connection from client.\n");
-            }
+        acceptConnectionIfWaiting(fdListenRW, &fdSet, fdClientRW, true);    // accept RW connection if waiting
+        acceptConnectionIfWaiting(fdListenWO, &fdSet, fdClientWO, false);   // accept WO connection if waiting
+
+        if(fdClientRW > 0 && FD_ISSET(fdClientRW, &fdSet)) {            // got data waiting in sock?
+            forwardData(fdClientRW, fdPty, bfr, sizeof(bfr), true);     // from socket to pty
         }
 
-        if(fdClient > 0 && FD_ISSET(fdClient, &fdSet)) {        // got data waiting in sock?
-            forwardData(fdClient, fdPty, bfr, sizeof(bfr), true);       // from socket to pty
+        if(fdClientWO > 0 && FD_ISSET(fdClientWO, &fdSet)) {            // got data waiting in sock?
+            forwardData(fdClientWO, fdPty, bfr, sizeof(bfr), true);     // from socket to pty
         }
 
-        if(fdPty > 0 && FD_ISSET(fdPty, &fdSet)) {              // got data waiting in pty?
-            forwardData(fdPty, fdClient, bfr, sizeof(bfr), false);     // from pty to socket
+        if(fdPty > 0 && FD_ISSET(fdPty, &fdSet)) {                      // got data waiting in pty?
+            forwardData(fdPty, fdClientRW, bfr, sizeof(bfr), false);    // from pty to socket
         }
     }
 
@@ -256,14 +288,27 @@ int main(int argc, char *argv[])
 
 void openListeningSockets(void)
 {
-    if(fdListen != 0) {           // already got listening socket? skip it
+    // open listening socket for main read-write socket
+    openListeningSocket(fdListenRW, pathSocket);
+
+    // open listening socket for helper write-only socket
+    char pathSocketWO[256];             // for read-only path use the main path + '.wo' at the end of path
+    strcpy(pathSocketWO, pathSocket);
+    strcat(pathSocketWO, ".wo");
+
+    openListeningSocket(fdListenWO, pathSocketWO);
+}
+
+void openListeningSocket(int& fdListening, char* socketPath)
+{
+    if(fdListening != 0) {                  // already got listening socket? skip it
         return;
     }
 
-    fdListen = openSocket();      // create listening socket
+    fdListening = openSocket(socketPath);   // create listening socket
 
-    if(fdListen < 0) {
-        printf("Failed to create listening socket!\n");
+    if(fdListening < 0) {
+        printf("Failed to create listening socket on path %s!\n", socketPath);
     }
 }
 
@@ -342,8 +387,8 @@ void forkCommand(void)
 void closeAllFds(void)
 {
     closeFd(fdPty);
-    closeFd(fdListen);
-    closeFd(fdClient);
+    closeFd(fdListenRW);
+    closeFd(fdClientRW);
 }
 
 void terminateAllChildren(uint32_t sleepTime)
@@ -376,7 +421,7 @@ void terminateAllChildren(uint32_t sleepTime)
     fProcPid = 0;                      // forget the pid
 }
 
-int openSocket(void)
+int openSocket(char* socketPath)
 {
     struct sockaddr_un addr;
 
@@ -389,14 +434,14 @@ int openSocket(void)
 
     // Delete any file that already exists at the address. Make sure the deletion
     // succeeds. If the error is just that the file/directory doesn't exist, it's fine.
-    if (remove(pathSocket) == -1 && errno != ENOENT) {
+    if (remove(socketPath) == -1 && errno != ENOENT) {
         return -1;
     }
 
     // Zero out the address, and set family and path.
     memset(&addr, 0, sizeof(struct sockaddr_un));
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, pathSocket, sizeof(addr.sun_path) - 1);
+    strncpy(addr.sun_path, socketPath, sizeof(addr.sun_path) - 1);
 
     // Bind the socket to the address. Note that we're binding the server socket
     // to a well-known address so that clients know where to connect.
@@ -410,8 +455,8 @@ int openSocket(void)
     }
 
     // allow for group and other to read and write to this sock
-    chmod(pathSocket, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
-    printf("Listening socket now at: %s\n", pathSocket);
+    chmod(socketPath, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
+    printf("Listening socket now at: %s\n", socketPath);
 
     // return listening socket. we need to listen and accept on it.
     return sfd;

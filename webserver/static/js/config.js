@@ -4,10 +4,10 @@
   ----------------------------------------------------------------
   RESTlike interface, using json
 
-  /stream/terminal 	POST
+  /stream/config 	POST
   Send Key
   
-  /stream/terminal 	GET
+  /stream/config 	GET
   Get current screen as VT100 sequence
 
   ----------------------------------------------------------------*/
@@ -36,10 +36,9 @@ function term_init()
         $.ajax({
             type: "POST",
             contentType: "application/json",
-            url: "/stream/terminal",
+            url: "/stream/config",
             data: JSON.stringify({data: data_from_kbd, len: data_from_kbd.length}),
             success: function(data) {
-                term_get_data();
                 lock=false;
             },
             error: function(data) {
@@ -54,12 +53,12 @@ function term_init()
 
 function term_get_data()
 {
-//    term.open($("#term").get(0));
-
     $.ajax({
-        url: "/stream/terminal",
+        url: "/stream/config",
     }).done(function(data_from_app) {
         term.write(data_from_app);
+    }).always(function() {
+        setTimeout(term_get_data, 50);
     });
 }
 

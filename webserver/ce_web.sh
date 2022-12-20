@@ -67,6 +67,9 @@ echo "Starting the webserver"
 . ./venv/bin/activate       # activate virtualenv
 
 # start web service
-gunicorn --workers 2 --worker-class=gevent --bind 0.0.0.0:80 wsgi:app --pid $pid_file --log-level debug
+gunicorn --workers 2 --worker-class=gevent --bind 0.0.0.0:80 \
+--access-logformat '%(l)s %(t)s "%(r)s" %(s)s %(b)s %(M)s ms' \
+--access-logfile '-' \
+wsgi:app --pid $pid_file --log-level debug
 
 echo "Webserver has terminated."
