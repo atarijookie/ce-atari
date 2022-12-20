@@ -5,13 +5,13 @@
   ----------------------------------------------------------------
   RESTlike interface, using json
 
-  /api/v1/floppy/[slot# 0-2] 	POST
+  /floppy/[slot# 0-2] 	POST
   Upload file
 
-  /api/v1/floppy/[slot# 0-2] 	PUT
+  /floppy/[slot# 0-2] 	PUT
   Activate slot - all others are deactivated
 
-  api/v1/floppy/ 	GET
+  /floppy/ 	GET
 	{"slots":["filename_slot1.msa","filename_slot2.msa","filename_slot3.msa"],"active":null|0|1|2,"encoding_ready":true|false}
 
   ----------------------------------------------------------------*/
@@ -23,7 +23,7 @@ CosmosEx.Floppy=function(){
   var refreshFilenames=function(){
   	$.ajax({
   		type: 'GET',
-  		url: '/api/v1/floppy',
+  		url: '/floppy',
       success: function(data){
         for( var i=0; i<3; i++){
           $("input[type=checkbox][data-slot='"+i+"']").prop('checked', false);
@@ -81,7 +81,7 @@ CosmosEx.Floppy=function(){
     }
 
     $.ajax({
-        url: '/api/v1/floppy/'+slotid,  //Server script to process data
+        url: '/floppy/'+slotid,  //Server script to process data
         type: 'PUT',
         success: function(){
             refreshFilenames();
@@ -98,7 +98,7 @@ CosmosEx.Floppy=function(){
   var onTimer=function(e){
   	$.ajax({
   		type: 'GET',
-  		url: '/api/v1/floppy',
+  		url: '/floppy',
       success: function(data){
 		if( typeof(data.encoding_ready)!=='undefined' ){
 	        if( data.encoding_ready ){
@@ -127,7 +127,7 @@ CosmosEx.Floppy=function(){
 
     if(slotid == 100 || slotid == 101) {    // special case: insert config image or insert floppy test image
         $.ajax({
-            url: '/api/v1/floppy/'+slotid,  //Server script to process data
+            url: '/floppy/'+slotid,  //Server script to process data
             type: 'PUT',
             success: function(){
                 refreshFilenames();
@@ -152,7 +152,7 @@ CosmosEx.Floppy=function(){
       }
     };
     $.ajax({
-        url: '/api/v1/floppy/'+slotid,  //Server script to process data
+        url: '/floppy/'+slotid,  //Server script to process data
         type: 'POST',
         xhr: function() {  // Custom XMLHttpRequest
             var myXhr = $.ajaxSettings.xhr();

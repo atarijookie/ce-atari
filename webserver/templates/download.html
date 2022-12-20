@@ -28,7 +28,7 @@ function getSearchResults(searchString)
     }
     prevSearchString = searchString;
 
-    url = '/api/v1/download/imagelist'; // base url
+    url = '/download/imagelist'; // base url
     url = url + "?page=" + currentPage; // add page
 
     if(searchString.length > 0) {       // some search string was specified?
@@ -137,7 +137,7 @@ function handleShowDownloading(downloading_count, downloading_progress)
 function onCheckTimer() {
     $.ajax({
         type: 'GET',
-        url: '/api/v1/download/status',
+        url: '/download/status',
         success: function(data){
             var check1 = handleShowOverlay(data.encoding_ready);         // encoding?
             var check2 = handleShowDownloading(data.downloading_count, data.downloading_progress);  // downloading?
@@ -159,7 +159,7 @@ function onCheckTimer() {
 
 function onInsert(imageName, slotNo)
 {
-    url = "/api/v1/download/insert?image=" + imageName + "&slot=" + slotNo;
+    url = "/download/insert?image=" + imageName + "&slot=" + slotNo;
 
     $.ajax({
         url: url,
@@ -182,7 +182,7 @@ function onInsert(imageName, slotNo)
 
 function onDownload(imageName)
 {
-    url = "/api/v1/download/download?image=" + imageName;
+    url = "/download/download?image=" + imageName;
 
     $.ajax({
         url: url,
