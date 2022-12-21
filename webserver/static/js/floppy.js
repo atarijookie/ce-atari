@@ -23,7 +23,7 @@ CosmosEx.Floppy=function(){
   var refreshFilenames=function(){
   	$.ajax({
   		type: 'GET',
-  		url: '/floppy',
+  		url: '/floppy/slots',
       success: function(data){
         for( var i=0; i<3; i++){
           $("input[type=checkbox][data-slot='"+i+"']").prop('checked', false);
@@ -98,7 +98,7 @@ CosmosEx.Floppy=function(){
   var onTimer=function(e){
   	$.ajax({
   		type: 'GET',
-  		url: '/floppy',
+  		url: '/floppy/slots',
       success: function(data){
 		if( typeof(data.encoding_ready)!=='undefined' ){
 	        if( data.encoding_ready ){

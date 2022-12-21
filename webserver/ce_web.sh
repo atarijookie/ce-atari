@@ -66,6 +66,11 @@ fi
 echo "Starting the webserver"
 . ./venv/bin/activate       # activate virtualenv
 
+# generate random secret key for flask if it doesn't exist
+if [ ! -f "/var/run/ce/flask_secret_key" ]; then
+  python -c 'import secrets; print(secrets.token_hex())' > /var/run/ce/flask_secret_key
+fi
+
 # start web service
 gunicorn --workers 2 --worker-class=gevent --bind 0.0.0.0:80 \
 --access-logformat '%(l)s %(t)s "%(r)s" %(s)s %(b)s %(M)s ms' \

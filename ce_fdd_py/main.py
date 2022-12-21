@@ -220,31 +220,6 @@ def download_worker():
         shared.queue_download.task_done()
 
 
-def send_to_core_worker():
-    """ send messages to core """
-    while shared.should_run:
-        item = None
-
-        try:
-            item = shared.queue_send.get(timeout=0.1)  # get one item to download
-        except Exception as ex:     # we're expecting exception on no item to send
-            continue
-
-        try:
-            app_log.debug(f"sending {item}")
-            b_item = bson.dumps(item)                # dict to bson encoded blob
-
-            sckt = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            sckt.connect(shared.core_sock_name)
-            sckt.send(b_item)
-            sckt.close()
-
-        except Exception as ex:
-            app_log.debug(f"failed to send {item} - {str(ex)}")
-
-        shared.queue_send.task_done()
-
-
 def on_show_selected_list(button, choice):
     shared.view_object = DownloaderView()
     shared.view_object.on_show_selected_list(button, choice)
@@ -304,11 +279,9 @@ if __name__ == "__main__":
     # threads for updating lists
     thr_download_lists = threading.Thread(target=download_lists)
     thr_download_images = threading.Thread(target=download_worker)
-    thr_send_to_core = threading.Thread(target=send_to_core_worker)
 
     thr_download_lists.start()
     thr_download_images.start()
-    thr_send_to_core.start()
 
     shared.main = urwid.Padding(create_main_menu())
 

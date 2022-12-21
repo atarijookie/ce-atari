@@ -1,8 +1,10 @@
 import queue
 import os
+import json
 from urwid_helpers import dialog
 import subprocess
 import codecs
+import socket
 import logging
 from logging.handlers import RotatingFileHandler
 from zipfile import ZipFile
@@ -10,7 +12,6 @@ from zipfile import ZipFile
 app_log = logging.getLogger()
 
 queue_download = queue.Queue()      # queue that holds things to download
-queue_send = queue.Queue()          # queue that holds things to send to core
 
 terminal_cols = 80  # should be 40 for ST low, 80 for ST mid
 terminal_rows = 23
@@ -25,9 +26,10 @@ LOG_DIR = '/var/log/ce/'
 LOG_FILE = os.path.join(LOG_DIR, 'ce_fdd_py.log')
 
 DATA_DIR = '/var/run/ce/'
-FILE_SLOTS = os.path.join(DATA_DIR, 'slots.txt')
+FILE_FLOPPY_SLOTS = os.path.join(DATA_DIR, 'floppy_slots.txt')
+FILE_FLOPPY_ACTIVE_SLOT = os.path.join(DATA_DIR, 'floppy_active_slot.txt')
 
-core_sock_name = os.path.join(DATA_DIR, 'core.sock')
+CORE_SOCK_PATH = os.path.join(DATA_DIR, 'core.sock')
 
 DOWNLOAD_STORAGE_DIR = os.path.join(DATA_DIR, 'download_storage')
 
@@ -169,23 +171,35 @@ def load_list_from_csv(csv_filename):
     return list_of_items
 
 
+def send_to_core(item):
+    """ send an item to core """
+    try:
+        app_log.debug(f"sending {item}")
+        json_item = json.dumps(item)   # dict to json
+
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+        sock.connect(CORE_SOCK_PATH)
+        sock.send(json_item.encode('utf-8'))
+        sock.close()
+    except Exception as ex:
+        app_log.debug(f"failed to send {item} - {str(ex)}")
+
+
 def slot_insert(slot_index, path_to_image):
     """ insert floppy image to specified slot
     :param slot_index: index of slot to eject - 0-2
     :param path_to_image: filesystem path to image file which should be inserted
     """
-    global queue_send
     item = {'module': 'floppy', 'action': 'insert', 'slot': slot_index, 'image': path_to_image}
-    queue_send.put(item)
+    send_to_core(item)
 
 
 def slot_eject(slot_index):
     """ eject floppy image from specified slot
     :param slot_index: index of slot to eject - 0-2
     """
-    global queue_send
     item = {'module': 'floppy', 'action': 'eject', 'slot': slot_index}
-    queue_send.put(item)
+    send_to_core(item)
 
 
 def file_seems_to_be_image(path_to_image, check_if_exists):

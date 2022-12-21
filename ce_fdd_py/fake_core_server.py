@@ -2,69 +2,65 @@ import socket
 import sys
 import os
 import base64
-import bson
-
+import json
+from shared import FILE_FLOPPY_SLOTS, FILE_FLOPPY_ACTIVE_SLOT, CORE_SOCK_PATH
 
 slots = {}
 
-PATH_VAR = '/var/run/ce'
-FILE_SLOTS = PATH_VAR + '/slots.txt'
+
+def text_to_file(text, filename):
+    # write text to file for later use
+    try:
+        with open(filename, 'wt') as f:
+            f.write(text)
+    except Exception as ex:
+        app_log.warning(logging.WARNING, f"failed to write to {filename}: {str(ex)}")
 
 
 def write_slots_to_file():
-    with open(FILE_SLOTS, 'wt') as f:
+    with open(FILE_FLOPPY_SLOTS, 'wt') as f:
         for i in range(3):
             img = slots.get(i, '')
             f.write(img)
             f.write('\n')
 
 
-def prep():
-    srv_sock = '/var/run/ce/core.sock'
+def create_socket():
     try:
-        os.unlink(srv_sock)
+        os.unlink(CORE_SOCK_PATH)
     except:
-        if os.path.exists(srv_sock):
+        if os.path.exists(CORE_SOCK_PATH):
             raise
 
-    sckt = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sckt = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
 
     try:
-        print(f'Bind and listen on socket: {srv_sock}')
-        sckt.bind(srv_sock)
-        sckt.listen(5)
-        print(f'Success, listening on: {srv_sock}')
+        sckt.bind(CORE_SOCK_PATH)
+        print(f'Success, got socket: {CORE_SOCK_PATH}')
         return sckt
     except Exception as e:
-        print(f'exception on bind or listen: {str(e)}')
+        print(f'exception on bind: {str(e)}')
         return False
 
 
 if __name__ == "__main__":
-    sock = prep()
+    sock = create_socket()
 
     if not sock:
         exit(0)
 
     while True:
-        connection, client_address = sock.accept()
+        # connection, client_address = sock.accept()
 
         try:
             buffer = b''
             rcvd_bytes = 0
 
-            while True:
-                data = connection.recv(1024)
-                rcvd_bytes = rcvd_bytes + len(data)
-                if not data:        # on connection close
-                    break
-
-                buffer = buffer + data
-
-            decoded = bson.loads(buffer)
+            data, address = sock.recvfrom(1024)
+            decoded = json.loads(data)
             print(f'received: {decoded}')
 
-            # {'module': 'floppy', 'action': 'eject', 'slot': 0}
+            # example message: {'module': 'floppy', 'action': 'eject', 'slot': 0}
             if decoded.get('module') == 'floppy':       # command for floppy module?
                 slot = decoded.get('slot')
 
@@ -76,5 +72,8 @@ if __name__ == "__main__":
                     slots[slot] = decoded.get('image')
                     write_slots_to_file()
 
-        finally:
-            connection.close()
+                if decoded.get('action') == 'activate':  # action is activate?
+                    text_to_file(f"{slot}", FILE_FLOPPY_ACTIVE_SLOT)
+
+        except Exception as ex:
+            print(f"got exception: {str(ex)}")
