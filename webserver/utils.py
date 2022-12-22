@@ -5,7 +5,8 @@ import logging
 from logging.handlers import RotatingFileHandler
 from flask import render_template, request, current_app as app
 from auth import login_required
-from shared import PID_FILE, LOG_DIR, CORE_SOCK_PATH, FILE_FLOPPY_SLOTS
+from shared import PID_FILE, LOG_DIR, CORE_SOCK_PATH, FILE_FLOPPY_SLOTS, DOWNLOAD_STORAGE_DIR
+import shared
 
 
 app_log = logging.getLogger()
@@ -193,3 +194,30 @@ def get_image_slots():
         image_names.append(image_name)
 
     return image_names
+
+
+def get_storage_path():
+    """ Find the storage path and return it. Use cached value if possible. """
+
+    # path still valid?
+    last_storage_exists = shared.last_storage_path is not None and os.path.exists(shared.last_storage_path)
+
+    if last_storage_exists:  # while the last storage exists, keep returning it
+        return shared.last_storage_path
+
+    storage_path = None
+
+    # does this symlink exist?
+    if os.path.exists(DOWNLOAD_STORAGE_DIR) and os.path.islink(DOWNLOAD_STORAGE_DIR):
+        storage_path = os.readlink(DOWNLOAD_STORAGE_DIR)    # read the symlink
+
+        if not os.path.exists(storage_path):                # symlink source doesn't exist? reset path to None
+            storage_path = None
+
+    if storage_path:    # if storage path was found, append subdir to it
+        storage_path = os.path.join(storage_path, "fdd_imgs")
+        os.makedirs(storage_path, exist_ok=True)
+
+    # store the found storage path and return it
+    shared.last_storage_path = storage_path
+    return storage_path

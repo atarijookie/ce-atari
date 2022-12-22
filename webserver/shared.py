@@ -26,3 +26,8 @@ CORE_SOCK_PATH = os.path.join(DATA_DIR, 'core.sock')
 
 FILE_FLOPPY_SLOTS = os.path.join(DATA_DIR, 'floppy_slots.txt')
 FILE_FLOPPY_ACTIVE_SLOT = os.path.join(DATA_DIR, 'floppy_active_slot.txt')
+
+DOWNLOAD_STORAGE_DIR = os.path.join(DATA_DIR, 'download_storage')
+last_storage_path = None
+
+FLOPPY_UPLOAD_PATH = os.path.join(DATA_DIR, 'floppy_slots')
