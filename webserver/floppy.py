@@ -1,6 +1,7 @@
 import os
 from flask import Blueprint, make_response, request, current_app as app, abort
-from utils import slot_activate, get_image_slots, text_from_file, slot_insert, file_seems_to_be_image
+from utils import slot_activate, get_image_slots, text_from_file, slot_insert, file_seems_to_be_image, \
+    unlink_without_fail, symlink_if_needed
 from werkzeug.utils import secure_filename
 
 floppy = Blueprint('floppy', __name__)
@@ -33,7 +34,8 @@ def upload_image(slot_no):
     f = request.files['file']
     filename = secure_filename(f.filename)          # create secure filename
 
-    file_path = os.path.join(os.getenv('FLOPPY_UPLOAD_PATH'), filename)
+    floppy_upload_path = os.getenv('FLOPPY_UPLOAD_PATH')
+    file_path = os.path.join(floppy_upload_path, filename)
     f.save(file_path)
     app.logger.debug(f"upload_image: floppy image saved to: {file_path}")
 
@@ -41,11 +43,25 @@ def upload_image(slot_no):
     success, message = file_seems_to_be_image(file_path, True)
 
     if not success:     # not a valid image? fail here
-        app.logger.debug(f"upload_image: not a valid image, deleting it and failing: {message}")
+        app.logger.warning(f"upload_image: not a valid image, deleting it and failing: {message}")
         os.unlink(file_path)
         abort(400, message)
 
-    # TODO: if slot_no has some image uploaded, delete it now, so we won't collect a pile of images
+    # if slot_no has some image uploaded, delete it now, so we won't collect a pile of images
+    symlink_slot_path = os.path.join(floppy_upload_path, f"image_in_slot_{slot_no}")
+
+    # get link to old file if possible
+    link_source_path = None
+    if os.path.exists(symlink_slot_path) and os.path.islink(symlink_slot_path):
+        link_source_path = os.readlink(symlink_slot_path)
+
+    # if old file is not the same as new file, delete file
+    if link_source_path and link_source_path != file_path:
+        app.logger.debug(f"upload_image: deleting previous image: {link_source_path}")
+        unlink_without_fail(link_source_path)
+
+    unlink_without_fail(symlink_slot_path)              # delete old link
+    symlink_if_needed(file_path, symlink_slot_path)     # create new symlink
 
     slot_insert(slot_no, file_path)     # tell core to insert this image
     return 'OK', 204

@@ -287,3 +287,56 @@ def file_seems_to_be_image(path_to_image, check_if_exists):
         app.logger.warning(f"file_seems_to_be_image failed: {str(ex)}")
 
     return False, "No valid image found in ZIP file"
+
+
+def unlink_without_fail(path):
+    # try to delete the symlink
+    try:
+        os.unlink(path)
+        return True
+    except FileNotFoundError:   # if it doesn't really exist, just ignore this exception (it's ok)
+        pass
+    except Exception as ex:     # if it existed (e.g. broken link) but failed to remove, log error
+        app.logger.warning(f'failed to unlink {path} - exception: {str(ex)}')
+
+    return False
+
+
+def symlink_if_needed(source_path, symlink_path):
+    """ This function creates symlink from mount_dir to symlink_dir, but tries to do it smart, e.g.:
+        - checks if the source really exists, doesn't try if it doesn't
+        - if the symlink doesn't exist, it will symlink it
+        - if the symlink does exist, it checks where the link points, and when the link is what it should be, then it
+          doesn't symlink anything, so it links only in cases where the link is wrong
+    """
+
+    # check if the source dir exists, fail if it doesn't
+    if not os.path.exists(source_path):
+        app.logger.warning(f"symlink_if_needed: source_path {source_path} does not exists!")
+        return
+
+    symlink_it = False
+
+    if not os.path.exists(symlink_path):            # symlink dir doesn't exist - symlink it
+        symlink_it = True
+    else:                                           # symlink dir does exist - check if it's pointing to right source
+        if os.path.islink(symlink_path):            # if it's a symlink
+            source_dir = os.readlink(symlink_path)  # read symlink
+
+            if source_dir != source_path:           # source of this link is not our mount dir
+                symlink_it = True
+        else:       # not a symlink - delete it, symlink it
+            symlink_it = True
+
+    # sym linking not needed? quit
+    if not symlink_it:
+        return
+
+    # should symlink now
+    unlink_without_fail(symlink_path)        # try to delete it
+
+    try:
+        os.symlink(source_path, symlink_path)  # symlink from mount path to symlink path
+        app.logger.debug(f'symlink_if_needed: symlinked {source_path} -> {symlink_path}')
+    except Exception as ex:
+        app.logger.warning(f'symlink_if_needed: failed with: {type(ex).__name__} - {str(ex)}')
