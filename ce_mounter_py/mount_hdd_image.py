@@ -2,7 +2,7 @@ import os
 import logging
 from glob import glob
 from shared import print_and_log, letter_shared, get_usb_drive_letters, get_symlink_path_for_letter, \
-    FILE_HDDIMAGE_RESOLVED, text_to_file, load_one_setting
+    text_to_file, load_one_setting
 
 
 def resolve_hddimage_path(path_image: str):
@@ -71,11 +71,11 @@ def get_hddimage_path():
 
     if not hdd_image or not os.path.exists(hdd_image):  # if te file doesn't exist, return None
         print_and_log(logging.DEBUG, f"resolve_hddimage_path: file {hdd_image} doesn't exist")
-        text_to_file("FAIL", FILE_HDDIMAGE_RESOLVED)        # store nothing to resolved hdd image file
+        text_to_file("FAIL", os.getenv('FILE_HDDIMAGE_RESOLVED'))        # store nothing to resolved hdd image file
         return None
 
     print_and_log(logging.DEBUG, f"resolve_hddimage_path: file {hdd_image} exist, will use it")
-    text_to_file(hdd_image, FILE_HDDIMAGE_RESOLVED)     # store hdd_image to resolved hdd image file
+    text_to_file(hdd_image, os.getenv('FILE_HDDIMAGE_RESOLVED'))     # store hdd_image to resolved hdd image file
     return hdd_image                                    # return path to file
 
 

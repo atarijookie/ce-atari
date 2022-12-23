@@ -1,8 +1,8 @@
-from os import path, system
+import os
 import urwid
 import logging
 from urwid_helpers import create_my_button, create_header_footer, dialog_yes_no, dialog
-from utils import on_cancel, back_to_main_menu, FILE_STATUS, FILE_PENDING_YES, FILE_PENDING_NO
+from utils import on_cancel, back_to_main_menu
 import shared
 from screen_network import create_setting_row
 
@@ -67,15 +67,15 @@ def update_create(button):
 
 def get_status():
     # if no update files present - 'before_check' state
-    if not path.exists(FILE_STATUS):
+    if not os.path.exists(os.getenv('FILE_UPDATE_STATUS')):
         return 'before_check', False
 
     # STATUS file exists, but no UPDATE_PENDING_* files present, but there's UPDATE_STATUS file, 'checking' state
-    if not path.exists(FILE_PENDING_YES) and not path.exists(FILE_PENDING_NO):
+    if not os.path.exists(os.getenv('FILE_UPDATE_PENDING_YES')) and not os.path.exists(os.getenv('FILE_UPDATE_PENDING_NO')):
         return 'checking', False
 
     # if there's UPDATE_PENDING_* file present, it's 'after_check' state
-    should_update = path.exists(FILE_PENDING_YES)
+    should_update = os.path.exists(os.getenv('FILE_UPDATE_PENDING_YES'))
     return 'after_check', should_update
 
 
@@ -86,7 +86,7 @@ def on_update_status_test(status):
         return
 
     try:
-        with open(FILE_STATUS) as f:            # try to open file and read content
+        with open(os.getenv('FILE_UPDATE_STATUS')) as f:            # try to open file and read content
             status_text_new = f.read()
 
         status_text_new = status_text_new.strip()   # remove leading and trailing white spaces
@@ -141,7 +141,7 @@ def on_action(button):
     status, should_update = get_status()        # get current update check status
 
     if status == 'before_check':                # didn't check yet? run the check
-        system('/ce/update/check_for_update.sh > /dev/null 2>&1 &')
+        os.system('/ce/update/check_for_update.sh > /dev/null 2>&1 &')
 
     elif status == 'after_check':               # we're after the check
         if should_update:                       # should update device? run the update
@@ -160,7 +160,7 @@ def on_update_force(should_force):
         return
 
     # check if update is not already running
-    running = system('/ce/update/update_running.sh > /dev/null 2>&1 &')
+    running = os.system('/ce/update/update_running.sh > /dev/null 2>&1 &')
     app_log.debug("update_running: {}".format(running))
 
     if running > 0:     # if the update is already running
@@ -174,6 +174,6 @@ def on_update_force(should_force):
 
     # user selected force update? run it
     app_log.debug("starting update now")
-    system('/ce/ce_update.sh > /dev/null 2>&1 &')
+    os.system('/ce/ce_update.sh > /dev/null 2>&1 &')
 
     on_cancel(None)         # back to main menu

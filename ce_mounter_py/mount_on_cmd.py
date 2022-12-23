@@ -2,7 +2,7 @@ import os
 import logging
 import traceback
 from wrapt_timeout_decorator import timeout
-from shared import print_and_log, get_symlink_path_for_letter, umount_if_mounted, MOUNT_COMMANDS_DIR, \
+from shared import print_and_log, get_symlink_path_for_letter, umount_if_mounted, \
     text_from_file, letter_zip, unlink_without_fail, show_symlinked_dirs, MOUNT_DIR_ZIP_FILE, is_zip_mounted, \
     symlink_if_needed
 
@@ -10,7 +10,7 @@ from shared import print_and_log, get_symlink_path_for_letter, umount_if_mounted
 def get_cmd_by_name(cmd_name):
     """ get command based on his name """
 
-    path_ = os.path.join(MOUNT_COMMANDS_DIR, cmd_name)
+    path_ = os.path.join(os.getenv('MOUNT_COMMANDS_DIR'), cmd_name)
 
     if not os.path.exists(path_):           # path doesn't exist? just quit
         return None
@@ -70,8 +70,8 @@ def unmount_folder(unmount_path):
 @timeout(10)
 def mount_on_command():
     """ go through list of expected commands from CE main app and execute all the found ones """
-    if not os.path.exists(MOUNT_COMMANDS_DIR):              # if dir for commands doesn't exist, create it
-        os.makedirs(MOUNT_COMMANDS_DIR, exist_ok=True)
+    if not os.path.exists(os.getenv('MOUNT_COMMANDS_DIR')):              # if dir for commands doesn't exist, create it
+        os.makedirs(os.getenv('MOUNT_COMMANDS_DIR'), exist_ok=True)
 
     # dictionary for commands vs their handling functions
     cmd_name_vs_handling_function = {'mount_zip': mount_zip_file, 'unmount': unmount_folder}

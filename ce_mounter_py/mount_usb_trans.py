@@ -1,7 +1,7 @@
 import os
 import logging
 from shared import print_and_log, get_symlink_path_for_letter, \
-    get_free_letters, DEV_DISK_DIR, LOG_DIR, unlink_without_fail, symlink_if_needed, get_disk_partitions, \
+    get_free_letters, DEV_DISK_DIR, unlink_without_fail, symlink_if_needed, get_disk_partitions, \
     get_root_fs_device
 
 

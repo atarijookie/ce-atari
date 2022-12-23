@@ -11,7 +11,6 @@ from wrapt_timeout_decorator import timeout
 
 app_log = logging.getLogger()
 
-SETTINGS_PATH = "/ce/settings"          # path to settings dir
 
 KEY_LETTER_FIRST = 'DRIVELETTER_FIRST'
 KEY_LETTER_CONFDRIVE = 'DRIVELETTER_CONFDRIVE'
@@ -30,31 +29,17 @@ settings_default = {KEY_LETTER_FIRST: 'C', KEY_LETTER_CONFDRIVE: 'O', KEY_LETTER
                     'ACSI_DEVTYPE_3': DEV_TYPE_OFF, 'ACSI_DEVTYPE_4': DEV_TYPE_OFF, 'ACSI_DEVTYPE_5': DEV_TYPE_OFF,
                     'ACSI_DEVTYPE_6': DEV_TYPE_OFF, 'ACSI_DEVTYPE_7': DEV_TYPE_OFF}
 
-LOG_DIR = '/var/log/ce/'
-DATA_DIR = '/var/run/ce/'
-PID_FILE = os.path.join(DATA_DIR, 'mount.pid')
-MOUNT_LOG_FILE = os.path.join(LOG_DIR, 'mount.log')
-MOUNT_COMMANDS_DIR = os.path.join(DATA_DIR, 'cmds')
-MOUNT_DIR_RAW = os.path.join(DATA_DIR, 'raw')
-MOUNT_DIR_TRANS = os.path.join(DATA_DIR, 'trans')
-MOUNT_SHARED_CMD_LAST = os.path.join(DATA_DIR, 'mount_shared_cmd_last')
-CONFIG_PATH_SOURCE = "/ce/app/configdrive"
-CONFIG_PATH_COPY = os.path.join(DATA_DIR, 'configdrive')
+MOUNT_SHARED_CMD_LAST = os.path.join(os.getenv('DATA_DIR'), 'mount_shared_cmd_last')
+FILE_MOUNT_CMD_SAMBA = os.path.join(os.getenv('SETTINGS_DIR'), 'mount_cmd_samba.txt')
+FILE_MOUNT_CMD_NFS = os.path.join(os.getenv('SETTINGS_DIR'), 'mount_cmd_nfs.txt')
 
-FILE_MOUNT_CMD_SAMBA = os.path.join(SETTINGS_PATH, 'mount_cmd_samba.txt')
-FILE_MOUNT_CMD_NFS = os.path.join(SETTINGS_PATH, 'mount_cmd_nfs.txt')
-
-FILE_MOUNT_USER = os.path.join(SETTINGS_PATH, 'mount_user.txt')         # user custom mounts in settings dir
-FILE_HDDIMAGE_RESOLVED = os.path.join(DATA_DIR, 'HDDIMAGE_RESOLVED')    # where the resolved HDDIMAGE will end up
-FILE_OLD_SETTINGS = os.path.join(DATA_DIR, 'settings_old.json')         # where the old settings in json are
-FILE_ROOT_DEV = os.path.join(DATA_DIR, 'root_dev.txt')                  # what device holds root file system
+FILE_OLD_SETTINGS = os.path.join(os.getenv('DATA_DIR'), 'settings_old.json')         # where the old settings in json are
+FILE_ROOT_DEV = os.path.join(os.getenv('DATA_DIR'), 'root_dev.txt')                  # what device holds root file system
 
 DEV_DISK_DIR = '/dev/disk/by-path'
 
 MOUNT_DIR_SHARED = "/mnt/shared"            # where the shared drive will be mounted == shared drive symlink source
 MOUNT_DIR_ZIP_FILE = "/mnt/zip_file"        # where the ZIP file will be mounted == ZIP file symlink source
-
-DOWNLOAD_STORAGE_DIR = os.path.join(DATA_DIR, 'download_storage')
 
 
 def letter_shared():
@@ -70,11 +55,14 @@ def letter_zip():
 
 
 def log_config():
-    os.makedirs(LOG_DIR, exist_ok=True)
+    log_dir = os.getenv('LOG_DIR')
+    log_file = os.path.join(log_dir, 'ce_mounter.log')
+
+    os.makedirs(log_dir, exist_ok=True)
 
     log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
 
-    my_handler = RotatingFileHandler(f'{LOG_DIR}/ce_mounter.log', mode='a', maxBytes=1024 * 1024, backupCount=1)
+    my_handler = RotatingFileHandler(log_file, mode='a', maxBytes=1024 * 1024, backupCount=1)
     my_handler.setFormatter(log_formatter)
     my_handler.setLevel(logging.DEBUG)
 
@@ -149,9 +137,10 @@ def save_old_settings(settinx):
 
 def load_one_setting(setting_name, default_value=None):
     """ load one setting from file and return it """
-    path = os.path.join(SETTINGS_PATH, setting_name)    # create full path
+    path = os.path.join(os.getenv('SETTINGS_DIR'), setting_name)    # create full path
 
-    if not os.path.isfile(path):  # if it's not a file, skip it
+    if not os.path.exists(path) or not os.path.isfile(path):  # if it's not a file, skip it
+        print_and_log(logging.WARNING, f"failed to read file {path} - file does not exist")
         return default_value
 
     try:
@@ -171,9 +160,9 @@ def load_one_setting(setting_name, default_value=None):
 def load_current_settings():
     settinx = deepcopy(settings_default)       # fill settings with default values before loading
 
-    os.makedirs(SETTINGS_PATH, exist_ok=True)
+    os.makedirs(os.getenv('SETTINGS_DIR'), exist_ok=True)
 
-    for f in os.listdir(SETTINGS_PATH):         # go through the settings dir
+    for f in os.listdir(os.getenv('SETTINGS_DIR')):         # go through the settings dir
         if f.startswith("."):                   # if it's a hidden file, skip it, because it might be nano .swp file
             continue
 
@@ -218,7 +207,7 @@ def setting_get_bool(setting_name):
     try:
         value = bool(int(value_raw))
     except Exception as exc:
-        print_and_log(logging.WARNING, f"failed to convert {value} to bool: {str(exc)}")
+        print_and_log(logging.WARNING, f"for {setting_name} failed to convert {value} to bool: {str(exc)}")
 
     return value
 
@@ -274,7 +263,7 @@ def letter_to_bitno(drive_letter):
 
 def get_symlink_path_for_letter(letter):
     letter = letter.upper()
-    path = os.path.join(MOUNT_DIR_TRANS, letter)  # construct path where the drive letter should be mounted
+    path = os.path.join(os.getenv('MOUNT_DIR_TRANS'), letter)  # construct path where the drive letter should be mounted
     return path
 
 
@@ -475,12 +464,12 @@ def show_symlinked_dirs():
     # first show translated drives
     print_and_log(logging.INFO, " ")
     print_and_log(logging.INFO, "list of current translated drives:")
-    get_and_show_symlinks(MOUNT_DIR_TRANS, partial(get_dir_usage, custom_letters))
+    get_and_show_symlinks(os.getenv('MOUNT_DIR_TRANS'), partial(get_dir_usage, custom_letters))
 
     # then show RAW drives
     print_and_log(logging.INFO, " ")
     print_and_log(logging.INFO, "list of current RAW drives:")
-    get_and_show_symlinks(MOUNT_DIR_RAW, get_symlink_source)
+    get_and_show_symlinks(os.getenv('MOUNT_DIR_RAW'), get_symlink_source)
 
     print_and_log(logging.INFO, " ")
 
@@ -551,12 +540,13 @@ def other_instance_running():
     pid_current = os.getpid()
     print_and_log(logging.INFO, f'PID of this process: {pid_current}')
 
-    os.makedirs(os.path.split(PID_FILE)[0], exist_ok=True)     # create dir for PID file if it doesn't exist
+    pid_file = os.path.join(os.getenv('DATA_DIR'), 'mount.pid')
+    os.makedirs(os.path.split(pid_file)[0], exist_ok=True)     # create dir for PID file if it doesn't exist
 
     # read PID from file and convert to int
     pid_from_file = -1
     try:
-        pff = text_from_file(PID_FILE)
+        pff = text_from_file(pid_file)
         pid_from_file = int(pff) if pff else -1
     except TypeError:       # we're expecting this on no text from file
         pass
@@ -575,7 +565,7 @@ def other_instance_running():
 
     # other PID doesn't exist, no other instance running
     print_and_log(logging.DEBUG, f'other_instance_running: PID from file not running, so other instance not running')
-    text_to_file(str(pid_current), PID_FILE)        # write our PID to file
+    text_to_file(str(pid_current), pid_file)        # write our PID to file
     return False            # no other instance running
 
 

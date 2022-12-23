@@ -1,11 +1,11 @@
 import os
 import logging
-from shared import print_and_log, setting_get_int, MOUNT_DIR_RAW, unlink_without_fail, DEV_TYPE_RAW, \
+from shared import print_and_log, setting_get_int, unlink_without_fail, DEV_TYPE_RAW, \
     symlink_if_needed, get_root_fs_device
 
 
 def get_symlink_path_for_id(id_):
-    path = os.path.join(MOUNT_DIR_RAW, str(id_))  # construct path where the id_ should be mounted
+    path = os.path.join(os.getenv('MOUNT_DIR_RAW'), str(id_))  # construct path where the id_ should be mounted
     return path
 
 

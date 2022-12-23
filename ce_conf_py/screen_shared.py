@@ -36,8 +36,8 @@ def shared_drive_create(button):
 
     cols = create_radio_button_options_rows(
         10, "Protocol",
-        [{'value': False, 'text': 'Samba / cifs / windows'},
-         {'value': True, 'text': 'NFS'}],
+        [{'value': 0, 'text': 'Samba / cifs / windows'},
+         {'value': 1, 'text': 'NFS'}],
         "SHARED_NFS_NOT_SAMBA")
     body.extend(cols)
     body.append(urwid.Divider())

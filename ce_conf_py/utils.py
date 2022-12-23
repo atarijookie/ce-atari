@@ -6,18 +6,41 @@ import logging
 from logging.handlers import RotatingFileHandler
 import psutil
 import shared
-from shared import PID_FILE, LOG_DIR
+from dotenv import load_dotenv
 
 
 app_log = logging.getLogger()
 
-settings_path = "/ce/settings"          # path to settings dir
 settings_default = {'DRIVELETTER_FIRST': 'C', 'DRIVELETTER_CONFDRIVE': 'O', 'DRIVELETTER_SHARED': 'N', 'DRIVELETTER_ZIP': 'P',
                     'MOUNT_RAW_NOT_TRANS': 0, 'SHARED_ENABLED': 0, 'SHARED_NFS_NOT_SAMBA': 0, 'FLOPPYCONF_ENABLED': 1,
                     'FLOPPYCONF_DRIVEID': 0, 'FLOPPYCONF_WRITEPROTECTED': 0, 'FLOPPYCONF_SOUND_ENABLED': 1,
                     'ACSI_DEVTYPE_0': 0, 'ACSI_DEVTYPE_1': 1, 'ACSI_DEVTYPE_2': 0, 'ACSI_DEVTYPE_3': 0,
                     'ACSI_DEVTYPE_4': 0, 'ACSI_DEVTYPE_5': 0, 'ACSI_DEVTYPE_6': 0, 'ACSI_DEVTYPE_7': 0,
                     'KEYBOARD_KEYS_JOY0': 'A%S%D%W%LSHIFT', 'KEYBOARD_KEYS_JOY1': 'LEFT%DOWN%RIGHT%UP%RSHIFT'}
+
+
+def load_dotenv_config():
+    """ Try to load the dotenv configuration file.
+    First try to see if there's an override path for this config file specified in the env variables.
+    Then try the normal installation path for dotenv on ce: /ce/services/.env
+    If that fails, try to find and use local dotenv file used during development - .env in your local dir
+    """
+
+    # First try to see if there's an override path for this config file specified in the env variables.
+    path = os.environ.get('CE_DOTENV_PATH')
+
+    if path and os.path.exists(path):       # path in env found and it really exists, use it
+        load_dotenv(dotenv_path=path)
+        return
+
+    # Then try the normal installation path for dotenv on ce: /ce/services/.env
+    ce_dot_env_file = '/ce/services/.env'
+    if os.path.exists(ce_dot_env_file):
+        load_dotenv(dotenv_path=ce_dot_env_file)
+        return
+
+    # If that fails, try to find and use local dotenv file used during development - .env in your local dir
+    load_dotenv()
 
 
 def setting_get_str(setting_name):
@@ -36,7 +59,7 @@ def setting_get_int(setting_name):
         value_raw = setting_get_merged(setting_name)
         value = int(value_raw)
     except Exception as exc:
-        app_log.warning(f"failed to convert {value_raw} to int: {str(exc)}")
+        app_log.warning(f"for {setting_name} failed to convert {value_raw} to int: {str(exc)}")
 
     return value
 
@@ -63,7 +86,8 @@ def setting_get_merged(setting_name):
 
 
 def setting_load_one(setting_name, default_value=None):
-    path = os.path.join(settings_path, setting_name)  # create full path
+    settings_path = os.getenv('SETTINGS_DIR')           # path to settings dir
+    path = os.path.join(settings_path, setting_name)    # create full path
 
     if not os.path.isfile(path):  # if it's not a file, skip it
         return default_value
@@ -84,7 +108,8 @@ def settings_load():
 
     shared.settings_changed = {}                # no changes settings yet
 
-    shared.settings = copy.deepcopy(settings_default)  # fill settings with default values before loading
+    shared.settings = copy.deepcopy(settings_default)   # fill settings with default values before loading
+    settings_path = os.getenv('SETTINGS_DIR')           # path to settings dir
 
     for f in os.listdir(settings_path):         # go through the settings dir
         shared.settings[f] = setting_load_one(f)
@@ -92,6 +117,8 @@ def settings_load():
 
 def settings_save():
     """ save only changed settings to settings dir """
+    settings_path = os.getenv('SETTINGS_DIR')           # path to settings dir
+
     for key, value in shared.settings_changed.items():     # get all the settings that have changed
         path = os.path.join(settings_path, key)     # create full path
 
@@ -144,14 +171,9 @@ def delete_file(path):
             app_log.warning('Could not delete file {}', path)
 
 
-FILE_STATUS = '/tmp/UPDATE_STATUS'
-FILE_PENDING_YES = '/tmp/UPDATE_PENDING_YES'
-FILE_PENDING_NO = '/tmp/UPDATE_PENDING_NO'
-
-
 def delete_update_files():
     """ delete all update chceck files """
-    for path in [FILE_STATUS, FILE_PENDING_YES, FILE_PENDING_NO]:
+    for path in [os.getenv('FILE_UPDATE_STATUS'), os.getenv('FILE_UPDATE_PENDING_YES'), os.getenv('FILE_UPDATE_PENDING_NO')]:
         delete_file(path)
 
 
@@ -184,7 +206,11 @@ def text_from_file(filename):
 def log_config():
     log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
 
-    my_handler = RotatingFileHandler(f'{LOG_DIR}/ce_conf_py.log', mode='a', maxBytes=1024 * 1024, backupCount=1)
+    log_dir = os.getenv('LOG_DIR')
+    log_file = os.path.join(log_dir, 'ce_conf_py.log')
+
+    os.makedirs(log_dir, exist_ok=True)
+    my_handler = RotatingFileHandler(log_file, mode='a', maxBytes=1024 * 1024, backupCount=1)
     my_handler.setFormatter(log_formatter)
     my_handler.setLevel(logging.DEBUG)
 
@@ -198,12 +224,13 @@ def other_instance_running():
     pid_current = os.getpid()
     app_log.info(f'PID of this process: {pid_current}')
 
-    os.makedirs(os.path.split(PID_FILE)[0], exist_ok=True)     # create dir for PID file if it doesn't exist
+    pid_file = os.path.join(os.getenv('DATA_DIR'), 'ce_config.pid')
+    os.makedirs(os.path.split(pid_file)[0], exist_ok=True)     # create dir for PID file if it doesn't exist
 
     # read PID from file and convert to int
     pid_from_file = -1
     try:
-        pff = text_from_file(PID_FILE)
+        pff = text_from_file(pid_file)
         pid_from_file = int(pff) if pff else -1
     except TypeError:       # we're expecting this on no text from file
         pass
@@ -222,5 +249,5 @@ def other_instance_running():
 
     # other PID doesn't exist, no other instance running
     app_log.debug(f'other_instance_running: PID from file not running, so other instance not running')
-    text_to_file(str(pid_current), PID_FILE)        # write our PID to file
+    text_to_file(str(pid_current), pid_file)        # write our PID to file
     return False            # no other instance running

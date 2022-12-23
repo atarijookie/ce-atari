@@ -50,8 +50,8 @@ def translated_create(button):
 
     cols = create_radio_button_options_rows(
         23, "Mount USB media as",
-        [{'value': False, 'text': 'translated'},
-         {'value': True, 'text': 'raw'}],
+        [{'value': 0, 'text': 'translated'},
+         {'value': 1, 'text': 'raw'}],
         "MOUNT_RAW_NOT_TRANS")
     body.extend(cols)
     body.append(urwid.Divider())

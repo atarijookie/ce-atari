@@ -13,7 +13,7 @@ from screen_network import network_create
 from screen_ikbd import ikbd_create
 from screen_update import update_create
 import shared
-from utils import delete_update_files, log_config, other_instance_running
+from utils import delete_update_files, log_config, other_instance_running, load_dotenv_config
 
 app_log = logging.getLogger()
 
@@ -68,9 +68,10 @@ def exit_program(button):
 if __name__ == "__main__":
     setproctitle("ce_config")  # set process title
 
+    load_dotenv_config()
     log_config()
 
-    for one_dir in [shared.LOG_DIR, shared.SETTINGS_PATH]:
+    for one_dir in [os.getenv('LOG_DIR'), os.getenv('SETTINGS_DIR')]:
         os.makedirs(one_dir, exist_ok=True)
 
     # check if other instance is running, quit if it is

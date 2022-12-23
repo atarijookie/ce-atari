@@ -2,18 +2,18 @@ import os
 import logging
 from wrapt_timeout_decorator import timeout
 from shared import print_and_log, get_symlink_path_for_letter, \
-    text_from_file, FILE_MOUNT_USER, symlink_if_needed
+    text_from_file, symlink_if_needed
 
 
 def get_user_custom_mount_settings():
     """ read the custom user mount settings from file and return them as list """
 
-    mnt_user = text_from_file(FILE_MOUNT_USER)              # current custom mounts
+    mnt_user = text_from_file(os.getenv('FILE_MOUNT_USER'))              # current custom mounts
 
     custom_mounts = []
 
     if not mnt_user:                        # no custom user mounts? quit
-        print_and_log(logging.INFO, f"mount_user_custom_folders: no custom user mounts from {FILE_MOUNT_USER}")
+        print_and_log(logging.INFO, f"mount_user_custom_folders: no custom user mounts from {os.getenv('FILE_MOUNT_USER')}")
         return custom_mounts
 
     lines = mnt_user.splitlines()           # split lines in string to list of string
@@ -50,7 +50,7 @@ def get_user_custom_mounts_letters():
 
 @timeout(10)
 def mount_user_custom_folders():
-    """ if the user has specified custom mounts in the FILE_MOUNT_USER (e.g. drive letter pointing to SSD drive,
+    """ if the user has specified custom mounts in the os.getenv('FILE_MOUNT_USER') (e.g. drive letter pointing to SSD drive,
         then symlink these folders as user requested """
 
     custom_mounts = get_user_custom_mount_settings()

@@ -5,7 +5,7 @@ import logging
 from wrapt_timeout_decorator import timeout
 from shared import print_and_log, setting_get_bool, get_symlink_path_for_letter, umount_if_mounted, \
     text_to_file, text_from_file, letter_shared, unlink_without_fail, FILE_MOUNT_CMD_SAMBA, FILE_MOUNT_CMD_NFS, \
-    MOUNT_SHARED_CMD_LAST, load_one_setting, MOUNT_LOG_FILE, MOUNT_DIR_SHARED, is_shared_mounted, symlink_if_needed
+    MOUNT_SHARED_CMD_LAST, load_one_setting, MOUNT_DIR_SHARED, is_shared_mounted, symlink_if_needed
 
 
 def get_shared_mount_command(nfs_not_samba):
@@ -92,7 +92,8 @@ def mount_shared():
 
     text_to_file(cmd, MOUNT_SHARED_CMD_LAST)     # store this cmd
 
-    cmd += f" > {MOUNT_LOG_FILE} 2>&1 "     # append writing of stdout and stderr to file
+    mount_log_file = os.path.join(os.getenv('LOG_DIR'), 'mount.log')
+    cmd += f" > {mount_log_file} 2>&1 "     # append writing of stdout and stderr to file
 
     # command changed, we should execute it
     if os.path.exists(symlink_path):        # remove symlink if it exists
@@ -114,6 +115,6 @@ def mount_shared():
 
     if not good:        # mount failed, copy mount log
         try:
-            shutil.copy(MOUNT_LOG_FILE, mount_path)
+            shutil.copy(mount_log_file, mount_path)
         except Exception as exc:
             print_and_log(logging.INFO, f'mount_shared: copy of log file failed : {str(exc)}')

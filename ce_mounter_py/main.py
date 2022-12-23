@@ -7,18 +7,48 @@ import traceback
 from datetime import datetime
 from setproctitle import setproctitle
 from wrapt_timeout_decorator import timeout
-from shared import print_and_log, log_config, DEV_DISK_DIR, MOUNT_DIR_RAW, MOUNT_COMMANDS_DIR, \
-    SETTINGS_PATH, MOUNT_DIR_TRANS, CONFIG_PATH_SOURCE, CONFIG_PATH_COPY, \
+from dotenv import load_dotenv
+
+
+def load_dotenv_config():
+    """ Try to load the dotenv configuration file.
+    First try to see if there's an override path for this config file specified in the env variables.
+    Then try the normal installation path for dotenv on ce: /ce/services/.env
+    If that fails, try to find and use local dotenv file used during development - .env in your local dir
+    """
+
+    # First try to see if there's an override path for this config file specified in the env variables.
+    path = os.environ.get('CE_DOTENV_PATH')
+
+    if path and os.path.exists(path):       # path in env found and it really exists, use it
+        load_dotenv(dotenv_path=path)
+        return
+
+    # Then try the normal installation path for dotenv on ce: /ce/services/.env
+    ce_dot_env_file = '/ce/services/.env'
+    if os.path.exists(ce_dot_env_file):
+        load_dotenv(dotenv_path=ce_dot_env_file)
+        return
+
+    # If that fails, try to find and use local dotenv file used during development - .env in your local dir
+    load_dotenv()
+
+
+load_dotenv_config()                        # load dotenv before our files
+
+
+from shared import print_and_log, log_config, DEV_DISK_DIR, \
     get_symlink_path_for_letter, setting_get_bool, unlink_everything_translated, letter_confdrive, \
     unlink_everything_raw, settings_load, show_symlinked_dirs, is_zip_mounted, \
     MOUNT_DIR_ZIP_FILE, letter_zip, symlink_if_needed, other_instance_running, unlink_without_fail, FILE_ROOT_DEV, \
-    load_one_setting, get_drives_bitno_from_settings, DOWNLOAD_STORAGE_DIR
+    load_one_setting, get_drives_bitno_from_settings
 from mount_usb_trans import get_usb_devices, find_and_mount_translated
 from mount_usb_raw import find_and_mount_raw
 from mount_hdd_image import mount_hdd_image
 from mount_on_cmd import mount_on_command
 from mount_shared import mount_shared
 from mount_user import mount_user_custom_folders
+
 
 task_queue = queue.Queue()
 
@@ -107,8 +137,8 @@ def find_and_mount_devices(dont_show_symlinked_dirs=False):
 
 # following two will help us to determine who caused the event and what function should handle it
 event_source = {}
-watched_paths = {SETTINGS_PATH: reload_settings_mount_everything,
-                 MOUNT_COMMANDS_DIR: mount_on_command,
+watched_paths = {os.getenv('SETTINGS_DIR'): reload_settings_mount_everything,
+                 os.getenv('MOUNT_COMMANDS_DIR'): mount_on_command,
                  DEV_DISK_DIR: find_and_mount_devices}
 
 
@@ -126,17 +156,17 @@ def my_process_event(event):
 
 def copy_and_symlink_config_dir():
     """ create a copy of configdir, then symlink it to right place """
-    if not os.path.exists(CONFIG_PATH_SOURCE):
-        print_and_log(logging.WARNING, f"Config drive origin folder doesn't exist! ( {CONFIG_PATH_SOURCE} )")
+    if not os.path.exists(os.getenv('CONFIG_PATH_SOURCE')):
+        print_and_log(logging.WARNING, f"Config drive origin folder doesn't exist! ( {os.getenv('CONFIG_PATH_SOURCE')} )")
         return
 
     try:
-        os.makedirs(CONFIG_PATH_COPY, exist_ok=True)                    # create dir for copy
-        os.system(f"cp -r {CONFIG_PATH_SOURCE}/* {CONFIG_PATH_COPY}")   # copy original config dir to copy dir
+        os.makedirs(os.getenv('CONFIG_PATH_COPY'), exist_ok=True)                    # create dir for copy
+        os.system(f"cp -r {os.getenv('CONFIG_PATH_SOURCE')}/* {os.getenv('CONFIG_PATH_COPY')}")   # copy original config dir to copy dir
 
         symlink_path = get_symlink_path_for_letter(letter_confdrive())
 
-        symlink_if_needed(CONFIG_PATH_COPY, symlink_path)               # create symlink, but only if needed
+        symlink_if_needed(os.getenv('CONFIG_PATH_COPY'), symlink_path)               # create symlink, but only if needed
         print_and_log(logging.INFO, f"Config drive was symlinked to: {symlink_path}")
     except Exception as ex:
         print_and_log(logging.WARNING, f'copy_and_symlink_config_dir: failed with: {type(ex).__name__} - {str(ex)}')
@@ -187,8 +217,8 @@ def symlink_download_storage():
     if not os.path.exists(download_storage):        # this drive doesn't exists? use /tmp then
         download_storage = '/tmp'
 
-    print_and_log(logging.INFO, f"symlink_download_storage: {download_storage} -> {DOWNLOAD_STORAGE_DIR}")
-    symlink_if_needed(download_storage, DOWNLOAD_STORAGE_DIR)
+    print_and_log(logging.INFO, f"symlink_download_storage: {download_storage} -> {os.getenv('DOWNLOAD_STORAGE_DIR')}")
+    symlink_if_needed(download_storage, os.getenv('DOWNLOAD_STORAGE_DIR'))
 
 
 if __name__ == "__main__":
@@ -207,16 +237,16 @@ if __name__ == "__main__":
         exit(1)
 
     # make dirs which might not exist (some might require root access)
-    for one_dir in [MOUNT_DIR_RAW, MOUNT_DIR_TRANS, MOUNT_COMMANDS_DIR]:
+    for one_dir in [os.getenv('MOUNT_DIR_RAW'), os.getenv('MOUNT_DIR_TRANS'), os.getenv('MOUNT_COMMANDS_DIR')]:
         os.makedirs(one_dir, exist_ok=True)
 
     unlink_without_fail(FILE_ROOT_DEV)          # delete this file to make get_root_fs_device() execute at least once
 
     settings_load()                  # load settings from disk
 
-    print_and_log(logging.INFO, f"MOUNT_COMMANDS_DIR: {MOUNT_COMMANDS_DIR}")
-    print_and_log(logging.INFO, f"MOUNT_DIR_RAW     : {MOUNT_DIR_RAW}")
-    print_and_log(logging.INFO, f"MOUNT_DIR_TRANS   : {MOUNT_DIR_TRANS}")
+    print_and_log(logging.INFO, f"MOUNT_COMMANDS_DIR: {os.getenv('MOUNT_COMMANDS_DIR')}")
+    print_and_log(logging.INFO, f"MOUNT_DIR_RAW     : {os.getenv('MOUNT_DIR_RAW')}")
+    print_and_log(logging.INFO, f"MOUNT_DIR_TRANS   : {os.getenv('MOUNT_DIR_TRANS')}")
 
     print_and_log(logging.INFO, f'On start will look for not mounted devices - they might be already connected')
 
@@ -236,11 +266,11 @@ if __name__ == "__main__":
     print_and_log(logging.INFO, f'Will now start watching folder: {DEV_DISK_DIR}')
     wm.add_watch(DEV_DISK_DIR, pyinotify.IN_CREATE | pyinotify.IN_DELETE | pyinotify.IN_UNMOUNT)
 
-    print_and_log(logging.INFO, f'Will now start watching folder: {SETTINGS_PATH}')
-    wm.add_watch(SETTINGS_PATH, pyinotify.IN_CREATE | pyinotify.IN_DELETE | pyinotify.IN_UNMOUNT | pyinotify.IN_MODIFY | pyinotify.IN_CLOSE_WRITE)
+    print_and_log(logging.INFO, f'Will now start watching folder: {os.getenv("SETTINGS_DIR")}')
+    wm.add_watch(os.getenv('SETTINGS_DIR'), pyinotify.IN_CREATE | pyinotify.IN_DELETE | pyinotify.IN_UNMOUNT | pyinotify.IN_MODIFY | pyinotify.IN_CLOSE_WRITE)
 
-    print_and_log(logging.INFO, f'Will now start watching folder: {MOUNT_COMMANDS_DIR}')
-    wm.add_watch(MOUNT_COMMANDS_DIR, pyinotify.IN_CREATE | pyinotify.IN_DELETE | pyinotify.IN_UNMOUNT | pyinotify.IN_MODIFY | pyinotify.IN_CLOSE_WRITE)
+    print_and_log(logging.INFO, f'Will now start watching folder: {os.getenv("MOUNT_COMMANDS_DIR")}')
+    wm.add_watch(os.getenv('MOUNT_COMMANDS_DIR'), pyinotify.IN_CREATE | pyinotify.IN_DELETE | pyinotify.IN_UNMOUNT | pyinotify.IN_MODIFY | pyinotify.IN_CLOSE_WRITE)
 
     try:
         loop.run_forever()
