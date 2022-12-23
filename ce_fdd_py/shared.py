@@ -8,6 +8,7 @@ import socket
 import logging
 from logging.handlers import RotatingFileHandler
 from zipfile import ZipFile
+from dotenv import load_dotenv
 
 app_log = logging.getLogger()
 
@@ -21,23 +22,6 @@ main = None
 main_loop = None
 current_body = None
 should_run = True
-
-LOG_DIR = '/var/log/ce/'
-LOG_FILE = os.path.join(LOG_DIR, 'ce_fdd_py.log')
-
-DATA_DIR = '/var/run/ce/'
-FILE_FLOPPY_SLOTS = os.path.join(DATA_DIR, 'floppy_slots.txt')
-FILE_FLOPPY_ACTIVE_SLOT = os.path.join(DATA_DIR, 'floppy_active_slot.txt')
-
-CORE_SOCK_PATH = os.path.join(DATA_DIR, 'core.sock')
-
-DOWNLOAD_STORAGE_DIR = os.path.join(DATA_DIR, 'download_storage')
-
-PATH_TO_LISTS = "/ce/lists/"                                    # where the lists are stored locally
-BASE_URL = "http://joo.kie.sk/cosmosex/update/"                 # base url where the lists will be stored online
-LIST_OF_LISTS_FILE = "list_of_lists.csv"
-LIST_OF_LISTS_URL = BASE_URL + LIST_OF_LISTS_FILE               # where the list of lists is on web
-LIST_OF_LISTS_LOCAL = PATH_TO_LISTS + LIST_OF_LISTS_FILE        # where the list of lists is locally
 
 list_of_lists = []      # list of dictionaries: {name, url, filename}
 list_index = 0          # index of list in list_of_lists which will be worked on
@@ -61,6 +45,30 @@ view_object = None
 
 last_status_string = ''
 new_status_string = ''
+
+
+def load_dotenv_config():
+    """ Try to load the dotenv configuration file.
+    First try to see if there's an override path for this config file specified in the env variables.
+    Then try the normal installation path for dotenv on ce: /ce/services/.env
+    If that fails, try to find and use local dotenv file used during development - .env in your local dir
+    """
+
+    # First try to see if there's an override path for this config file specified in the env variables.
+    path = os.environ.get('CE_DOTENV_PATH')
+
+    if path and os.path.exists(path):       # path in env found and it really exists, use it
+        load_dotenv(dotenv_path=path)
+        return
+
+    # Then try the normal installation path for dotenv on ce: /ce/services/.env
+    ce_dot_env_file = '/ce/services/.env'
+    if os.path.exists(ce_dot_env_file):
+        load_dotenv(dotenv_path=ce_dot_env_file)
+        return
+
+    # If that fails, try to find and use local dotenv file used during development - .env in your local dir
+    load_dotenv()
 
 
 def on_unhandled_keys_generic(key):
@@ -126,8 +134,9 @@ def get_storage_path():
     storage_path = None
 
     # does this symlink exist?
-    if os.path.exists(DOWNLOAD_STORAGE_DIR) and os.path.islink(DOWNLOAD_STORAGE_DIR):
-        storage_path = os.readlink(DOWNLOAD_STORAGE_DIR)    # read the symlink
+    download_storage_dir = os.getenv('DOWNLOAD_STORAGE_DIR')
+    if os.path.exists(download_storage_dir) and os.path.islink(download_storage_dir):
+        storage_path = os.readlink(download_storage_dir)    # read the symlink
 
         if not os.path.exists(storage_path):                # symlink source doesn't exist? reset path to None
             storage_path = None
@@ -178,7 +187,7 @@ def send_to_core(item):
         json_item = json.dumps(item)   # dict to json
 
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-        sock.connect(CORE_SOCK_PATH)
+        sock.connect(os.getenv('CORE_SOCK_PATH'))
         sock.send(json_item.encode('utf-8'))
         sock.close()
     except Exception as ex:
@@ -204,8 +213,9 @@ def slot_eject(slot_index):
 
 def file_seems_to_be_image(path_to_image, check_if_exists):
     """ check if the supplied path seems to be image or not """
-    if not os.path.exists(path_to_image) or not os.path.isfile(path_to_image):
-        return False, f"Error accessing {path_to_image}"
+    if check_if_exists:
+        if not os.path.exists(path_to_image) or not os.path.isfile(path_to_image):
+            return False, f"Error accessing {path_to_image}"
 
     path = path_to_image.strip()
     path = os.path.basename(path)       # get just filename
@@ -220,15 +230,17 @@ def file_seems_to_be_image(path_to_image, check_if_exists):
         return True, None
 
     if ext != 'zip':                    # not a zip file and not any of supported extensions? fail
-        return False, f"Files with '{ext}' extension not supported."
+        return False, f"ext not supported: {ext}"
 
     # if we got here, it's a zip file
     try:
         with ZipFile(path_to_image, 'r') as zipObj:
             files = zipObj.namelist()       # Get list of files names in zip
 
-            for file in files:
-                if file_seems_to_be_image(file, False):
+            for file in files:              # go through all the files in zip
+                success, message = file_seems_to_be_image(file, False)
+
+                if success:
                     app_log.debug(f"the ZIP file {path_to_image} contains valid image {file}")
                     return True, None
 
@@ -241,8 +253,12 @@ def file_seems_to_be_image(path_to_image, check_if_exists):
 def log_config():
     log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
 
-    os.makedirs(LOG_DIR, exist_ok=True)
-    my_handler = RotatingFileHandler(LOG_FILE, mode='a', maxBytes=1024 * 1024, backupCount=1)
+    log_dir = os.getenv('LOG_DIR')
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, 'ce_fdd_py.log')
+
+    os.makedirs(log_dir, exist_ok=True)
+    my_handler = RotatingFileHandler(log_file, mode='a', maxBytes=1024 * 1024, backupCount=1)
     my_handler.setFormatter(log_formatter)
     my_handler.setLevel(logging.DEBUG)
 

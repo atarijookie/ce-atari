@@ -10,9 +10,10 @@ from setproctitle import setproctitle
 from downloader import DownloaderView
 from image_slots import on_show_image_slots
 import shared
+from shared import load_dotenv_config
 from urwid_helpers import create_my_button, create_header_footer
-import bson
 
+load_dotenv_config()                # load dotenv
 app_log = logging.getLogger('root')
 
 thr_download_lists = None
@@ -21,20 +22,20 @@ thr_download_images = None
 
 def update_list_of_lists():
     # check if should download this file
-    should_download = should_download_list(shared.LIST_OF_LISTS_LOCAL)
+    should_download = should_download_list(os.getenv('LIST_OF_LISTS_LOCAL'))
 
     if should_download:     # download file if should
-        download_list(shared.LIST_OF_LISTS_URL, shared.LIST_OF_LISTS_LOCAL)
+        download_list(os.getenv('LIST_OF_LISTS_URL'), os.getenv('LIST_OF_LISTS_LOCAL'))
 
     # check again if should download - True here after download would mean that the
     # list is not available locally or is outdated, but failed udpate
-    should_download = should_download_list(shared.LIST_OF_LISTS_LOCAL)
+    should_download = should_download_list(os.getenv('LIST_OF_LISTS_LOCAL'))
     return (not should_download)        # return success / failure
 
 
 def read_list_of_lists():
     # read whole file into memory, split to lines
-    file = open(shared.LIST_OF_LISTS_LOCAL, "r")
+    file = open(os.getenv('LIST_OF_LISTS_LOCAL'), "r")
     data = file.read()
     file.close()
     lines = data.split("\n")
@@ -53,7 +54,7 @@ def read_list_of_lists():
 
         list_filename = re.sub(r'\W+', '', item['name'])    # from the list name remove all non alphanumeric chars
         list_filename = list_filename.lower()               # all to lowercase
-        list_filename = shared.PATH_TO_LISTS + list_filename + ext       # path + filename + extension
+        list_filename = os.getenv('PATH_TO_LISTS') + list_filename + ext       # path + filename + extension
         item['filename'] = list_filename
 
         shared.list_of_lists.append(item)
@@ -255,7 +256,7 @@ def create_main_menu():
 if __name__ == "__main__":
     setproctitle("ce_fdd_py")  # set process title
 
-    for dir in [shared.PATH_TO_LISTS, shared.DATA_DIR, shared.LOG_DIR]:
+    for dir in [os.getenv('PATH_TO_LISTS'), os.getenv('DATA_DIR'), os.getenv('LOG_DIR')]:
         os.makedirs(dir, exist_ok=True)
 
     shared.log_config()

@@ -3,7 +3,7 @@ import urwid
 import logging
 import shared
 from urwid_helpers import create_my_button, dialog, back_to_main_menu, create_header_footer
-from shared import load_list_from_csv, FILE_FLOPPY_SLOTS, FILE_FLOPPY_ACTIVE_SLOT
+from shared import load_list_from_csv
 from file_view import FilesView
 
 app_log = logging.getLogger()
@@ -28,7 +28,7 @@ def alarm_callback_refresh(loop=None, data=None):
 
     slots_mod_time = 0
     try:
-        slots_mod_time = os.path.getmtime(FILE_FLOPPY_SLOTS)    # get modification time
+        slots_mod_time = os.path.getmtime(os.getenv('FILE_FLOPPY_SLOTS'))    # get modification time
     except Exception as ex:
         app_log.warning(f"slots_mod_time - failed: {str(ex)}")
 
@@ -73,11 +73,11 @@ def get_image_slots():
     txt_image_content = []
 
     try:
-        with open(FILE_FLOPPY_SLOTS, 'rt') as f:
+        with open(os.getenv('FILE_FLOPPY_SLOTS'), 'rt') as f:
             txt_image_name = f.readlines()
 
     except Exception as ex:
-        app_log.warning(f"Failed to open file {FILE_FLOPPY_SLOTS} : {str(ex)}")
+        app_log.warning(f"Failed to open file {os.getenv('FILE_FLOPPY_SLOTS')} : {str(ex)}")
 
     # now get images content for slot 1, 2, 3
     for i in range(3):
@@ -110,7 +110,7 @@ def on_show_image_slots(button):
 
     try:
         last_slots_mod_time = 0
-        last_slots_mod_time = os.path.getmtime(FILE_FLOPPY_SLOTS)
+        last_slots_mod_time = os.path.getmtime(os.getenv('FILE_FLOPPY_SLOTS'))
     except Exception as ex:
         app_log.warning(f"last_slots_mod_time - failed: {str(ex)}")
 

@@ -3,7 +3,6 @@ import sys
 import os
 import base64
 import json
-from shared import FILE_FLOPPY_SLOTS, FILE_FLOPPY_ACTIVE_SLOT, CORE_SOCK_PATH
 
 slots = {}
 
@@ -18,7 +17,7 @@ def text_to_file(text, filename):
 
 
 def write_slots_to_file():
-    with open(FILE_FLOPPY_SLOTS, 'wt') as f:
+    with open(os.getenv('FILE_FLOPPY_SLOTS'), 'wt') as f:
         for i in range(3):
             img = slots.get(i, '')
             f.write(img)
@@ -26,17 +25,19 @@ def write_slots_to_file():
 
 
 def create_socket():
+    core_sock_path = os.getenv('CORE_SOCK_PATH')
+
     try:
-        os.unlink(CORE_SOCK_PATH)
+        os.unlink(core_sock_path)
     except:
-        if os.path.exists(CORE_SOCK_PATH):
+        if os.path.exists(core_sock_path):
             raise
 
     sckt = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
 
     try:
-        sckt.bind(CORE_SOCK_PATH)
-        print(f'Success, got socket: {CORE_SOCK_PATH}')
+        sckt.bind(core_sock_path)
+        print(f'Success, got socket: {core_sock_path}')
         return sckt
     except Exception as e:
         print(f'exception on bind: {str(e)}')
@@ -44,6 +45,9 @@ def create_socket():
 
 
 if __name__ == "__main__":
+    from shared import load_dotenv_config
+    load_dotenv_config()
+
     sock = create_socket()
 
     if not sock:
@@ -73,7 +77,7 @@ if __name__ == "__main__":
                     write_slots_to_file()
 
                 if decoded.get('action') == 'activate':  # action is activate?
-                    text_to_file(f"{slot}", FILE_FLOPPY_ACTIVE_SLOT)
+                    text_to_file(f"{slot}",  os.getenv('FILE_FLOPPY_ACTIVE_SLOT'))
 
         except Exception as ex:
             print(f"got exception: {str(ex)}")
