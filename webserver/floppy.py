@@ -64,7 +64,7 @@ def upload_image(slot_no):
     symlink_if_needed(file_path, symlink_slot_path)     # create new symlink
 
     slot_insert(slot_no, file_path)     # tell core to insert this image
-    return 'OK', 204
+    return {'status': 'ok'}
 
 
 @floppy.route('/<int:slot_no>', methods=['PUT'])
@@ -79,4 +79,4 @@ def activate_slot(slot_no):
         slot_no = -1
 
     slot_activate(slot_no)
-    return '', 204
+    return {'status': 'ok'}

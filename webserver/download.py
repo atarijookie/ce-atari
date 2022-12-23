@@ -2,7 +2,7 @@ import os
 import re
 import math
 from flask import Blueprint, request, current_app as app, abort
-from utils import get_arg_int, slot_insert, get_image_slots, get_storage_path
+from utils import get_arg_int, slot_insert, get_image_slots, get_storage_path, send_to_taskq
 
 download = Blueprint('download', __name__)
 
@@ -113,7 +113,8 @@ def image_list():
     sublist = list_of_items_filtered[item_start: (item_start + items_per_page)]     # get just part of the filtered list
     slots = get_image_slots()
 
-    return {'totalPages': total_pages, 'currentPage': page, 'imageList': sublist, 'slots': slots}
+    resp = {'totalPages': total_pages, 'currentPage': page, 'imageList': sublist, 'slots': slots}
+    return resp
 
 
 @download.route('/insert', methods=['GET'])
@@ -131,10 +132,16 @@ def insert():
     # send the insert command with full path to image
     slot = get_arg_int('slot', 0)
     slot_insert(slot, full_path)
-    return '', 204
+    return {'status': 'ok'}, 204
 
 
 @download.route('/download', methods=['GET'])
 def download_image():
-    image = request.args.get('image')
-    return ''
+    image_url = request.args.get('image')                       # url where the image should be download from
+    image_filename = os.path.basename(image_url)
+    storage_path = get_storage_path()
+    destination = os.path.join(storage_path, image_filename)    # destination where the file should be saved to
+
+    item = {'action': 'download_floppy', 'url': image_url, 'destination': destination}
+    send_to_taskq(item)
+    return {'status': 'ok'}

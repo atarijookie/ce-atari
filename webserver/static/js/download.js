@@ -174,8 +174,8 @@ function onDownload(imageName)
             handleShowDownloading(prevDownloadingCount, 0);
             setTimeout(onCheckTimer, 333); // check every while
         },
-        error: function (xhr) {
-            console.log("Download Error: " + xhr.statusText);
+        error: function (xhr, textStatus, errorThrown) {
+            console.log("Download Error: " + xhr.statusText + ", " + textStatus + ", " + errorThrown);
         }
     })
 }
@@ -277,7 +277,7 @@ function generateSearchResultRow(item, searchString)
             insertIcons = insertIcons.concat(generateActionButton(IconType.INSERT, i, item.filename));
         }
     } else {                        // if file is not downloaded yet
-        downloadIcon = generateActionButton(IconType.DOWNLOAD, 0, item.filename);
+        downloadIcon = generateActionButton(IconType.DOWNLOAD, 0, item.url);
 
         for(var i=0; i<3; i++) {    // just 3 empty placeholders
             insertIcons = insertIcons.concat(generateActionButton(IconType.DUMMY, 0, ""));

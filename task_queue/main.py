@@ -6,13 +6,14 @@ import queue
 import logging
 import json
 import urllib3
+import threading
 from setproctitle import setproctitle
 import concurrent.futures
 from utils import load_dotenv_config, log_config, other_instance_running
 
 should_run = True
 task_queue = queue.Queue()      # queue that holds things to download
-
+thr_worker = None
 
 def download_file(item):
     try:
@@ -43,16 +44,23 @@ def taskq_worker():
     """ download any / all selected images to local storage """
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         while should_run:
+            got_item = False
+
             try:
-                item = task_queue.get()     # get one item to process
+                item = task_queue.get(timeout=0.3)              # get one item to process
+                got_item = True
 
-                if item.get('action') == 'download':
-                    executor.submit(download_file)
+                app_log.info(f"worker got item: {item}")
 
+                if item.get('action') == 'download_floppy':
+                    executor.submit(download_file, item)
+            except queue.Empty:
+                pass
             except Exception as ex:         # we're expecting exception on no item to download
                 app_log.warning(f"taskq_worker exception: {str(ex)}")
 
-            task_queue.task_done()
+            if got_item:                    # if managed to get item, mark it as done
+                task_queue.task_done()
 
 
 def create_socket(app_log):
@@ -101,6 +109,9 @@ if __name__ == "__main__":
         app_log.error("Cannot run without socket! Terminating.")
         exit(1)
 
+    thr_worker = threading.Thread(target=taskq_worker)
+    thr_worker.start()
+
     app_log.info(f"Entering main loop, waiting for messages via: {os.getenv('TASKQ_SOCK_PATH')}")
 
     # this receiving main loop with receive messages via UNIX domain sockets and put them in the task queue,
@@ -112,8 +123,8 @@ if __name__ == "__main__":
             app_log.debug(f'received message: {message}')
             task_queue.put(message)
         except KeyboardInterrupt:
+            app_log.error("Got keyboard interrupt, terminating.")
             break
-
         except Exception as ex:
             app_log.warning(f"got exception: {str(ex)}")
 
