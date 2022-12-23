@@ -1,7 +1,6 @@
 import os
 from flask import Blueprint, make_response, request, current_app as app, abort
-from utils import slot_activate, get_image_slots, text_from_file, slot_insert
-from shared import FILE_FLOPPY_ACTIVE_SLOT, FLOPPY_UPLOAD_PATH
+from utils import slot_activate, get_image_slots, text_from_file, slot_insert, file_seems_to_be_image
 from werkzeug.utils import secure_filename
 
 floppy = Blueprint('floppy', __name__)
@@ -10,7 +9,7 @@ floppy = Blueprint('floppy', __name__)
 @floppy.route('/slots', methods=['GET'])
 def status():
     image_names = get_image_slots()
-    active_slot = text_from_file(FILE_FLOPPY_ACTIVE_SLOT)
+    active_slot = text_from_file(os.getenv('FILE_FLOPPY_ACTIVE_SLOT'))
 
     try:        # try to convert to int if possible
         active_slot = int(active_slot)
@@ -34,18 +33,17 @@ def upload_image(slot_no):
     f = request.files['file']
     filename = secure_filename(f.filename)          # create secure filename
 
-    file_ext = os.path.splitext(filename)[1]        # get file extension
-    file_ext = file_ext.lower()
-
-    if file_ext not in ['.st', '.msa', '.zip']:     # file extension seems wrong?
-        abort(400, f'file extension {file_ext} not allowed')
-
-    # TODO: if ZIP, check for image inside ZIP
-
-    file_path = os.path.join(FLOPPY_UPLOAD_PATH, filename)
+    file_path = os.path.join(os.getenv('FLOPPY_UPLOAD_PATH'), filename)
+    f.save(file_path)
     app.logger.debug(f"upload_image: floppy image saved to: {file_path}")
 
-    f.save(file_path)
+    # check if the file extension is supported
+    success, message = file_seems_to_be_image(file_path, True)
+
+    if not success:     # not a valid image? fail here
+        app.logger.debug(f"upload_image: not a valid image, deleting it and failing: {message}")
+        os.unlink(file_path)
+        abort(400, message)
 
     # TODO: if slot_no has some image uploaded, delete it now, so we won't collect a pile of images
 

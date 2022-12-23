@@ -2,14 +2,39 @@ import os
 import json
 import socket
 import logging
+from dotenv import load_dotenv
+from zipfile import ZipFile
 from logging.handlers import RotatingFileHandler
 from flask import render_template, request, current_app as app
 from auth import login_required
-from shared import PID_FILE, LOG_DIR, CORE_SOCK_PATH, FILE_FLOPPY_SLOTS, DOWNLOAD_STORAGE_DIR
 import shared
 
 
 app_log = logging.getLogger()
+
+
+def load_dotenv_config():
+    """ Try to load the dotenv configuration file.
+    First try to see if there's an override path for this config file specified in the env variables.
+    Then try the normal installation path for dotenv on ce: /ce/services/.env
+    If that fails, try to find and use local dotenv file used during development - .env in your local dir
+    """
+
+    # First try to see if there's an override path for this config file specified in the env variables.
+    path = os.environ.get('CE_DOTENV_PATH')
+
+    if path and os.path.exists(path):       # path in env found and it really exists, use it
+        load_dotenv(dotenv_path=path)
+        return
+
+    # Then try the normal installation path for dotenv on ce: /ce/services/.env
+    ce_dot_env_file = '/ce/services/.env'
+    if os.path.exists(ce_dot_env_file):
+        load_dotenv(dotenv_path=ce_dot_env_file)
+        return
+
+    # If that fails, try to find and use local dotenv file used during development - .env in your local dir
+    load_dotenv()
 
 
 def text_to_file(text, filename):
@@ -39,10 +64,11 @@ def text_from_file(filename):
 
 
 def log_config():
-    os.makedirs(LOG_DIR, exist_ok=True)
+    os.makedirs(os.getenv('LOG_DIR'), exist_ok=True)
     log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
 
-    my_handler = RotatingFileHandler(f'{LOG_DIR}/ce_webserver.log', mode='a', maxBytes=1024 * 1024, backupCount=1)
+    my_handler = RotatingFileHandler(os.path.join(os.getenv('LOG_DIR'), 'ce_webserver.log'),
+                                     mode='a', maxBytes=1024 * 1024, backupCount=1)
     my_handler.setFormatter(log_formatter)
     my_handler.setLevel(logging.DEBUG)
 
@@ -55,12 +81,13 @@ def other_instance_running():
     pid_current = os.getpid()
     app_log.info(f'PID of this process: {pid_current}')
 
-    os.makedirs(os.path.split(PID_FILE)[0], exist_ok=True)     # create dir for PID file if it doesn't exist
+    pid_file = os.path.join(os.getenv('PID_FILE'), 'ce_webserver.pid')
+    os.makedirs(os.path.split(pid_file)[0], exist_ok=True)     # create dir for PID file if it doesn't exist
 
     # read PID from file and convert to int
     pid_from_file = -1
     try:
-        pff = text_from_file(PID_FILE)
+        pff = text_from_file(pid_file)
         pid_from_file = int(pff) if pff else -1
     except TypeError:       # we're expecting this on no text from file
         pass
@@ -79,7 +106,7 @@ def other_instance_running():
 
     # other PID doesn't exist, no other instance running
     app_log.debug(f'other_instance_running: PID from file not running, so other instance not running')
-    text_to_file(str(pid_current), PID_FILE)        # write our PID to file
+    text_to_file(str(pid_current), pid_file)        # write our PID to file
     return False            # no other instance running
 
 
@@ -138,7 +165,7 @@ def send_to_core(item):
         json_item = json.dumps(item)   # dict to json
 
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-        sock.connect(CORE_SOCK_PATH)
+        sock.connect(os.getenv('CORE_SOCK_PATH'))
         sock.send(json_item.encode('utf-8'))
         sock.close()
     except Exception as ex:
@@ -178,10 +205,10 @@ def get_image_slots():
     txt_image_name = []
 
     try:
-        with open(FILE_FLOPPY_SLOTS, 'rt') as f:
+        with open(os.getenv('FILE_FLOPPY_SLOTS'), 'rt') as f:
             txt_image_name = f.readlines()
     except Exception as ex:
-        app_log.warning(f"Failed to open file {FILE_FLOPPY_SLOTS} : {str(ex)}")
+        app_log.warning(f"Failed to open file {os.getenv('FILE_FLOPPY_SLOTS')} : {str(ex)}")
 
     # now get images content for slot 1, 2, 3
     for i in range(3):
@@ -208,8 +235,8 @@ def get_storage_path():
     storage_path = None
 
     # does this symlink exist?
-    if os.path.exists(DOWNLOAD_STORAGE_DIR) and os.path.islink(DOWNLOAD_STORAGE_DIR):
-        storage_path = os.readlink(DOWNLOAD_STORAGE_DIR)    # read the symlink
+    if os.path.exists(os.getenv('DOWNLOAD_STORAGE_DIR')) and os.path.islink(os.getenv('DOWNLOAD_STORAGE_DIR')):
+        storage_path = os.readlink(os.getenv('DOWNLOAD_STORAGE_DIR'))    # read the symlink
 
         if not os.path.exists(storage_path):                # symlink source doesn't exist? reset path to None
             storage_path = None
@@ -221,3 +248,42 @@ def get_storage_path():
     # store the found storage path and return it
     shared.last_storage_path = storage_path
     return storage_path
+
+
+def file_seems_to_be_image(path_to_image, check_if_exists):
+    """ check if the supplied path seems to be image or not """
+    if check_if_exists:
+        if not os.path.exists(path_to_image) or not os.path.isfile(path_to_image):
+            return False, f"Error accessing {path_to_image}"
+
+    path = path_to_image.strip()
+    path = os.path.basename(path)       # get just filename
+    ext = os.path.splitext(path)[1]     # get file extension
+
+    if ext.startswith('.'):             # if extension starts with dot, remove it
+        ext = ext[1:]
+
+    ext = ext.lower()                   # to lowercase
+
+    if ext in ['st', 'msa']:            # if extension is one of the expected values, we're good
+        return True, None
+
+    if ext != 'zip':                    # not a zip file and not any of supported extensions? fail
+        return False, f"ext not supported: {ext}"
+
+    # if we got here, it's a zip file
+    try:
+        with ZipFile(path_to_image, 'r') as zipObj:
+            files = zipObj.namelist()       # Get list of files names in zip
+
+            for file in files:              # go through all the files in zip
+                success, message = file_seems_to_be_image(file, False)
+
+                if success:
+                    app.logger.debug(f"the ZIP file {path_to_image} contains valid image {file}")
+                    return True, None
+
+    except Exception as ex:
+        app.logger.warning(f"file_seems_to_be_image failed: {str(ex)}")
+
+    return False, "No valid image found in ZIP file"

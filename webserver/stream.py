@@ -1,7 +1,6 @@
 import os
 import socket
 from flask import Blueprint, make_response, request, current_app as app
-from shared import SOCK_PATH_CONFIG, SOCK_PATH_FLOPPY, SOCK_PATH_TERMINAL
 
 stream = Blueprint('stream', __name__)
 
@@ -61,7 +60,7 @@ def write_to_unix_sock(sock_path, data):
 # GET config stream
 @stream.route('/config', methods=['GET'])
 def config_get():
-    return read_from_unix_sock(SOCK_PATH_CONFIG)
+    return read_from_unix_sock(os.getenv('SOCK_PATH_CONFIG'))
 
 
 # POST config stream
@@ -69,13 +68,13 @@ def config_get():
 def config_post():
     data_dict = request.get_json(force=True)
     data = data_dict.get('data')
-    return write_to_unix_sock(SOCK_PATH_CONFIG + '.wo', data)
+    return write_to_unix_sock(os.getenv('SOCK_PATH_CONFIG') + '.wo', data)
 
 
 # GET floppy stream
 @stream.route('/floppy', methods=['GET'])
 def floppy_get():
-    return read_from_unix_sock(SOCK_PATH_FLOPPY)
+    return read_from_unix_sock(os.getenv('SOCK_PATH_FLOPPY'))
 
 
 # POST floppy stream
@@ -83,13 +82,13 @@ def floppy_get():
 def floppy_post():
     data_dict = request.get_json(force=True)
     data = data_dict.get('data')
-    return write_to_unix_sock(SOCK_PATH_FLOPPY + '.wo', data)
+    return write_to_unix_sock(os.getenv('SOCK_PATH_FLOPPY') + '.wo', data)
 
 
 # GET terminal stream
 @stream.route('/terminal', methods=['GET'])
 def terminal_get():
-    return read_from_unix_sock(SOCK_PATH_TERMINAL)
+    return read_from_unix_sock(os.getenv('SOCK_PATH_TERMINAL'))
 
 
 # POST terminal stream
@@ -97,5 +96,4 @@ def terminal_get():
 def terminal_post():
     data_dict = request.get_json(force=True)
     data = data_dict.get('data')
-    return write_to_unix_sock(SOCK_PATH_TERMINAL + '.wo', data)
-
+    return write_to_unix_sock(os.getenv('SOCK_PATH_TERMINAL') + '.wo', data)

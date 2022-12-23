@@ -1,20 +1,23 @@
 import os
 from flask import Flask, render_template
-from utils import log_config, generate_routes_for_templates, text_from_file
-from shared import SECRET_KEY_PATH
+from utils import log_config, generate_routes_for_templates, text_from_file, load_dotenv_config
+
+load_dotenv_config()        # load dotenv before our imports which might need it already loaded
+
 from stream import stream
 from download import download
 from floppy import floppy
 from auth import auth, login_required
-from shared import FLOPPY_UPLOAD_PATH
 
-log_config()
+log_config()                                                    # configure logs
 app = Flask(__name__,  template_folder='templates', static_folder='static')
-app.secret_key = text_from_file(SECRET_KEY_PATH)        # set the secret key on start
 
-os.makedirs(FLOPPY_UPLOAD_PATH, exist_ok=True)          # create upload folder if it doesn't exist
-app.config['UPLOAD_FOLDER'] = FLOPPY_UPLOAD_PATH        # default upload location
-app.config['MAX_CONTENT_PATH'] = 5*1024*1024            # max file size
+SECRET_KEY_PATH = os.path.join(os.getenv('DATA_DIR'), "flask_secret_key")
+app.secret_key = text_from_file(SECRET_KEY_PATH)                # set the secret key on start
+
+os.makedirs(os.getenv('FLOPPY_UPLOAD_PATH'), exist_ok=True)     # create upload folder if it doesn't exist
+app.config['UPLOAD_FOLDER'] = os.getenv('FLOPPY_UPLOAD_PATH')   # default upload location
+app.config['MAX_CONTENT_PATH'] = 5*1024*1024                    # max file size
 
 app.register_blueprint(auth, url_prefix='/auth')
 app.register_blueprint(stream, url_prefix='/stream')

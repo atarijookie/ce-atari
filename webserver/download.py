@@ -1,9 +1,8 @@
 import os
 import re
 import math
-from flask import Blueprint, make_response, request, current_app as app
+from flask import Blueprint, request, current_app as app, abort
 from utils import get_arg_int, slot_insert, get_image_slots, get_storage_path
-from shared import LIST_OF_LISTS_LOCAL, PATH_TO_LISTS
 
 download = Blueprint('download', __name__)
 
@@ -19,7 +18,7 @@ def status():
 
 def read_list_of_lists():
     # read whole file into memory, split to lines
-    file = open(LIST_OF_LISTS_LOCAL, "r")
+    file = open(os.getenv('LIST_OF_LISTS_LOCAL'), "r")
     data = file.read()
     file.close()
     lines = data.split("\n")
@@ -39,7 +38,7 @@ def read_list_of_lists():
 
         list_filename = re.sub(r'\W+', '', item['name'])    # from the list name remove all non alphanumeric chars
         list_filename = list_filename.lower()               # all to lowercase
-        list_filename = os.path.join(PATH_TO_LISTS, list_filename + ext)       # path + filename + extension
+        list_filename = os.path.join(os.getenv('PATH_TO_LISTS'), list_filename + ext)   # path + filename + extension
         item['filename'] = list_filename
 
         list_of_lists.append(item)
@@ -78,10 +77,10 @@ def load_list_from_csv(csv_filename):
 def floppy_image_exists(storage_path, image_name):
     """ Function returns true if image exists in storage path. """
     if not storage_path:
-        return False
+        return False, None
 
     image_path = os.path.join(storage_path, image_name)
-    return os.path.exists(image_path)
+    return os.path.exists(image_path), image_path
 
 
 @download.route('/imagelist', methods=['GET'])
@@ -103,7 +102,8 @@ def image_list():
         content = item['content'].lower()   # content to lower case
 
         if not search_phrase or search_phrase in content:       # search phrase not provided or it's found in content
-            item['haveIt'] = floppy_image_exists(storage_path, item['filename'])
+            exist, _ = floppy_image_exists(storage_path, item['filename'])
+            item['haveIt'] = exist
             list_of_items_filtered.append(item)                 # append item
 
     total_items = len(list_of_items_filtered)                   # how many items current list has
@@ -120,8 +120,17 @@ def image_list():
 def insert():
     """ insert floppy image to specified slot """
     image = request.args.get('image')
+
+    # check if the image exists
+    storage_path = get_storage_path()
+    exits, full_path = floppy_image_exists(storage_path, image)
+
+    if not exits:
+        abort(400, f"Image {image} is not present in storage path {storage_path}")
+
+    # send the insert command with full path to image
     slot = get_arg_int('slot', 0)
-    slot_insert(slot, image)
+    slot_insert(slot, full_path)
     return '', 204
 
 
