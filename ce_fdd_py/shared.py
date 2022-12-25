@@ -12,8 +12,6 @@ from dotenv import load_dotenv
 
 app_log = logging.getLogger()
 
-queue_download = queue.Queue()      # queue that holds things to download
-
 terminal_cols = 80  # should be 40 for ST low, 80 for ST mid
 terminal_rows = 23
 items_per_page = 19
@@ -180,18 +178,28 @@ def load_list_from_csv(csv_filename):
     return list_of_items
 
 
-def send_to_core(item):
+def send_to_socket(sock_path, item):
     """ send an item to core """
     try:
-        app_log.debug(f"sending {item}")
+        app_log.debug(f"sending {item} to {sock_path}")
         json_item = json.dumps(item)   # dict to json
 
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-        sock.connect(os.getenv('CORE_SOCK_PATH'))
+        sock.connect(sock_path)
         sock.send(json_item.encode('utf-8'))
         sock.close()
     except Exception as ex:
         app_log.debug(f"failed to send {item} - {str(ex)}")
+
+
+def send_to_core(item):
+    """ send an item to core """
+    send_to_socket(os.getenv('CORE_SOCK_PATH'), item)
+
+
+def send_to_taskq(item):
+    """ send an item to task queue """
+    send_to_socket(os.getenv('TASKQ_SOCK_PATH'), item)
 
 
 def slot_insert(slot_index, path_to_image):

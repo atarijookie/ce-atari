@@ -12,6 +12,12 @@ class DownloaderView(PaginatedView):
     list_index = 0
     list_of_items = []
 
+    def download_image_file(self, item):
+        storage_path = shared.get_storage_path()                    # find out if we got storage path
+        destination = os.path.join(storage_path, item['filename'])  # create local path
+        item = {'action': 'download_floppy', 'url': item['url'], 'destination': destination}
+        shared.send_to_taskq(item)
+
     def on_show_selected_list(self, button, choice):
         self.list_index = choice     # store the chosen list index
         self.title = "CE FDD: " + shared.list_of_lists[shared.list_index]['name']
@@ -96,14 +102,14 @@ class DownloaderView(PaginatedView):
             return
 
         if is_download:                             # should download?
-            shared.queue_download.put(user_data)
+            self.download_image_file(item)
             return
 
     def download_image(self, button, item):
         """ when image has been selected for download """
         app_log.debug("download image {}".format(item['filename']))
-        shared.queue_download.put(item)        # enqueue image
-        self.show_current_page(None)         # show current list page
+        self.download_image_file(item)           # enqueue image
+        self.show_current_page(None)        # show current list page
 
     def insert_image(self, button, item_slot):
         """ when image should be inserted to slot """

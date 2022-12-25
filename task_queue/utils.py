@@ -107,7 +107,7 @@ def log_config():
 
     log_dir = os.getenv('LOG_DIR')
     os.makedirs(log_dir, exist_ok=True)
-    log_file = os.path.join(log_dir, 'ce_fdd_py.log')
+    log_file = os.path.join(log_dir, 'ce_taskq.log')
 
     os.makedirs(log_dir, exist_ok=True)
     my_handler = RotatingFileHandler(log_file, mode='a', maxBytes=1024 * 1024, backupCount=1)

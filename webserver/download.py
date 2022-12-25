@@ -1,8 +1,9 @@
 import os
 import re
 import math
+import json
 from flask import Blueprint, request, current_app as app, abort
-from utils import get_arg_int, slot_insert, get_image_slots, get_storage_path, send_to_taskq
+from utils import get_arg_int, slot_insert, get_image_slots, get_storage_path, send_to_taskq, text_from_file
 
 download = Blueprint('download', __name__)
 
@@ -12,7 +13,16 @@ def status():
     """ return status - are images being downloaded? do we have storage for images? """
     have_storage = get_storage_path() is not None
 
-    return {'encoding_ready': 1, 'downloading_count': 0, 'downloading_progress': 100,
+    taskq_status = text_from_file(os.getenv('TASKQ_STATUS_PATH'))
+    taskq_status = json.loads(taskq_status)
+    dn_floppy = taskq_status.get('download_floppy', {})     # get just status for 'download_floppy' actions
+    dn_count = len(dn_floppy.keys())
+
+    # go through all the floppy files being now download, get their progress in list, use lowest
+    progresses = [item.get('progress', 0) for item in dn_floppy.values()]
+    dn_progress = min(progresses) if progresses else 0
+
+    return {'encoding_ready': 1, 'downloading_count': dn_count, 'downloading_progress': dn_progress,
             'do_we_have_storage': have_storage}
 
 

@@ -17,7 +17,6 @@ load_dotenv_config()                # load dotenv
 app_log = logging.getLogger('root')
 
 thr_download_lists = None
-thr_download_images = None
 
 
 def update_list_of_lists():
@@ -174,53 +173,6 @@ def update_status(new_status):
             shared.main_loop.set_alarm_in(0.1, update_status_alarm)
 
 
-def download_worker():
-    """ download any / all selected images to local storage """
-    while shared.should_run:
-        item = None
-
-        try:
-            item = shared.queue_download.get(timeout=0.1)  # get one item to download
-        except Exception as ex:                 # we're expecting exception on no item to download
-            continue
-
-        storage_path = shared.get_storage_path()       # check if got storage and get path
-
-        if not storage_path:                    # no storage? skip item
-            shared.queue_download.task_done()
-            continue
-
-        local_path = os.path.join(storage_path, item['filename'])   # create local path
-
-        try:
-            status = "Status: downloading {}".format(item['filename'])
-            app_log.debug(status)
-            update_status(status)
-
-            # open url
-            http = urllib3.PoolManager()
-            r = http.request('GET', item['url'], preload_content=False)
-
-            with open(local_path, 'wb') as out:     # open local path
-                while True:
-                    data = r.read(4096)
-                    
-                    if not data:
-                        break
-
-                    out.write(data)                 # write data to file
-
-            r.release_conn()
-            update_status("Status: idle")
-            app_log.debug("download of {} finished".format(item['filename']))
-
-        except Exception as ex:
-            app_log.debug("failed to download {} - ".format(item['filename'], str(ex)))
-            update_status("Status: {}".format(str(ex)))
-
-        shared.queue_download.task_done()
-
-
 def on_show_selected_list(button, choice):
     shared.view_object = DownloaderView()
     shared.view_object.on_show_selected_list(button, choice)
@@ -279,10 +231,7 @@ if __name__ == "__main__":
 
     # threads for updating lists
     thr_download_lists = threading.Thread(target=download_lists)
-    thr_download_images = threading.Thread(target=download_worker)
-
     thr_download_lists.start()
-    thr_download_images.start()
 
     shared.main = urwid.Padding(create_main_menu())
 
