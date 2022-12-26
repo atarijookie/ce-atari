@@ -1,12 +1,10 @@
 import os
 import json
 import socket
+from loguru import logger as app_log
 import logging
-from logging.handlers import RotatingFileHandler
 from dotenv import load_dotenv
 import psutil
-
-app_log = logging.getLogger()
 
 
 def load_dotenv_config():
@@ -88,39 +86,36 @@ def get_storage_path():
     return storage_path
 
 
-def send_to_core(item):
+def send_to_socket(sock_path, item):
     """ send an item to core """
     try:
-        app_log.debug(f"sending {item}")
+        app_log.debug(f"sending {item} to {sock_path}")
         json_item = json.dumps(item)   # dict to json
 
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-        sock.connect(os.getenv('CORE_SOCK_PATH'))
+        sock.connect(sock_path)
         sock.send(json_item.encode('utf-8'))
         sock.close()
     except Exception as ex:
         app_log.debug(f"failed to send {item} - {str(ex)}")
 
 
-def log_config():
-    log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
+def send_to_core(item):
+    """ send an item to core """
+    send_to_socket(os.getenv('CORE_SOCK_PATH'), item)
 
+
+def send_to_taskq(item):
+    """ send an item to task queue """
+    send_to_socket(os.getenv('TASKQ_SOCK_PATH'), item)
+
+
+def log_config():
     log_dir = os.getenv('LOG_DIR')
     os.makedirs(log_dir, exist_ok=True)
     log_file = os.path.join(log_dir, 'ce_taskq.log')
 
-    os.makedirs(log_dir, exist_ok=True)
-    my_handler = RotatingFileHandler(log_file, mode='a', maxBytes=1024 * 1024, backupCount=1)
-    my_handler.setFormatter(log_formatter)
-    my_handler.setLevel(logging.DEBUG)
-
-    app_log = logging.getLogger()
-    app_log.setLevel(logging.DEBUG)
-    app_log.addHandler(my_handler)
-
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(log_formatter)
-    app_log.addHandler(console_handler)
+    app_log.add(log_file, rotation="1 MB", retention=1)
 
 
 def text_to_file(text, filename):
@@ -181,3 +176,16 @@ def other_instance_running():
     app_log.debug(f'other_instance_running: PID from file not running, so other instance not running')
     text_to_file(str(pid_current), pid_file)        # write our PID to file
     return False            # no other instance running
+
+
+def unlink_without_fail(path):
+    # try to delete the file
+    try:
+        os.unlink(path)
+        return True
+    except FileNotFoundError:   # if it doesn't really exist, just ignore this exception (it's ok)
+        pass
+    except Exception as ex:     # if it existed (e.g. broken link) but failed to remove, log error
+        app.logger.warning(f'failed to unlink {path} - exception: {str(ex)}')
+
+    return False

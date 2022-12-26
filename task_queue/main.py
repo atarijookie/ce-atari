@@ -1,6 +1,5 @@
 import socket
 import os
-import logging
 import json
 import urllib3
 import threading
@@ -8,8 +7,10 @@ from time import time
 from enum import Enum
 from uuid import uuid1
 from setproctitle import setproctitle
+from floppy_image_lists import update_floppy_image_lists, after_floppy_image_list_downloaded  # these imports are needed
 import concurrent.futures
-from utils import load_dotenv_config, log_config, other_instance_running, text_to_file
+from utils import load_dotenv_config, log_config, other_instance_running, text_to_file, unlink_without_fail
+from loguru import logger as app_log
 
 should_run = True
 lock = threading.Lock()
@@ -69,10 +70,13 @@ def update_status_json(item, operation: StatusOp):
         store_status_to_file(force)      # store it all to file
 
 
+@app_log.catch
 def download_file(item):
     try:
         # open url
-        dest = item.get('destination')
+        dest = item.get('destination')              # the final filename after the download
+        dest_during_download = dest + ".dwnld"      # temporary filename during the download
+
         app_log.info(f"will now download {item.get('url')} to {dest}")
 
         http = urllib3.PoolManager()
@@ -83,7 +87,7 @@ def download_file(item):
         app_log.debug(f"url: {item.get('url')} - total_length: {total_length}")
 
         got_cnt = 0
-        with open(dest, 'wb') as out:  # open local path
+        with open(dest_during_download, 'wb') as out:   # open local path - temporary filename during download
 
             while True:
                 data_ = r.read(16*1024)
@@ -103,19 +107,42 @@ def download_file(item):
                 out.write(data_)        # write data to file
 
         r.release_conn()
-        app_log.debug(f"download of {dest} finished")
+
+        unlink_without_fail(dest)                       # delete if something with the final filename exist
+        os.rename(dest_during_download, dest)           # rename from something.dwnld to something
+        app_log.info(f"download of {dest} finished with success!")
 
     except Exception as ex:
         app_log.warning(f"failed to download {dest} - {str(ex)}")
 
     update_status_json(item, StatusOp.REMOVE)    # remove item from status
 
+    # if some action should be triggered after this action, do it now
+    after_action = item.get('after_action')
+
+    if after_action:
+        # get function for this action (function should have the name as action) and submit it to executor
+        fun_for_action = globals().get(after_action)
+
+        if not fun_for_action:      # function not found? fail here
+            app_log.warning(f'Could not find handler function for after_action {after_action}! after_action ignored.')
+            return
+
+        app_log.info(f'Now executing after_action: {after_action} on item: {item}')
+        fun_for_action(item)
+
 
 def download_floppy(item):
+    """ action handler for action 'download_floppy' """
     download_file(item)
 
 
-def create_socket(app_log):
+def download_list(item):
+    """ action handler for action 'download_list' """
+    download_file(item)
+
+
+def create_socket():
     taskq_sock_path = os.getenv('TASKQ_SOCK_PATH')
 
     try:
@@ -129,11 +156,41 @@ def create_socket(app_log):
 
     try:
         sckt.bind(taskq_sock_path)
+        sckt.settimeout(1.0)
         app_log.info(f'Success, got socket: {taskq_sock_path}')
         return sckt
     except Exception as e:
         app_log.warning(f'exception on bind: {str(e)}')
         return False
+
+
+def add_run_once_tasks(xecutor):
+    """ CE and its components need these things to run at least once since power-on of the device. """
+    msg = {'action': 'update_floppy_image_lists'}
+    submit_task_to_executor(xecutor, msg)
+
+
+def submit_task_to_executor(xecutor, msg):
+    """ Submit one message to executor with all the steps that are needed to be done. """
+    action = msg.get('action')  # try to fetch 'action' value
+
+    if not action:  # no action defined? we don't know what to do
+        app_log.warning('Ignored message with empty action.')
+        return
+
+    # get function for this action (function should have the name as action) and submit it to executor
+    fun_for_action = globals().get(action)
+
+    if not fun_for_action:
+        app_log.warning(f'Could not find handler function for action {action}! Message ignored.')
+        return
+
+    if 'id' not in msg:  # if our message doesn't have id, generate on
+        msg['id'] = str(uuid1())
+
+    app_log.debug(f'submitting message to executor: {msg}')
+    update_status_json(msg, StatusOp.ADD)   # add item to status
+    xecutor.submit(fun_for_action, msg)     # submit message to thread executor
 
 
 if __name__ == "__main__":
@@ -142,7 +199,7 @@ if __name__ == "__main__":
     setproctitle("ce_taskq")      # set process title
 
     log_config()
-    app_log = logging.getLogger()
+    #app_log = logging.getLogger()
 
     # check if running as root, fail and quit if not
     if os.geteuid() != 0:           # If not root user, fail
@@ -157,7 +214,7 @@ if __name__ == "__main__":
     store_status_to_file()          # store initial state to file
 
     # try to create socket
-    sock = create_socket(app_log)
+    sock = create_socket()
 
     if not sock:
         app_log.error("Cannot run without socket! Terminating.")
@@ -167,26 +224,17 @@ if __name__ == "__main__":
 
     # This receiving main loop with receive messages via UNIX domain sockets and submit them to thread pool executor.
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        add_run_once_tasks(executor)                                # add all run-once tasks
+
         while True:
             try:
                 data, address = sock.recvfrom(1024)                 # receive message
                 message = json.loads(data)                          # convert from json string to dictionary
                 app_log.debug(f'received message: {message}')
 
-                action = message.get('action')                      # try to fetch 'action' value
-
-                if not action:                                      # no action defined? we don't know what to do
-                    app_log.warning('Ignored message with empty action.')
-                    continue
-
-                # get function for this action (function should have the name as action) and submit it to executor
-                fun_for_action = locals().get(action)
-
-                if 'id' not in message:                             # if our message doesn't have id, generate on
-                    message['id'] = str(uuid1())
-
-                update_status_json(message, StatusOp.ADD)           # add item to status
-                executor.submit(fun_for_action, message)            # submit message to thread executor
+                submit_task_to_executor(executor, message)          # ship it!
+            except socket.timeout:          # when socket fails to receive data
+                pass
             except KeyboardInterrupt:
                 app_log.error("Got keyboard interrupt, terminating.")
                 break
