@@ -22,6 +22,7 @@
         var prevSearchString = "";
 
         $(document).ready(function(){
+            imageListLoadAndShow(); // get list of lists
             onCheckTimer();         // load all the status variables
             getSearchResults("");   // get list of files and show it
 
@@ -52,6 +53,12 @@
         
     <!-- ---------------------------- -->
     <table border=1 cellspacing=0 cellpadding=5>
+      <tr><td>List of images:</td><td>
+        <select name="select_image_list" id="select_image_list" onchange="on_image_list_select_changed()">
+          <option value="0">default</option>
+        </select>
+      </td></tr>
+
       <tr><td colspan=2><p id='no_storage_warning'> </p> </td></tr>
 
       <tr><td>Search: </td><td> <input type="text" id="search_input">  </td></tr>

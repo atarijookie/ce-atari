@@ -24,9 +24,8 @@ def update_floppy_image_lists(msg):
                 'after_action': 'after_floppy_image_list_downloaded'}
 
         send_to_taskq(item)
-
-    # if some of the individual lists needs a download, trigger it now
-    update_floppy_image_lists_from_list()
+    else:               # no list of lists download needed, can proceed with downloading individual lists files
+        update_floppy_image_lists_from_list()
 
 
 def update_floppy_image_lists_from_list():
@@ -158,4 +157,5 @@ def after_floppy_image_list_downloaded(item):
     # when main list-of-list was just downloaded, trigger download of individual lists
     lol_local = os.getenv('LIST_OF_LISTS_LOCAL')
     if list_filename == lol_local:
+        app_log.info('Triggering individual lists download after the main list download has finished.')
         update_floppy_image_lists_from_list()

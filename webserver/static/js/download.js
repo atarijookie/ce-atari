@@ -7,8 +7,11 @@ function getSearchResults(searchString)
     }
     prevSearchString = searchString;
 
+    var select_image_list = document.getElementById('select_image_list');
+    var list_index = select_image_list.value;
+
     url = '/download/imagelist'; // base url
-    url = url + "?page=" + currentPage; // add page
+    url = url + "?page=" + currentPage + '&list_index=' + list_index; // add page and list_index as request args
 
     if(searchString.length > 0) {       // some search string was specified?
         url = url + "&search=" + searchString;
@@ -146,11 +149,6 @@ function onInsert(imageName, slotNo)
         dataType: 'json',
         success: function(data){
             console.log("Insert Success");
-
-//          prev_encoding_ready = false;    // now we're encoding, so not ready now
-//          $(".over_convert").show();      // show overlay
-//          setTimeout(onCheckTimer, 333);  // check every while
-
             onSearchStringChanged();        // fake search string change to reload the download/insert icons
         },
         error: function (xhr) {
@@ -363,4 +361,46 @@ function onSearchStringChanged()
 function onDelayedSearchStringChanged()
 {
     setTimeout(function(){ onSearchStringChanged(); }, 100);
+}
+
+function imageListLoadAndShow()
+{
+    url = "/download/list_of_lists";
+
+    $.ajax({
+        url: url,
+        type: 'GET',
+        dataType: 'json',
+        success: function(data){
+            console.log("Download Success");
+            var select_image_list = document.getElementById('select_image_list');
+
+            // remove any existing options in select
+            for(i=0; i<select_image_list.options.length; i++) {
+                select_image_list.remove(0);
+            }
+
+            // fill select with retrieved image lists
+            for(var i=0; i<data.length; i++) {          // go through input list
+                var idx = data[i]['index']              // fetch index and name
+                var name = data[i]['name']
+
+                var opt = document.createElement("option");     // create option
+                opt.value = idx;
+                opt.innerHTML = name;
+                select_image_list.append(opt);                  // append option
+            }
+
+            select_image_list.value = 0;                // select item with index 0
+        },
+        error: function (xhr, textStatus, errorThrown) {
+            console.log("Download Error: " + xhr.statusText + ", " + textStatus + ", " + errorThrown);
+        }
+    })
+}
+
+function on_image_list_select_changed()
+{
+    console.log("on_image_list_select_changed");
+    onGoToPage(0);
 }
