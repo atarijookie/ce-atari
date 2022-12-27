@@ -10,7 +10,7 @@ from setproctitle import setproctitle
 from downloader import DownloaderView
 from image_slots import on_show_image_slots
 import shared
-from shared import load_dotenv_config
+from shared import load_dotenv_config, get_list_of_lists
 from urwid_helpers import create_my_button, create_header_footer
 
 load_dotenv_config()                # load dotenv
@@ -61,11 +61,12 @@ def create_main_menu():
     body.append(urwid.Text('Games to download:'))
     body.append(urwid.Divider())
 
-    for index, item in enumerate(shared.list_of_lists):           # go through the list of lists, extract names, put them in the buttons
-        button = create_my_button(item['name'], on_show_selected_list, index)
+    lol = get_list_of_lists()
+    for index, item in enumerate(lol):           # go through the list of lists, extract names, put them in the buttons
+        button = create_my_button(item['name'], on_show_selected_list, item)
         body.append(button)
 
-    if not shared.list_of_lists:        # no lists of images?
+    if not lol:         # no lists of images?
         body.append(urwid.Text('(no list of images present)'))
 
     body.append(urwid.Divider())
@@ -84,9 +85,6 @@ if __name__ == "__main__":
 
     shared.terminal_cols, terminal_rows = urwid.raw_display.Screen().get_cols_rows()
     shared.items_per_page = terminal_rows - 4
-
-    # read list of lists into memory
-    #read_list_of_lists()
 
     shared.main = urwid.Padding(create_main_menu())
 

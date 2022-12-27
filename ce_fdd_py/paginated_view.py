@@ -15,14 +15,16 @@ class MyDivider(urwid.Divider):
 class PaginatedView:
     title = 'this view title'
     page_current = 1            # start from page 1
+    page_current_zbi = 0
+    total_pages = 1             # count of pages available
     search_phrase = ""          # no search string first
     last_focus_path = None
     main_list_pile = None
     text_pages = None
+    list_of_items = []
     list_of_items_filtered = []
     search_phrase_lc = None
     pile_current_page = None
-    page_current_zbi = 0
     btn_prev = None
     btn_next = None
 
@@ -111,29 +113,21 @@ class PaginatedView:
         self.update_pile_with_current_buttons()  # show the new buttons
 
     def filter_items_by_search_phrase(self):
-        for item in self.list_of_items:                      # go through all items in list
-            content = item['content'].lower()           # content to lower case
+        for item in self.list_of_items:                     # go through all items in list
+            content = item['content'].lower()               # content to lower case
 
-            if self.search_phrase_lc in content:             # if search string in content found
-                self.list_of_items_filtered.append(item)     # append item
-
-    def get_total_pages(self):
-        total_items = len(self.list_of_items_filtered)                   # how many items current list has
-        total_pages = math.ceil(total_items / shared.items_per_page)       # how many pages current list has
-        return total_pages
+            if self.search_phrase_lc in content:            # if search string in content found
+                self.list_of_items_filtered.append(item)    # append item
 
     def show_page_text(self):
-        total_pages = self.get_total_pages()     # how many pages current list has
-        self.text_pages.set_text("{} / {}".format(self.page_current, total_pages))
+        self.text_pages.set_text("{} / {}".format(self.page_current, self.total_pages))
 
     def on_page_change(self, change_direction):
-        total_pages = self.get_total_pages()     # how many pages current list has
-
-        if total_pages == 0:                # no total pages? no current page
+        if self.total_pages == 0:                # no total pages? no current page
             self.page_current = 1
         else:                               # some total pages?
             if change_direction > 0:                # to next page?
-                if self.page_current < total_pages:      # not on last page yet? increment
+                if self.page_current < self.total_pages:      # not on last page yet? increment
                     self.page_current += 1
             else:                                   # to previous page?
                 if self.page_current > 1:                # not on 1st page yet? decrement

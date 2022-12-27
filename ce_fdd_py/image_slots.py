@@ -3,7 +3,7 @@ import urwid
 import logging
 import shared
 from urwid_helpers import create_my_button, dialog, back_to_main_menu, create_header_footer
-from shared import load_list_from_csv
+from shared import get_data_from_webserver
 from file_view import FilesView
 
 app_log = logging.getLogger()
@@ -40,32 +40,6 @@ def alarm_callback_refresh(loop=None, data=None):
     shared.main_loop.set_alarm_in(1, alarm_callback_refresh)        # check for changes in 1 second
 
 
-def load_image_contents():
-    """ load images content if needed """
-    global image_name_to_content
-
-    if image_name_to_content:       # if already got images content, just quit
-        return
-
-    for img_list in shared.list_of_lists:       # go through all the image lists
-        try:
-            list_of_items = load_list_from_csv(img_list['filename'])        # get content from file to list
-
-            for item in list_of_items:          # extract filename-to-content to dictionary
-                image_name_to_content[item['filename'].strip().lower()] = item['content'].strip()
-
-        except Exception as ex:
-            app_log.warning(f"failed to load list {img_list} - {str(ex)}")
-
-
-def get_content_for_image_name(image_name):
-    load_image_contents()                               # load lists if needed
-    image_name = image_name.strip().lower()
-    content = image_name_to_content.get(image_name, '')    # get content for filename
-    app_log.debug(f"image_name: {image_name} , content: {content}")
-    return content
-
-
 def get_image_slots():
     # first get the image names that are in slot 1, 2, 3
     global txt_image_name, txt_image_content
@@ -87,8 +61,15 @@ def get_image_slots():
         image_name = txt_image_name[i].strip()
         image_name = os.path.basename(image_name)           # get just filename from the path
         txt_image_name[i] = image_name
-        content = get_content_for_image_name(image_name)    # get content (game names) for this image name
-        txt_image_content.append(content)
+
+    # fetch all the image contents
+    image_filenames = ','.join(txt_image_name)              # join the filenames to one string
+    contents = get_data_from_webserver('download/image_content', {'image_filenames': image_filenames})
+
+    # assign the txt_image_content from the response we got
+    for i in range(3):
+        cont = contents.get(txt_image_name[i], '')
+        txt_image_content.append(cont)
 
 
 def on_show_image_slots(button):

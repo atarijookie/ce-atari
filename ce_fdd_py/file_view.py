@@ -2,6 +2,7 @@ import os
 import urwid
 import logging
 import shared
+import math
 from urwid_helpers import dialog, back_to_main_menu
 from paginated_view import PaginatedView
 
@@ -87,6 +88,7 @@ class FilesView(PaginatedView):
 
         # first the filtered list is the same as original list
         self.list_of_items_filtered = self.list_of_items
+        self.total_pages = math.ceil(len(self.list_of_items) / shared.items_per_page)
 
         # if failed to load, show error
         if error:
@@ -123,7 +125,11 @@ class FilesView(PaginatedView):
 
     def get_item_btn_text(self, item):
         """ for a specified item retrieve text """
-        btn_text = f"{item['filename']:13} {item['size']}"
+        fname_max_len = 25
+        filename = item['filename']
+        filename = (filename[:(fname_max_len - 2)] + '..') if len(filename) > fname_max_len else filename   # shorten
+        filename = filename.ljust(fname_max_len)        # left justify if needed
+        btn_text = f"{filename} {item['size']}"
         return btn_text
 
     def on_back_button(self, button):
@@ -136,3 +142,5 @@ class FilesView(PaginatedView):
 
             if self.search_phrase_lc in content:            # if search string in content found
                 self.list_of_items_filtered.append(item)    # append item
+
+        self.total_pages = math.ceil(self.list_of_items_filtered / shared.items_per_page)

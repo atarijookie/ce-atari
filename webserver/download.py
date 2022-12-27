@@ -26,22 +26,66 @@ def status():
             'do_we_have_storage': have_storage}
 
 
+@download.route('/list_of_lists', methods=['GET'])
+def list_of_lists():
+    """ Read a list of lists from disk """
+
+    lol = read_list_of_lists()
+    return lol
+
+
+@download.route('/image_content', methods=['GET'])
+def get_image_content():
+    image_filenames = request.args.get('image_filenames')
+
+    if not image_filenames:                             # if mandatory parameter missing, fail
+        abort(400, 'image_filenames were not provided')
+
+    lc_to_in = {}           # this dict will hold input filename vs the internal lower-case one
+    resp = {}
+    if image_filenames:                                 # multiple filenames provided? store them
+        image_filenames = image_filenames.split(',')    # split thins string by ','
+
+        for im_fi in image_filenames:           # go through the filenames, convert them to lowercase, store to response
+            resp[im_fi] = ''                    # to response
+
+            fname_lc = im_fi.strip().lower()    # to lowercase
+            lc_to_in[fname_lc] = im_fi          # to our dict
+
+    lol = read_list_of_lists()                  # read list of lists
+
+    for list_ in lol:                                           # go through the list of lists
+        list_of_items = load_list_from_csv(list_['filename'])   # load one list
+
+        for item in list_of_items:  # find                      # go through single list
+            fname_lc = item['filename'].strip().lower()         # filename to lowercase
+
+            if fname_lc in lc_to_in.keys():                     # if this filename matches one of wanted filenames
+                fname_in = lc_to_in[fname_lc]                   # convert lowercase filename to input filename
+                resp[fname_in] = item['content']                # store content
+
+    return resp
+
+
 def read_list_of_lists():
     # read whole file into memory, split to lines
     file = open(os.getenv('LIST_OF_LISTS_LOCAL'), "r")
     data = file.read()
     file.close()
     lines = data.split("\n")
-    list_of_lists = []
+    lol = []
 
     # split csv lines into list of dictionaries
+    index = 0
+
     for line in lines:
         cols = line.split(",")
 
         if len(cols) < 2:                               # not enough cols in this row? skip it
             continue
 
-        item = {'name': cols[0], 'url': cols[1]}        # add {name, url} to item
+        item = {'index': index, 'name': cols[0], 'url': cols[1]}    # add {index, name, url} to item
+        index += 1
 
         url_filename = os.path.basename(item['url'])    # get filename from url
         ext = os.path.splitext(url_filename)[1]         # get extension from filename
@@ -51,9 +95,9 @@ def read_list_of_lists():
         list_filename = os.path.join(os.getenv('PATH_TO_LISTS'), list_filename + ext)   # path + filename + extension
         item['filename'] = list_filename
 
-        list_of_lists.append(item)
+        lol.append(item)
 
-    return list_of_lists
+    return lol
 
 
 def load_list_from_csv(csv_filename):

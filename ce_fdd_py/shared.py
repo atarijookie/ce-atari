@@ -1,6 +1,8 @@
 import queue
 import os
 import json
+from urllib.request import urlopen
+from urllib.parse import urlencode
 from urwid_helpers import dialog
 import subprocess
 import codecs
@@ -12,25 +14,16 @@ from dotenv import load_dotenv
 
 app_log = logging.getLogger()
 
-terminal_cols = 80  # should be 40 for ST low, 80 for ST mid
-terminal_rows = 23
-items_per_page = 19
-
 main = None
-main_loop = None
 current_body = None
 should_run = True
 
-list_of_lists = []      # list of dictionaries: {name, url, filename}
 list_index = 0          # index of list in list_of_lists which will be worked on
-list_of_items = []      # list containing all the items from file (unfiltered)
-list_of_items_filtered = []     # filtered list of items (based on search string)
 pile_current_page = None        # urwid pile containing buttons for current page
 search_phrase = ""
 
 main_loop = None        # main loop of the urwid library
 text_pages = None       # widget holding the text showing current and total pages
-page_current = 1        # currently shown page
 text_status = None      # widget holding status text
 last_focus_path = None  # holds last focus path to widget which had focus before going to widget subpage
 terminal_cols = 80      # should be 40 for ST low, 80 for ST mid
@@ -148,36 +141,6 @@ def get_storage_path():
     return storage_path
 
 
-def load_list_from_csv(csv_filename):
-    list_of_items = []
-
-    app_log.debug(f'will load .csv: {csv_filename}')
-
-    # read whole file into memory, split to lines
-    file = open(csv_filename, "r")
-    data = file.read()
-    file.close()
-
-    data = data.replace("<br>", "\n")
-    lines = data.split("\n")
-
-    # go through the lines, extract individual items
-    for line in lines:
-        cols = line.split(",", 2)                       # split to 3 items - url, crc, content (which is also coma-separated, but we want it as 1 piece here)
-
-        if len(cols) < 3:                               # not enough cols in this row? skip it
-            continue
-
-        item = {'url': cols[0], 'crc': cols[1], 'content': cols[2]}     # add {name, url} to item
-
-        url_filename = os.path.basename(item['url'])    # get filename from url
-        item['filename'] = url_filename
-
-        list_of_items.append(item)
-
-    return list_of_items
-
-
 def send_to_socket(sock_path, item):
     """ send an item to core """
     try:
@@ -273,3 +236,21 @@ def log_config():
     app_log = logging.getLogger()
     app_log.setLevel(logging.DEBUG)
     app_log.addHandler(my_handler)
+
+
+def get_data_from_webserver(url_path, get_params=None):
+    port = os.getenv('WEBSERVER_PORT')
+    url = f"http://127.0.0.1:{port}/{url_path}"
+
+    if get_params:                          # if get params were provided, add them to url
+        query_string = urlencode(get_params)
+        url = url + "?" + query_string
+
+    response = urlopen(url)                 # store the response of URL
+    data_json = json.loads(response.read()) # json string to dict
+    return data_json
+
+
+def get_list_of_lists():
+    return get_data_from_webserver("download/list_of_lists")
+
