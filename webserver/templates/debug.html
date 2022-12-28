@@ -1,0 +1,57 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html lang="en">
+    <head>
+        <meta http-equiv="content-type" content="text/html; charset=utf-8">
+	    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
+        <title>CosmosEx download page</title>
+        <link rel="stylesheet" type="text/css" href="static/css/bootstrap.light.css">
+        <script type="text/javascript" src="static/js/modernizr.custom.50426.js"></script>
+        <script type="text/javascript" src="static/js/jquery.js"> </script>
+        <script type="text/javascript" src="static/js/debug.js"> </script>
+        <link rel="stylesheet" type="text/css" href="static/css/style.css">
+
+    <script type="text/javascript">
+        $(document).ready(function(){
+            get_loglevel();
+        });
+        </script>
+  </head>
+  <body>
+    <div class="container">
+        <div class="row">
+            <div class="span10">
+                <ul class="nav nav-pills">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="http://joo.kie.sk/?page_id=415">Manual</a></li>
+                    <li><a href="/floppy">Floppy</a></li>
+                    <li><a href="/download">Download</a></li>
+                    <li><a href="/remote">Remote</a></li>
+                    <li><a href="/screenshots">Screenshots</a></li>
+                    <li><a href="/config">Config</a></li>
+                    <li><a href="/status">Status</a></li>
+                </ul>
+    <h3>Debug page</h3>
+    <p>Things that might help you better understand some issue with the device.</p>
+        
+    <!-- ---------------------------- -->
+    <table border=1 cellspacing=0 cellpadding=15>
+      <tr><td>Core log level:</td><td>
+        <select name="select_loglevel" id="select_loglevel" onchange="on_loglevel_select_changed()">
+          <option value="0">OFF</option>
+          <option value="1">INFO</option>
+          <option value="2">ERROR</option>
+          <option value="3">DEBUG</option>
+        </select>
+      </td></tr>
+    </table>
+
+    <p> &nbsp; </p>
+    <p>Check all the available log files:</p>
+    <ul>
+      {% for file in files %}
+        <li><a href="debug/logfile/{{file}}">{{file}}</a></li>
+      {% endfor %}
+    </ul>
+  </body>
+</html>
+

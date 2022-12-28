@@ -119,7 +119,7 @@ def template_renderer(app):
     return register_template_endpoint
 
 
-def generate_routes_for_templates(app_in):
+def generate_routes_for_templates(app_in, skip_pages):
     app_in.logger.info("Generating routes for templates (for each worker)")
 
     web_dir = os.path.dirname(os.path.abspath(__file__))
@@ -136,7 +136,7 @@ def generate_routes_for_templates(app_in):
         if not os.path.isfile(full_path) or ext not in['.htm', '.html']:    # not a file or not supported extension?
             continue
 
-        if fname_wo_ext == 'login':     # skip login page as we need this without @require_login
+        if fname_wo_ext in skip_pages:              # skip these pages
             continue
 
         app_in.logger.info(f'Added route /{fname_wo_ext} for template {filename}')
@@ -159,7 +159,7 @@ def get_arg_int(name, default=0):
 
 
 def send_to_socket(sock_path, item):
-    """ send an item to core """
+    """ send an item to specified socket """
     try:
         app_log.debug(f"sending {item} to {sock_path}")
         json_item = json.dumps(item)   # dict to json

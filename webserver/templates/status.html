@@ -1,0 +1,50 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html lang="en">
+    <head>
+        <meta http-equiv="content-type" content="text/html; charset=utf-8">
+	    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
+        <title>CosmosEx download page</title>
+        <link rel="stylesheet" type="text/css" href="static/css/bootstrap.light.css">
+        <script type="text/javascript" src="static/js/modernizr.custom.50426.js"></script>
+        <script type="text/javascript" src="static/js/jquery.js"> </script>
+        <script type="text/javascript" src="static/js/debug.js"> </script>
+        <link rel="stylesheet" type="text/css" href="static/css/style.css">
+
+        <style>
+            pre {outline: 1px solid #ccc; padding: 5px; margin: 5px; }
+            .string { color: green; }
+            .number { color: darkorange; }
+            .boolean { color: blue; }
+            .null { color: magenta; }
+            .key { color: red; }
+        </style>
+
+    <script type="text/javascript">
+        $(document).ready(function(){
+            getStatus();                    // get first status now
+            setInterval(getStatus, 10000);  // refresh status every 10 seconds
+        });
+        </script>
+  </head>
+  <body>
+    <div class="container">
+        <div class="row">
+            <div class="span10">
+                <ul class="nav nav-pills">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="http://joo.kie.sk/?page_id=415">Manual</a></li>
+                    <li><a href="/floppy">Floppy</a></li>
+                    <li><a href="/download">Download</a></li>
+                    <li><a href="/remote">Remote</a></li>
+                    <li><a href="/screenshots">Screenshots</a></li>
+                    <li><a href="/config">Config</a></li>
+                    <li class="active"><a href="/status">Status</a></li>
+                </ul>
+                <h3>Current status of the CosmosEx core</h3>
+                <pre name="pre_status" id="pre_status"></pre>
+            </div>
+         </div>
+     </div>
+  </body>
+</html>
+

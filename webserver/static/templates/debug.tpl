@@ -20,7 +20,7 @@ $(document).ready(function(){
   $('#setloglevel').on('change', function() {
     var sLogLevel=$(this).val();
     $.ajax({
-        url : "/api/v1/config/loglevel",
+        url : "/debug/loglevel",
         type: "POST",
         data : {"loglevel":sLogLevel},
         success: function(data, textStatus, jqXHR)

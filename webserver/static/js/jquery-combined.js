@@ -251,14 +251,14 @@ CosmosEx.Screencast=function(c){
   ----------------------------------------------------------------
   RESTlike interface, using json
 
-  /api/v1/mouse 	POST
+  /hid/mouse 	POST
 	Mousemove: 
 	{ "type":"relative", "x": 8, "y": 21 }
 	Mouse click:
 	{ "type": "buttonleft", "state": "down" }
 	{ "type": "buttonright", "state": "up" }
 
-  /api/v1/keyboard 	POST 
+  /hid/keyboard 	POST 
 	{ "type": "pc", "code": 40, "state": "down" };
 	{ "type": "pc", "code": 40, "state": "up" };
 	
@@ -382,7 +382,7 @@ CosmosEx.Remote=function(){
 				var transmit=function(iDX,iDY){
 					$.ajax({
 						type: 'POST',
-						url: '/api/v1/mouse',
+						url: '/hid/mouse',
 						data: JSON.stringify({ "type":"relative", "x": iDX, "y": iDY }),
 						contentType: 'application/json'
 					});
@@ -462,7 +462,7 @@ CosmosEx.Remote=function(){
 	    var sendMouseKey=function(sType,sState){
 				$.ajax({
 					type: 'POST',
-					url: '/api/v1/mouse',
+					url: '/hid/mouse',
 					data: JSON.stringify({ "type": sType, "state": sState }),
 					contentType: 'application/json'
 				});
@@ -526,7 +526,7 @@ CosmosEx.Remote=function(){
 				//return;	    		
 				$.ajax({
 					type: 'POST',
-					url: '/api/v1/keyboard',
+					url: '/hid/keyboard',
 					data: JSON.stringify(xData),
 					contentType: 'application/json'
 				});
