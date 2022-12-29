@@ -35,6 +35,9 @@ def ip_prefix_to_netmask(prefix):
 def netmask_to_ip_prefix(netmask):
     """ convert netmask to IP prefix number, e.g. 255.255.255.0 to 24 """
 
+    if not netmask:         # None or empty netmask?
+        return 0
+
     ones = 0
     parts = netmask.split('.')                  # split 255.255.255.0 to ["255", "255", "255", "0"]
 
@@ -48,11 +51,31 @@ def netmask_to_ip_prefix(netmask):
     return ones
 
 
+def system_custom(command, to_log=False):
+    """ This is a replacement for os.system() from which it's harder to get the output
+        and also for direct calling of subprocess.run(), where you should pass in list instead of string.
+
+        @param command: command with arguments as string
+        @param to_log: if true, log the output of the command
+    """
+    command_list = command.split(' ')                               # split command from string to list
+    result = subprocess.run(command_list, stdout=subprocess.PIPE)   # run the command
+    stdout = result.stdout.decode('utf-8')                          # get output as string
+
+    if to_log:
+        app_log.debug(f'command   : {command}')
+        app_log.debug(f'returncode: {result.returncode}')
+        app_log.debug(f'cmd output: {stdout}')
+
+    return stdout
+
+
 def get_interface():
     """ fetch interface names for ethernet and wifi using nmcli """
     # run 'nmcli -t -f DEVICE,TYPE,CON-UUID device'
-    result = subprocess.run(['nmcli', '-t', '-f', 'DEVICE,TYPE,CON-UUID', 'device'], stdout=subprocess.PIPE)
-    result = result.stdout.decode('utf-8')  # get output as string
+    # result = subprocess.run(['nmcli', '-t', '-f', 'DEVICE,TYPE,CON-UUID', 'device'], stdout=subprocess.PIPE)
+    # result = result.stdout.decode('utf-8')  # get output as string
+    result = system_custom('nmcli -t -f DEVICE,TYPE,CON-UUID device')
     lines = result.split('\n')              # split whole result to lines
 
     eth = wifi = None
@@ -80,8 +103,9 @@ def get_interface():
 def get_interface_settings(con_uuid):
     """ fetch interface settings specified device using nmcli """
     # nmcli -t con show [connection_uuid]
-    result = subprocess.run(['nmcli', '-t', 'con', 'show', con_uuid], stdout=subprocess.PIPE)
-    result = result.stdout.decode('utf-8')  # get output as string
+    # result = subprocess.run(['nmcli', '-t', 'con', 'show', con_uuid], stdout=subprocess.PIPE)
+    # result = result.stdout.decode('utf-8')  # get output as string
+    result = system_custom(f'nmcli -t con show {con_uuid}')
     lines = result.split('\n')              # split whole result to lines
 
     # output from 'nmcli -t con show con_uuid' looks like this:
@@ -138,8 +162,9 @@ def get_interface_settings(con_uuid):
 def get_all_connections(eth_not_wifi):
     """ fetch all connections for ethernet or wifi """
     # nmcli -t con show
-    result = subprocess.run(['nmcli', '-t', 'con', 'show'], stdout=subprocess.PIPE)
-    result = result.stdout.decode('utf-8')  # get output as string
+    # result = subprocess.run(['nmcli', '-t', 'con', 'show'], stdout=subprocess.PIPE)
+    # result = result.stdout.decode('utf-8')  # get output as string
+    result = system_custom('nmcli -t con show')
     lines = result.split('\n')              # split whole result to lines
 
     # output from 'nmcli -t con show' looks like this:
@@ -166,10 +191,10 @@ def get_all_connections(eth_not_wifi):
 
 def delete_connection_by_uuid(uuid):
     """ delete one connection by uuid """
-    result = subprocess.run(['nmcli', 'con', 'delete', uuid], stdout=subprocess.PIPE)
-    result = result.stdout.decode('utf-8')  # get output as string
-
-    app_log.debug(f"Deleting connection: {uuid}. result: {result}")
+    # result = subprocess.run(['nmcli', 'con', 'delete', uuid], stdout=subprocess.PIPE)
+    # result = result.stdout.decode('utf-8')  # get output as string
+    system_custom(f'nmcli con delete {uuid}', to_log=True)
+    # app_log.debug(f"Deleting connection: {uuid}. result: {result}")
 
 
 def create_setting_row(label, what, value, col1w, col2w, reverse=False, setting_name=None, return_widget=False,
@@ -344,7 +369,7 @@ def network_settings_changed(eth_not_wifi, values):
     iface_present = values['ETH_PRESENT'] if eth_not_wifi else values['WIFI_PRESENT']
 
     if not iface_present:   # interface is not present, we're ignoring any changes and not saving them
-        app_log.debug(f'iface_present: {iface_present}, so network_settings_changed answers False for {iface}')
+        app_log.debug(f'{iface} - iface_present: {iface_present}, so network_settings_changed answers False')
         return False
 
     if_keys = ['DNS', 'ETH_USE_DHCP', 'ETH_IP', 'ETH_MASK', 'ETH_GW'] if eth_not_wifi else \
@@ -352,10 +377,10 @@ def network_settings_changed(eth_not_wifi, values):
 
     for key in if_keys:                             # go through watched keys
         if key in shared.settings_changed.keys():   # changed key was found
-            app_log.debug(f'changed key {key} found, so network_settings_changed answers True for {iface}')
+            app_log.debug(f'{iface} - changed key {key} found, so network_settings_changed answers True')
             return True                             # settings have changed
 
-    app_log.debug(f'no changed key found, so network_settings_changed answers False for {iface}')
+    app_log.debug(f'{iface} - no changed key found, so network_settings_changed answers False')
     return False        # no settings changed here
 
 
@@ -370,7 +395,7 @@ def network_settings_good(eth_not_wifi, values):
 
     # if interface not present or using dhcp, don't check IP addresses and pretend IPs are all good
     if not changed or not iface_present or using_dhcp:
-        app_log.debug(f'network_settings_good for {iface} returning True')
+        app_log.debug(f'{iface} - network_settings_good returning True')
         return True
 
     ip_keys = ['DNS', 'ETH_IP', 'ETH_MASK', 'ETH_GW'] if eth_not_wifi else ['DNS', 'WIFI_IP', 'WIFI_MASK', 'WIFI_GW']
@@ -386,12 +411,47 @@ def network_settings_good(eth_not_wifi, values):
 
         if not good:
             dialog(shared.main_loop, shared.current_body, f"The IP address {values[name]} seems to be invalid!")
-            app_log.debug(f'network_settings_good for {iface} returning False')
+            app_log.debug(f'{iface} - network_settings_good returning False')
             return False
 
     # if got here, no exception occured, we're good
-    app_log.debug(f'network_settings_good for {iface} returning True (at the end)')
+    app_log.debug(f'{iface} - network_settings_good returning True (at the end)')
     return True
+
+
+def save_net_settings_dhcp(eth_not_wifi, values):
+    cons = get_all_connections(eth_not_wifi)  # get all existing connections
+
+    # for uuid in cons:  # existing connections down
+    #     system_custom(f'nmcli con down {uuid}', to_log=True)
+
+    system_custom('nmcli device modify {if_name} ipv4.method auto'.format(**values), to_log=True)
+
+
+def save_net_settings_static(eth_not_wifi, values):
+    cons = get_all_connections(eth_not_wifi)  # get all existing connections
+
+    for uuid in cons:  # existing connections down
+        system_custom(f'nmcli con down {uuid}', to_log=True)
+
+    values['prefix'] = netmask_to_ip_prefix(values['mask'])  # mask from '255.255.255.0' to 24
+    values['con_name'] = "static-" + values['iface_type']  # static-eth or static-wifi will be used as connection name
+    app_log.debug(f'{values["iface_type"]} - using values_out: {values}')
+
+    if not cons:            # no connections? add one
+        system_custom(
+            'nmcli con add con-name {con_name} ifname {if_name} type ethernet ip4 {ip4}/{prefix} gw4 {gw4}'
+            .format(**values), to_log=True)
+
+        cons = get_all_connections(eth_not_wifi)  # get all existing connections
+
+    values['uuid'] = cons[0]      # get uuid of 0th connection
+    system_custom('nmcli con mod {uuid} ipv4.addresses {ip4}/{prefix}'.format(**values), to_log=True)
+    system_custom('nmcli con mod {uuid} ipv4.gateway {gw4}'.format(**values), to_log=True)
+    system_custom('nmcli con mod {uuid} ipv4.dns {dns}'.format(**values), to_log=True)
+
+    for uuid in cons:       # existing connections up
+        system_custom(f'nmcli con up {uuid}', to_log=True)
 
 
 def save_net_settings(eth_not_wifi, values_in):
@@ -406,26 +466,15 @@ def save_net_settings(eth_not_wifi, values_in):
         name_in = setting_names[i]                  # fetch input name
         values_out[out_name] = values_in[name_in]   # for output key-value fetch input value
 
-    values_out['prefix'] = netmask_to_ip_prefix(values_out['mask'])     # mask from '255.255.255.0' to 24
-    values_out['con_name'] = "static" + iface_type      # static-eth or static-wifi will be used as connection name
-    app_log.debug(f'for {iface_type} using values_out: {values_out}')
-
     # get interface name
     eth, wifi = get_interface()
-    values_out['ifname'] = eth[0] if eth_not_wifi else wifi[0]
+    values_out['iface_type'] = iface_type
+    values_out['if_name'] = eth[0] if eth_not_wifi else wifi[0]
 
-    if using_dhcp:      # for dhcp - enable auto method
-        system('nmcli device modify {if_name} ipv4.method auto'.format(**values_out))
-    else:               # for static ip - add new connection
-        old_connections = get_all_connections(eth_not_wifi)     # get all existing connections
-
-        for uuid in old_connections:                # remove all existing connections
-            delete_connection_by_uuid(uuid)
-
-        # create new connection using nmcli
-        system('nmcli con add con-name {con_name} ifname {if_name} type ethernet ip4 {ip4}/{prefix} gw4 {gw4}'.format(**values_out))
-        system('nmcli con mod {con_name} ipv4.dns "{dns},8.8.8.8"'.format(**values_out))
-        system('nmcli con up {con_name} iface {if_name}'.format(**values_out))
+    if using_dhcp:              # for dhcp - enable auto method
+        save_net_settings_dhcp(eth_not_wifi, values_out)
+    else:                       # for static ip - add new connection
+        save_net_settings_static(eth_not_wifi, values_out)
 
 
 def save_wifi_settings(values):
@@ -433,10 +482,10 @@ def save_wifi_settings(values):
     _, wifi = get_interface()
     values_out = {'device': wifi[0], 'ssid': values['WIFI_SSID'], 'psk': values['WIFI_PSK']}
 
-    system("nmcli radio wifi on")
+    system_custom("nmcli radio wifi on", to_log=True)
     # nmcli con down ssid/uuid
-    system('sudo nmcli dev {device} connect {ssid} password "{psk}"'.format(**values_out))
-    system('nmcli con up {ssid}'.format(**values_out))
+    system_custom('sudo nmcli dev {device} connect {ssid} password "{psk}"'.format(**values_out), to_log=True)
+    system_custom('nmcli con up {ssid}'.format(**values_out), to_log=True)
 
 
 def network_save(button):
