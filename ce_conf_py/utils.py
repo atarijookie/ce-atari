@@ -57,6 +57,10 @@ def setting_get_int(setting_name):
 
     try:
         value_raw = setting_get_merged(setting_name)
+
+        if value_raw is None:       # value not present? just use default value
+            return value
+
         value = int(value_raw)
     except Exception as exc:
         app_log.warning(f"for {setting_name} failed to convert {value_raw} to int: {str(exc)}")
