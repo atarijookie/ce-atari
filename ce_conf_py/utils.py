@@ -276,6 +276,9 @@ def system_custom(command_str, to_log=True, shell=False):
     # But this fails in some cases, e.g. when supplying "" as empty ip address to nmcli, so for that case we allow
     # to run that command with shell=True.
 
+    if '"' in command_str and not shell:    # add this warning for future developers
+        app_log.warning('Hey! Your command string has " character in it, if the command is failing, call system_custom() with shell=True')
+
     if shell:       # run with shell - heavier, but sometimes necessary to make it work
         result = subprocess.run(command_str, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     else:           # run without shell - lighter, but fails sometimes

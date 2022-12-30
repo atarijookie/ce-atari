@@ -1,6 +1,7 @@
 from os import system
 import urwid
 import logging
+import copy
 from urwid_helpers import create_my_button, create_header_footer, create_edit, MyCheckBox, dialog
 from utils import settings_load, on_cancel, back_to_main_menu, setting_get_bool, on_editline_changed, \
     on_checkbox_changed, setting_get_merged, text_to_file, system_custom
@@ -85,7 +86,7 @@ def get_interface_settings(con_uuid):
     # nmcli -t con show [connection_uuid]
     # result = subprocess.run(['nmcli', '-t', 'con', 'show', con_uuid], stdout=subprocess.PIPE)
     # result = result.stdout.decode('utf-8')  # get output as string
-    result, _ = system_custom(f'nmcli -t con show {con_uuid}')
+    result, _ = system_custom(f'nmcli -t --show-secrets con show {con_uuid}')
     lines = result.split('\n')              # split whole result to lines
 
     # output from 'nmcli -t con show con_uuid' looks like this:
@@ -102,8 +103,11 @@ def get_interface_settings(con_uuid):
     # IP4.ROUTE[1]:dst = 0.0.0.0/0, nh = 192.168.123.1, mt = 100
     # IP4.ROUTE[2]:dst = 192.168.123.0/24, nh = 0.0.0.0, mt = 100
     # IP4.DNS[1]:192.168.123.1
+    # 802-11-wireless.ssid:jooknet2
+    # 802-11-wireless-security.psk:yourpasswordhere
 
-    settings = {'use_dhcp': True, 'ip': None, 'mask': None, 'gateway': None, 'dns': None}
+    settings = {'use_dhcp': True, 'ip': None, 'mask': None, 'gateway': None, 'dns': None,
+                'WIFI_SSID': None, 'WIFI_PSK': None}
 
     for line in lines:                          # go through the individual lines
         chunks = line.split(':', maxsplit=1)
@@ -113,7 +117,8 @@ def get_interface_settings(con_uuid):
 
         key, value = chunks                     # split list to individual vars
         nmcli_to_simple = {'GENERAL.DEVICE': 'device', 'IP4.ADDRESS[1]': 'ip', 'IP4.GATEWAY': 'gateway',
-                           'IP4.DNS[1]': 'dns', 'ipv4.method': 'use_dhcp'}
+                           'IP4.DNS[1]': 'dns', 'ipv4.method': 'use_dhcp',
+                           '802-11-wireless.ssid': 'WIFI_SSID', '802-11-wireless-security.psk': 'WIFI_PSK'}
 
         if key not in nmcli_to_simple.keys():   # this key is not what we're looking for, skip it
             continue
@@ -151,7 +156,12 @@ def cons_get_or_create(eth_not_wifi, values):
     values['con_name'] = "con-" + values['if_type']          # con-eth or con-wifi will be used as connection name
 
     # add single connection
-    system_custom('nmcli con add con-name {con_name} ifname {if_name} type {if_type}'.format(**values))
+    cmd = 'nmcli con add con-name {con_name} ifname {if_name} type {if_type}'.format(**values)
+
+    if not eth_not_wifi:        # for wifi also add ssid
+        cmd += ' ssid {WIFI_SSID}'.format(**values)
+
+    system_custom(cmd)          # execute command
 
     cons = get_cons_for_if(eth_not_wifi)  # get all existing connections
     return cons
@@ -169,7 +179,7 @@ def get_cons_for_if(eth_not_wifi):
     # Wired connection 1:275b0764-94eb-4626-ba69-26d861af541c:802-3-ethernet:eno1
     # docker0:8b0ddfde-1bac-4333-87d4-967e1f4b3814:bridge:docker0
 
-    wanted_type = 'ethernet' if eth_not_wifi else 'wifi'
+    wanted_type = 'ethernet' if eth_not_wifi else 'wireless'
     uuids = []
 
     for line in lines:                          # go through the individual lines
@@ -260,8 +270,8 @@ def load_network_settings():
         shared.settings['WIFI_GW'] = setts['gateway']
         shared.settings['WIFI_USE_DHCP'] = setts['use_dhcp']
         shared.settings['DNS'] = setts['dns']
-
-        # TODO: fetch wifi SSID and PSK
+        shared.settings['WIFI_SSID'] = setts['WIFI_SSID']
+        shared.settings['WIFI_PSK'] = setts['WIFI_PSK']
 
 
 def network_create(button):
@@ -458,7 +468,7 @@ def save_net_settings(eth_not_wifi, values_in):
     setting_names = ['DNS', 'ETH_IP', 'ETH_MASK', 'ETH_GW'] if eth_not_wifi else ['DNS', 'WIFI_IP', 'WIFI_MASK', 'WIFI_GW']
     format_names = ['dns', 'ip4', 'mask', 'gw4']
 
-    values_out = {}
+    values_out = copy.deepcopy(values_in)           # copy all the original values in
     for i, out_name in enumerate(format_names):     # for these output setting names
         name_in = setting_names[i]                  # fetch input name
         values_out[out_name] = values_in[name_in]   # for output key-value fetch input value
@@ -474,16 +484,46 @@ def save_net_settings(eth_not_wifi, values_in):
         save_net_settings_static(eth_not_wifi, values_out)
 
 
+def wifi_get_active_ssid():
+    result, status = system_custom('nmcli -t -f ACTIVE,SSID dev wifi')
+
+    # example output of above command...
+    # yes:jooknet2
+    # no:jooknet2
+    # no:
+    # no:W-HMR-17
+    # no:TP-Link_BC2B
+
+    resp = {'WIFI_SSID': None, 'WIFI_PSK': None}
+
+    lines = result.split('\n')      # whole output to lines
+
+    for line in lines:              # find line with active connection
+        parts = line.split(':')
+
+        if not parts or len(parts) != 2:    # skip weird lines
+            continue
+
+        if parts[0] == 'yes':       # found active connection?
+            return parts[1]
+
+    return None
+
+
 def save_wifi_settings(values):
     """ save wifi SSID and PSK """
     _, wifi = get_interface()
     values_out = {'device': wifi[0], 'ssid': values['WIFI_SSID'], 'psk': values['WIFI_PSK']}
+    app_log.debug(f'save_wifi_settings - values: {values_out}')
 
-    # TODO: not tested. Test & fix with wifi.
+    cons = get_cons_for_if(False)       # get existing connections for wifi
 
-    system_custom("nmcli radio wifi on")
-    # nmcli con down ssid/uuid
-    system_custom('sudo nmcli dev {device} connect {ssid} password "{psk}"'.format(**values_out))
+    for uuid in cons:                   # delete existing wifi connections
+        app_log.debug(f'deleting wifi connection {uuid}')
+        system_custom(f'nmcli con delete {uuid}')
+
+    system_custom('nmcli radio wifi on')
+    system_custom('nmcli dev wifi connect {ssid} password "{psk}"'.format(**values_out), shell=True)
     system_custom('nmcli con up {ssid}'.format(**values_out))
 
 
@@ -537,8 +577,8 @@ def network_save(button):
     wifi_changed = network_settings_changed(False, values)
 
     if wifi_changed:        # if wifi changed, save it
-        save_net_settings(False, values)
         save_wifi_settings(values)
+        save_net_settings(False, values)
 
     # if something changed, sync and suggest restart
     if hostname_changed or eth_changed or wifi_changed:
