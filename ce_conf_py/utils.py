@@ -7,7 +7,7 @@ from logging.handlers import RotatingFileHandler
 import psutil
 import shared
 from dotenv import load_dotenv
-
+import subprocess
 
 app_log = logging.getLogger()
 
@@ -255,3 +255,40 @@ def other_instance_running():
     app_log.debug(f'other_instance_running: PID from file not running, so other instance not running')
     text_to_file(str(pid_current), pid_file)        # write our PID to file
     return False            # no other instance running
+
+
+def system_custom(command_str, to_log=True, shell=False):
+    """ This is a replacement for os.system() from which it's harder to get the output
+        and also for direct calling of subprocess.run(), where you should pass in list instead of string.
+
+        @param command_str: command with arguments as string
+        @param to_log: if true, log the output of the command
+        @param shell: if true, subprocess.run() runs the command with shell binary (== heavier than shel=False)
+    """
+
+    # subprocess.run() can accept command with arguments as:
+    # string - if shell=True
+    # list - if shell=False
+    # The problem is that when you run it with shell=True, it doesn't lunch the executable directly, but it first
+    # starts the shell binary and then the executable, so whenever we can, we should run it without shell, thus
+    # with list of arguments instead of strings. But writing the command as list of strings instead of single string
+    # is annoying, so instead this function takes in a string and splits it to list of strings.
+    # But this fails in some cases, e.g. when supplying "" as empty ip address to nmcli, so for that case we allow
+    # to run that command with shell=True.
+
+    if shell:       # run with shell - heavier, but sometimes necessary to make it work
+        result = subprocess.run(command_str, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    else:           # run without shell - lighter, but fails sometimes
+        command_list = command_str.split(' ')  # split command from string to list
+        result = subprocess.run(command_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE)   # run the command list
+
+    stdout = result.stdout.decode('utf-8')                          # get output as string
+    stderr = result.stderr.decode('utf-8')
+
+    if to_log:
+        app_log.debug(f'command   : {command_str}')
+        app_log.debug(f'returncode: {result.returncode}')
+        app_log.debug(f'cmd stdout: {stdout}')
+        app_log.debug(f'cmd stderr: {stderr}')
+
+    return stdout, result.returncode
