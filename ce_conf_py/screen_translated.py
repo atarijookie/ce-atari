@@ -1,11 +1,9 @@
 import urwid
-import logging
+from loguru import logger as app_log
 from urwid_helpers import create_edit_one, create_my_button, create_header_footer, dialog, \
     create_radio_button_options_rows
 from utils import settings_load, settings_save, on_cancel, back_to_main_menu, setting_get_merged
 import shared
-
-app_log = logging.getLogger()
 
 
 def translated_create(button):

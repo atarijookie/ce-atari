@@ -1,13 +1,11 @@
 import urwid
-import logging
+from loguru import logger as app_log
 from IPy import IP
 from urwid_helpers import create_my_button, create_header_footer, create_edit, MyCheckBox, dialog, \
     create_radio_button_options_rows
 from utils import settings_load, settings_save, on_cancel, back_to_main_menu, setting_get_bool, setting_get_str, \
     on_checkbox_changed, on_editline_changed
 import shared
-
-app_log = logging.getLogger()
 
 
 def shared_drive_create(button):

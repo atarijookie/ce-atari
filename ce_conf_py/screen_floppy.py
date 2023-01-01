@@ -1,11 +1,9 @@
-import logging
+from loguru import logger as app_log
 import urwid
 from urwid_helpers import create_my_button, create_header_footer, MyCheckBox, create_radio_button_options_rows
 from utils import settings_load, settings_save, on_cancel, back_to_main_menu, setting_get_bool, \
     on_checkbox_changed
 import shared
-
-app_log = logging.getLogger()
 
 
 def floppy_create(button):

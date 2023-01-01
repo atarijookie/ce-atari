@@ -10,3 +10,6 @@ should_run = True
 settings = {}
 settings_changed = {}
 
+# for saving things that take longer time
+thread_save_running = False
+thread_save = None

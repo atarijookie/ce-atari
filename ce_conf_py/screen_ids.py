@@ -1,10 +1,8 @@
 import urwid
-import logging
+from loguru import logger as app_log
 from urwid_helpers import create_my_button, create_header_footer, MyRadioButton, dialog
 from utils import settings_load, settings_save, on_cancel, back_to_main_menu, setting_get_int
 import shared
-
-app_log = logging.getLogger()
 
 
 def acsi_ids_create(button):

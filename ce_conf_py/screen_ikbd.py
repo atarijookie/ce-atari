@@ -1,11 +1,9 @@
 import urwid
-import logging
+from loguru import logger as app_log
 from urwid_helpers import create_my_button, create_header_footer, create_edit, MyCheckBox, dialog
 from utils import settings_load, settings_save, on_cancel, back_to_main_menu, setting_get_bool, on_checkbox_changed, \
     setting_get_str, on_editline_changed
 import shared
-
-app_log = logging.getLogger()
 
 
 def ikbd_checkbox_line(label, hint, setting_name):

@@ -1,14 +1,14 @@
 from os import system
+from time import time
 import urwid
-import logging
+from loguru import logger as app_log
 import copy
+import threading
 from urwid_helpers import create_my_button, create_header_footer, create_edit, MyCheckBox, dialog
 from utils import settings_load, on_cancel, back_to_main_menu, setting_get_bool, on_editline_changed, \
     on_checkbox_changed, setting_get_merged, text_to_file, system_custom
 import shared
 from IPy import IP
-
-app_log = logging.getLogger()
 
 
 def ip_prefix_to_netmask(prefix):
@@ -275,6 +275,12 @@ def load_network_settings():
 
 
 def network_create(button):
+    # if saving thread still running, don't show network screen
+    if shared.thread_save_running:
+        dialog(shared.main_loop, shared.current_body,
+               "Your last network changes are still being applied. Please try again in a moment.")
+        return
+
     _, res = system_custom('which nmcli')         # figure out if we got nmcli installed
     got_nmcli = res == 0
 
@@ -291,7 +297,7 @@ def network_create(button):
     body.append(urwid.Divider())
 
     col1w = 16
-    col2w = 17
+    col2w = 18
 
     # hostname and DNS
     cols = create_setting_row('Hostname', 'edit', '', col1w, col2w, False, 'HOSTNAME')
@@ -527,7 +533,40 @@ def save_wifi_settings(values):
     system_custom('nmcli con up {ssid}'.format(**values_out))
 
 
+def network_save_in_thread(values):
+    """ Network settings here are applied using nmcli, with wifi connecting it can take 15 seconds,
+        so we better run this in thread, so the app doesn't look stuck on saving.
+    """
+
+    start = time()
+    app_log.debug('network_save_in_thread started')
+    shared.thread_save_running = True
+
+    if values['eth_changed']:   # if eth changed, save it
+        app_log.debug(f'network_save_in_thread - applying eth changes')
+        save_net_settings(True, values)
+
+    if values['wifi_changed']:  # if wifi changed, save it
+        app_log.debug(f'network_save_in_thread - applying wifi changes')
+        save_wifi_settings(values)
+        save_net_settings(False, values)
+
+    # if something changed, sync and suggest restart
+    if values['hostname_changed'] or values['eth_changed'] or values['wifi_changed']:
+        app_log.debug(f'network_save_in_thread - sync caches and drives')
+        system_custom('sync')
+
+    # calc duration, log message, finish
+    duration = time() - start
+    app_log.debug(f'network_save_in_thread finished in {duration} seconds.')
+    shared.thread_save_running = False
+
+
 def network_save(button):
+    """ Function will check if network settings seem to be correct and shows a warning if they aren't.
+        Proceeds with saving if everything looks ok.
+    """
+
     _, res = system_custom('which nmcli')         # figure out if we got nmcli installed
     got_nmcli = res == 0
 
@@ -567,25 +606,34 @@ def network_save(button):
         # for /etc/hostname - write new hostname to file
         text_to_file(values['HOSTNAME'], "/etc/hostname")
 
-    # eth settings changed or not?
+    # eth and wifi settings changed or not?
     eth_changed = network_settings_changed(True, values)
-
-    if eth_changed:         # if eth changed, save it
-        save_net_settings(True, values)
-
-    # wifi settings changed or not?
     wifi_changed = network_settings_changed(False, values)
 
-    if wifi_changed:        # if wifi changed, save it
-        save_wifi_settings(values)
-        save_net_settings(False, values)
+    # if nothing really changed, go to main menu
+    if not eth_changed and not wifi_changed:
+        back_to_main_menu(None)
+        return
 
-    # if something changed, sync and suggest restart
-    if hostname_changed or eth_changed or wifi_changed:
-        system_custom('sync')
-
+    # if saving thread still running, don't make it run twice
+    if shared.thread_save_running:
         dialog(shared.main_loop, shared.current_body,
-               "Your network settings have been saved. Restart your device for the changes to take effect.")
+               "Your last network changes are still being applied. Please try again in a moment.")
+        return
+
+    values['eth_changed'] = eth_changed
+    values['wifi_changed'] = wifi_changed
+    values['hostname_changed'] = hostname_changed
+
+    # create thread and run the eth and wifi saving in thread
+    # note: ',' in (values,) is intentional, otherwise won't pass values as dict but as individual args without it.
+    shared.thread_save = threading.Thread(target=network_save_in_thread, args=(values,))
+    shared.thread_save.start()
 
     # back to main menu if managed to get here
     back_to_main_menu(None)
+
+    # this dialog will show over main menu
+    dialog(shared.main_loop, shared.current_body,
+        "Your network settings are being applied now. It can take several seconds until they take effect.")
+

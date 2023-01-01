@@ -2,14 +2,11 @@ import copy
 import os
 import re
 import urwid
-import logging
-from logging.handlers import RotatingFileHandler
+from loguru import logger as app_log
 import psutil
 import shared
 from dotenv import load_dotenv
 import subprocess
-
-app_log = logging.getLogger()
 
 settings_default = {'DRIVELETTER_FIRST': 'C', 'DRIVELETTER_CONFDRIVE': 'O', 'DRIVELETTER_SHARED': 'N', 'DRIVELETTER_ZIP': 'P',
                     'MOUNT_RAW_NOT_TRANS': 0, 'SHARED_ENABLED': 0, 'SHARED_NFS_NOT_SAMBA': 0, 'FLOPPYCONF_ENABLED': 1,
@@ -208,19 +205,12 @@ def text_from_file(filename):
 
 
 def log_config():
-    log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
-
     log_dir = os.getenv('LOG_DIR')
     log_file = os.path.join(log_dir, 'ce_conf_py.log')
 
     os.makedirs(log_dir, exist_ok=True)
-    my_handler = RotatingFileHandler(log_file, mode='a', maxBytes=1024 * 1024, backupCount=1)
-    my_handler.setFormatter(log_formatter)
-    my_handler.setLevel(logging.DEBUG)
-
-    app_log = logging.getLogger()
-    app_log.setLevel(logging.DEBUG)
-    app_log.addHandler(my_handler)
+    app_log.remove()        # remove all previous log settings
+    app_log.add(log_file, rotation="1 MB", retention=1)
 
 
 def other_instance_running():

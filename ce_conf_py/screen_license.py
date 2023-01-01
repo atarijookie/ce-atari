@@ -1,10 +1,8 @@
 import urwid
-import logging
+from loguru import logger as app_log
 from urwid_helpers import create_my_button, create_header_footer, create_edit, dialog
 from utils import settings_load, settings_save, on_cancel, back_to_main_menu, on_editline_changed
 import shared
-
-app_log = logging.getLogger()
 
 
 def license_create(button):

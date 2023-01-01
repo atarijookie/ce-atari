@@ -1,13 +1,12 @@
 import os
 import urwid
-import logging
+from loguru import logger as app_log
 from time import sleep
 from urwid_helpers import create_my_button, create_header_footer, create_edit, dialog, dialog_yes_no
 from utils import settings_load, settings_save, on_cancel, back_to_main_menu, setting_get_str, on_editline_changed, \
     text_from_file, delete_file, setting_load_one
 import shared
 
-app_log = logging.getLogger()
 edit_imgpath = None
 
 DATA_DIR = '/var/run/ce/'

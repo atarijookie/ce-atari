@@ -1,12 +1,10 @@
 import os
 import urwid
-import logging
+from loguru import logger as app_log
 from urwid_helpers import create_my_button, create_header_footer, dialog_yes_no, dialog
 from utils import on_cancel, back_to_main_menu
 import shared
 from screen_network import create_setting_row
-
-app_log = logging.getLogger()
 
 # only 1 button - Check / Update / Force
 # check  - trigger check on button press
