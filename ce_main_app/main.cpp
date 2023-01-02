@@ -20,6 +20,7 @@
 #include "update.h"
 #include "version.h"
 #include "periodicthread.h"
+#include "cmdsockthread.h"
 #include "display/displaythread.h"
 #include "floppy/floppyencoder.h"
 #include "chipinterface_v1_v2/chipinterface12.h"
@@ -28,7 +29,7 @@
 volatile sig_atomic_t sigintReceived = 0;
 void sigint_handler(int sig);
 
-void handlePthreadCreate(int res, const char *threadName, pthread_t *pThread);
+void handlePthreadCreate(const char* threadName, pthread_t* pThreadInfo, void* threadCode);
 void parseCmdLineArguments(int argc, char *argv[]);
 void printfPossibleCmdLineArgs(void);
 void loadDefaultArgumentsFromFile(void);
@@ -164,6 +165,13 @@ int main(int argc, char *argv[])
     return runCore(0, true);
 }
 
+void pthread_kill_join(const char* threadName, pthread_t& threadInfo)
+{
+    printf("Stoping %s thread\n", threadName);
+    pthread_kill(threadInfo, SIGINT);           // stop the select()
+    pthread_join(threadInfo, NULL);             // wait until periodic  thread finishes
+}
+
 // instanceNo: number of core instance, used for separating folders and ports
 // localNotNetwork: if true, will access local hardware for communication; if false then will use network interface
 int runCore(int instanceNo, bool localNotNetwork)
@@ -173,6 +181,7 @@ int runCore(int instanceNo, bool localNotNetwork)
     pthread_t   floppyEncThreadInfo;
     pthread_t   periodicThreadInfo;
     pthread_t   displayThreadInfo;
+    pthread_t   cmdSockThreadInfo;
 
     flags.localNotNetwork = localNotNetwork;            // store if this core runs as local device or as network server
     flags.instanceNo = instanceNo;
@@ -221,22 +230,18 @@ int runCore(int instanceNo, bool localNotNetwork)
     system("cp -r /ce/app/configdrive/* /tmp/configdrive"); // copy new content
     //-------------
     core = new CCoreThread();
-    int res;
 
-    res = pthread_create(&ikbdThreadInfo, NULL, ikbdThreadCode, NULL);          // create the keyboard emulation thread and run it
-    handlePthreadCreate(res, "ce ikbd", &ikbdThreadInfo);
+    // display thread - only on RPi 2 or newer (RPi 1 doesn't have the extra GPIO pins and this then kills eth + usb on RPi1)
+    bool hasDisplay = rpiConfig.revisionInt >= 0xa01041;
 
-    res = pthread_create(&floppyEncThreadInfo, NULL, floppyEncodeThreadCode, NULL); // create the floppy encoding thread and run it
-    handlePthreadCreate(res, "ce floppy encode", &floppyEncThreadInfo);
+    handlePthreadCreate("ikbd", &ikbdThreadInfo, (void*) ikbdThreadCode);
+    handlePthreadCreate("floppy encode", &floppyEncThreadInfo, (void*) floppyEncodeThreadCode);
+    handlePthreadCreate("periodic", &periodicThreadInfo, (void*) periodicThreadCode);
+    handlePthreadCreate("command socket", &cmdSockThreadInfo, (void*) cmdSockThreadCode);
 
-    res = pthread_create(&periodicThreadInfo, NULL, periodicThreadCode, NULL);  // create the periodic thread and run it
-    handlePthreadCreate(res, "periodic", &periodicThreadInfo);
-
-    if(rpiConfig.revisionInt >= 0xa01041) {   // display thread - only on RPi 2 or newer (RPi 1 doesn't have the extra GPIO pins and this then kills eth + usb on RPi1)
+    if(hasDisplay) {
         Debug::out(LOG_INFO, "Running on RPi 2 or newer (%x), starting displayThread.", rpiConfig.revisionInt);
-
-        res = pthread_create(&displayThreadInfo, NULL, displayThreadCode, NULL);  // create the display thread and run it
-        handlePthreadCreate(res, "display", &displayThreadInfo);
+        handlePthreadCreate("display", &displayThreadInfo, (void*) displayThreadCode);
     } else {
         Debug::out(LOG_INFO, "Running on RPi 1 (%x), not starting displayThread.", rpiConfig.revisionInt);
     }
@@ -249,22 +254,14 @@ int runCore(int instanceNo, bool localNotNetwork)
 
     delete core;
 
-    printf("Stoping ikbd thread\n");
-    pthread_kill(ikbdThreadInfo, SIGINT);               // stop the select()
-    pthread_join(ikbdThreadInfo, NULL);                 // wait until ikbd      thread finishes
-
-    printf("Stoping floppy encoder thread\n");
     floppyEncoder_stop();
-    pthread_join(floppyEncThreadInfo, NULL);            // wait until floppy encode thread finishes
+    pthread_kill_join("ikbd", ikbdThreadInfo);
+    pthread_kill_join("floppy encoder", floppyEncThreadInfo);
+    pthread_kill_join("periodic", periodicThreadInfo);
+    pthread_kill_join("command socket", cmdSockThreadInfo);
 
-    printf("Stoping periodic thread\n");
-    pthread_kill(periodicThreadInfo, SIGINT);           // stop the select()
-    pthread_join(periodicThreadInfo, NULL);             // wait until periodic  thread finishes
-
-    if(rpiConfig.revisionInt >= 0xa01041) {             // kill display thread - only on RPi 2 or newer
-        printf("Stopping display thread\n");
-        pthread_kill(displayThreadInfo, SIGINT);        // stop the select()
-        pthread_join(displayThreadInfo, NULL);          // wait until display thread finishes
+    if(hasDisplay) {             // kill display thread
+        pthread_kill_join("display", displayThreadInfo);
     }
 
     //---------------------------------------------------
@@ -503,13 +500,15 @@ void printfPossibleCmdLineArgs(void)
     printf("nocap    - don't do exclusive USB mouse and keyboard capture\n");
 }
 
-void handlePthreadCreate(int res, const char *threadName, pthread_t *pThread)
+void handlePthreadCreate(const char* threadName, pthread_t* pThreadInfo, void* threadCode)
 {
+    int res = pthread_create(pThreadInfo, NULL, (void* (*)(void*)) threadCode, NULL);
+
     if(res != 0) {
         Debug::out(LOG_ERROR, "Failed to create %s thread, %s won't work...", threadName, threadName);
     } else {
         Debug::out(LOG_DEBUG, "%s thread created", threadName);
-        pthread_setname_np(*pThread, threadName);
+        pthread_setname_np(*pThreadInfo, threadName);
     }
 }
 
