@@ -25,8 +25,6 @@
 #include "chipinterface_v1_v2/chipinterface12.h"
 #include "chipinterface_network/chipinterfacenetwork.h"
 
-#define PIDFILE "/var/run/cosmosex.pid"
-
 volatile sig_atomic_t sigintReceived = 0;
 void sigint_handler(int sig);
 
@@ -57,17 +55,20 @@ void networkServerMain(void);
 
 int main(int argc, char *argv[])
 {
-    pthread_mutex_init(&shared.mtxScsi,             NULL);
-    pthread_mutex_init(&shared.mtxImages,           NULL);
+    pthread_mutex_init(&shared.mtxScsi,   NULL);
+    pthread_mutex_init(&shared.mtxImages, NULL);
 
     printf("\033[H\033[2J\n");
 
     initializeFlags();                                          // initialize flags
 
+    Utils::loadDotEnv();                                        // load dotEnv before setting default log file
     Debug::setDefaultLogFile();
 
     loadDefaultArgumentsFromFile();                             // first parse default arguments from file
     parseCmdLineArguments(argc, argv);                          // then parse cmd line arguments and set global variables
+
+    Debug::printfLogLevelString();
 
     //------------------------------------
     // if should only show help and quit
@@ -278,7 +279,10 @@ int runCore(int instanceNo, bool localNotNetwork)
         close(singleInstanceSocketFd);
     }
 
-    unlink(PIDFILE);
+    // remove PID file on termination
+    std::string pidFilePath = Utils::dotEnvValue("CORE_PID_FILE", "/var/run/ce/core.pid");
+    unlink(pidFilePath.c_str());
+
     Debug::out(LOG_INFO, "CosmosEx terminated.");
     printf("Terminated\n");
     return 0;
@@ -301,7 +305,7 @@ void loadLastHwConfig(void)
 void initializeFlags(void)
 {
     flags.justShowHelp = false;
-    flags.logLevel     = LOG_ERROR;     // init current log level to LOG_ERROR
+    Debug::setLogLevel(LOG_ERROR);      // init current log level to LOG_ERROR
     flags.chipInterface = CHIPIF_UNKNOWN; // start with unknown chip interface, this will do the auto-detect atttempt
     flags.justDoReset  = false;         // if shouldn't run the app, but just reset Hans and Franz (used with STM32 ST-Link JTAG)
     flags.noReset      = false;         // don't reset Hans and Franz on start - used with STM32 ST-Link JTAG
@@ -387,12 +391,7 @@ void parseCmdLineArguments(int argc, char *argv[])
 
             if(ll >= 48 && ll <= 57) {                              // if it's a number between 0 and 9
                 ll = ll - 48;
-
-                if(ll > LOG_DEBUG) {                                // would be higher than highest log level? fix it
-                    ll = LOG_DEBUG;
-                }
-
-                flags.logLevel = ll;                                // store log level
+                Debug::setLogLevel(ll);                             // store log level
             }
 
             continue;
@@ -530,16 +529,18 @@ bool otherInstanceIsRunning(void)
     char self_exe[PATH_MAX];
 
     self_pid = getpid();
-    f = fopen(PIDFILE, "r");
+    std::string pidFilePath = Utils::dotEnvValue("CORE_PID_FILE", "/var/run/ce/core.pid");
+
+    f = fopen(pidFilePath.c_str(), "r");
     if(!f) {    // can't open file? other instance probably not running (or is, but can't figure out, so screw it)
-        Debug::out(LOG_DEBUG, "otherInstanceIsRunning - couldn't open %s, returning false", PIDFILE);
+        Debug::out(LOG_DEBUG, "otherInstanceIsRunning - couldn't open %s, returning false", pidFilePath.c_str());
     } else {
         int r = fscanf(f, "%d", &other_pid);
         fclose(f);
         if(r != 1) {
-            Debug::out(LOG_ERROR, "otherInstanceIsRunning - can't read pid in %s, returning false", PIDFILE);
+            Debug::out(LOG_ERROR, "otherInstanceIsRunning - can't read pid in %s, returning false", pidFilePath.c_str());
         } else {
-            Debug::out(LOG_DEBUG, "otherInstanceIsRunning - %s pid=%d (own pid=%d)", PIDFILE, other_pid, self_pid);
+            Debug::out(LOG_DEBUG, "otherInstanceIsRunning - %s pid=%d (own pid=%d)", pidFilePath.c_str(), other_pid, self_pid);
             snprintf(proc_path, sizeof(proc_path), "/proc/%d/exe", other_pid);
             if(readlink("/proc/self/exe", self_exe, sizeof(self_exe)) < 0) {
                 Debug::out(LOG_ERROR, "otherInstanceIsRunning readlink(%s): %s", "/proc/self/exe", strerror(errno));
@@ -552,17 +553,10 @@ bool otherInstanceIsRunning(void)
             }
         }
     }
-    f = fopen(PIDFILE, "w");
-    if(!f) {
-        Debug::out(LOG_ERROR, "otherInstanceIsRunning - failed to open %s for writing", PIDFILE);
-        return false;
-    }
-    fprintf(f, "%d", self_pid);
-    if(fclose(f) == 0) {
-        Debug::out(LOG_DEBUG, "otherInstanceIsRunning -- pid %d written to %s", self_pid, PIDFILE);
-    } else {
-        Debug::out(LOG_ERROR, "otherInstanceIsRunning -- FAILED to write pid %d to %s : %s", self_pid, PIDFILE, strerror(errno));
-    }
+
+    Utils::intToFile(self_pid, pidFilePath.c_str());
+    Debug::out(LOG_DEBUG, "otherInstanceIsRunning -- pid %d written to %s", self_pid, pidFilePath.c_str());
+
     return false;
 }
 

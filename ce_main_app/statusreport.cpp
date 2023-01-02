@@ -38,6 +38,13 @@ static const char * netIfStatus(const uint8_t * p)
     return str;
 }
 
+void StatusReport::createReportFileFromEnv(void)
+{
+    std::string report;
+    createReport(report, REPORTFORMAT_JSON);                        // report to json string
+    Utils::textToFileFromEnv(report.c_str(), "CORE_STATUS_FILE");   // string to expected core status file
+}
+
 void StatusReport::createReport(std::string &report, int reportFormat)
 {
     report = "";

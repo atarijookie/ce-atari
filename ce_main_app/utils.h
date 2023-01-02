@@ -75,6 +75,16 @@ public:
 
     static int bcdToInt(int bcd);
 
+    static std::string dotEnvValue(std::string key, const char* defValue=NULL);
+    static void loadDotEnv(void);
+    static bool loadDotEnvFrom(const char* path);
+    static int  dotEnvSubstituteVars(void);
+
+    static void intToFile(int value, const char* filePath);                 // int to text file
+    static void intToFileFromEnv(int value, const char* envKeyForFileName); // int to text file specified in .env
+    static void textToFile(const char* text, const char* filePath);         // text to text file
+    static void textToFileFromEnv(const char* text, const char* envKeyForFileName); // text to text file specified in .env
+
 private:
     static bool copyFileByHandles(FILE *from, FILE *to);
 

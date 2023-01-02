@@ -59,6 +59,8 @@ ImageSilo::ImageSilo()
         clearSlot(i);
     }
 
+    siloToSlotsFile();                  // silo content to file on disk
+
     currentSlot = EMPTY_IMAGE_SLOT;
     reloadProxy = NULL;
 
@@ -171,6 +173,8 @@ void ImageSilo::add(int positionIndex, std::string &filename, std::string &hostP
     // create and add floppy encode request
     floppyEncoder_addEncodeWholeImageRequest(positionIndex, hostPath.c_str());
 
+    siloToSlotsFile();                      // silo content to file on disk
+
     if(saveToSettings) {                    // should we save this to settings? (false when loading settings)
         saveSettings();
     }
@@ -211,8 +215,8 @@ void ImageSilo::swap(int index)
         floppyImages[i].imageFile = slots[i].imageFile;
     }
 
-    // save it to settings
-    saveSettings();
+    siloToSlotsFile();                  // silo content to file on disk
+    saveSettings();                     // save it to settings
 }
 
 void ImageSilo::remove(int index)                   // remove image at specified slot
@@ -234,9 +238,8 @@ void ImageSilo::remove(int index)                   // remove image at specified
     }
 
     clearSlot(index);
-
-    // save it to settings
-    saveSettings();
+    siloToSlotsFile();                  // silo content to file on disk
+    saveSettings();                     // save it to settings
 }
 
 void ImageSilo::dumpStringsToBuffer(uint8_t *bfr)      // copy the strings to buffer
@@ -298,6 +301,29 @@ void ImageSilo::setCurrentSlot(int index)
     display_showNow(DISP_SCREEN_HDD1_IDX);      // show it right now - floppy image changed
 
     beeper_beep(BEEP_SHORT);                    // do a beep on button press / changing floppy slot
+
+    // active slot number to file
+    Utils::intToFileFromEnv(currentSlot, "FILE_FLOPPY_ACTIVE_SLOT");
+}
+
+void ImageSilo::siloToSlotsFile(void)
+{
+    /* store current image silo content to file, so external components can pick them up */
+
+    std::string fileContent;
+
+    for(int i=0; i<SLOT_COUNT; i++) {
+        if(slots[i].imageFile.empty()) {                                // no image in this slot? just add empty line
+            fileContent += std::string("\n");
+        } else {                                                        // some image in slot?
+            std::string imageWithPath = slots[i].hostPath;              // get copy of path
+            Utils::mergeHostPaths(imageWithPath, slots[i].imageFile);   // full path = path + filename
+            fileContent += imageWithPath;                               // add image with path
+            fileContent += std::string("\n");                           // add new line char
+        }
+    }
+
+    Utils::textToFileFromEnv(fileContent.c_str(), "FILE_FLOPPY_SLOTS"); // silo content to this file
 }
 
 int ImageSilo::getCurrentSlot(void)
@@ -383,6 +409,7 @@ void ImageSilo::removeByFileName(std::string &filenameWExt)
 
         if(isInSlot) {                                          // if image is in slot
              remove(i);
+             siloToSlotsFile();                                 // silo content to file on disk
         }
     }
 }

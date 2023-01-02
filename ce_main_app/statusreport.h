@@ -62,6 +62,7 @@ extern volatile TStatuses statuses;
 
 class StatusReport {
 public:
+    void createReportFileFromEnv(void);
     void createReport(std::string &report, int reportFormat);
 
 private:

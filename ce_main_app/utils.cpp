@@ -12,6 +12,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <map>
 
 #include <unistd.h>
 #include <sys/types.h>
@@ -32,6 +33,8 @@
 #include "debug.h"
 #include "version.h"
 #include "settings.h"
+
+std::map<std::string, std::string> dotEnv;
 
 uint32_t Utils::getCurrentMs(void)
 {
@@ -733,3 +736,172 @@ void Utils::toUpperCaseString(std::string &st)
     }
 }
 
+void Utils::loadDotEnv(void)
+{
+    /* try to load .env from multiple locations in their priority order */
+
+    bool good = false;
+    good = loadDotEnvFrom("/ce/services/.env");     // try to load from main location
+
+    if(!good) {
+        good = loadDotEnvFrom("./.env");            // if failed, try from local directory
+    }
+
+    if(good) {      // if something was loaded, do the vars subtitution
+        dotEnvSubstituteVars();
+    }
+}
+
+std::string Utils::dotEnvValue(std::string key, const char* defValue)
+{
+    /* get value from dotEnv map for specified key */
+
+    try {
+        std::string& value = dotEnv.at(key);             // get value
+        return value;
+    }
+    catch (const std::out_of_range&) {
+        Debug::out(LOG_DEBUG, "Utils::dotEnvValue - no value for key '%s' !", key.c_str());
+    }
+
+    // if value not found and default value was provided, use it; otherwise return empty string
+    std::string defValueStr = defValue ? std::string(defValue) : std::string("");
+    return defValueStr;
+}
+
+int Utils::dotEnvSubstituteVars(void)
+{
+    /* go through the current dotEnv values and replace vars with values */
+
+    Debug::out(LOG_DEBUG, "Utils::dotEnvSubstituteVars starting");
+
+    int found = 0;
+
+    std::map<std::string, std::string>::iterator it = dotEnv.begin();
+    while (it != dotEnv.end())                          // go through all map values
+    {
+        std::string key = it->first;
+        std::string value = it->second;
+
+        std::size_t varStart = value.find("${");       // var start tag
+        std::size_t varEnd = value.find("}");          // vag end tag
+
+        if(varStart != std::string::npos) {                 // start tag was found?
+            std::string varName = value.substr(varStart + 2, varEnd - varStart - 2);    // get just var name
+
+            std::string varValue = Utils::dotEnvValue(varName);         // get variable value
+//          Debug::out(LOG_DEBUG, "Utils::dotEnvSubstituteVars - for var '%s' found value '%s'", varName.c_str(), varValue.c_str());
+
+            value.replace(varStart, varEnd - varStart + 1, varValue);   // replace variable in original value
+//          Debug::out(LOG_DEBUG, "Utils::dotEnvSubstituteVars - value after replacing var: '%s'", value.c_str());
+
+            dotEnv[key] = value;        // store new value back to map
+            found++;
+        }
+
+        ++it;
+    }
+
+    return found;
+}
+
+bool Utils::loadDotEnvFrom(const char* path)
+{
+    /* try to load .env file from the specified path */
+
+    FILE *f = fopen(path, "rt");        // try to open file
+
+    if(!f) {
+        Debug::out(LOG_ERROR, "Utils::loadDotEnv - failed to open file %s", path);
+        return false;
+    }
+
+    char line[1024];
+
+    while(true) {                           // go through file line by line
+        if(feof(f)) {
+            break;
+        }
+
+        int eqlPos = -1;                    // where the '=' is
+        memset(line, 0, sizeof(line));
+        fgets(line, sizeof(line) - 1, f);   // get one line, including '\n' symbol
+
+        // first loop - remove new line chars, and everything after comment symbol
+        int len = strlen(line);     // get length of line
+        for(int i=0; i<len; i++) {
+            if(line[i] == '\n' || line[i] == '\r' || line[i] == '#') {     // remove EOL, RET, and if it's a start of comment, ignore the rest of line
+                line[i] = 0;        // string ends here now
+                break;
+            }
+
+            if(line[i] == '=') {    // found equal (=) sign? store position
+                eqlPos = i;
+            }
+        }
+
+        // second loop - trim trailing white spaces
+        len = strlen(line);         // get length of line
+        for(int i=(len-1); i>=0; i--) {
+            if(line[i] == ' ' || line[i] == '\t') {     // space or tab? trim
+                line[i] = 0;
+            }
+        }
+
+        // check if something remained after previous changes to line
+        len = strlen(line);         // get length of line
+        if(len < 1 || eqlPos < 0) { // line empty or no equal sign there? skip it
+            continue;
+        }
+
+        line[eqlPos] = 0;           // split the string on the equal sign
+
+        std::string key, value;
+        key = line;                 // key   is on [0 : eqlPos-1]
+        value = line + eqlPos + 1;  // value is on [eqlPos+1 : ...]
+//      Debug::out(LOG_DEBUG, "Utils::loadDotEnv - found %s -> %s", key.c_str(), value.c_str());
+
+        dotEnv[key] = value;        // store to map
+    }
+
+    fclose(f);
+    return true;
+}
+
+void Utils::intToFileFromEnv(int value, const char* envKeyForFileName)
+{
+    std::string fileNameFromEnv = Utils::dotEnvValue(envKeyForFileName);    // fetch filename from env by key
+    Utils::intToFile(value, fileNameFromEnv.c_str());                       // int to filename
+}
+
+void Utils::intToFile(int value, const char* filePath)
+{
+    char bfr[128];
+    int lastIndex = sizeof(bfr) - 1;
+    bfr[lastIndex] = 0;                     // zero terminate buffer
+
+    snprintf(bfr, lastIndex, "%d", value);  // integer to string
+    Utils::textToFile(bfr, filePath);       // string to file
+}
+
+void Utils::textToFileFromEnv(const char* text, const char* envKeyForFileName)
+{
+    std::string fileNameFromEnv = Utils::dotEnvValue(envKeyForFileName);    // fetch filename from env by key
+    Utils::textToFile(text, fileNameFromEnv.c_str());                       // text to filename
+}
+
+void Utils::textToFile(const char* text, const char* filePath)
+{
+    if(!filePath || strlen(filePath) < 1) {     // null path or empty string path? quit
+        return;
+    }
+
+    FILE *f = fopen(filePath, "wt");    // open file
+
+    if(!f) {                            // could not open file? quit
+        return;
+    }
+
+    fputs(text, f);                     // write text to file
+    fclose(f);                          // close file
+}

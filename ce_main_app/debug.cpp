@@ -8,11 +8,10 @@
 #include "debug.h"
 #include "utils.h"
 
-#define LOG_FILE        "/var/log/ce.log"
 uint32_t prevLogOut;
 
 extern TFlags   flags;
-       uint8_t     g_outToConsole;
+       uint8_t  g_outToConsole;
 
 DebugVars dbgVars;
 
@@ -25,7 +24,9 @@ void Debug::setOutputToConsole(void)
 
 void Debug::setDefaultLogFile(void)
 {
-    setLogFile(LOG_FILE);
+    std::string logFilePath = Utils::dotEnvValue("LOG_DIR", "/var/log/ce");     // path to logs dir
+    Utils::mergeHostPaths(logFilePath, "ce_core.log");          // full path = dir + filename
+    setLogFile(logFilePath.c_str());                            // use full path here
 }
 
 void Debug::setLogFile(const char *path)
@@ -151,3 +152,18 @@ void Debug::outBfr(uint8_t *bfr, int count)
     fclose(f);
 }
 
+void Debug::setLogLevel(int newLogLevel)
+{
+    if(newLogLevel < LOG_OFF) {         // too low? fix it
+        newLogLevel = LOG_OFF;
+    }
+
+    if(newLogLevel > LOG_DEBUG) {       // would be higher than highest log level? fix it
+        newLogLevel = LOG_DEBUG;
+    }
+
+    Debug::out(LOG_INFO, "Switching LOG LEVEL from %d to %d", flags.logLevel, newLogLevel);
+    flags.logLevel = newLogLevel;                               // new value to struct
+
+    Utils::intToFileFromEnv(newLogLevel, "CORE_LOGLEVEL_FILE");        // new value to file
+}
