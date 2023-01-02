@@ -84,7 +84,7 @@ void DirTranslator::shortToLongPath(const std::string& shortPath, std::string& l
         ok = fs->shortToLongFileName(shortPathParts[i], longName);  // try to convert short-to-long filename
 
         if(!ok && refreshOnMiss) {          // if conversion from short-to-long failed, and we should do a refresh on dict-miss (cache-miss)
-            UtilsLib::out(LOG_DEBUG, "DirTranslator::shortToLongPath - shortToLongFileName() failed for short name: %s , subPath=%s, but will do a refresh now!", shortPathParts[i].c_str(), subPath.c_str());
+            UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::shortToLongPath - shortToLongFileName() failed for short name: %s , subPath=%s, but will do a refresh now!", shortPathParts[i].c_str(), subPath.c_str());
 
             feedShortener(subPath, fs);     // feed shortener with possibly new filenames
             ok = fs->shortToLongFileName(shortPathParts[i], longName);      // 2nd attempt to convert short-to-long filename (after refresh)
@@ -94,7 +94,7 @@ void DirTranslator::shortToLongPath(const std::string& shortPath, std::string& l
             longPathParts.push_back(std::string(longName));
         } else {        // failed to find long path, use the original in this place
             longPathParts.push_back(shortPathParts[i]);
-            UtilsLib::out(LOG_DEBUG, "DirTranslator::shortToLongPath - shortToLongFileName() failed for short name: %s , subPath=%s", shortPathParts[i].c_str(), subPath.c_str());
+            UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::shortToLongPath - shortToLongFileName() failed for short name: %s , subPath=%s", shortPathParts[i].c_str(), subPath.c_str());
         }
     }
 
@@ -119,14 +119,14 @@ FilenameShortener *DirTranslator::getShortenerForPath(std::string path, bool cre
     FilenameShortener *fs;
 
     if(it != mapPathToShortener.end()) {            // already got the shortener
-        //UtilsLib::out(LOG_DEBUG, "DirTranslator::getShortenerForPath - shortener for %s found", path.c_str());
+        //UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::getShortenerForPath - shortener for %s found", path.c_str());
         fs = it->second;
     } else {                                        // don't have the shortener yet
         if(createIfNotFound) {  // should create?
-            UtilsLib::out(LOG_DEBUG, "DirTranslator::getShortenerForPath - shortener for %s NOT found, creating", path.c_str());
+            UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::getShortenerForPath - shortener for %s NOT found, creating", path.c_str());
             fs = createShortener(path);
         } else {                // shoul NOT create?
-            //UtilsLib::out(LOG_DEBUG, "DirTranslator::getShortenerForPath - shortener for %s NOT found, returning NULL", path.c_str());
+            //UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::getShortenerForPath - shortener for %s NOT found, returning NULL", path.c_str());
             fs = NULL;
         }
     }
@@ -172,7 +172,7 @@ int DirTranslator::feedShortener(const std::string &path, FilenameShortener *fs)
         }
 
         if(de->d_type != DT_DIR && de->d_type != DT_REG) {          // not  a file, not a directory?
-            UtilsLib::out(LOG_DEBUG, "TranslatedDisk::feedShortener -- skipped %s because the type %d is not supported!", de->d_name, de->d_type);
+            UtilsLib::out(LDP_LOG_DEBUG, "TranslatedDisk::feedShortener -- skipped %s because the type %d is not supported!", de->d_name, de->d_type);
             continue;
         }
 
@@ -262,7 +262,7 @@ int DirTranslator::cleanUpShortenersIfNeeded(void)
     uint32_t now = UtilsLib::getCurrentMs();
 
     if((now - lastCleanUpCheck) < 1000) {   // too soon after last clean up? quit
-        UtilsLib::out(LOG_DEBUG, "DirTranslator::cleanUpShortenersIfNeeded - too soon, ignoring");
+        UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::cleanUpShortenersIfNeeded - too soon, ignoring");
         return 0;
     }
 
@@ -270,7 +270,7 @@ int DirTranslator::cleanUpShortenersIfNeeded(void)
 
     int currentSize = size();
     if(currentSize < MAX_NAMES_IN_TRANSLATOR) {  // still not above the maximum limit? quit
-        UtilsLib::out(LOG_DEBUG, "DirTranslator::cleanUpShortenersIfNeeded - still below the limit, ignoring");
+        UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::cleanUpShortenersIfNeeded - still below the limit, ignoring");
         return 0;
     }
 
@@ -313,7 +313,7 @@ int DirTranslator::cleanUpShortenersIfNeeded(void)
         }
     }
 
-    UtilsLib::out(LOG_DEBUG, "DirTranslator::cleanUpShortenersIfNeeded - removed %d items", removed);
+    UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::cleanUpShortenersIfNeeded - removed %d items", removed);
     return removed;
 }
 
@@ -375,12 +375,12 @@ bool DirTranslator::findFirstAndNext(SearchParams& sp, DiskItem& di)
         // matches one particular file
         if (Internal(sp)->searchString.find('*') == std::string::npos && Internal(sp)->searchString.find('?') == std::string::npos) {
             struct stat attr;
-            UtilsLib::out(LOG_DEBUG, "DirTranslator::findFirstAndNext - no wildcard in %s, checking %s", Internal(sp)->searchString.c_str(), sp.path.c_str());
+            UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::findFirstAndNext - no wildcard in %s, checking %s", Internal(sp)->searchString.c_str(), sp.path.c_str());
 
             // this might be a short filename, so try to translate it from short to long version
             std::string longPath;
             shortToLongPath(sp.path, longPath, false);
-            UtilsLib::out(LOG_DEBUG, "DirTranslator::findFirstAndNext - translated possible short path: %s to long path: %s", sp.path.c_str(), longPath.c_str());
+            UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::findFirstAndNext - translated possible short path: %s to long path: %s", sp.path.c_str(), longPath.c_str());
 
             if (UtilsLib::fileExists(longPath)) {      // matching just one file and it exists? good!
                 std::string justPath, justLongFname;
@@ -390,7 +390,7 @@ bool DirTranslator::findFirstAndNext(SearchParams& sp, DiskItem& di)
                 closeDirSetFlags(sp);
                 return true;        // got some valid item
             } else {
-                UtilsLib::out(LOG_DEBUG, "DirTranslator::findFirstAndNext - long path: %s doesn't exist, will try to find file one-by-one anyway", longPath.c_str());
+                UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::findFirstAndNext - long path: %s doesn't exist, will try to find file one-by-one anyway", longPath.c_str());
             }
         }
 
@@ -401,7 +401,7 @@ bool DirTranslator::findFirstAndNext(SearchParams& sp, DiskItem& di)
         Internal(sp)->dir = opendir(Internal(sp)->hostPath.c_str());                        // try to open the dir
 
         if(Internal(sp)->dir == NULL) {     // not found?
-            UtilsLib::out(LOG_DEBUG, "DirTranslator::findFirstAndNext - opendir(\"%s\") FAILED", Internal(sp)->hostPath.c_str());
+            UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::findFirstAndNext - opendir(\"%s\") FAILED", Internal(sp)->hostPath.c_str());
             closeDirSetFlags(sp);
             return false;
         }
@@ -418,7 +418,7 @@ bool DirTranslator::findFirstAndNext(SearchParams& sp, DiskItem& di)
         }
 
         if(de->d_type != DT_DIR && de->d_type != DT_REG) {  // not a file, not a directory?
-            UtilsLib::out(LOG_DEBUG, "TranslatedDisk::findFirstAndNext -- skipped %s because the type %d is not supported!", de->d_name, de->d_type);
+            UtilsLib::out(LDP_LOG_DEBUG, "TranslatedDisk::findFirstAndNext -- skipped %s because the type %d is not supported!", de->d_name, de->d_type);
             continue;
         }
 
@@ -432,7 +432,7 @@ bool DirTranslator::findFirstAndNext(SearchParams& sp, DiskItem& di)
            that if you set FA_DIR bit, then should include subdirectories.
         */
         if(isDir && !wantDirs) {        // if is_dir but dont_want_dirs, skip it
-            UtilsLib::out(LOG_DEBUG, "TranslatedDisk::findFirstAndNext -- skipped %s because the it's a dir and we're not looking for dir now", de->d_name);
+            UtilsLib::out(LDP_LOG_DEBUG, "TranslatedDisk::findFirstAndNext -- skipped %s because the it's a dir and we're not looking for dir now", de->d_name);
             continue;
         }
 
@@ -467,7 +467,7 @@ bool DirTranslator::setDiskItem(SearchParams& sp, DiskItem& di, const std::strin
     res = stat(fullEntryPath.c_str(), &attr);                   // get the file status
 
     if(res != 0) {
-        UtilsLib::out(LOG_ERROR, "TranslatedDisk::setDiskItem -- stat(%s) failed, errno %d", fullEntryPath.c_str(), errno);
+        UtilsLib::out(LDP_LOG_ERROR, "TranslatedDisk::setDiskItem -- stat(%s) failed, errno %d", fullEntryPath.c_str(), errno);
         return false;       // failed, ignore this item
     }
 
@@ -493,10 +493,10 @@ bool DirTranslator::setDiskItem(SearchParams& sp, DiskItem& di, const std::strin
 
     // check the current name against searchString using fnmatch
     if (compareSearchStringAndFilename(searchString, shortFname) != 0) {
-        UtilsLib::out(LOG_ERROR, "TranslatedDisk::setDiskItem -- %s - %s does not match pattern %s", fullEntryPath.c_str(), shortFname.c_str(), searchString.c_str());
+        UtilsLib::out(LDP_LOG_ERROR, "TranslatedDisk::setDiskItem -- %s - %s does not match pattern %s", fullEntryPath.c_str(), shortFname.c_str(), searchString.c_str());
         return false;       // not matching? ignore this item
     } else {
-        UtilsLib::out(LOG_DEBUG, "TranslatedDisk::setDiskItem -- %s matches pattern %s", shortFname.c_str(), searchString.c_str());
+        UtilsLib::out(LDP_LOG_DEBUG, "TranslatedDisk::setDiskItem -- %s matches pattern %s", shortFname.c_str(), searchString.c_str());
     }
 
     // get MS-DOS VFAT attributes if this is a VFAT filesystem
@@ -516,7 +516,7 @@ bool DirTranslator::setDiskItem(SearchParams& sp, DiskItem& di, const std::strin
 
             close(fd);
         } else {
-            UtilsLib::out(LOG_ERROR, "TranslatedDisk::appendFoundToFindStorage -- open(%s) failed, errno %d", fullEntryPath.c_str(), errno);
+            UtilsLib::out(LDP_LOG_ERROR, "TranslatedDisk::appendFoundToFindStorage -- open(%s) failed, errno %d", fullEntryPath.c_str(), errno);
         }
     }
 

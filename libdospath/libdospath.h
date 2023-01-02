@@ -8,10 +8,11 @@
 #include <inttypes.h>
 #include <dirent.h>
 
-#define LOG_OFF         0
-#define LOG_INFO        1       // info         - info which can be displayed when running at user's place
-#define LOG_ERROR       2       // errors       - should be always visible, even to users
-#define LOG_DEBUG       3       // debug info   - useful only to developers
+#define LDP_LOG_OFF     0
+#define LDP_LOG_INFO    1       // info         - info which can be displayed when running at user's place
+#define LDP_LOG_ERROR   2       // errors       - should be always visible, even to users
+#define LDP_LOG_WARNING 3       // warning
+#define LDP_LOG_DEBUG   4       // debug info   - useful only to developers
 
 #define HOSTPATH_SEPAR_STRING       "/"
 #define HOSTPATH_SEPAR_CHAR         '/'

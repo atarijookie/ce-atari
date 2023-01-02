@@ -45,7 +45,7 @@ bool FilenameShortener::longToShortFileName(const std::string& longFileName, std
 
     if(it != mapFilenameWithExt.end()) {                        // if we have this fileName already, use it!
         shortFileName = it->second;
-        UtilsLib::out(LOG_DEBUG, "FilenameShortener found mapping %s <=> %s", shortFileName.c_str(), longFileName.c_str());
+        UtilsLib::out(LDP_LOG_DEBUG, "FilenameShortener found mapping %s <=> %s", shortFileName.c_str(), longFileName.c_str());
 
         if(createdNotFound) 
             *createdNotFound = false;       // false == translation was found
@@ -71,7 +71,7 @@ bool FilenameShortener::longToShortFileName(const std::string& longFileName, std
     std::string shortName, shortExt;
 
     if(!shortenName(fileName, shortName)) {
-        UtilsLib::out(LOG_ERROR, "FilenameShortener::longToShortFileName failed to shortenName %s", fileName.c_str());
+        UtilsLib::out(LDP_LOG_ERROR, "FilenameShortener::longToShortFileName failed to shortenName %s", fileName.c_str());
         return false;
     }
 
@@ -84,7 +84,7 @@ bool FilenameShortener::longToShortFileName(const std::string& longFileName, std
     mapFilenameWithExt.insert( std::pair<std::string, std::string>(longFileName, shortFileName) );  // store this key-value pair
     mapReverseFilename.insert( std::pair<std::string, std::string>(shortFileName, longFileName) );  // for reverse transformation
 
-    UtilsLib::out(LOG_DEBUG, "FilenameShortener mapped %s <=> %s", shortFileName.c_str(), longFileName.c_str());
+    UtilsLib::out(LDP_LOG_DEBUG, "FilenameShortener mapped %s <=> %s", shortFileName.c_str(), longFileName.c_str());
     return true;
 }
 
@@ -142,7 +142,7 @@ bool FilenameShortener::shortToLongFileName(const std::string& shortFileName, st
         mapReverseFilename.insert( std::pair<std::string, std::string>(shortFileName, shortFileName) );  // for reverse transformation
 
         longFileName = shortFileName;
-        UtilsLib::out(LOG_DEBUG, "FilenameShortener found that shortFileName %s exists as %s", shortFileName.c_str(), fullPath.c_str());
+        UtilsLib::out(LDP_LOG_DEBUG, "FilenameShortener found that shortFileName %s exists as %s", shortFileName.c_str(), fullPath.c_str());
         return true;
     }
 
