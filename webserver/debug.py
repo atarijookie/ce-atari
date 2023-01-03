@@ -27,7 +27,7 @@ def set_loglevel():
     except ValueError:                  # if not int, fail
         abort(400, 'conversion to int failed')
 
-    if loglevel not in range(4):        # if not from 0 to 3, fail
+    if loglevel not in range(5):        # if not from 0 to 4, fail
         abort(400, f'invalid loglevel {loglevel}')
 
     item = {'module': 'all', 'action': 'set_loglevel', 'loglevel': loglevel}
@@ -51,6 +51,9 @@ def get_logfile(filename):
 @debug.route('/status', methods=['GET'])
 def get_statusfile():
     """ fetch status file  """
+    item = {'module': 'all', 'action': 'generate_status'}
+    send_to_core(item)
+
     status_path = os.getenv('CORE_STATUS_FILE')         # retrieve log dir from env
 
     if not os.path.exists(status_path):         # requested file not found? fail

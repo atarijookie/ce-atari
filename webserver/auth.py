@@ -30,7 +30,7 @@ def logout():
 def login_required(f):
     @wraps(f)
     def decorator(*args, **kwargs):
-        if not session['username']:             # don't have username? redirect to login
+        if not session.get('username'):             # don't have username? redirect to login
             return redirect(url_for('login'))
 
         return f(*args, **kwargs)

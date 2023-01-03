@@ -5,7 +5,11 @@
 #include <sys/select.h>
 #include <sys/un.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
+#include <linux/input.h>
+#include <linux/joystick.h>
 
 #include <signal.h>
 #include <pthread.h>
@@ -20,6 +24,7 @@
 #include "native/scsi.h"
 #include "native/scsi_defs.h"
 #include "update.h"
+#include "statusreport.h"
 #include "json.h"
 
 using json = nlohmann::json;
@@ -29,6 +34,8 @@ extern TFlags           flags;
 extern SharedObjects    shared;
 
 void handleFloppyAction(std::string& action, json& data);
+void handleGenericAction(std::string& action, json& data);
+void handlIkbdAction(std::string& action, json& data);
 
 int createSocket(void)
 {
@@ -112,6 +119,10 @@ void *cmdSockThreadCode(void *ptr)
 
             if(module == "floppy") {                // for floppy module?
                 handleFloppyAction(action, data);
+            } else if (module == "all") {           // generic / all modules?
+                handleGenericAction(action, data);
+            } else if(module == "ikbd") {           // ikbd module?
+                handlIkbdAction(action, data);
             } else {                                // for uknown module?
                 Debug::out(LOG_WARNING, "cmdSockThreadCode: uknown module '%s', ignoring message!", module.c_str());
             }
@@ -147,9 +158,205 @@ void handleFloppyAction(std::string& action, json& data)
         }
     } else if(action == "eject") {              // for 'eject' action
         shared.imageSilo->remove(slot);
+    } else if(action == "activate") {           // for 'activate' action
+        shared.imageSilo->setCurrentSlot(slot);
     } else {
         Debug::out(LOG_WARNING, "handleFloppyAction: unknown action '%s', ignoring message!", action.c_str());
     }
 
     pthread_mutex_unlock(&shared.mtxImages);    // unlock floppy images shared objects
+}
+
+void handleGenericAction(std::string& action, json& data)
+{
+    if(action == "generate_status") {
+        StatusReport *sr = new StatusReport();
+        sr->createReportFileFromEnv();
+        delete sr;
+    } else if(action == "set_loglevel") {
+        int loglevel = 1;
+
+        if(data.contains("loglevel")) {            // loglevel is present in message
+            loglevel = data["loglevel"].get<int>();
+            Debug::setLogLevel(loglevel);
+        } else {
+            Debug::out(LOG_WARNING, "handleGenericAction: missing 'loglevel' in message, ignoring message!");
+        }
+    } else {
+        Debug::out(LOG_WARNING, "handleGenericAction: unknown action '%s', ignoring message!", action.c_str());
+    }
+}
+
+int fdVirtKeyboard;
+int fdVirtMouse;
+
+int openFifo(bool keybNotMouse)
+{
+    int& fd = keybNotMouse ? fdVirtKeyboard : fdVirtMouse;
+    std::string devpath = keybNotMouse ? Utils::dotEnvValue("IKBD_VIRTUAL_KEYB_FILE") : Utils::dotEnvValue("IKBD_VIRTUAL_MOUSE_FILE");
+
+    if(fd > 0) {        // already got fd? just return it
+        return fd;
+    }
+
+    Debug::out(LOG_DEBUG, "Creating %s", devpath.c_str());
+
+    // try to remove if it's a file
+    unlink(devpath.c_str());
+
+    int err = mkfifo(devpath.c_str(), 0666);
+
+    if(err < 0) {
+        Debug::out(LOG_ERROR, "Could not create %s - errno: %d", devpath.c_str(), errno);
+
+		if(errno == EEXIST) {
+            Debug::out(LOG_ERROR, "    %s already exists.", devpath.c_str());
+		}
+	}
+
+    fd = open(devpath.c_str(), O_RDWR | O_NONBLOCK);    // we open Read/Write in order to initialize the fifo
+
+    if(fd < 0) {
+        Debug::out(LOG_ERROR, "openFifo(): open(%s) : %s", devpath.c_str(), strerror(errno));
+    }
+
+    return fd;
+}
+
+void closeFifo(bool keybNotMouse)
+{
+    int& fd = keybNotMouse ? fdVirtKeyboard : fdVirtMouse;
+
+    if(fd <= 0) {       // nothing to close, quit
+        return;
+    }
+
+    close(fd);
+    fd = -1;
+}
+
+void sendKeyboardPacket(int iKeyCode, int iState)
+{
+    int fd = openFifo(true);
+
+    input_event xEvent;
+    gettimeofday(&xEvent.time, NULL);
+    xEvent.type = EV_KEY;
+    xEvent.code = iKeyCode;
+    xEvent.value = iState;        // ev->value -- 1: down, 2: auto repeat, 0: up
+    write(fd, &xEvent, sizeof(xEvent));
+}
+
+void sendMouseButton(int iButton,int iState)
+{
+    int fd = openFifo(false);
+
+	ssize_t res;
+    input_event xEvent;
+    gettimeofday(&xEvent.time, NULL);
+    xEvent.type = EV_KEY;
+
+    if(iButton == 0) {
+        xEvent.code = BTN_LEFT;
+    } else if(iButton==1) {
+        xEvent.code = BTN_RIGHT;
+    } // TODO : other buttons ?
+
+    xEvent.value = iState;
+
+    res = write(fd, &xEvent, sizeof(xEvent));
+	if(res < 0 ) {
+		Debug::out(LOG_ERROR, "sendMouseButton() write: %s", strerror(errno));
+	}
+}
+
+void sendMousePacket(int iX, int iY)
+{
+    int fd = openFifo(false);
+
+	ssize_t res;
+
+    input_event ev[2];
+    gettimeofday(&ev[0].time, NULL);
+	memcpy(&ev[1].time, &ev[0].time, sizeof(ev[0].time));
+    ev[0].type = EV_REL;
+    ev[0].code = REL_X;
+    ev[0].value = iX;
+    ev[1].type = EV_REL;
+    ev[1].code = REL_Y;
+    ev[1].value = iY;
+    res = write(fd, ev, sizeof(ev));
+
+	if(res < 0) {
+		Debug::out(LOG_ERROR, "sendMousePacket() write: %s", strerror(errno));
+	}
+}
+
+void handlIkbdAction(std::string& action, json& data)
+{
+    if(action == "mouse") {
+        /*
+        example data:
+            {'module': 'ikbd', 'action': 'mouse', 'type': 'relative', 'x': -1, 'y': 11}
+            {'module': 'ikbd', 'action': 'mouse', 'type': 'relative', 'x': 0, 'y': 6}
+            {'module': 'ikbd', 'action': 'mouse', 'type': 'buttonleft', 'state': 'down'}
+            {'module': 'ikbd', 'action': 'mouse', 'type': 'buttonleft', 'state': 'up'}
+            {'module': 'ikbd', 'action': 'mouse', 'type': 'buttonright', 'state': 'down'}
+            {'module': 'ikbd', 'action': 'mouse', 'type': 'buttonright', 'state': 'up'}
+        */
+
+        if(data.contains("type")) {
+            std::string type = data["type"].get<std::string>();
+
+            if(type == "relative") {
+                if(data.contains("x") && data.contains("y")) {
+                    int x = data["x"].get<int>();
+                    int y = data["y"].get<int>();
+
+                    sendMousePacket(x, y);      // send mouse packet now
+                } else {
+                    Debug::out(LOG_WARNING, "handlIkbdAction: mouse - relative - missing 'x' or 'y' in message, ignoring message!");
+                }
+            } else if(type == "buttonleft" || type == "buttonright") {
+                if(data.contains("state")) {
+                    std::string stateStr = data["state"].get<std::string>();
+                    int state = (stateStr == "down") ? 1 : ((stateStr == "up") ? 0 : -1);           // down -> 1, up -> 0, others: -1
+                    int button = (type == "buttonright") ? 1 : ((type == "buttonleft") ? 0 : -1);   // right -> 1, left -> 0, others: -1
+
+                    if(button != -1) {      // got valid mouse button?
+                        sendMouseButton(button, state);
+                    } else {                // invalid mouse button
+                        Debug::out(LOG_WARNING, "handlIkbdAction: mouse - button - invalid type in message, ignoring message!");
+                    }
+                } else {
+                    Debug::out(LOG_WARNING, "handlIkbdAction: mouse - button - missing 'state' in message, ignoring message!");
+                }
+            }
+        } else {
+            Debug::out(LOG_WARNING, "handlIkbdAction: mouse - missing 'type' in message, ignoring message!");
+        }
+    } else if(action == "keyboard") {
+        /*
+        example data:
+            {'module': 'ikbd', 'action': 'keyboard', 'type': 'pc', 'code': 35, 'state': 'down'}
+            {'module': 'ikbd', 'action': 'keyboard', 'type': 'pc', 'code': 35, 'state': 'up'}
+        */
+
+        if(data.contains("code") && data.contains("state")) {
+            int code = data["code"].get<int>();
+            std::string stateStr = data["state"].get<std::string>();
+            int state = (stateStr == "down") ? 1 : ((stateStr == "up") ? 0 : -1);   // down -> 1, up -> 0, others: -1
+
+            if(state == -1) {       // invalid state?
+                Debug::out(LOG_WARNING, "handlIkbdAction: keyboard - invalid state '%s', ignoring message!", stateStr.c_str());
+            } else {                // goot state? ship it
+                sendKeyboardPacket(code, state);
+            }
+        } else {
+            Debug::out(LOG_WARNING, "handlIkbdAction: keyboard - missing 'code' or 'state' in message, ignoring message!");
+        }
+
+    } else {
+        Debug::out(LOG_WARNING, "handlIkbdAction: unknown action '%s', ignoring message!", action.c_str());
+    }
 }
