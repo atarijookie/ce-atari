@@ -2,3 +2,4 @@ setproctitle
 urllib3
 urwid
 python-dotenv
+loguru

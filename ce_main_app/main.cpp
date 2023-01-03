@@ -25,6 +25,7 @@
 #include "floppy/floppyencoder.h"
 #include "chipinterface_v1_v2/chipinterface12.h"
 #include "chipinterface_network/chipinterfacenetwork.h"
+#include "chipinterface_dummy/chipinterfacedummy.h"
 
 volatile sig_atomic_t sigintReceived = 0;
 void sigint_handler(int sig);
@@ -105,6 +106,12 @@ int main(int argc, char *argv[])
             Debug::out(LOG_INFO, "ChipInterface auto-detect: v1/v2 opened, continuing.");
             printf("\nChipInterface auto-detect: v1/v2 opened\n");
         }
+    } else if(flags.chipInterface == CHIPIF_DUMMY) {
+        Debug::out(LOG_INFO, "ChipInterface: opening DUMMY chip interface");
+        chipInterface = new ChipInterfaceDummy();
+        hwConfig.version = 2;
+        flags.noReset = true;
+        good = chipInterface->ciOpen();
     } else if(flags.chipInterface == CHIPIF_NETWORK) {
         Debug::out(LOG_INFO, "ChipInterface: starting NETWORK server");
         networkServerMain();
@@ -408,6 +415,7 @@ void parseCmdLineArguments(int argc, char *argv[])
                     case 1:
                     case 2: flags.chipInterface = CHIPIF_V1_V2;     break;  // 1 or 2 means SPI interface
 
+                    case 0: flags.chipInterface = CHIPIF_DUMMY;     break;  // 0 for dummy interface
                     case 9: flags.chipInterface = CHIPIF_NETWORK;   break;  // 9 for network server
                 }
             }

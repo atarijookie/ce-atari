@@ -11,8 +11,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from zipfile import ZipFile
 from dotenv import load_dotenv
-
-app_log = logging.getLogger()
+from loguru import logger as app_log
 
 main = None
 current_body = None
@@ -222,32 +221,30 @@ def file_seems_to_be_image(path_to_image, check_if_exists):
 
 
 def log_config():
-    log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
-
     log_dir = os.getenv('LOG_DIR')
-    os.makedirs(log_dir, exist_ok=True)
     log_file = os.path.join(log_dir, 'ce_fdd_py.log')
 
     os.makedirs(log_dir, exist_ok=True)
-    my_handler = RotatingFileHandler(log_file, mode='a', maxBytes=1024 * 1024, backupCount=1)
-    my_handler.setFormatter(log_formatter)
-    my_handler.setLevel(logging.DEBUG)
-
-    app_log = logging.getLogger()
-    app_log.setLevel(logging.DEBUG)
-    app_log.addHandler(my_handler)
+    app_log.remove()        # remove all previous log settings
+    app_log.add(log_file, rotation="1 MB", retention=1)
 
 
 def get_data_from_webserver(url_path, get_params=None):
-    port = os.getenv('WEBSERVER_PORT')
-    url = f"http://127.0.0.1:{port}/{url_path}"
+    data_json = {}
 
-    if get_params:                          # if get params were provided, add them to url
-        query_string = urlencode(get_params)
-        url = url + "?" + query_string
+    try:
+        port = os.getenv('WEBSERVER_PORT')
+        url = f"http://127.0.0.1:{port}/{url_path}"
 
-    response = urlopen(url)                 # store the response of URL
-    data_json = json.loads(response.read()) # json string to dict
+        if get_params:                          # if get params were provided, add them to url
+            query_string = urlencode(get_params)
+            url = url + "?" + query_string
+
+        response = urlopen(url)                 # store the response of URL
+        data_json = json.loads(response.read()) # json string to dict
+    except Exception as ex:
+        app_log.warning(f"get_data_from_webserver() - failed with exception: {str(ex)}")
+
     return data_json
 
 

@@ -5,8 +5,7 @@ import shared
 import math
 from urwid_helpers import dialog, back_to_main_menu
 from paginated_view import PaginatedView
-
-app_log = logging.getLogger()
+from loguru import logger as app_log
 
 
 class FilesView(PaginatedView):

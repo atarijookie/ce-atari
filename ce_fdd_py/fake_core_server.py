@@ -3,6 +3,7 @@ import sys
 import os
 import base64
 import json
+from loguru import logger as app_log
 
 slots = {}
 
@@ -13,7 +14,7 @@ def text_to_file(text, filename):
         with open(filename, 'wt') as f:
             f.write(text)
     except Exception as ex:
-        app_log.warning(logging.WARNING, f"failed to write to {filename}: {str(ex)}")
+        app_log.warning(f"failed to write to {filename}: {str(ex)}")
 
 
 def write_slots_to_file():

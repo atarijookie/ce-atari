@@ -12,9 +12,9 @@ from image_slots import on_show_image_slots
 import shared
 from shared import load_dotenv_config, get_list_of_lists
 from urwid_helpers import create_my_button, create_header_footer
+from loguru import logger as app_log
 
 load_dotenv_config()                # load dotenv
-app_log = logging.getLogger('root')
 
 thr_download_lists = None
 

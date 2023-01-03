@@ -3,8 +3,7 @@ import urwid
 import logging
 import shared
 from urwid_helpers import create_my_button, back_to_main_menu, create_header_footer
-
-app_log = logging.getLogger()
+from loguru import logger as app_log
 
 
 class MyDivider(urwid.Divider):

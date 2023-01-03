@@ -5,8 +5,7 @@ import shared
 from urwid_helpers import create_my_button, dialog, back_to_main_menu, create_header_footer
 from shared import get_data_from_webserver
 from file_view import FilesView
-
-app_log = logging.getLogger()
+from loguru import logger as app_log
 
 widget_image_name = []
 txt_image_name = []                         # fetch current image names here
@@ -88,6 +87,7 @@ def on_show_image_slots(button):
     body.append(urwid.Divider())
 
     global txt_image_name, widget_image_name, txt_image_content, widget_image_content, last_slots_mod_time
+    widget_image_name = []
 
     try:
         last_slots_mod_time = 0
@@ -172,7 +172,13 @@ def on_back_to_main_menu(button):
 def on_insert(button, index):
     shared.view_object = FilesView()
     shared.view_object.set_fdd_slot(index)      # tell files view to which slot it should insert image
-    shared.view_object.on_show_selected_list(button, '/mnt')
+
+    storage_path = shared.get_storage_path()    # will open download storage path
+
+    if not os.path.exists(storage_path):        # storage path seems to be invalid, use this instead
+        storage_path = '/mnt'
+
+    shared.view_object.on_show_selected_list(button, storage_path)
 
 
 def on_eject(button, index):

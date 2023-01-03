@@ -5,8 +5,7 @@ import shared
 from shared import get_data_from_webserver
 from urwid_helpers import create_my_button, dialog, create_header_footer
 from paginated_view import PaginatedView
-
-app_log = logging.getLogger()
+from loguru import logger as app_log
 
 
 class DownloaderView(PaginatedView):

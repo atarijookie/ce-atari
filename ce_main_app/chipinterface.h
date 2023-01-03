@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 // types of chip interface, as returned by 
+#define CHIP_IF_DUMMY   -1
 #define CHIP_IF_V1_V2   1
 #define CHIP_IF_NETWORK 9
 
