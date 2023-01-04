@@ -177,14 +177,15 @@ void Ikbd::findVirtualDevices(void)
 {
     char devpath[PATH_BUFF_SIZE];
 
-    DIR *dir = opendir("/tmp/vdev/");                            // try to open the dir
+    std::string vdevFolder = Utils::dotEnvValue("IKBD_VIRTUAL_DEVICES_PATH");
+    DIR *dir = opendir(vdevFolder.c_str());     // try to open the dir
 
-    if(dir == NULL) {                                                 // not found?
+    if(dir == NULL) {                                               // not found?
         return;
     }
 
     while(1) {                                                      // while there are more files, store them
-        struct dirent *de = readdir(dir);                            // read the next directory entry
+        struct dirent *de = readdir(dir);                           // read the next directory entry
 
         if(de == NULL) {                                            // no more entries?
             break;
@@ -201,7 +202,7 @@ void Ikbd::findVirtualDevices(void)
             continue;
         }
 
-        snprintf(devpath, sizeof(devpath), "/tmp/vdev/%s", de->d_name);
+        snprintf(devpath, sizeof(devpath), "%s/%s", vdevFolder.c_str(), de->d_name);
 
         processFoundDev(devpath, devpath);    // and do something with that file
     }
@@ -215,20 +216,23 @@ void Ikbd::processFoundDev(const char *linkName, const char *fullPath)
     const char *what;
     bool virtualDevice = false;
 
+    std::string vdevMouse = Utils::dotEnvValue("IKBD_VIRTUAL_MOUSE_FILE");
+    std::string vdevKbd = Utils::dotEnvValue("IKBD_VIRTUAL_KEYBOARD_FILE");
+
     Debug::out(LOG_DEBUG, "Ikbd::processFoundDev(%s, %s)", linkName, fullPath);
-    if(strstr(linkName, "/tmp/vdev/mouse") != NULL) {             // it's a mouse
-        if(ikbdDevs[INTYPE_VDEVMOUSE].fd == -1) {             // don't have mouse?
+    if(vdevMouse == linkName) {                         // it's a VIRTUAL mouse
+        if(ikbdDevs[INTYPE_VDEVMOUSE].fd == -1) {       // don't have mouse?
             in = &ikbdDevs[INTYPE_VDEVMOUSE];
-            what = "/tmp/vdev/mouse";
+            what = linkName;
             virtualDevice = true;
         } else {                                        // already have a mouse?
             logDebugAndIkbd(LOG_DEBUG, "%s: already have a mouse", fullPath);
             return;
         }
-    } else if(strstr(linkName, "/tmp/vdev/kbd") != NULL) {               // it's a keyboard?
+    } else if(vdevKbd == linkName) {                    // it's a VIRTUAL keyboard?
         if(ikbdDevs[INTYPE_VDEVKEYBOARD].fd == -1) {          // don't have keyboard?
             in = &ikbdDevs[INTYPE_VDEVKEYBOARD];
-            what = "/tmp/vdev/keyboard";
+            what = linkName;
             virtualDevice = true;
         } else {                                        // already have a keyboard?
             logDebugAndIkbd(LOG_DEBUG, "%s: already have a keyboard", fullPath);

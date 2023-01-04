@@ -36,6 +36,7 @@ extern SharedObjects    shared;
 void handleFloppyAction(std::string& action, json& data);
 void handleGenericAction(std::string& action, json& data);
 void handlIkbdAction(std::string& action, json& data);
+void closeFifo(bool keybNotMouse);
 
 int createSocket(void)
 {
@@ -131,6 +132,9 @@ void *cmdSockThreadCode(void *ptr)
         }
     }
 
+    closeFifo(true);
+    closeFifo(false);
+
     Debug::out(LOG_INFO, "Command Socket thread terminated.");
     return 0;
 }
@@ -193,13 +197,16 @@ int fdVirtMouse;
 int openFifo(bool keybNotMouse)
 {
     int& fd = keybNotMouse ? fdVirtKeyboard : fdVirtMouse;
-    std::string devpath = keybNotMouse ? Utils::dotEnvValue("IKBD_VIRTUAL_KEYB_FILE") : Utils::dotEnvValue("IKBD_VIRTUAL_MOUSE_FILE");
+    std::string devpath = keybNotMouse ? Utils::dotEnvValue("IKBD_VIRTUAL_KEYBOARD_FILE") : Utils::dotEnvValue("IKBD_VIRTUAL_MOUSE_FILE");
 
     if(fd > 0) {        // already got fd? just return it
         return fd;
     }
 
     Debug::out(LOG_DEBUG, "Creating %s", devpath.c_str());
+
+    std::string vdevFolder = Utils::dotEnvValue("IKBD_VIRTUAL_DEVICES_PATH");
+    Utils::mkpath(vdevFolder.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);   // make dir where the virtual devs will be
 
     // try to remove if it's a file
     unlink(devpath.c_str());

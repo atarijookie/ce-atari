@@ -60,8 +60,10 @@ void *ikbdThreadCode(void *ptr)
         if(wd1 < 0) Debug::out(LOG_ERROR, "inotify_add_watch(/dev/input, IN_CREATE) failed");
         wd2 = inotify_add_watch(inotifyFd, "/dev/input/by-path", IN_CREATE | IN_DELETE_SELF);
         if(wd2 < 0) Debug::out(LOG_ERROR, "inotify_add_watch(/dev/input/by-path, IN_CREATE | IN_DELETE_SELF)");
-        wd3 = inotify_add_watch(inotifyFd, "/tmp/vdev", IN_CREATE);
-        if(wd3 < 0) Debug::out(LOG_ERROR, "inotify_add_watch(/tmp/vdev, IN_CREATE)");
+
+        std::string vdevFolder = Utils::dotEnvValue("IKBD_VIRTUAL_DEVICES_PATH");
+        wd3 = inotify_add_watch(inotifyFd, vdevFolder.c_str(), IN_CREATE);
+        if(wd3 < 0) Debug::out(LOG_ERROR, "inotify_add_watch('%s', IN_CREATE)", vdevFolder.c_str());
     }
 
     ikbd.fillDisplayLine();      // fill it for showing it on display
@@ -315,6 +317,8 @@ int Ikbd::fdWrite(int fd, uint8_t *bfr, int cnt)
     return res;
 }
 
+std::string ikbdLogFilePath;
+
 void ikbdLog(const char *format, ...)
 {
     if(!flags.ikbdLogs) {               // don't do IKBD logs? quit
@@ -328,7 +332,12 @@ void ikbdLog(const char *format, ...)
 
     FILE *f;
 
-    f = fopen("/var/log/ikbdlog.txt", "a+t");
+    if(ikbdLogFilePath.empty()) {   // construct this path once, reuse later
+        ikbdLogFilePath = Utils::dotEnvValue("LOG_DIR", "/var/log/ce");     // path to logs dir
+        Utils::mergeHostPaths(ikbdLogFilePath, "ikbd.log");                 // full path = logs dir + filename
+    }
+
+    f = fopen(ikbdLogFilePath.c_str(), "a+t");
 
     if(!f) {
         printf("%08d: ", Utils::getCurrentMs());
