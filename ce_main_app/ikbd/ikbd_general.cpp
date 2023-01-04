@@ -360,6 +360,8 @@ void ikbdLog(const char *format, ...)
     va_end(args);
 }
 
+std::string chipLogFilePath;
+
 // chipLog() will receive incomplete lines stored in cb, terminated by '\n'.
 // It should write only complete lines to file, so it will try to gather chars until '\n' char and do write to file then.
 void chipLog(uint16_t cnt, CyclicBuff *cb)
@@ -378,7 +380,12 @@ void chipLog(uint16_t cnt, CyclicBuff *cb)
         oneLine += val;         // append to string
 
         if(val == '\n') {       // if last char was new line, dump it to file
-            FILE *f = fopen("/var/log/ce_chip.log", "a+t");
+            if(chipLogFilePath.empty()) {
+                chipLogFilePath = Utils::dotEnvValue("LOG_DIR", "/var/log/ce");     // path to logs dir
+                Utils::mergeHostPaths(chipLogFilePath, "chip.log");             // full path = dir + filename
+            }
+
+            FILE *f = fopen(chipLogFilePath.c_str(), "a+t");
 
             if(f != NULL) {     // if file open good, write data
                 fprintf(f, "%08d\t%08d\t ", now, diff);

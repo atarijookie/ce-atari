@@ -35,7 +35,8 @@ extern SharedObjects    shared;
 
 void handleFloppyAction(std::string& action, json& data);
 void handleGenericAction(std::string& action, json& data);
-void handlIkbdAction(std::string& action, json& data);
+void handleIkbdAction(std::string& action, json& data);
+void handleSceencastAction(std::string& action, json& data);
 void closeFifo(bool keybNotMouse);
 
 int createSocket(void)
@@ -123,7 +124,9 @@ void *cmdSockThreadCode(void *ptr)
             } else if (module == "all") {           // generic / all modules?
                 handleGenericAction(action, data);
             } else if(module == "ikbd") {           // ikbd module?
-                handlIkbdAction(action, data);
+                handleIkbdAction(action, data);
+            } else if(module == "screencast") {
+                handleSceencastAction(action, data);
             } else {                                // for uknown module?
                 Debug::out(LOG_WARNING, "cmdSockThreadCode: uknown module '%s', ignoring message!", module.c_str());
             }
@@ -299,7 +302,7 @@ void sendMousePacket(int iX, int iY)
 	}
 }
 
-void handlIkbdAction(std::string& action, json& data)
+void handleIkbdAction(std::string& action, json& data)
 {
     if(action == "mouse") {
         /*
@@ -322,7 +325,7 @@ void handlIkbdAction(std::string& action, json& data)
 
                     sendMousePacket(x, y);      // send mouse packet now
                 } else {
-                    Debug::out(LOG_WARNING, "handlIkbdAction: mouse - relative - missing 'x' or 'y' in message, ignoring message!");
+                    Debug::out(LOG_WARNING, "handleIkbdAction: mouse - relative - missing 'x' or 'y' in message, ignoring message!");
                 }
             } else if(type == "buttonleft" || type == "buttonright") {
                 if(data.contains("state")) {
@@ -333,14 +336,14 @@ void handlIkbdAction(std::string& action, json& data)
                     if(button != -1) {      // got valid mouse button?
                         sendMouseButton(button, state);
                     } else {                // invalid mouse button
-                        Debug::out(LOG_WARNING, "handlIkbdAction: mouse - button - invalid type in message, ignoring message!");
+                        Debug::out(LOG_WARNING, "handleIkbdAction: mouse - button - invalid type in message, ignoring message!");
                     }
                 } else {
-                    Debug::out(LOG_WARNING, "handlIkbdAction: mouse - button - missing 'state' in message, ignoring message!");
+                    Debug::out(LOG_WARNING, "handleIkbdAction: mouse - button - missing 'state' in message, ignoring message!");
                 }
             }
         } else {
-            Debug::out(LOG_WARNING, "handlIkbdAction: mouse - missing 'type' in message, ignoring message!");
+            Debug::out(LOG_WARNING, "handleIkbdAction: mouse - missing 'type' in message, ignoring message!");
         }
     } else if(action == "keyboard") {
         /*
@@ -355,15 +358,28 @@ void handlIkbdAction(std::string& action, json& data)
             int state = (stateStr == "down") ? 1 : ((stateStr == "up") ? 0 : -1);   // down -> 1, up -> 0, others: -1
 
             if(state == -1) {       // invalid state?
-                Debug::out(LOG_WARNING, "handlIkbdAction: keyboard - invalid state '%s', ignoring message!", stateStr.c_str());
+                Debug::out(LOG_WARNING, "handleIkbdAction: keyboard - invalid state '%s', ignoring message!", stateStr.c_str());
             } else {                // goot state? ship it
                 sendKeyboardPacket(code, state);
             }
         } else {
-            Debug::out(LOG_WARNING, "handlIkbdAction: keyboard - missing 'code' or 'state' in message, ignoring message!");
+            Debug::out(LOG_WARNING, "handleIkbdAction: keyboard - missing 'code' or 'state' in message, ignoring message!");
         }
 
     } else {
-        Debug::out(LOG_WARNING, "handlIkbdAction: unknown action '%s', ignoring message!", action.c_str());
+        Debug::out(LOG_WARNING, "handleIkbdAction: unknown action '%s', ignoring message!", action.c_str());
+    }
+}
+
+void handleSceencastAction(std::string& action, json& data)
+{
+    if(action == "do_screenshot") {                     // take a screenshot?
+        events.doScreenShot = true;
+    } else if(action == "screenshot_vbl_enable") {      // enable screenshot VBLs
+        Utils::screenShotVblEnabled(true);
+    } else if(action == "screenshot_vbl_disable") {     // disable screenshot VBLs
+        Utils::screenShotVblEnabled(false);
+    } else {
+        Debug::out(LOG_WARNING, "handleSceencastAction: unknown action '%s', ignoring message!", action.c_str());
     }
 }

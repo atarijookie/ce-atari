@@ -43,7 +43,7 @@ CosmosEx.Screencast=function(c){
 	var loadScreen=function(){
 		var xhr = new XMLHttpRequest();
 		cnt++;
-		xhr.open('GET', '/app/screencast/getscreen?'+cnt, true);
+		xhr.open('GET', '/screencast/getscreen?'+cnt, true);
 		xhr.responseType = 'arraybuffer';
 		xhr.onerror = onError; 
 		xhr.onload = onLoad;

@@ -25,7 +25,7 @@ void Debug::setOutputToConsole(void)
 void Debug::setDefaultLogFile(void)
 {
     std::string logFilePath = Utils::dotEnvValue("LOG_DIR", "/var/log/ce");     // path to logs dir
-    Utils::mergeHostPaths(logFilePath, "ce_core.log");          // full path = dir + filename
+    Utils::mergeHostPaths(logFilePath, "core.log");             // full path = dir + filename
     setLogFile(logFilePath.c_str());                            // use full path here
 }
 

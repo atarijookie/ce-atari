@@ -26,7 +26,7 @@
         $(document).ready(function() {
             $.ajax({
                 type: 'GET',
-                url:  '/app/screencast/screenshot_query_vbl',
+                url:  '/screencast/screenshot_query_vbl',
                 
                 success: function(data){
                     var radioVblOn  = document.getElementById('vbl_on');
@@ -82,7 +82,7 @@
         });
     
         function vblOn(onNotOff) {
-            var reqUrl = '/app/screencast/screenshot_vbl_';
+            var reqUrl = '/screencast/screenshot_vbl_';
             if(onNotOff) {
                 reqUrl += 'enable';
             } else {
@@ -100,7 +100,7 @@
         function doScreenShot() {
             $.ajax({
                 type: 'POST',
-                url: '/app/screencast/do_screenshot',
+                url: '/screencast/do_screenshot',
                 data: JSON.stringify({ "action":"do_screenshot" }),
                 contentType: 'application/json',
 				success: function(){

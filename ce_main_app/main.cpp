@@ -69,6 +69,7 @@ int main(int argc, char *argv[])
 
     loadDefaultArgumentsFromFile();                             // first parse default arguments from file
     parseCmdLineArguments(argc, argv);                          // then parse cmd line arguments and set global variables
+    Utils::screenShotVblEnabled(false);                         // screenshot vbl not enabled by default
 
     Debug::printfLogLevelString();
 

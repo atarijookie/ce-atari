@@ -85,6 +85,7 @@ public:
     static void textToFile(const char* text, const char* filePath);         // text to text file
     static void textToFileFromEnv(const char* text, const char* envKeyForFileName); // text to text file specified in .env
 
+    static void screenShotVblEnabled(bool enabled);
 private:
     static bool copyFileByHandles(FILE *from, FILE *to);
 

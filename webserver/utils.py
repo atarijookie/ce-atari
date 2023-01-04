@@ -67,7 +67,7 @@ def log_config():
     os.makedirs(os.getenv('LOG_DIR'), exist_ok=True)
     log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
 
-    my_handler = RotatingFileHandler(os.path.join(os.getenv('LOG_DIR'), 'ce_webserver.log'),
+    my_handler = RotatingFileHandler(os.path.join(os.getenv('LOG_DIR'), 'webserver.log'),
                                      mode='a', maxBytes=1024 * 1024, backupCount=1)
     my_handler.setFormatter(log_formatter)
     my_handler.setLevel(logging.DEBUG)
@@ -143,8 +143,11 @@ def generate_routes_for_templates(app_in, skip_pages):
         register_template_endpoint(fname_wo_ext)
 
 
-def get_arg_int(name, default=0):
-    value = request.args.get(name, default)
+def value_to_int(value, default=0):
+    """
+    take input value which is str or None and convert it to integer if possible,
+    return default value if conversion failed
+    """
 
     if value is None:       # don't even try to convert None, just return default
         return default
@@ -156,6 +159,14 @@ def get_arg_int(name, default=0):
         return default
 
     return value
+
+
+def get_arg_int(name, default=0):
+    """
+    Fetch value by name from request, try to convert to int if possible, return default if not possible to convert.
+    """
+    value = request.args.get(name, default)
+    return value_to_int(value, default)
 
 
 def send_to_socket(sock_path, item):

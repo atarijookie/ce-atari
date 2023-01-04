@@ -33,6 +33,7 @@
 #include "debug.h"
 #include "version.h"
 #include "settings.h"
+#include "global.h"
 
 std::map<std::string, std::string> dotEnv;
 
@@ -904,4 +905,10 @@ void Utils::textToFile(const char* text, const char* filePath)
 
     fputs(text, f);                     // write text to file
     fclose(f);                          // close file
+}
+
+void Utils::screenShotVblEnabled(bool enabled)
+{
+    events.screenShotVblEnabled = enabled;
+    Utils::intToFileFromEnv((int) enabled, "SCREENSHOT_VBL_ENABLED_FILE");        // new value to file
 }

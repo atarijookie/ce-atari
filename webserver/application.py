@@ -7,6 +7,7 @@ load_dotenv_config()        # load dotenv before our imports which might need it
 from stream import stream
 from download import download
 from floppy import floppy
+from screencast import screencast
 from debug import debug
 from hid import hid
 from auth import auth, login_required
@@ -26,6 +27,7 @@ app.register_blueprint(auth, url_prefix='/auth')
 app.register_blueprint(stream, url_prefix='/stream')
 app.register_blueprint(download, url_prefix='/download')
 app.register_blueprint(floppy, url_prefix='/floppy')
+app.register_blueprint(screencast, url_prefix='/screencast')
 app.register_blueprint(debug, url_prefix='/debug')
 app.register_blueprint(hid, url_prefix='/hid')
 
