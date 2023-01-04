@@ -39,11 +39,11 @@ def getscreen():
     fd = -1
 
     # open the shared memory file using shm_open()
-    # try:
-    mem_name = os.getenv('SCREENCAST_MEMORY_NAME')
-    fd = shm_open(mem_name)
-    # except Exception as ex:
-    #     app.logger.warning(f"failed to open shared memory: {str(ex)}")
+    try:
+        mem_name = os.getenv('SCREENCAST_MEMORY_NAME')
+        fd = shm_open(mem_name)
+    except Exception as ex:
+        app.logger.warning(f"failed to open shared memory: {str(ex)}")
 
     if fd == -1:
         abort(400, 'shared memory access failed')

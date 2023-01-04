@@ -57,6 +57,12 @@ void ScreencastAcsiCommand::sharedMemoryOpen(void)
         sharedMemPointer = (uint8_t*) mmapRes;                // store pointer
         memset(sharedMemPointer, 0, SCREENCAST_BUFFER_SIZE);  // set all to zeros
 
+        FILE *f = fopen("ce_logo.bin", "rb");           // if can open this logo file
+        if(f) {
+            fread(sharedMemPointer + 1, 1, 32032, f);   // fill the initial screencast buffer with logo
+            fclose(f);
+        }
+
         Debug::out(LOG_DEBUG, "ScreenCastAcsiCommand::openSharedMemory - mmap() success");
     } else {                        // on error, log error
         Debug::out(LOG_ERROR, "ScreenCastAcsiCommand::openSharedMemory - mmap() shared memory failed : %d", errno);
