@@ -80,19 +80,14 @@ TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt)
     prgSectorEnd    = PEXEC_DRIVE_SIZE_SECTORS;
     pexecDriveIndex = -1;
 
-    detachAll();
-
     for(int i=0; i<MAX_FILES; i++) {        // initialize host file structures
         files[i].hostHandle     = NULL;
         files[i].atariHandle    = EIHNDL;
         files[i].hostPath       = "";
     }
 
+    findAttachedDisks();                // find all the currently mounted disks
     initFindStorages();
-
-    loadSettings();
-
-    attachConfigDrive();                                                // if config drive is enabled, attach it
 
     //ACSI command "date"
     dateAcsiCommand         = new DateAcsiCommand(dataTrans);
@@ -130,255 +125,40 @@ void TranslatedDisk::setSettingsReloadProxy(SettingsReloadProxy *rp)
     reloadProxy = rp;
 }
 
-void TranslatedDisk::loadSettings(void)
+void TranslatedDisk::findAttachedDisks(void)
 {
-    Debug::out(LOG_DEBUG, "TranslatedDisk::loadSettings");
+    // TODO: trigger this from mounter when translated disks are changed
+
+    std::string dirTrans = Utils::dotEnvValue("MOUNT_DIR_TRANS");    // where the translated disks are symlinked
+    Utils::mergeHostPaths(dirTrans, "/X");          // add placeholder
+    int len = dirTrans.length();
+
+    for(int i=2; i<MAX_DRIVES; i++) {               // go through all the possible drives
+        dirTrans[len - 1] = (char) (65 + i);        // replace placeholder / drive character with the current drive char
+
+        if(!Utils::dirExists(dirTrans)) {           // dir doesn't exist? skip rest
+            conf[i].enabled = false;                // not enabled
+            continue;
+        }
+
+        // fill in device info accordingly
+        conf[i].enabled = true;
+        conf[i].hostRootPath = dirTrans;
+        conf[i].currentAtariPath = HOSTPATH_SEPAR_STRING;
+        conf[i].mediaChanged = true;
+        conf[i].label = "Device Label Here";        // Utils::getDeviceLabel(devicePath);
+    }
 
     Settings s;
-    char drive1, drive2, drive3;
+    char driveFirst, driveShared, driveConfig;
 
-    drive1 = s.getChar("DRIVELETTER_FIRST",      -1);
-    drive2 = s.getChar("DRIVELETTER_SHARED",     -1);
-    drive3 = s.getChar("DRIVELETTER_CONFDRIVE",  'O');
+    driveFirst = s.getChar("DRIVELETTER_FIRST",      -1);
+    driveShared = s.getChar("DRIVELETTER_SHARED",    -1);
+    driveConfig = s.getChar("DRIVELETTER_CONFDRIVE", 'O');
 
-    driveLetters.firstTranslated    = drive1 - 'A';
-    driveLetters.shared             = drive2 - 'A';
-    driveLetters.confDrive          = drive3 - 'A';
-
-    // now set the read only drive flags
-    driveLetters.readOnly = 0;
-
-    if(driveLetters.confDrive >= 0 && driveLetters.confDrive <=15) {        // if got a valid drive letter for config drive
-        driveLetters.readOnly = (1 << driveLetters.confDrive);              // make config drive read only
-    }
-
-    useZipdirNotFile = s.getBool("USE_ZIP_DIR", 1);
-
-    fillDisplayLines();     // fill stuff which should be on display
-}
-
-void TranslatedDisk::reloadSettings(int type)
-{
-    Debug::out(LOG_DEBUG, "TranslatedDisk::reloadSettings");
-
-    // first load the settings
-    loadSettings();
-
-    // now move the attached drives around to match the new configuration
-
-    TranslatedConfTemp tmpConf[MAX_DRIVES];
-    for(int i=2; i<MAX_DRIVES; i++) {           // first make the copy of the current state
-        tmpConf[i].enabled          = conf[i].enabled;
-        tmpConf[i].hostRootPath     = conf[i].hostRootPath;
-        tmpConf[i].translatedType   = conf[i].translatedType;
-        tmpConf[i].devicePath       = conf[i].devicePath;
-        tmpConf[i].label            = conf[i].label;
-    }
-
-    detachAll();                                // then deinit the conf structures
-
-    int good = 0, bad = 0;
-    bool res;
-
-    for(int i=2; i<MAX_DRIVES; i++) {           // and now find new places
-        if(!tmpConf[i].enabled) {       // skip the not used positions
-            continue;
-        }
-
-        res = attachToHostPath(tmpConf[i].hostRootPath, tmpConf[i].translatedType, tmpConf[i].devicePath);   // now attach back
-
-        if(res) {
-            good++;
-        } else {
-            bad++;
-        }
-    }
-
-    // attach shared and config disk if they weren't attached before and now should be
-    attachConfigDrive();                                    // if config drive is enabled, attach it
-
-    // todo: attach remaining DOS drives when they couldn't be attached before (not enough letters before)
-
-    Debug::out(LOG_DEBUG, "TranslatedDisk::configChanged_reload -- attached again, good %d, bad %d", good, bad);
-}
-
-void TranslatedDisk::attachConfigDrive(void)
-{
-    std::string configDrivePath = CONFIG_DRIVE_PATH;
-    bool res = attachToHostPath(configDrivePath, TRANSLATEDTYPE_CONFIGDRIVE, configDrivePath);   // try to attach
-
-    if(!res) {                                                                              // if didn't attach, skip the rest
-        Debug::out(LOG_ERROR, "attachConfigDrive: failed to attach config drive %s", configDrivePath.c_str());
-    }
-}
-
-bool TranslatedDisk::attachToHostPath(std::string hostRootPath, int translatedType, std::string devicePath)
-{
-    int index = -1;
-
-    if(isAlreadyAttached(hostRootPath)) {                   // if already attached, return success
-        Debug::out(LOG_DEBUG, "TranslatedDisk::attachToHostPath - already attached");
-        return true;
-    }
-
-    // are we attaching shared drive?
-    if(translatedType == TRANSLATEDTYPE_SHAREDDRIVE) {
-        if(driveLetters.shared > 0) {                       // we have shared drive letter defined
-            attachToHostPathByIndex(driveLetters.shared, hostRootPath, translatedType, devicePath);
-
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    // are we attaching config drive?
-    if(translatedType == TRANSLATEDTYPE_CONFIGDRIVE) {
-        if(driveLetters.confDrive > 0) {              // we have config drive letter defined
-            attachToHostPathByIndex(driveLetters.confDrive, hostRootPath, translatedType, devicePath);
-
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    // ok, so we're attaching normal drive
-    int start = driveLetters.firstTranslated;
-
-    if(start < 0) {                                     // no first normal drive defined? fail
-        return false;
-    }
-
-    for(int i=start; i<MAX_DRIVES; i++) {               // find the empty slot for the new drive
-        // if this letter is reserved to shared drive
-        if(i == driveLetters.shared) {
-            continue;
-        }
-
-        // if this letter is reserved to config drive
-        if(i == driveLetters.confDrive) {
-            continue;
-        }
-
-        if(!conf[i].enabled) {              // not used yet?
-            index = i;                      // found one!
-            break;
-        }
-    }
-
-    if(index == -1) {                       // no empty slot?
-        return false;
-    }
-
-    attachToHostPathByIndex(index, hostRootPath, translatedType, devicePath);
-    return true;
-}
-
-void TranslatedDisk::attachToHostPathByIndex(int index, std::string hostRootPath, int translatedType, std::string devicePath)
-{
-    if(index < 0 || index > MAX_DRIVES) {
-        return;
-    }
-
-    conf[index].enabled             = true;
-    conf[index].devicePath          = devicePath;
-    conf[index].hostRootPath        = hostRootPath;
-    conf[index].currentAtariPath    = HOSTPATH_SEPAR_STRING;
-    conf[index].translatedType      = translatedType;
-    conf[index].mediaChanged        = true;
-    conf[index].label = Utils::getDeviceLabel(devicePath);
-
-    Debug::out(LOG_DEBUG, "TranslatedDisk::attachToHostPath - path %s attached to index %d (letter %c)", hostRootPath.c_str(), index, 'A' + index);
-
-    fillDisplayLines();     // fill stuff which should be on display
-}
-
-bool TranslatedDisk::isAlreadyAttached(std::string hostRootPath)
-{
-    for(int i=0; i<MAX_DRIVES; i++) {                   // see if the specified path is already attached
-        if(!conf[i].enabled) {                          // not used yet? skip
-            continue;
-        }
-
-        if(conf[i].hostRootPath == hostRootPath) {      // found the matching path?
-            return true;
-        }
-    }
-
-    return false;
-}
-
-void TranslatedDisk::detachByIndex(int index)
-{
-    if(index < 0 || index > MAX_DRIVES) {
-        return;
-    }
-
-    conf[index].enabled             = false;
-    conf[index].stDriveLetter       = 'A' + index;
-    conf[index].currentAtariPath    = HOSTPATH_SEPAR_STRING;
-    conf[index].translatedType      = TRANSLATEDTYPE_NORMAL;
-    conf[index].mediaChanged        = true;
-    conf[index].label.clear();
-
-    fillDisplayLines();     // fill stuff which should be on display
-}
-
-void TranslatedDisk::detachAll(void)
-{
-    for(int i=0; i<MAX_DRIVES; i++) {               // initialize the config structs
-        detachByIndex(i);
-    }
-
-    currentDriveLetter  = 'C';
-    currentDriveIndex   = 0;
-
-    fillDisplayLines();     // fill stuff which should be on display
-}
-
-void TranslatedDisk::detachAllUsbMedia(void)
-{
-    for(int i=0; i<MAX_DRIVES; i++) {               // go through the drives
-        // if it's shared drive, or it's a config drive, don't detach
-        if(conf[i].translatedType == TRANSLATEDTYPE_SHAREDDRIVE || conf[i].translatedType == TRANSLATEDTYPE_CONFIGDRIVE) {
-            continue;
-        }
-
-        detachByIndex(i);       // it's normal drive, detach
-    }
-
-    currentDriveLetter  = 'C';
-    currentDriveIndex   = 0;
-}
-
-void TranslatedDisk::detachFromHostPath(std::string hostRootPath)
-{
-    int index = -1;
-
-    for(int i=2; i<MAX_DRIVES; i++) {                   // find where the storage the existing empty slot for the new drive
-        if(!conf[i].enabled) {                          // skip disabled drives
-            continue;
-        }
-
-        if(conf[i].hostRootPath == hostRootPath) {      // the host root path matches?
-            index = i;
-            break;
-        }
-    }
-
-    if(index == -1) {                                   // no empty slot?
-        return;
-    }
-
-    detachByIndex(index);
-
-    // close all files which might be open on this host path
-    for(int i=0; i<MAX_FILES; i++) {
-        if(startsWith(files[i].hostPath, hostRootPath)) {       // the host path starts with this detached path
-            closeFileByIndex(i);
-        }
-    }
+    driveLetters.firstTranslated    = driveFirst - 'A';
+    driveLetters.shared             = driveShared - 'A';
+    driveLetters.confDrive          = driveConfig - 'A';
 }
 
 void TranslatedDisk::processCommand(uint8_t *cmd)
@@ -490,17 +270,9 @@ void TranslatedDisk::onUnmountDrive(uint8_t *cmd)
         return;
     }
 
-    // if shared drive or config drive, don't do anything
-    if(conf[drive].translatedType == TRANSLATEDTYPE_SHAREDDRIVE || conf[drive].translatedType == TRANSLATEDTYPE_CONFIGDRIVE) {
-        dataTrans->setStatus(E_OK);
-        return;
-    }
-
     Debug::out(LOG_DEBUG, "onUnmountDrive -- drive: %d, hostRootPath: %s", drive, conf[drive].hostRootPath.c_str());
 
     // TODO: unmount here
-
-    detachByIndex(drive);                                                   // detach drive from translated disk module
 
     dataTrans->setStatus(E_OK);
 }
@@ -516,7 +288,7 @@ void TranslatedDisk::onGetMounts(uint8_t *cmd)
 
     for(int i=2; i<MAX_DRIVES; i++) {       // create enabled drive bits
         if(conf[i].enabled) {
-            index = conf[i].translatedType + 1;
+            index = 1;
         } else {
             index = 0;
         }
@@ -604,15 +376,6 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
 
     Debug::out(LOG_DEBUG, "tosVersion: %x, drives: %04x", tosVersion, drives);
 
-    bool  sdNoobEnabled;
-    uint32_t sdNoobSizeSectors;    // sdCardSizeSectors;
-
-    sdNoobEnabled       = dataBuffer[6];                    //     6: is SD NOOB present and enabled?
-    sdNoobSizeSectors   = Utils::getDword(dataBuffer +  7); //  7-10: size of SD NOOB partition in sectors
-    //sdCardSizeSectors   = Utils::getDword(dataBuffer + 11); // 11-14: size of SD card in sectors
-
-    Debug::out(LOG_DEBUG, "SD NOOB enabled: %d, size: %d", sdNoobEnabled, sdNoobSizeSectors);
-
     //------------------------------------
     // depending on TOS major version determine the machine, on which this SCSI device is used, and limit the available SCSI IDs depending on that
     uint8_t tosVersionMajor = tosVersion >> 8;
@@ -644,14 +407,6 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
     dc.translatedDrives  = translatedDrives;             // just translated drives
     dc.configDrive       = driveLetters.confDrive;       // index of config drive
     dc.sharedDrive       = driveLetters.shared;          // index of shared drive
-
-    dc.sdNoobEnabled     = sdNoobEnabled;                // is SD NOOB currently enabled?
-    dc.sdNoobSizeSectors = sdNoobSizeSectors;            // size of SD NOOB partition
-    dc.sdNoobDriveNumber = 2;                            // fixed to C now
-
-    if(sdNoobEnabled) {                                  // if SD NOOB enabled, add it to all drives
-        dc.drivesAll |= (1 << dc.sdNoobDriveNumber);
-    }
 
     Settings s;
     dc.settingsResolution   = s.getInt("SCREEN_RESOLUTION", 1);
@@ -930,24 +685,6 @@ int TranslatedDisk::driveLetterToDriveIndex(char pathDriveLetter)
     }
 
     return driveIndex;
-}
-
-bool TranslatedDisk::isDriveIndexReadOnly(int driveIndex)
-{
-    if(driveIndex < 0 || driveIndex > 15) {
-        Debug::out(LOG_DEBUG, "TranslatedDisk::isDriveIndexReadOnly -- drive index: %d -> out of index, not READ ONLY ", driveIndex);
-        return false;
-    }
-
-    uint16_t mask = (1 << driveIndex);
-
-    if((driveLetters.readOnly & mask) != 0) {               // if the bit representing the drive is set, it's read only
-        Debug::out(LOG_DEBUG, "TranslatedDisk::isDriveIndexReadOnly -- drive index: %d -> is READ ONLY ", driveIndex);
-        return true;
-    }
-
-    Debug::out(LOG_DEBUG, "TranslatedDisk::isDriveIndexReadOnly -- drive index: %d -> not READ ONLY ", driveIndex);
-    return false;
 }
 
 void TranslatedDisk::removeDoubleDots(std::string &path)
@@ -1646,31 +1383,7 @@ void TranslatedDisk::driveGetReport(int driveIndex, std::string &reportString)
         return;
     }
 
-    int typeIndex  = conf[driveIndex].translatedType;
-
-    switch(typeIndex) {
-        case TRANSLATEDTYPE_NORMAL:
-            if(conf[driveIndex].label.empty())
-                reportString = "USB drive";
-            else {
-                reportString = conf[driveIndex].label;
-                reportString += " (USB drive)";
-            }
-            reportString += " - device: ";
-            reportString += conf[driveIndex].devicePath;
-            break;
-        case TRANSLATEDTYPE_SHAREDDRIVE:
-            reportString = "shared drive, ";
-            reportString += conf[driveIndex].devicePath;
-            break;
-        case TRANSLATEDTYPE_CONFIGDRIVE:
-            reportString = "config drive (located at ";
-            reportString += conf[driveIndex].devicePath;
-            reportString += ")";
-            break;
-        default:
-            reportString = "unknown";
-    }
+    reportString = "drive";     // TODO: get drive type (config / usb / shared) from mounter
 }
 
 void TranslatedDisk::fillDisplayLines(void)
@@ -1691,7 +1404,7 @@ void TranslatedDisk::fillDisplayLines(void)
     // other drives
     strcpy(tmp, "drvs: ");
     for(int i=2; i<MAX_DRIVES; i++) {   // if drive is normal and enabled
-        if(conf[i].enabled && conf[i].translatedType == TRANSLATEDTYPE_NORMAL) {
+        if(conf[i].enabled) {
             char tmp2[2];
             tmp2[0] = 'A' + i;  // drive letter
             tmp2[1] = 0;        // string terminator
@@ -1699,38 +1412,4 @@ void TranslatedDisk::fillDisplayLines(void)
         }
     }
     display_setLine(DISP_LINE_TRAN_DRIV, tmp);
-}
-
-bool TranslatedDisk::getPathToUsbDriveOrSharedDrive(std::string &hostRootPath)
-{
-    int i, sharedDriveIndex = -1;
-    hostRootPath.clear();
-
-    // first look for any USB drive, if not found, use shared drive
-    for(i=0; i<MAX_DRIVES; i++) {	// go through the drives
-        // not enabled or it's config drive? skip it
-        if(!conf[i].enabled || conf[i].translatedType == TRANSLATEDTYPE_CONFIGDRIVE) {
-            continue;
-        }
-
-        // if got some USB drive, return path to its root, success
-        if(conf[i].translatedType == TRANSLATEDTYPE_NORMAL) {
-            hostRootPath = conf[i].hostRootPath;
-            return true;
-        }
-
-        // if got shared drive, mark down its index
-        if(conf[i].translatedType == TRANSLATEDTYPE_SHAREDDRIVE) {
-            sharedDriveIndex = i;
-        }
-    }
-
-    // if came here, couldn't find USB
-    if(sharedDriveIndex != -1) {    // got shared drive? good
-        hostRootPath = conf[sharedDriveIndex].hostRootPath;
-        return true;
-	}
-
-    // no usb drive, no shared drive? fail
-    return false;
 }

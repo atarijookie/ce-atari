@@ -29,22 +29,10 @@ typedef struct {
     bool        enabled;
     bool        mediaChanged;
 
-    std::string devicePath;                 // where the device is
     std::string hostRootPath;               // where is the root on host file system
     std::string label;						// "DOS" label
-    char        stDriveLetter;              // what letter will be used on ST
     std::string currentAtariPath;           // what is the current path on this drive
-
-    int         translatedType;             // normal / shared / config
 } TranslatedConf;
-
-typedef struct {
-    bool        enabled;
-    std::string devicePath;                 // where the device is
-    std::string hostRootPath;               // where is the root on host file system
-    std::string label;						// "DOS" label
-    int         translatedType;             // normal / shared / config
-} TranslatedConfTemp;
 
 typedef struct {
     FILE *hostHandle;                       // file handle for all the work with the file on host
@@ -56,10 +44,6 @@ typedef struct {
 
 #define MAX_FILES       40                  // maximum open files count, 40 is the value from EmuTOS
 #define MAX_DRIVES      16
-
-#define TRANSLATEDTYPE_NORMAL           0
-#define TRANSLATEDTYPE_SHAREDDRIVE      1
-#define TRANSLATEDTYPE_CONFIGDRIVE      2
 
 #define MAX_FIND_STORAGES               32
 
@@ -117,7 +101,7 @@ class ZipDirEntry {
     }
 };
 
-class TranslatedDisk: public ISettingsUser
+class TranslatedDisk
 {
 private:
     static TranslatedDisk * instance;
@@ -130,17 +114,12 @@ public:
     static TranslatedDisk * getInstance(void);
     static void deleteInstance(void);
 
+    void findAttachedDisks(void);
+
     void mutexLock(void);
     void mutexUnlock(void);
 
     void processCommand(uint8_t *cmd);
-
-    bool attachToHostPath(std::string hostRootPath, int translatedType, std::string devicePath);
-    void detachFromHostPath(std::string hostRootPath);
-    void detachAll(void);
-    void detachAllUsbMedia(void);
-
-    virtual void reloadSettings(int type);      // from ISettingsUser
 
     void setSettingsReloadProxy(SettingsReloadProxy *rp);
 
@@ -151,8 +130,6 @@ public:
 
     bool createFullAtariPathAndFullHostPath(const std::string &inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel);
     void createFullHostPath (const std::string &inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel);
-
-    bool getPathToUsbDriveOrSharedDrive(std::string &hostRootPath);
 
     // for status report
     bool driveIsEnabled(int driveIndex);
@@ -165,8 +142,6 @@ public:
     void fillDisplayLines(void);
 
 private:
-	void attachConfigDrive(void);
-
     AcsiDataTrans       *dataTrans;
     SettingsReloadProxy *reloadProxy;
 
@@ -183,8 +158,6 @@ private:
         int firstTranslated;
         int shared;
         int confDrive;
-
-        uint16_t readOnly;
     } driveLetters;
 
     char asciiAtariToPc[256];
@@ -195,7 +168,6 @@ private:
     void loadSettings(void);
 
     uint16_t getDrivesBitmap(void);
-    bool isDriveIndexReadOnly(int driveIndex);
     static void removeDoubleDots(std::string &path);
     static void pathSeparatorHostToAtari(std::string &path);
     static bool isLetter(char a);
@@ -276,10 +248,6 @@ private:
 
     void closeFileByIndex(int index);
     void closeAllFiles(void);
-
-    void attachToHostPathByIndex(int index, std::string hostRootPath, int translatedType, std::string devicePath);
-    void detachByIndex(int index);
-    bool isAlreadyAttached(std::string hostRootPath);
 
     const char *functionCodeToName(int code);
     void atariFindAttribsToString(uint8_t attr, std::string &out);

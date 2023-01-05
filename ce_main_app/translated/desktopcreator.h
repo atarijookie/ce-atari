@@ -26,10 +26,6 @@ typedef struct {
     uint8_t  configDrive;          // index of config drive
     uint8_t  sharedDrive;          // index of shared drive
     std::string label[MAX_DRIVES];
-    
-    bool  sdNoobEnabled;        // is SD NOOB enabled for this session?
-    uint32_t sdNoobSizeSectors;    // size of SD NOOB partition
-    int   sdNoobDriveNumber;    // TOS drive # for SD NOOB
 } DesktopConfig;
 
 class DesktopCreator {

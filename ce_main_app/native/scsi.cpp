@@ -6,6 +6,7 @@
 #include "scsi.h"
 #include "../global.h"
 #include "../debug.h"
+#include "../utils.h"
 #include "devicemedia.h"
 #include "imagefilemedia.h"
 
@@ -19,25 +20,16 @@ Scsi::Scsi(void)
     dataBuffer2 = new uint8_t[SCSI_BUFFER_SIZE];
 
     for(i=0; i<8; i++) {
-        devInfo[i].attachedMediaIndex   = -1;
-        devInfo[i].accessType           = SCSI_ACCESSTYPE_NO_DATA;
+        clearDevInfo(i);
     }
 
-    for(i=0; i<MAX_ATTACHED_MEDIA; i++) {
-        initializeAttachedMediaVars(i);
-    }
-
-    loadSettings();
+    findAttachedDisks();
 }
 
 Scsi::~Scsi()
 {
     delete []dataBuffer;
     delete []dataBuffer2;
-
-    for(int i=0; i<MAX_ATTACHED_MEDIA; i++) {                        // detach all attached media
-        dettachByIndex(i);
-    }
 }
 
 void Scsi::setAcsiDataTrans(AcsiDataTrans *dt)
@@ -45,348 +37,62 @@ void Scsi::setAcsiDataTrans(AcsiDataTrans *dt)
     dataTrans = dt;
 }
 
-bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int accessType)
+void Scsi::findAttachedDisks(void)
 {
-    bool res;
-    IMedia *dm;
+    // TODO: trigger this from mounter when raw disks are changed
 
-    if(hostSourceType == SOURCETYPE_IMAGE_TRANSLATEDBOOT) {         // if we're trying to attach TRANSLATED boot image
-        dettachBySourceType(SOURCETYPE_IMAGE_TRANSLATEDBOOT);       // first remove it, if we have it
-    }
+    std::string pathRaw = Utils::dotEnvValue("MOUNT_DIR_RAW");    // where the raw disks are symlinked
+    Utils::mergeHostPaths(pathRaw, "/X");           // add placeholder
+    int len = pathRaw.length();
 
-    int index = findAttachedMediaByHostPath(hostPath);              // check if we already don't have this
-
-    if(index != -1) {                                               // if we already have this media
-        if(attachedMedia[index].devInfoIndex == -1) {               // but it's not attached to ACSI ID
-            res = attachMediaToACSIid(index, hostSourceType, accessType);          // attach media to ACSI ID
-
-            if(res) {
-                Debug::out(LOG_DEBUG, "Scsi::attachToHostPath - %s(%s) - media was already attached, attached to ACSI ID %d", hostPath.c_str(), SourceTypeStr(hostSourceType), attachedMedia[index].devInfoIndex);
-            } else {
-                Debug::out(LOG_DEBUG, "Scsi::attachToHostPath - %s(%s) - media was already attached, but still not attached to ACSI ID!", hostPath.c_str(), SourceTypeStr(hostSourceType));
-            }
-
-            return res;
-        }
-
-        // well, we have the media attached and we're also attached to ACSI ID
-        Debug::out(LOG_DEBUG, "Scsi::attachToHostPath - %s(%s) - media was already attached to ACSI ID %d, not doing anything.", hostPath.c_str(), SourceTypeStr(hostSourceType), attachedMedia[index].devInfoIndex);
-        return true;
-    }
-
-    index = findEmptyAttachSlot();                              // find where we can store it
-
-    if(index == -1) {                                               // no more place to store it?
-        Debug::out(LOG_ERROR, "Scsi::attachToHostPath - %s(%s) - no empty slot! Not attaching.", hostPath.c_str(), SourceTypeStr(hostSourceType));
-        return false;
-    }
-
-    switch(hostSourceType) {                                                // try to open it depending on source type
-    case SOURCETYPE_SD_CARD:
-        attachedMedia[index].hostPath       = hostPath;
-        attachedMedia[index].hostSourceType = SOURCETYPE_SD_CARD;
-        attachedMedia[index].dataMedia      = &sdMedia;
-        attachedMedia[index].accessType     = SCSI_ACCESSTYPE_FULL;
-        attachedMedia[index].dataMediaDynamicallyAllocated = false;         // didn't use new on .dataMedia
-        break;
-
-    case SOURCETYPE_NONE:
-        attachedMedia[index].hostPath       = hostPath;
-        attachedMedia[index].hostSourceType = SOURCETYPE_NONE;
-        attachedMedia[index].dataMedia      = &noMedia;
-        attachedMedia[index].accessType     = SCSI_ACCESSTYPE_NO_DATA;
-        attachedMedia[index].dataMediaDynamicallyAllocated = false;         // didn't use new on .dataMedia
-        break;
-
-    case SOURCETYPE_IMAGE:
-        dm  = new ImageFileMedia();
-        res = dm->iopen(hostPath.c_str(), false);                  // try to open the image
-
-        if(res) {                                                           // image opened?
-            attachedMedia[index].hostPath       = hostPath;
-            attachedMedia[index].hostSourceType = hostSourceType;
-            attachedMedia[index].dataMedia      = dm;
-
-            if(hostSourceType != SOURCETYPE_IMAGE_TRANSLATEDBOOT) {                // for normal images - full access is allowed
-                attachedMedia[index].accessType    = accessType;
-            } else {                                                            // for translated boot image - read only
-                attachedMedia[index].accessType    = SCSI_ACCESSTYPE_READ_ONLY;
-            }
-
-            attachedMedia[index].dataMediaDynamicallyAllocated = true;      // did use new on .dataMedia
-        } else {                                                            // failed to open image?
-            Debug::out(LOG_ERROR, "Scsi::attachToHostPath - failed to open image %s! Not attaching.", hostPath.c_str());
-            attachedMedia[index].dataMediaDynamicallyAllocated = false;     // didn't use new on .dataMedia
-            delete dm;
-            return false;
-        }
-        break;
-
-    case SOURCETYPE_IMAGE_TRANSLATEDBOOT:
-        attachedMedia[index].hostPath       = hostPath;
-        attachedMedia[index].hostSourceType = hostSourceType;
-        attachedMedia[index].dataMedia      = &tranBootMedia;
-        attachedMedia[index].accessType        = SCSI_ACCESSTYPE_READ_ONLY;
-        attachedMedia[index].dataMediaDynamicallyAllocated = false;         // didn't use new on .dataMedia
-        break;
-
-    case SOURCETYPE_DEVICE:
-        dm  = new DeviceMedia();
-        res = dm->iopen(hostPath.c_str(), false);                   // try to open the device
-
-        if(res) {
-            attachedMedia[index].hostPath       = hostPath;
-            attachedMedia[index].hostSourceType = hostSourceType;
-            attachedMedia[index].dataMedia      = dm;
-            attachedMedia[index].accessType     = SCSI_ACCESSTYPE_FULL;
-            attachedMedia[index].dataMediaDynamicallyAllocated = true;      // did use new on .dataMedia
-        } else {
-            Debug::out(LOG_ERROR, "Scsi::attachToHostPath - failed to open device %s! Not attaching.", hostPath.c_str());
-            attachedMedia[index].dataMediaDynamicallyAllocated = false;     // didn't use new on .dataMedia
-            delete dm;
-            return false;
-        }
-
-        break;
-
-    case SOURCETYPE_TESTMEDIA:
-        Debug::out(LOG_DEBUG, "Scsi::attachToHostPath - test media stored at index %d", index);
-
-        attachedMedia[index].hostPath       = hostPath;
-        attachedMedia[index].hostSourceType = hostSourceType;
-        attachedMedia[index].dataMedia      = &testMedia;
-        attachedMedia[index].accessType     = SCSI_ACCESSTYPE_FULL;
-        attachedMedia[index].dataMediaDynamicallyAllocated = false;         // didn't use new on .dataMedia
-        break;
-    }
-
-    res = attachMediaToACSIid(index, hostSourceType, accessType);          // last step - attach media to ACSI ID
-
-    if(res) {
-        Debug::out(LOG_DEBUG, "Scsi::attachToHostPath - %s - attached to ACSI ID %d", hostPath.c_str(), attachedMedia[index].devInfoIndex);
-    } else {
-        Debug::out(LOG_ERROR, "Scsi::attachToHostPath - %s - media attached, but not attached to ACSI ID!", hostPath.c_str());
-    }
-
-    return res;
-}
-
-bool Scsi::attachMediaToACSIid(int mediaIndex, int hostSourceType, int accessType)
-{
-    for(int i=0; i<8; i++) {                                                // find empty and proper ACSI ID
-        // if this index is already used, skip it
-        if(devInfo[i].attachedMediaIndex != -1) {
-            continue;
-        }
-        bool canAttach;
-        switch(acsiIdInfo.acsiIDdevType[i]) {
-        case DEVTYPE_SD:    // only attaching SD CARDs
-            canAttach = (hostSourceType == SOURCETYPE_SD_CARD);
-            break;
-        case DEVTYPE_RAW:   // attaching everything except SD CARDs and Translated boot
-            canAttach = (hostSourceType != SOURCETYPE_SD_CARD) && (hostSourceType != SOURCETYPE_IMAGE_TRANSLATEDBOOT);
-            break;
-        case DEVTYPE_TRANSLATED:    // only attaching TRANSLATEDBOOT
-            canAttach = (hostSourceType == SOURCETYPE_IMAGE_TRANSLATEDBOOT);
-            break;
-        default:
-            canAttach = false;
-        }
-        if(canAttach) {
-            devInfo[i].attachedMediaIndex   = mediaIndex;
-            devInfo[i].accessType           = accessType;
-            attachedMedia[mediaIndex].devInfoIndex = i;
-
-            if(hostSourceType == SOURCETYPE_IMAGE_TRANSLATEDBOOT) {
-                tranBootMedia.updateBootsectorConfigWithACSIid(i);        // and update boot sector config with ACSI ID to which this has been attached
-            }
-            return true;
-        }
-    }
-
-    return false;
-}
-
-void Scsi::detachMediaFromACSIidByIndex(int index)
-{
-    if(index < 0 || index >= 8) {                                   // out of index?
-        return;
-    }
-
-    if(devInfo[index].attachedMediaIndex == -1) {                   // nothing attached?
-        return;
-    }
-
-    int attMediaInd = devInfo[index].attachedMediaIndex;
-    if(    attachedMedia[attMediaInd].dataMediaDynamicallyAllocated) { // if dataMedia was creates using new, use delete
-        if(attachedMedia[ attMediaInd ].dataMedia != NULL) {
-            delete attachedMedia[ attMediaInd ].dataMedia;            // delete the data source access object
-            attachedMedia[ attMediaInd ].dataMedia = NULL;
-        }
-    }
-    initializeAttachedMediaVars(attMediaInd);
-
-    devInfo[index].attachedMediaIndex   = -1;                       // set not attached in dev info
-    devInfo[index].accessType           = SCSI_ACCESSTYPE_NO_DATA;
-}
-
-void Scsi::dettachFromHostPath(std::string hostPath)
-{
-    int index = findAttachedMediaByHostPath(hostPath);          // find media by host path
-
-    if(index == -1) {                                           // not found? quit
-        return;
-    }
-
-    dettachByIndex(index);                                      // found? detach!
-}
-
-void Scsi::detachAll(void)
-{
-    for(int i=0; i<8; i++) {
-        detachMediaFromACSIidByIndex(i);
-    }
-}
-
-void Scsi::detachAllUsbMedia(void)
-{
-    for(int i=0; i<8; i++) {                                                    // go through all the devices and detach only USB devices
-        if(devInfo[i].attachedMediaIndex == -1) {                               // nothing attached?
-            continue;
-        }
-
-        int attMediaInd = devInfo[i].attachedMediaIndex;
-        if( attachedMedia[ attMediaInd ].hostSourceType != SOURCETYPE_DEVICE) { // this is not a USB device? skip it
-            continue;
-        }
-
-        detachMediaFromACSIidByIndex(i);
-    }
-}
-
-int Scsi::findAttachedMediaByHostPath(std::string hostPath)
-{
-    for(int i=0; i<MAX_ATTACHED_MEDIA; i++) {               // find where it's attached
-        if(attachedMedia[i].hostPath == hostPath) {         // if found
-            return i;
-        }
-    }
-
-    return -1;                                              // if not found
-}
-
-void Scsi::dettachBySourceType(int hostSourceType)
-{
-    for(int i=0; i<MAX_ATTACHED_MEDIA; i++) {                       // find where it's attached
-        if(attachedMedia[i].hostSourceType == hostSourceType) {     // if found
-            dettachByIndex(i);
-            return;
-        }
-    }
-}
-
-void Scsi::dettachByIndex(int index)
-{
-    if(index < 0 || index >= MAX_ATTACHED_MEDIA) {
-        return;
-    }
-
-    if(attachedMedia[index].devInfoIndex != -1) {                           // if was attached to ACSI ID
-        int ind2 = attachedMedia[index].devInfoIndex;
-
-        detachMediaFromACSIidByIndex(ind2);
-    }
-
-    if(    attachedMedia[index].dataMediaDynamicallyAllocated) {               // if dataMedia was created using new, delete it
-        if(attachedMedia[index].dataMedia != NULL) {
-            attachedMedia[index].dataMedia->iclose();                       // close it, delete it
-            delete attachedMedia[index].dataMedia;
-            attachedMedia[index].dataMedia = NULL;
-        }
-    }
-
-    initializeAttachedMediaVars(index);
-}
-
-void Scsi::initializeAttachedMediaVars(int index)
-{
-    if(index < 0 || index >= MAX_ATTACHED_MEDIA) {
-        return;
-    }
-
-    attachedMedia[index].hostPath       = "";
-    attachedMedia[index].hostSourceType = SOURCETYPE_NONE;
-    attachedMedia[index].dataMedia      = NULL;
-    attachedMedia[index].accessType     = SCSI_ACCESSTYPE_NO_DATA;
-    attachedMedia[index].devInfoIndex   = -1;
-    attachedMedia[index].dataMediaDynamicallyAllocated = false;
-}
-
-int Scsi::findEmptyAttachSlot(void)
-{
-    for(int i=0; i<MAX_ATTACHED_MEDIA; i++) {
-        if(attachedMedia[i].dataMedia == NULL) {
-            return i;
-        }
-    }
-
-    return -1;
-}
-
-void Scsi::reloadSettings(int type)
-{
-    loadSettings();
-}
-
-void Scsi::loadSettings(void)
-{
-    Debug::out(LOG_DEBUG, "Scsi::loadSettings");
-
-    // first read the new settings
     Settings s;
     s.loadAcsiIDs(&acsiIdInfo);
 
-    // then dettach everything from ACSI IDs
-    for(int i=0; i<8; i++) {
-        detachMediaFromACSIidByIndex(i);
-    }
+    for(int i=0; i<8; i++) {                        // go through all the possible drives
+        pathRaw[len - 1] = (char) ('0' + i);        // replace placeholder / drive character with the current drive char
 
-    if(acsiIdInfo.sdCardAcsiId != 0xff) {                // if we got ACSI ID for SD card, attach this SD card...
-        std::string sdCardHostPath("SD_CARD");
-        attachToHostPath(sdCardHostPath, SOURCETYPE_SD_CARD, SCSI_ACCESSTYPE_FULL);
-    }
+        bool isBoot = (acsiIdInfo.ceddId == i);     // if this ID is used for CE_DD booting
+        bool isFile = Utils::fileExists(pathRaw);   // if it's a file, then it's an image
+        bool isDev = Utils::devExists(pathRaw);     // device is a device is a device is a device ;)
 
-    // attach Translated bootmedia
-    attachToHostPath(TRANSLATEDBOOTMEDIA_FAKEPATH, SOURCETYPE_IMAGE_TRANSLATEDBOOT, SCSI_ACCESSTYPE_FULL);
+        if(!isFile && !isDev && !isBoot) {          // not a file, not a dev, not a CE_DD boot?
+            clearDevInfo(i);
+            continue;
+        }
 
-    // TODO : attach RAW usb drives again
-#if 0
-    // and now reattach everything back according to new ACSI ID settings
-    for(int i=0; i<MAX_ATTACHED_MEDIA; i++) {
-        if(attachedMedia[i].dataMedia != NULL) {            // if there's some media to use
-            attachMediaToACSIid(i, attachedMedia[i].hostSourceType, attachedMedia[i].accessType);
+        // it's a file or dir
+        devInfo[i].enabled = true;
+
+        if(isFile) {        // file means image
+            devInfo[i].hostSourceType = SOURCETYPE_IMAGE;
+            devInfo[i].accessType = SCSI_ACCESSTYPE_FULL;
+        } else if(isDev) {  // device is device
+            devInfo[i].hostSourceType = SOURCETYPE_DEVICE;
+            devInfo[i].accessType = SCSI_ACCESSTYPE_FULL;
+        } else if(isBoot) { // boot media here
+            devInfo[i].hostSourceType = SOURCETYPE_IMAGE_TRANSLATEDBOOT;
+            devInfo[i].accessType = SCSI_ACCESSTYPE_READ_ONLY;
+
+            tranBootMedia.updateBootsectorConfigWithACSIid(i);        // update boot sector config with ACSI ID
+        } else {            // we don't know
+            devInfo[i].hostSourceType = SOURCETYPE_NONE;
+            devInfo[i].accessType = SCSI_ACCESSTYPE_NO_DATA;
+            Debug::out(LOG_WARNING, "Scsi::findAttachedDisks() -- unknown source type!");
         }
     }
-#endif
+}
 
-    std::string img;
-    img = s.getString("HDDIMAGE", "");
-    while(!img.empty() && (img[img.length()-1] == '\n' || img[img.length()-1] == ' '))
-        img.erase(img.length()-1);
-    if(!img.empty()) {
-        int accessType = SCSI_ACCESSTYPE_FULL;
-        size_t pos = img.find_last_of(' ');
-        if(pos != std::string::npos) {
-            std::string end = img.substr(pos+1);
-            if(end.compare("READ_ONLY") == 0 || end.compare("READONLY") == 0 || end.compare("RO") == 0) {
-                accessType = SCSI_ACCESSTYPE_READ_ONLY;
-                img = img.substr(0, pos);
-            }
-        }
-        if(!attachToHostPath(img, SOURCETYPE_IMAGE, accessType)) {
-            Debug::out(LOG_ERROR, "Scsi::loadSettings fail to attach HDDIMAGE %s", img.c_str());
-        }
+void Scsi::clearDevInfo(int index)
+{
+    if(index < 0 || index >= MAX_ATTACHED_MEDIA) {
+        return;
     }
+
+    devInfo[index].enabled = false;
+    devInfo[index].hostSourceType = SOURCETYPE_NONE;
+    devInfo[index].accessType = SCSI_ACCESSTYPE_NO_DATA;
+    devInfo[index].dataMedia = NULL;
+    devInfo[index].dataMediaDynamicallyAllocated = false;
 }
 
 void Scsi::processCommand(uint8_t *command)
@@ -394,13 +100,7 @@ void Scsi::processCommand(uint8_t *command)
     cmd     = command;
     acsiId  = cmd[0] >> 5;
 
-    dataMedia = NULL;
-
-    int attachedMediaIndex = devInfo[acsiId].attachedMediaIndex;
-
-    if(attachedMediaIndex != -1) {                                  // if we got media attached to this ACSI ID
-        dataMedia = attachedMedia[ attachedMediaIndex ].dataMedia;  // get pointer to dataMedia
-    }
+    dataMedia = devInfo[acsiId].dataMedia;  // get pointer to dataMedia
 
     if(dataTrans == 0) {
         Debug::out(LOG_ERROR, "Scsi::processCommand was called without valid dataTrans, can't tell ST that his went wrong...");
@@ -410,7 +110,7 @@ void Scsi::processCommand(uint8_t *command)
     dataTrans->clear();                                         // clean data transporter before handling
 
     if(dataMedia == 0) {
-        Debug::out(LOG_ERROR, "Scsi::processCommand was called without valid dataMedia, will return error CHECK CONDITION acsiId=%d attachedMediaIndex=%d", acsiId, attachedMediaIndex);
+        Debug::out(LOG_ERROR, "Scsi::processCommand was called without valid dataMedia, will return error CHECK CONDITION acsiId=%d", acsiId);
         dataTrans->setStatus(SCSI_ST_CHECK_CONDITION);
         dataTrans->sendDataAndStatus();
         return;
@@ -541,9 +241,9 @@ void Scsi::SCSI_Inquiry(uint8_t lun)
         return;
     }
 
-    if(devInfo[acsiId].attachedMediaIndex != -1) {
-        int type = attachedMedia[devInfo[acsiId].attachedMediaIndex].hostSourceType;
-        switch(type) {
+    int type = devInfo[acsiId].hostSourceType;
+
+    switch(type) {
         case SOURCETYPE_IMAGE:
           memcpy(type_str, "IMG ", 4);
           break;
@@ -558,7 +258,6 @@ void Scsi::SCSI_Inquiry(uint8_t lun)
           break;
         default:
           snprintf(type_str, sizeof(type_str), "%4d", type);
-        }
     }
     //-----------
     inquiryLength = cmd[4];                             // how many bytes should be sent

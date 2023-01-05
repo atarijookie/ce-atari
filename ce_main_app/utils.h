@@ -69,8 +69,10 @@ public:
     static const char *getExtension(const char *fileName);
     static bool isZIPfile(const char *fileName);
     static void createPathWithOtherExtension(std::string &inPathWithOriginalExt, const char *otherExtension, std::string &outPathWithOtherExtension);
-    static bool fileExists(std::string &hostPath);
-    static bool fileExists(const char *hostPath);
+    static bool fileExists(std::string &path);
+    static bool fileExists(const char *path);
+    static bool dirExists(std::string& path);
+    static bool devExists(std::string& path);
     static void toUpperCaseString(std::string &st);
 
     static int bcdToInt(int bcd);

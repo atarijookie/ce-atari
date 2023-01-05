@@ -40,51 +40,33 @@
 #define BUFFER_SIZE_SECTORS     MAXIMUM_SECTOR_COUNT_LANGE
 
 typedef struct {
-    std::string hostPath;                       // specifies host path to image file or device
+    bool        enabled;
+    uint8_t     LastStatus;         // last returned SCSI status
+    uint8_t     SCSI_ASC;           // additional sense code
+    uint8_t     SCSI_ASCQ;          // additional sense code qualifier
+    uint8_t     SCSI_SK;            // sense key
+
     int         hostSourceType;                 // type: image or device
     int         accessType;                     // access type: read only, read write, no data
 
     IMedia      *dataMedia;                     // pointer to the data provider object
     bool        dataMediaDynamicallyAllocated;  // set to true if dataMedia was created by new and delete should be used, otherwise set to false and delete won't be used
-
-    int         devInfoIndex;                   // index in devInfo[]
-} TScsiConf;
-
-typedef struct {
-    int     attachedMediaIndex; // index in attachedMedia[]
-
-    uint8_t    accessType;         // SCSI_ACCESSTYPE_FULL || SCSI_ACCESSTYPE_READ_ONLY || SCSI_ACCESSTYPE_NO_DATA
-
-    uint8_t    LastStatus;         // last returned SCSI status
-    uint8_t    SCSI_ASC;           // additional sense code
-    uint8_t    SCSI_ASCQ;          // additional sense code qualifier
-    uint8_t    SCSI_SK;            // sense key
 } TDevInfo;
 
-
-class Scsi: public ISettingsUser
+class Scsi
 {
 public:
     Scsi(void);
     virtual ~Scsi();
 
-    void reloadSettings(int type);
-
     void setAcsiDataTrans(AcsiDataTrans *dt);
-
-    bool attachToHostPath(std::string hostPath, int hostSourceType, int accessType);
-    void dettachFromHostPath(std::string hostPath);
-    void detachAll(void);
-    void detachAllUsbMedia(void);
-
+    void findAttachedDisks(void);
     void processCommand(uint8_t *command);
-
     void updateTranslatedBootMedia(void);
 
-    TScsiConf * getDevAttachedMedia(int id) {
+    TDevInfo* getDevInfo(int id) {
         if(id < 0 || id >= 8) return NULL;
-        if(devInfo[id].attachedMediaIndex < 0) return NULL;
-        return &attachedMedia[devInfo[id].attachedMediaIndex];
+        return &devInfo[id];
     }
 
     static const char * SourceTypeStr(int sourceType);
@@ -107,7 +89,6 @@ private:
 
     bool            sendDataAndStatus_notJustStatus;
 
-    TScsiConf       attachedMedia[MAX_ATTACHED_MEDIA];
     TDevInfo        devInfo[8];
 
     AcsiIDinfo      acsiIdInfo;
@@ -157,16 +138,7 @@ private:
     bool compareSectors (uint32_t startSectorNo, uint32_t sectorCount);
     bool eraseMedia(void);
 
-    void loadSettings(void);
-
-    int  findEmptyAttachSlot(void);
-    int  findAttachedMediaByHostPath(std::string hostPath);
-    void dettachBySourceType(int hostSourceType);
-    void dettachByIndex(int index);
-    bool attachMediaToACSIid(int mediaIndex, int hostSourceType, int accessType);
-    void detachMediaFromACSIidByIndex(int index);
-
-    void initializeAttachedMediaVars(int index);
+    void clearDevInfo(int index);
 
     const char *getCommandName(uint8_t cmd);
 };

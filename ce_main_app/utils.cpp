@@ -705,16 +705,45 @@ void Utils::createPathWithOtherExtension(std::string &inPathWithOriginalExt, con
     outPathWithOtherExtension = outPathWithOtherExtension + std::string(otherExtension);    // append other extension
 }
 
-bool Utils::fileExists(std::string &hostPath)
+bool Utils::fileExists(std::string &path)
 {
-    int res = access(hostPath.c_str(), F_OK);
-    return (res != -1);     // if not error, file exists
+    return Utils::fileExists(path.c_str());
 }
 
-bool Utils::fileExists(const char *hostPath)
+bool Utils::fileExists(const char *path)
 {
-    int res = access(hostPath, F_OK);
-    return (res != -1);     // if not error, file exists
+    struct stat sb;
+
+    // if can get stat and ISREG is in mode, it's a regular file
+    if (stat(path, &sb) == 0 && S_ISREG(sb.st_mode)) {
+        return true;
+    }
+
+    return false;
+}
+
+bool Utils::dirExists(std::string& path)
+{
+    struct stat sb;
+
+    // if can get stat and ISDIR is in mode, it's a dir
+    if (stat(path.c_str(), &sb) == 0 && S_ISDIR(sb.st_mode)) {
+        return true;
+    }
+
+    return false;
+}
+
+bool Utils::devExists(std::string& path)
+{
+    struct stat sb;
+
+    // if can get stat and S_ISBLK is in mode, it's a block device
+    if (stat(path.c_str(), &sb) == 0 && S_ISBLK(sb.st_mode)) {
+        return true;
+    }
+
+    return false;
 }
 
 int Utils::bcdToInt(int bcd)

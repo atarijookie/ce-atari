@@ -61,6 +61,8 @@ void ScreencastAcsiCommand::sharedMemoryOpen(void)
         if(f) {
             fread(sharedMemPointer + 1, 1, 32032, f);   // fill the initial screencast buffer with logo
             fclose(f);
+        } else {
+            Debug::out(LOG_WARNING, "ScreenCastAcsiCommand::openSharedMemory - failed to load ce_logo.bin");
         }
 
         Debug::out(LOG_DEBUG, "ScreenCastAcsiCommand::openSharedMemory - mmap() success");

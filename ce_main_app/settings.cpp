@@ -330,6 +330,7 @@ void Settings::loadAcsiIDs(AcsiIDinfo *aii, bool useDefaultsIfNoSettings)
         }
 
         if(devType == DEVTYPE_TRANSLATED) {             // found at least one TRANSLATED device?
+            aii->ceddId = id;                           // ID of CE_DD device
             aii->gotDevTypeTranslated = true;
         }
     }

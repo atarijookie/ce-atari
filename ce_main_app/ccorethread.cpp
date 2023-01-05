@@ -533,11 +533,6 @@ void CCoreThread::reloadSettings(int type)
         return;
     }
 
-    // first dettach all the devices
-    pthread_mutex_lock(&shared.mtxScsi);
-    shared.scsi->detachAll();
-    pthread_mutex_unlock(&shared.mtxScsi);
-
     // then load the new settings
     loadSettings();
 }
