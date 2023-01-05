@@ -1,15 +1,14 @@
 from copy import deepcopy
 import os
+import sys
 import re
-import logging
 import json
 import psutil
 import subprocess
+import socket
 from functools import partial
-from logging.handlers import RotatingFileHandler
 from wrapt_timeout_decorator import timeout
-
-app_log = logging.getLogger()
+from loguru import logger as app_log
 
 
 KEY_LETTER_FIRST = 'DRIVELETTER_FIRST'
@@ -59,27 +58,9 @@ def log_config():
     log_file = os.path.join(log_dir, 'ce_mounter.log')
 
     os.makedirs(log_dir, exist_ok=True)
-
-    log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
-
-    my_handler = RotatingFileHandler(log_file, mode='a', maxBytes=1024 * 1024, backupCount=1)
-    my_handler.setFormatter(log_formatter)
-    my_handler.setLevel(logging.DEBUG)
-
-    app_log.setLevel(logging.DEBUG)
-    app_log.addHandler(my_handler)
-
-
-def print_and_log(loglevel, message):
-    """ print to console and store to log """
-    if loglevel in [logging.WARNING, logging.ERROR]:        # highlight messages with issues
-        message = f"!!! {message} !!!"
-
-    loglevel_string = logging.getLevelName(loglevel).ljust(8)
-    message = loglevel_string + " " + message               # add log level to message
-
-    print(message)
-    app_log.log(loglevel, message)
+    app_log.remove()        # remove all previous log settings
+    app_log.add(sys.stderr, format="{time:YYYY-MM-DD HH:mm:ss} {level: <7} {message}")
+    app_log.add(log_file, format="{time:YYYY-MM-DD HH:mm:ss} {level: <7} {message}", rotation="1 MB", retention=1)
 
 
 @timeout(1)
@@ -87,18 +68,18 @@ def log_all_changed_settings(settings1: dict, settings2: dict):
     """ go through the supplied list of keys and log changed keys """
 
     cnt = 0
-    print_and_log(logging.DEBUG, f"Changed keys:")
+    app_log.debug(f"Changed keys:")
 
     for key in settings1.keys():        # go through all the keys, compare values
         v1 = settings1.get(key)
         v2 = settings2.get(key)
 
         if v1 != v2:  # compare values for key from both dicts - not equal? changed!
-            print_and_log(logging.DEBUG, f"    {key}: {v1} -> {v2}")
+            app_log.debug(f"    {key}: {v1} -> {v2}")
             cnt += 1
 
     if not cnt:                         # nothing changed?
-        print_and_log(logging.DEBUG, f"    (none)")
+        app_log.debug(f"    (none)")
 
 
 def setting_changed_on_keys(keys: list, settings1: dict, settings2: dict):
@@ -140,7 +121,7 @@ def load_one_setting(setting_name, default_value=None):
     path = os.path.join(os.getenv('SETTINGS_DIR'), setting_name)    # create full path
 
     if not os.path.exists(path) or not os.path.isfile(path):  # if it's not a file, skip it
-        print_and_log(logging.WARNING, f"failed to read file {path} - file does not exist")
+        app_log.warning(f"failed to read file {path} - file does not exist")
         return default_value
 
     try:
@@ -149,9 +130,9 @@ def load_one_setting(setting_name, default_value=None):
             value = re.sub('[\n\r\t]', '', value)
             return value
     except UnicodeDecodeError:
-        print_and_log(logging.WARNING, f"failed to read file {path} - binary data in text file?")
+        app_log.warning(f"failed to read file {path} - binary data in text file?")
     except Exception as ex:
-        print_and_log(logging.WARNING, f"failed to read file {path} with exception: {type(ex).__name__} - {str(ex)}")
+        app_log.warning(f"failed to read file {path} with exception: {type(ex).__name__} - {str(ex)}")
 
     return default_value
 
@@ -196,7 +177,7 @@ def settings_load():
     changed = detect_settings_change(settinx, settings_old)
     save_old_settings(settinx)                  # save the current settings to json file
 
-    print_and_log(logging.DEBUG, f"settings_load - changed_letters: {changed[0]}, changed_ids: {changed[1]}")
+    app_log.debug(f"settings_load - changed_letters: {changed[0]}, changed_ids: {changed[1]}")
     return changed
 
 
@@ -207,7 +188,7 @@ def setting_get_bool(setting_name):
     try:
         value = bool(int(value_raw))
     except Exception as exc:
-        print_and_log(logging.WARNING, f"for {setting_name} failed to convert {value} to bool: {str(exc)}")
+        app_log.warning(f"for {setting_name} failed to convert {value} to bool: {str(exc)}")
 
     return value
 
@@ -219,7 +200,7 @@ def setting_get_int(setting_name):
     try:
         value = int(value_raw)
     except Exception as exc:
-        print_and_log(logging.WARNING, f"failed to convert {value} to int: {str(exc)}")
+        app_log.warning(f"failed to convert {value} to int: {str(exc)}")
 
     return value
 
@@ -275,7 +256,7 @@ def unlink_without_fail(path):
     except FileNotFoundError:   # if it doesn't really exist, just ignore this exception (it's ok)
         pass
     except Exception as ex:     # if it existed (e.g. broken link) but failed to remove, log error
-        print_and_log(logging.WARNING, f'failed to unlink {path} - exception: {str(ex)}')
+        app_log.warning(f'failed to unlink {path} - exception: {str(ex)}')
 
     return False
 
@@ -316,14 +297,14 @@ def get_usb_drive_letters(all_letters):
 
 def unlink_drives_from_list(drive_letters):
     """ go through the list of drive letters and try to unlink them """
-    print_and_log(logging.DEBUG, f'unlink_drives_from_list - will unlink these if they exist: {drive_letters}')
+    app_log.debug(f'unlink_drives_from_list - will unlink these if they exist: {drive_letters}')
 
     for letter in drive_letters:                    # go through drive letters which can be used for USB drives
         path = get_symlink_path_for_letter(letter)  # construct path where the drive letter should be mounted
         good = unlink_without_fail(path)            # unlink if possible
 
         if good:
-            print_and_log(logging.DEBUG, f'unlink_drives_from_list - unlinked {path}')
+            app_log.debug(f'unlink_drives_from_list - unlinked {path}')
 
 
 def unlink_everything_raw():
@@ -369,7 +350,7 @@ def umount_if_mounted(mount_dir, delete=False):
 
     try:
         if not os.path.exists(mount_dir):
-            print_and_log(logging.INFO, f'umount_if_mounted: path {mount_dir} does not exists, not doing umount')
+            app_log.info(f'umount_if_mounted: path {mount_dir} does not exists, not doing umount')
             return
 
         cmd = f'umount "{mount_dir}"'     # construct umount command
@@ -378,9 +359,9 @@ def umount_if_mounted(mount_dir, delete=False):
         if delete:                      # if should also delete folder
             os.rmdir(mount_dir)
 
-        print_and_log(logging.INFO, f'umount_if_mounted: umounted {mount_dir}')
+        app_log.info(f'umount_if_mounted: umounted {mount_dir}')
     except Exception as exc:
-        print_and_log(logging.INFO, f'umount_if_mounted: failed to umount {mount_dir} : {str(exc)}')
+        app_log.info(f'umount_if_mounted: failed to umount {mount_dir} : {str(exc)}')
 
 
 def text_to_file(text, filename):
@@ -389,7 +370,7 @@ def text_to_file(text, filename):
         with open(filename, 'wt') as f:
             f.write(text)
     except Exception as ex:
-        print_and_log(logging.WARNING, f"mount_shared: failed to write to {filename}: {str(ex)}")
+        app_log.warning(f"mount_shared: failed to write to {filename}: {str(ex)}")
 
 
 def text_from_file(filename):
@@ -404,7 +385,7 @@ def text_from_file(filename):
             text = f.read()
             text = text.strip()         # remove whitespaces
     except Exception as ex:
-        print_and_log(logging.WARNING, f"mount_shared: failed to read {filename}: {str(ex)}")
+        app_log.warning(f"mount_shared: failed to read {filename}: {str(ex)}")
 
     return text
 
@@ -450,9 +431,9 @@ def get_and_show_symlinks(search_dir, fun_on_each_found):
 
         for one_dir in dirs:
             desc = '' if not fun_on_each_found else fun_on_each_found(search_dir, one_dir)  # get description if got function
-            print_and_log(logging.INFO, f" * {one_dir} {desc}")
+            app_log.info(f" * {one_dir} {desc}")
     else:                                       # nothing was found
-        print_and_log(logging.INFO, f" (none)")
+        app_log.info(f" (none)")
 
 
 def show_symlinked_dirs():
@@ -462,16 +443,16 @@ def show_symlinked_dirs():
     custom_letters = get_user_custom_mounts_letters()           # fetch all the user custom letters
 
     # first show translated drives
-    print_and_log(logging.INFO, " ")
-    print_and_log(logging.INFO, "list of current translated drives:")
+    app_log.info(" ")
+    app_log.info("list of current translated drives:")
     get_and_show_symlinks(os.getenv('MOUNT_DIR_TRANS'), partial(get_dir_usage, custom_letters))
 
     # then show RAW drives
-    print_and_log(logging.INFO, " ")
-    print_and_log(logging.INFO, "list of current RAW drives:")
+    app_log.info(" ")
+    app_log.info("list of current RAW drives:")
     get_and_show_symlinks(os.getenv('MOUNT_DIR_RAW'), get_symlink_source)
 
-    print_and_log(logging.INFO, " ")
+    app_log.info(" ")
 
 
 def is_mountpoint_mounted(mountpoint):
@@ -505,8 +486,8 @@ def symlink_if_needed(mount_dir, symlink_dir):
 
     # check if the source (mount) dir exists, fail if it doesn't
     if not os.path.exists(mount_dir):
-        print_and_log(logging.WARNING, f"symlink_if_needed: mount_dir {mount_dir} does not exists!")
-        return
+        app_log.warning(f"symlink_if_needed: mount_dir {mount_dir} does not exists!")
+        return False
 
     symlink_it = False
 
@@ -523,22 +504,26 @@ def symlink_if_needed(mount_dir, symlink_dir):
 
     # sym linking not needed? quit
     if not symlink_it:
-        return
+        return False
 
     # should symlink now
     unlink_without_fail(symlink_dir)        # try to delete it
 
+    good = False
     try:
         os.symlink(mount_dir, symlink_dir)  # symlink from mount path to symlink path
-        print_and_log(logging.DEBUG, f'symlink_if_needed: symlinked {mount_dir} -> {symlink_dir}')
+        app_log.debug(f'symlink_if_needed: symlinked {mount_dir} -> {symlink_dir}')
+        good = True
     except Exception as ex:
-        print_and_log(logging.WARNING, f'symlink_if_needed: failed with: {type(ex).__name__} - {str(ex)}')
+        app_log.warning(f'symlink_if_needed: failed with: {type(ex).__name__} - {str(ex)}')
+
+    return good
 
 
 def other_instance_running():
     """ check if other instance of this app is running, return True if yes """
     pid_current = os.getpid()
-    print_and_log(logging.INFO, f'PID of this process: {pid_current}')
+    app_log.info(f'PID of this process: {pid_current}')
 
     pid_file = os.path.join(os.getenv('DATA_DIR'), 'mount.pid')
     os.makedirs(os.path.split(pid_file)[0], exist_ok=True)     # create dir for PID file if it doesn't exist
@@ -551,20 +536,20 @@ def other_instance_running():
     except TypeError:       # we're expecting this on no text from file
         pass
     except Exception as ex:
-        print_and_log(logging.WARNING, f'other_instance_running: getting int PID from file failed: {type(ex).__name__} - {str(ex)}')
+        app_log.warning(f'other_instance_running: getting int PID from file failed: {type(ex).__name__} - {str(ex)}')
 
     # our and other PID match? no other instance
     if pid_current == pid_from_file:
-        print_and_log(logging.DEBUG, f'other_instance_running: PID from file is ours, so other instance not running.')
+        app_log.debug(f'other_instance_running: PID from file is ours, so other instance not running.')
         return False        # no other instance running
 
     # some other PID than ours was found in file
     if psutil.pid_exists(pid_from_file):
-        print_and_log(logging.WARNING, f'other_instance_running: Other mounter with PID {pid_from_file} is running!')
+        app_log.warning(f'other_instance_running: Other mounter with PID {pid_from_file} is running!')
         return True         # other instance is running
 
     # other PID doesn't exist, no other instance running
-    print_and_log(logging.DEBUG, f'other_instance_running: PID from file not running, so other instance not running')
+    app_log.debug(f'other_instance_running: PID from file not running, so other instance not running')
     text_to_file(str(pid_current), pid_file)        # write our PID to file
     return False            # no other instance running
 
@@ -616,7 +601,7 @@ def get_root_fs_device():
     dev_root_fs = text_from_file(FILE_ROOT_DEV)
 
     if dev_root_fs:         # if already got dev_root_fs figured out, just return it
-        #print_and_log(logging.DEBUG, f'get_root_fs_device: returning cached root filesystem device: {dev_root_fs}')
+        #app_log.debug(f'get_root_fs_device: returning cached root filesystem device: {dev_root_fs}')
         return dev_root_fs
 
     # run the mount command in subprocess, get output
@@ -639,6 +624,66 @@ def get_root_fs_device():
     while root_dev[-1].isnumeric():             # last char is a number?
         root_dev = root_dev[:-1]                # remove last char
 
-    #print_and_log(logging.DEBUG, f'get_root_fs_device: root filesystem device: {root_dev}')
+    # app_log.debug(f'get_root_fs_device: root filesystem device: {root_dev}')
     text_to_file(root_dev, FILE_ROOT_DEV)       # cache this value to file
     return root_dev
+
+
+def send_to_socket(sock_path, item):
+    """ send an item to core """
+    try:
+        app_log.debug(f"sending {item} to {sock_path}")
+        json_item = json.dumps(item)   # dict to json
+
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+        sock.connect(sock_path)
+        sock.send(json_item.encode('utf-8'))
+        sock.close()
+    except Exception as ex:
+        app_log.debug(f"failed to send {item} - {str(ex)}")
+
+
+def send_to_core(item):
+    """ send an item to core """
+    send_to_socket(os.getenv('CORE_SOCK_PATH'), item)
+
+
+def send_to_taskq(item):
+    """ send an item to task queue """
+    send_to_socket(os.getenv('TASKQ_SOCK_PATH'), item)
+
+
+def trigger_reload_translated():
+    """ when translated disks change, trigger disks reload in core """
+    app_log.debug(f"Will now trigger reload of translated drives in core!")
+    item = {'module': 'disks', 'action': 'reload_trans'}
+    send_to_core(item)
+
+
+def trigger_reload_raw():
+    """ when raw disks change, trigger disks reload in core """
+    app_log.debug(f"Will now trigger reload of raw drives in core!")
+    item = {'module': 'disks', 'action': 'reload_raw'}
+    send_to_core(item)
+
+
+def copy_and_symlink_config_dir():
+    """ create a copy of configdir, then symlink it to right place """
+    if not os.path.exists(os.getenv('CONFIG_PATH_SOURCE')):
+        app_log.warning(f"Config drive origin folder doesn't exist! ( {os.getenv('CONFIG_PATH_SOURCE')} )")
+        return
+
+    symlinked = False
+    try:
+        os.makedirs(os.getenv('CONFIG_PATH_COPY'), exist_ok=True)                    # create dir for copy
+        os.system(f"cp -r {os.getenv('CONFIG_PATH_SOURCE')}/* {os.getenv('CONFIG_PATH_COPY')}")   # copy original config dir to copy dir
+
+        symlink_path = get_symlink_path_for_letter(letter_confdrive())
+
+        symlinked = symlink_if_needed(os.getenv('CONFIG_PATH_COPY'), symlink_path)  # create symlink, but only if needed
+        app_log.info(f"Config drive was symlinked to: {symlink_path}")
+    except Exception as ex:
+        app_log.warning(f'copy_and_symlink_config_dir: failed with: {type(ex).__name__} - {str(ex)}')
+
+    if symlinked:           # if config drive was symlinked, trigger core reload of translated disks
+        trigger_reload_translated()

@@ -37,6 +37,7 @@ void handleFloppyAction(std::string& action, json& data);
 void handleGenericAction(std::string& action, json& data);
 void handleIkbdAction(std::string& action, json& data);
 void handleSceencastAction(std::string& action, json& data);
+void handleDisksAction(std::string& action, json& data);
 void closeFifo(bool keybNotMouse);
 
 int createSocket(void)
@@ -123,6 +124,8 @@ void *cmdSockThreadCode(void *ptr)
                 handleFloppyAction(action, data);
             } else if (module == "all") {           // generic / all modules?
                 handleGenericAction(action, data);
+            } else if (module == "disks") {         // disk modules?
+                handleDisksAction(action, data);
             } else if(module == "ikbd") {           // ikbd module?
                 handleIkbdAction(action, data);
             } else if(module == "screencast") {
@@ -381,5 +384,21 @@ void handleSceencastAction(std::string& action, json& data)
         Utils::screenShotVblEnabled(false);
     } else {
         Debug::out(LOG_WARNING, "handleSceencastAction: unknown action '%s', ignoring message!", action.c_str());
+    }
+}
+
+void handleDisksAction(std::string& action, json& data)
+{
+    if(action == "reload_trans") {              // reload translated disks
+        pthread_mutex_lock(&shared.mtxScsi);
+        TranslatedDisk* translated = TranslatedDisk::getInstance();
+        translated->findAttachedDisks();
+        pthread_mutex_unlock(&shared.mtxScsi);
+    } else if(action == "reload_raw") {         // reload raw disks
+        pthread_mutex_lock(&shared.mtxScsi);
+        shared.scsi->findAttachedDisks();
+        pthread_mutex_unlock(&shared.mtxScsi);
+    } else {
+        Debug::out(LOG_WARNING, "handleDisksAction: unknown action '%s', ignoring message!", action.c_str());
     }
 }

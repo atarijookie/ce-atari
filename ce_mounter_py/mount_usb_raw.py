@@ -1,7 +1,7 @@
 import os
-import logging
-from shared import print_and_log, setting_get_int, unlink_without_fail, DEV_TYPE_RAW, \
-    symlink_if_needed, get_root_fs_device
+from loguru import logger as app_log
+from shared import setting_get_int, unlink_without_fail, DEV_TYPE_RAW, \
+    symlink_if_needed, get_root_fs_device, trigger_reload_raw
 
 
 def get_symlink_path_for_id(id_):
@@ -52,8 +52,8 @@ def link_raw_device(device, acsi_id):
     path = get_symlink_path_for_id(acsi_id)  # create mount path for this id
 
     # create symlink from device to ACSI slot
-    print_and_log(logging.DEBUG, f"mount_device as RAW: {device} -> {path}")
-    symlink_if_needed(device, path)  # create symlink, but only if needed
+    app_log.debug(f"mount_device as RAW: {device} -> {path}")
+    return symlink_if_needed(device, path)  # create symlink, but only if needed
 
 
 def find_and_mount_raw(root_devs):
@@ -62,19 +62,19 @@ def find_and_mount_raw(root_devs):
 
     if dev_root_fs in root_devs:        # if the root fs device is reported in root devs, just remove it
         root_devs.remove(dev_root_fs)
-        print_and_log(logging.DEBUG, f"find_and_mount_raw: ignoring {dev_root_fs} which is mounted as '/' on linux")
+        app_log.debug(f"find_and_mount_raw: ignoring {dev_root_fs} which is mounted as '/' on linux")
 
     root_devs = [dev for dev in root_devs if not is_raw_device_linked(dev)]  # keep only not symlinked devices
 
     if not root_devs:           # no devices? quit
-        print_and_log(logging.DEBUG, f"find_and_mount_raw: no devices to be linked were found, skipping")
+        app_log.debug(f"find_and_mount_raw: no devices to be linked were found, skipping")
         return
 
     # find which ACSI slots are configured as RAW and are free
     ids = get_free_ids()
 
     if not ids:
-        print_and_log(logging.WARNING, f"find_and_mount_raw: No free RAW IDs found, cannot mount RAW devices")
+        app_log.warning(f"find_and_mount_raw: No free RAW IDs found, cannot mount RAW devices")
         return False
 
     # get lengths of found devices and available IDs
@@ -82,12 +82,18 @@ def find_and_mount_raw(root_devs):
     len_ids = len(ids)
 
     if len_ids < len_devs:
-        print_and_log(logging.WARNING, (f"find_and_mount_raw: not enough free IDs for RAW devices, won't be able "
+        app_log.warning((f"find_and_mount_raw: not enough free IDs for RAW devices, won't be able "
                                         f"to mount {len_devs - len_ids} devices"))
 
     count = min(len_devs, len_ids)  # if we don't have enough free ids, mount just that lower count
 
+    got_something = False           # each time device is attempted to be symlinked, this will be ORed with result
+
     for i in range(count):          # mount all the found partition devices, if possible
         device = root_devs[i]
         acsi_id = ids[i]
-        link_raw_device(device, acsi_id)
+        good = link_raw_device(device, acsi_id)
+        got_something = got_something or good   # if at least 1 device was symlinked, got_something will become true
+
+    if got_something:               # if something was symlinked, the core should look for new IDs
+        trigger_reload_raw()

@@ -1,8 +1,8 @@
 import os
-import logging
+from loguru import logger as app_log
 from wrapt_timeout_decorator import timeout
-from shared import print_and_log, get_symlink_path_for_letter, \
-    text_from_file, symlink_if_needed
+from shared import get_symlink_path_for_letter, \
+    text_from_file, symlink_if_needed, trigger_reload_translated
 
 
 def get_user_custom_mount_settings():
@@ -13,7 +13,7 @@ def get_user_custom_mount_settings():
     custom_mounts = []
 
     if not mnt_user:                        # no custom user mounts? quit
-        print_and_log(logging.INFO, f"mount_user_custom_folders: no custom user mounts from {os.getenv('FILE_MOUNT_USER')}")
+        app_log.info(f"mount_user_custom_folders: no custom user mounts from {os.getenv('FILE_MOUNT_USER')}")
         return custom_mounts
 
     lines = mnt_user.splitlines()           # split lines in string to list of string
@@ -25,13 +25,13 @@ def get_user_custom_mount_settings():
             continue
 
         if ':' not in line:
-            print_and_log(logging.WARNING, f"mount_user_custom_folders: ':' not found in line '{line}', expecting 'DRIVE:PATH'")
+            app_log.warning(f"mount_user_custom_folders: ':' not found in line '{line}', expecting 'DRIVE:PATH'")
             continue
 
         drive, custom_path = line.split(':', 1)     # split line to drive and path, maximum 1 splits
 
         if len(drive) != 1:                 # make sure drive letter is single letter
-            print_and_log(logging.WARNING, f"mount_user_custom_folders: drive letter '{drive}' not length of 1, ignoring")
+            app_log.warning(f"mount_user_custom_folders: drive letter '{drive}' not length of 1, ignoring")
             continue
 
         drive = drive.upper()               # drive letter to uppercase
@@ -55,8 +55,14 @@ def mount_user_custom_folders():
 
     custom_mounts = get_user_custom_mount_settings()
 
+    got_something = False
+
     for mnt in custom_mounts:                           # go through all found custom mount settings
         drive, custom_path = mnt                        # split tuple to vars
 
         symlink_path = get_symlink_path_for_letter(drive)       # create path where we should symlink the user folder
-        symlink_if_needed(custom_path, symlink_path)            # create symlink, but only if needed
+        good = symlink_if_needed(custom_path, symlink_path)     # create symlink, but only if needed
+        got_something = got_something or good   # if at least 1 thing was symlinked, got_something will become true
+
+    if got_something:           # if something was symlinked, the core should look for new translated drives
+        trigger_reload_translated()
