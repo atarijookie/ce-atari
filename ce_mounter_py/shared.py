@@ -14,7 +14,6 @@ from loguru import logger as app_log
 KEY_LETTER_FIRST = 'DRIVELETTER_FIRST'
 KEY_LETTER_CONFDRIVE = 'DRIVELETTER_CONFDRIVE'
 KEY_LETTER_SHARED = 'DRIVELETTER_SHARED'
-KEY_LETTER_ZIP = 'DRIVELETTER_ZIP'
 
 DEV_TYPE_OFF = 0
 DEV_TYPE_SD = 1
@@ -22,7 +21,6 @@ DEV_TYPE_RAW = 2
 DEV_TYPE_CEDD = 3
 
 settings_default = {KEY_LETTER_FIRST: 'C', KEY_LETTER_CONFDRIVE: 'O', KEY_LETTER_SHARED: 'N',
-                    KEY_LETTER_ZIP: 'P',
                     'MOUNT_RAW_NOT_TRANS': 0, 'SHARED_ENABLED': 0, 'SHARED_NFS_NOT_SAMBA': 0,
                     'ACSI_DEVTYPE_0': DEV_TYPE_OFF, 'ACSI_DEVTYPE_1': DEV_TYPE_CEDD, 'ACSI_DEVTYPE_2': DEV_TYPE_OFF,
                     'ACSI_DEVTYPE_3': DEV_TYPE_OFF, 'ACSI_DEVTYPE_4': DEV_TYPE_OFF, 'ACSI_DEVTYPE_5': DEV_TYPE_OFF,
@@ -37,8 +35,8 @@ FILE_ROOT_DEV = os.path.join(os.getenv('DATA_DIR'), 'root_dev.txt')             
 
 DEV_DISK_DIR = '/dev/disk/by-path'
 
-MOUNT_DIR_SHARED = "/mnt/shared"            # where the shared drive will be mounted == shared drive symlink source
-MOUNT_DIR_ZIP_FILE = "/mnt/zip_file"        # where the ZIP file will be mounted == ZIP file symlink source
+MOUNT_DIR_SHARED = os.getenv('MOUNT_DIR_SHARED')        # where the shared drive will be mounted
+MOUNT_DIR_ZIP_FILE = os.getenv('MOUNT_DIR_ZIP_FILE')    # where the ZIP file will be mounted
 
 
 def letter_shared():
@@ -49,13 +47,9 @@ def letter_confdrive():
     return settings_letter(KEY_LETTER_CONFDRIVE)
 
 
-def letter_zip():
-    return settings_letter(KEY_LETTER_ZIP)
-
-
 def log_config():
     log_dir = os.getenv('LOG_DIR')
-    log_file = os.path.join(log_dir, 'ce_mounter.log')
+    log_file = os.path.join(log_dir, 'mounter.log')
 
     os.makedirs(log_dir, exist_ok=True)
     app_log.remove()        # remove all previous log settings
@@ -158,7 +152,7 @@ def detect_settings_change(settings_current, settings_old):
 
     # check if ACSI translated drive letters changed
     changed_letters = setting_changed_on_keys(
-        [KEY_LETTER_SHARED, KEY_LETTER_CONFDRIVE, KEY_LETTER_ZIP, KEY_LETTER_FIRST],
+        [KEY_LETTER_SHARED, KEY_LETTER_CONFDRIVE, KEY_LETTER_FIRST],
         settings_old, settings_current)
 
     # check if ACSI RAW IDs changed
@@ -211,9 +205,8 @@ def get_drives_bitno_from_settings():
     first = settings_letter_to_bitno(KEY_LETTER_FIRST)
     shared = settings_letter_to_bitno(KEY_LETTER_SHARED)     # network drive
     config = settings_letter_to_bitno(KEY_LETTER_CONFDRIVE)  # config drive
-    zip_ = settings_letter_to_bitno(KEY_LETTER_ZIP)          # ZIP file drive
 
-    return first, shared, config, zip_
+    return first, shared, config
 
 
 def settings_letter(setting_name):
@@ -273,7 +266,7 @@ def get_usb_drive_letters(all_letters):
     usb_drive_letters = []
 
     # get letters from config, convert them to bit numbers
-    first, shared, config, zip_ = get_drives_bitno_from_settings()
+    first, shared, config = get_drives_bitno_from_settings()
 
     # get custom user mount letters, so they could be skipped below
     from mount_user import get_user_custom_mounts_letters
@@ -282,7 +275,7 @@ def get_usb_drive_letters(all_letters):
     start = 2 if all_letters else first     # if all then start from drive #2 (C), else from first drive letter
 
     for i in range(start, 16):              # go through available drive letters - from 0 to 15
-        if i in [shared, config, zip_]:     # skip these special drives
+        if i in [shared, config]:           # skip these special drives
             continue
 
         letter = chr(65 + i)                # number to ascii char
@@ -393,8 +386,7 @@ def text_from_file(filename):
 def get_dir_usage(custom_letters, search_dir, name):
     """ turn folder name (drive letter) into what is this folder used for - config / shared / usb / zip drive """
     name_to_usage = {letter_shared(): "shared drive",
-                     letter_confdrive(): "config drive",
-                     letter_zip(): "ZIP file drive"}
+                     letter_confdrive(): "config drive"}
 
     for c_letter in custom_letters:                             # insert custom letters into name_to_usage
         name_to_usage[c_letter] = "custom drive"
@@ -651,6 +643,11 @@ def send_to_core(item):
 def send_to_taskq(item):
     """ send an item to task queue """
     send_to_socket(os.getenv('TASKQ_SOCK_PATH'), item)
+
+
+def send_to_mounter(item):
+    """ send an item to mounter """
+    send_to_socket(os.getenv('MOUNT_SOCK_PATH'), item)
 
 
 def trigger_reload_translated():

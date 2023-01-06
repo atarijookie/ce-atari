@@ -8,8 +8,9 @@ import shared
 from dotenv import load_dotenv
 import subprocess
 
-settings_default = {'DRIVELETTER_FIRST': 'C', 'DRIVELETTER_CONFDRIVE': 'O', 'DRIVELETTER_SHARED': 'N', 'DRIVELETTER_ZIP': 'P',
+settings_default = {'DRIVELETTER_FIRST': 'C', 'DRIVELETTER_CONFDRIVE': 'O', 'DRIVELETTER_SHARED': 'N',
                     'MOUNT_RAW_NOT_TRANS': 0, 'SHARED_ENABLED': 0, 'SHARED_NFS_NOT_SAMBA': 0, 'FLOPPYCONF_ENABLED': 1,
+                    'USE_ZIP_DIR': 1,
                     'FLOPPYCONF_DRIVEID': 0, 'FLOPPYCONF_WRITEPROTECTED': 0, 'FLOPPYCONF_SOUND_ENABLED': 1,
                     'ACSI_DEVTYPE_0': 0, 'ACSI_DEVTYPE_1': 1, 'ACSI_DEVTYPE_2': 0, 'ACSI_DEVTYPE_3': 0,
                     'ACSI_DEVTYPE_4': 0, 'ACSI_DEVTYPE_5': 0, 'ACSI_DEVTYPE_6': 0, 'ACSI_DEVTYPE_7': 0,
@@ -184,7 +185,7 @@ def text_to_file(text, filename):
         with open(filename, 'wt') as f:
             f.write(text)
     except Exception as ex:
-        app_log.warning(logging.WARNING, f"mount_shared: failed to write to {filename}: {str(ex)}")
+        app_log.warning(f"mount_shared: failed to write to {filename}: {str(ex)}")
 
 
 def text_from_file(filename):
@@ -199,7 +200,7 @@ def text_from_file(filename):
             text = f.read()
             text = text.strip()         # remove whitespaces
     except Exception as ex:
-        app_log.warning(logging.WARNING, f"mount_shared: failed to read {filename}: {str(ex)}")
+        app_log.warning(f"mount_shared: failed to read {filename}: {str(ex)}")
 
     return text
 

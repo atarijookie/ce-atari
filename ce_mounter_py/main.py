@@ -1,6 +1,8 @@
 import os
 import pyinotify
 import asyncio
+import socket
+import json
 from loguru import logger as app_log
 import threading, queue
 import traceback
@@ -40,7 +42,7 @@ load_dotenv_config()                        # load dotenv before our files
 from shared import log_config, DEV_DISK_DIR, \
     get_symlink_path_for_letter, setting_get_bool, unlink_everything_translated, letter_confdrive, \
     unlink_everything_raw, settings_load, show_symlinked_dirs, is_zip_mounted, \
-    MOUNT_DIR_ZIP_FILE, letter_zip, symlink_if_needed, other_instance_running, unlink_without_fail, FILE_ROOT_DEV, \
+    MOUNT_DIR_ZIP_FILE, symlink_if_needed, other_instance_running, unlink_without_fail, FILE_ROOT_DEV, \
     load_one_setting, get_drives_bitno_from_settings, copy_and_symlink_config_dir
 from mount_usb_trans import get_usb_devices, find_and_mount_translated
 from mount_usb_raw import find_and_mount_raw
@@ -57,14 +59,19 @@ def worker():
     lock = threading.Lock()
 
     while True:
-        funct = task_queue.get()
+        func_and_args = task_queue.get()
+        funct = func_and_args['function']
+        args = func_and_args['args']
         lock.acquire()
         app_log.info(f'')
         app_log.info(f'EXECUTING: {funct.__name__}()')
         start = datetime.now()
 
         try:
-            funct()
+            if not args:        # no args supplied? call function without arguments
+                funct()
+            else:               # arguments provided? use them
+                funct(args)
         except TimeoutError:
             app_log.warning(f'The function {funct.__name__} was terminated with TimeoutError')
         except Exception as ex:
@@ -79,6 +86,48 @@ def worker():
         task_queue.task_done()
 
 
+def create_socket():
+    mounter_sock_path = os.getenv('MOUNT_SOCK_PATH')
+
+    try:
+        os.unlink(mounter_sock_path)
+    except Exception as ex:
+        if os.path.exists(mounter_sock_path):
+            app_log.warning(f"failed to unlink sock path: {mounter_sock_path} : {str(ex)}")
+            raise
+
+    sckt = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+
+    try:
+        sckt.bind(mounter_sock_path)
+        sckt.settimeout(1.0)
+        app_log.info(f'Success, got socket: {mounter_sock_path}')
+        return sckt
+    except Exception as e:
+        app_log.warning(f'exception on bind: {str(e)}')
+        return False
+
+
+def sock_receiver():
+    """ This loop receives mount commands from socket, puts them in queue and lets them be handled by worker """
+    app_log.info(f"Entering sock receiving loop, waiting for messages via: {os.getenv('MOUNT_SOCK_PATH')}")
+
+    while True:
+        try:
+            data, address = sock.recvfrom(1024)                 # receive message
+            message = json.loads(data)                          # convert from json string to dictionary
+            app_log.debug(f'received message: {message}')
+
+            task_queue.put({'function': mount_on_command, 'args': message})
+        except socket.timeout:          # when socket fails to receive data
+            pass
+        except KeyboardInterrupt:
+            app_log.error("Got keyboard interrupt, terminating.")
+            break
+        except Exception as ex:
+            app_log.warning(f"got exception: {str(ex)}")
+
+
 def handle_read_callback(ntfr):
     app_log.info(f'monitored folder changed...')
 
@@ -86,7 +135,7 @@ def handle_read_callback(ntfr):
         if event_source.get(path_):                 # if this one did change
             event_source[path_] = False             # clear this flag
             app_log.info(f'adding handler to task queue: {handler.__name__}()')
-            task_queue.put(handler)                 # call the handler
+            task_queue.put({'function': handler, 'args': None})   # call the handler
 
 
 def reload_settings_mount_everything():
@@ -108,7 +157,6 @@ def reload_settings_mount_everything():
 
     mount_user_custom_folders()     # mount user custom folders if they changed
     copy_and_symlink_config_dir()   # possibly symlink config drive
-    symlink_zip_drive_if_mounted()  # possibly symlink ZIP drive
     mount_shared()                  # either remount shared drive or just symlink it
     find_and_mount_devices(True)    # mount and/or symlink USB devices
     symlink_download_storage()      # symlink download storage dir
@@ -138,7 +186,6 @@ def find_and_mount_devices(dont_show_symlinked_dirs=False):
 # following two will help us to determine who caused the event and what function should handle it
 event_source = {}
 watched_paths = {os.getenv('SETTINGS_DIR'): reload_settings_mount_everything,
-                 os.getenv('MOUNT_COMMANDS_DIR'): mount_on_command,
                  DEV_DISK_DIR: find_and_mount_devices}
 
 
@@ -152,16 +199,6 @@ def my_process_event(event):
     for path_ in watched_paths.keys():      # go through the watched paths
         if event.path == path_:             # if this watched patch caused this event
             event_source[path_] = True      # mark this event source
-
-
-def symlink_zip_drive_if_mounted():
-    """ when we unlink all translated drives, use this to re-link zip drive """
-    if not is_zip_mounted():        # zip drive not mounted? nothing to do
-        return
-
-    mount_path = MOUNT_DIR_ZIP_FILE  # get where ZIP file is mounted
-    symlink_path = get_symlink_path_for_letter(letter_zip())  # get where it should be symlinked
-    symlink_if_needed(mount_path, symlink_path)     # create symlink, but only if needed
 
 
 def symlink_download_storage():
@@ -180,7 +217,7 @@ def symlink_download_storage():
         app_log.warning(f'symlink_download_storage: failed to convert {download_storage_type} to int: {type(ex).__name__} - {str(ex)}')
 
     # get letters from config, convert them to bit numbers
-    first, shared, _, _ = get_drives_bitno_from_settings()
+    first, shared, _ = get_drives_bitno_from_settings()
 
     drive_letter = 'C'
     if download_storage_type == 0:      # USB? use first letter
@@ -219,24 +256,32 @@ if __name__ == "__main__":
         exit(1)
 
     # make dirs which might not exist (some might require root access)
-    for one_dir in [os.getenv('MOUNT_DIR_RAW'), os.getenv('MOUNT_DIR_TRANS'), os.getenv('MOUNT_COMMANDS_DIR')]:
+    for one_dir in [os.getenv('MOUNT_DIR_RAW'), os.getenv('MOUNT_DIR_TRANS')]:
         os.makedirs(one_dir, exist_ok=True)
 
     unlink_without_fail(FILE_ROOT_DEV)          # delete this file to make get_root_fs_device() execute at least once
 
     settings_load()                  # load settings from disk
 
-    app_log.info(f"MOUNT_COMMANDS_DIR: {os.getenv('MOUNT_COMMANDS_DIR')}")
+    sock = create_socket()              # try to create socket
+
+    if not sock:
+        app_log.error("Cannot run without socket! Terminating.")
+        exit(1)
+
+    threading.Thread(target=sock_receiver, daemon=True).start()
+
+    app_log.info(f"MOUNT_SOCK_PATH   : {os.getenv('MOUNT_SOCK_PATH')}")
     app_log.info(f"MOUNT_DIR_RAW     : {os.getenv('MOUNT_DIR_RAW')}")
     app_log.info(f"MOUNT_DIR_TRANS   : {os.getenv('MOUNT_DIR_TRANS')}")
 
     app_log.info(f'On start will look for not mounted devices - they might be already connected')
 
     # try to mount what we can on start
-    for func in [unlink_everything_translated, copy_and_symlink_config_dir, symlink_zip_drive_if_mounted,
-                 mount_user_custom_folders, find_and_mount_devices, mount_shared, mount_on_command,
+    for func in [unlink_everything_translated, copy_and_symlink_config_dir,
+                 mount_user_custom_folders, find_and_mount_devices, mount_shared,
                  symlink_download_storage, show_symlinked_dirs]:
-        task_queue.put(func)        # put these functions in the test queue, execute them in the worker
+        task_queue.put({'function': func, 'args': None})        # put these functions in the test queue, execute them in the worker
 
     threading.Thread(target=worker, daemon=True).start()        # start the task queue worker
 
@@ -250,9 +295,6 @@ if __name__ == "__main__":
 
     app_log.info(f'Will now start watching folder: {os.getenv("SETTINGS_DIR")}')
     wm.add_watch(os.getenv('SETTINGS_DIR'), pyinotify.IN_CREATE | pyinotify.IN_DELETE | pyinotify.IN_UNMOUNT | pyinotify.IN_MODIFY | pyinotify.IN_CLOSE_WRITE)
-
-    app_log.info(f'Will now start watching folder: {os.getenv("MOUNT_COMMANDS_DIR")}')
-    wm.add_watch(os.getenv('MOUNT_COMMANDS_DIR'), pyinotify.IN_CREATE | pyinotify.IN_DELETE | pyinotify.IN_UNMOUNT | pyinotify.IN_MODIFY | pyinotify.IN_CLOSE_WRITE)
 
     try:
         loop.run_forever()

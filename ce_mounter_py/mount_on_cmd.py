@@ -1,58 +1,54 @@
 import os
-import logging
 import traceback
 from loguru import logger as app_log
 from wrapt_timeout_decorator import timeout
-from shared import get_symlink_path_for_letter, umount_if_mounted, \
-    text_from_file, letter_zip, unlink_without_fail, show_symlinked_dirs, MOUNT_DIR_ZIP_FILE, is_zip_mounted, \
-    symlink_if_needed
+from shared import umount_if_mounted, \
+    unlink_without_fail, show_symlinked_dirs, MOUNT_DIR_ZIP_FILE, is_zip_mounted, \
+    send_to_core
 
 
-def get_cmd_by_name(cmd_name):
-    """ get command based on his name """
-
-    path_ = os.path.join(os.getenv('MOUNT_COMMANDS_DIR'), cmd_name)
-
-    if not os.path.exists(path_):           # path doesn't exist? just quit
-        return None
-
-    path_in_cmd = text_from_file(path_)     # read content of file
-    unlink_without_fail(path_)              # delete command file after reading
-    return path_in_cmd                      # return file path
-
-
-def mount_zip_file(zip_file_path):
+def mount_zip_file(msg):
     """ mount ZIP file if possible """
-    if not os.path.exists(zip_file_path):  # got path, but it doesn't exist?
+    path = msg.get('path')
+
+    if not os.path.exists(path):  # got path, but it doesn't exist?
+        app_log.warning(f'mount_zip_file: archive does not exist: {path}')
         return
 
     mounted = is_zip_mounted()
     app_log.info(f'mount_zip_file: is some ZIP already mounted? {mounted}')
 
     mount_path = MOUNT_DIR_ZIP_FILE                             # get where it should be mounted
-    symlink_path = get_symlink_path_for_letter(letter_zip())    # get where it should be symlinked
-
-    unlink_without_fail(symlink_path)       # unlink symlink if it exists
 
     if mounted:
         umount_if_mounted(mount_path)       # umount dir if it's mounted
 
     os.makedirs(mount_path, exist_ok=True)  # create mount dir
 
-    mount_cmd = f'fuse-zip {zip_file_path} {mount_path}'  # construct mount command
+    mount_cmd = f'fuse-zip {path} {mount_path}'  # construct mount command
 
+    good = False
     try:  # try to mount it
         app_log.info(f'mount_zip_file: cmd: {mount_cmd}')
         os.system(mount_cmd)
-        app_log.info(f'mounted {zip_file_path} to {mount_path}')
-
-        symlink_if_needed(mount_path, symlink_path)     # create symlink, but only if needed
+        app_log.info(f'mounted {path} to {mount_path}')
+        good = True
     except Exception as exc:  # on exception
         app_log.info(f'failed to mount zip with cmd: {mount_cmd} : {str(exc)}')
 
+    # let the core know that ZIP was mounted (or failed)
+    item = {'module': 'disks', 'action': 'zip_mounted', 'zip_path': path, 'mount_path': mount_path, 'success': good}
+    send_to_core(item)
 
-def unmount_folder(unmount_path):
+
+def unmount_folder(msg):
     """ unlink symlink, unmount device """
+    unmount_path = msg.get('path')
+
+    if not unmount_path:
+        app_log.warning(f'unmount_folder: unmount_path empty? skipping')
+        return
+
     try:
         source = None
 
@@ -69,27 +65,17 @@ def unmount_folder(unmount_path):
 
 
 @timeout(10)
-def mount_on_command():
+def mount_on_command(msg):
     """ go through list of expected commands from CE main app and execute all the found ones """
-    if not os.path.exists(os.getenv('MOUNT_COMMANDS_DIR')):              # if dir for commands doesn't exist, create it
-        os.makedirs(os.getenv('MOUNT_COMMANDS_DIR'), exist_ok=True)
 
     # dictionary for commands vs their handling functions
     cmd_name_vs_handling_function = {'mount_zip': mount_zip_file, 'unmount': unmount_folder}
+    cmd_name = msg.get('cmd_name')
+    handler = cmd_name_vs_handling_function.get(cmd_name)
 
-    handled = False         # something was handled?
-
-    # go through the supported commands and handle them if needed
-    for cmd_name, handling_fun in cmd_name_vs_handling_function.items():
-        cmd_args = get_cmd_by_name(cmd_name)        # try to fetch cmd args for this command
-
-        if cmd_args:                    # got cmd args? then we should execute handling function
-            app_log.info(f"mount_on_command: for command {cmd_name} found args: {cmd_args}, will handle")
-            handling_fun(cmd_args)
-            handled = True
-        else:
-            app_log.info(f"mount_on_command: skipping command {cmd_name}")
-
-    # if something was handled, show currently symlinked dirs
-    if handled:
-        show_symlinked_dirs()
+    if handler:                     # handler present?
+        app_log.debug(f"mount_on_command: will call handler for cmd_name: {cmd_name}")
+        handler(msg)                # call handler
+        show_symlinked_dirs()       # if something was handled, show currently symlinked dirs
+    else:                           # no handler?
+        app_log.warning(f"mount_on_command: did not find handler for cmd_name: {cmd_name}")
