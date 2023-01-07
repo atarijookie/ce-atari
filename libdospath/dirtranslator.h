@@ -35,9 +35,17 @@ public:
 
     void updateFileName(const std::string& hostPath, const std::string& oldFileName, const std::string& newFileName);
 
+    // Create virtual symlink from source to destination. Use empty destination to remove symlink.
+    void symlink(const std::string& longPathSource, const std::string& longPathDest);
+
+    // returns true if symlink for the source is present
+    bool gotSymlink(const std::string& longPathSource);
+
 private:
     std::map<std::string, FilenameShortener *>  mapPathToShortener;
     uint32_t lastCleanUpCheck;
+
+    std::map<std::string, std::string> mapSymlinks;
 
     FilenameShortener *getShortenerForPath(std::string path, bool createIfNotFound=true);
     FilenameShortener *createShortener(const std::string &path);
@@ -56,6 +64,8 @@ private:
     bool setDiskItem(SearchParams& sp, DiskItem& di, const std::string &hostPath, const std::string& searchString, const std::string& lonFname, bool isDir);
     static void closeDirSetFlags(SearchParams& sp);
     static void toUpperCaseString(std::string &st);
+
+    void applySymlinkIfPossible(std::string& inLongPath);
 };
 
 #endif // DIRTRANSLATOR_H

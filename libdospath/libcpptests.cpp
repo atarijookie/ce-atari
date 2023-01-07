@@ -22,6 +22,7 @@ void TestClass::runTests(void)
     longToShortAndBack();
     testFeedingShortener();
     testNamesCountLimiting();
+    testSymlinks();
 }
 
 void TestClass::splitPathAndFilename(void)
@@ -185,6 +186,99 @@ void TestClass::testNamesCountLimiting(void)
     assert(removed == 2);               // 2 shorteners were removed
 
     MAX_NAMES_IN_TRANSLATOR = 100000;   // back to initial large value
+
+    delete dt;
+}
+
+void TestClass::testSymlinks(void)
+{
+    printf("TEST: testSymlinks\n");
+
+    DirTranslator* dt = new DirTranslator();
+    dt->mapSymlinks.clear();                // clear map
+    assert(dt->mapSymlinks.size() == 0);    // make sure it's clear
+
+    // adding symlink
+    std::string src, dst;
+    src = "/this/is/source";
+    dst = "/that/iz/dest";
+    dt->symlink(src, dst);                  // add symlink
+    assert(dt->mapSymlinks.size() == 1);    // make sure we got it
+
+    std::map<std::string, std::string>::iterator it;
+    it = dt->mapSymlinks.begin();           // find symlink in map, make sure it's stored properly
+    assert(it->first == src);
+    assert(it->second == dst);
+
+    assert(dt->gotSymlink(src));            // make sure this returns that we have it - lookup by source
+
+    std::string smth = "/we/dont/have/this";
+    assert(!dt->gotSymlink(smth));          // mae sure this returns that we don't have this
+    //---------
+    // updating symlink
+    dst = "/thot/new/dezt";
+    dt->symlink(src, dst);                  // update existing symlink
+    assert(dt->mapSymlinks.size() == 1);    // make sure we still got it only 1
+
+    it = dt->mapSymlinks.begin();           // find symlink in map, make sure it's updated properly
+    assert(it->first == src);
+    assert(it->second == dst);
+
+    //---------
+    // removing symlink - use empty destination
+    dst = "";
+    dt->symlink(src, dst);                  // remove existing symlink
+    assert(dt->mapSymlinks.size() == 0);    // make sure we don't have any symlinks
+
+    //----------
+    // test applying symlinks
+    std::string shortPath = "/THIS/PATH/SOME/FILE.TXT";
+    std::string longPath;
+    dt->shortToLongPath(shortPath, longPath, false);
+
+    // the long path will match short path when the short path isn't stored in shorteners and it even doesn't exist on disk
+    assert(longPath == shortPath);
+
+    src = "/THIS/PATH";
+    dst = "/THAT/DIR";
+    dt->symlink(src, dst);                              // add symlink: /THIS/PATH -> /THAT/DIR
+    dt->shortToLongPath(shortPath, longPath, false);    // translate and apply symlink
+
+    // instead of finding /THIS/PATH/SOME/FILE.TXT the first part will be replaced with current symlink and will
+    // be returned as     /THAT/DIR/SOME/FILE.TXT
+    assert(longPath == "/THAT/DIR/SOME/FILE.TXT");
+
+    // now make sure, that if symlink matches only part of the path, it doesn't get applied falsely, e.g.
+    // symlink: /THIS/PATH    -->    part of path: /THIS/PATHS   -->   matching partially, but not fully
+    std::string similarShortPath = "/THIS/PATHS/SOME/FILE.TXT";
+    dt->shortToLongPath(similarShortPath, longPath, false);     // translate and DON'T apply symlink - matching only partially
+    assert(similarShortPath == longPath);                       // no change in path has been made, input and output must match
+
+    //-----------
+    // additional tests with '/' at the end of symlink or path
+    shortPath = "/THIS/PATH/SOME/FILE.TXT";
+    dt->mapSymlinks.clear();                                            // clear map
+    dt->symlink(std::string("/THIS/PATH"), std::string("/THAT/DIR"));   // no '/' at end - OK
+    dt->shortToLongPath(shortPath, longPath, false);
+    assert(longPath == "/THAT/DIR/SOME/FILE.TXT");                      // symlink was applied
+
+    dt->mapSymlinks.clear();                                            // clear map
+    dt->symlink(std::string("/THIS/PATH/"), std::string("/THAT/DIR"));  // source with '/', dest without '/'
+    dt->shortToLongPath(shortPath, longPath, false);
+    assert(longPath == "/THAT/DIR/SOME/FILE.TXT");                      // symlink was applied
+
+    dt->mapSymlinks.clear();                                            // clear map
+    dt->symlink(std::string("/THIS/PATH/"), std::string("/THAT/DIR/")); // source with '/', dest with '/'
+    dt->shortToLongPath(shortPath, longPath, false);
+    assert(longPath == "/THAT/DIR/SOME/FILE.TXT");                      // symlink was applied
+
+    shortPath = "/THIS/PATH";                                           // nothing more after symlink, without '/'
+    dt->shortToLongPath(shortPath, longPath, false);
+    assert(longPath == "/THAT/DIR");                                    // symlink was applied
+
+    shortPath = "/THIS/PATH/";                                          // nothing more after expected symlink, ends with '/'
+    dt->shortToLongPath(shortPath, longPath, false);
+    assert(longPath == "/THAT/DIR");                                    // symlink was applied
 
     delete dt;
 }

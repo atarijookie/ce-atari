@@ -24,6 +24,7 @@ public:
     static uint32_t getCurrentMs(void);
 
     static void toHostSeparators(std::string &path);
+    static void removeTrailingSeparator(std::string& path);
 
     static void attributesHostToAtari(bool isReadOnly, bool isDir, uint8_t &attrAtari);
     static void fileDateTimeToHostTime(uint16_t atariDate, uint16_t atariTime, struct tm *ptm);

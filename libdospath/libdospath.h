@@ -66,6 +66,8 @@ extern "C" {
     void ldp_shortToLongPath(const std::string& shortPath, std::string& longPath, bool refreshOnMiss);
     void ldp_updateFileName(const std::string& hostPath, const std::string& oldFileName, const std::string& newFileName);
     bool ldp_findFirstAndNext(SearchParams& sp, DiskItem& di);
+    void ldp_symlink(const std::string& longPathSource, const std::string& longPathDest);
+    bool ldp_gotSymlink(const std::string& longPathSource);
     void ldp_cleanup(void);
     void ldp_runCppTests(void);
 }

@@ -93,6 +93,42 @@ extern "C" bool ldp_findFirstAndNext(SearchParams& sp, DiskItem& di)
 }
 
 /*
+    This function will create a virtual symlink from source to destination, this means that:
+        - if ldp_shortToLongPath() constructs a long path, which matches source, then it's replaced with destination,
+          e.g. if you create a symlink - source: /this/is/source
+                                         dest:   /tmp/something
+          and the ldp_shortToLongPath() creates: /this/is/source/and/rest
+          then instead of that it will return    /tmp/something/and/rest
+        - the symlink is virtual, that means that after your app terminates, it doesn't leave any actual links on disk
+          (= no need to clean up)
+        - to remove this symlink, use the same source as when the symlink was created, but use empty destination value.
+
+    :param longPathSource: if this is found in long path, it will be replaced with longPathDest
+    :param longPathDest: this is what replaces the source path
+*/
+extern "C" void ldp_symlink(const std::string& longPathSource, const std::string& longPathDest)
+{
+    if(!dt) {
+        dt = new DirTranslator();
+    }
+
+    dt->symlink(longPathSource, longPathDest);
+}
+
+/*
+    Function returns true if symlink for the source is present.
+    :param longPathSource: if this is present, will return true.
+*/
+extern "C" bool ldp_gotSymlink(const std::string& longPathSource)
+{
+    if(!dt) {
+        dt = new DirTranslator();
+    }
+
+    return dt->gotSymlink(longPathSource);
+}
+
+/*
     You should call this function to release memory at the program exit.
 */
 extern "C" void ldp_cleanup(void)

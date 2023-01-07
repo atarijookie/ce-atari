@@ -252,3 +252,12 @@ void UtilsLib::toHostSeparators(std::string &path)
         }
     }
 }
+
+void UtilsLib::removeTrailingSeparator(std::string& path)
+{
+    int len = path.length();
+
+    if(len > 1 && path[len - 1] == HOSTPATH_SEPAR_CHAR) {    // path ending with '/'? remove it
+        path.pop_back();
+    }
+}

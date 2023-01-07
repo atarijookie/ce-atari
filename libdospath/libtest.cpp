@@ -48,7 +48,7 @@ void testFindFirstAndNext(void)
 {
     system("rm -rf /tmp/t");
     system("mkdir -p /tmp/t/a /tmp/t/b /tmp/t/c /tmp/t/ThisIsLongDir");
-    system("touch /tmp/t/m /tmp/t/n /tmp/t/o /tmp/t/ThisIsLongFile.extension");
+    system("touch /tmp/t/m /tmp/t/n /tmp/t/o /tmp/t/ThisIzLongFile.extension");
     system("echo 'hello, this is non empty file' > /tmp/t/m");
     system("echo 'different file size' > /tmp/t/n");
     system("echo 'this content will produce another different size' > /tmp/t/o");
@@ -110,7 +110,7 @@ void testFindFirstAndNext(void)
 
     printf("\n\nMATCH 2 ITEMS WITH ? WILDCARD\n");
     sp.internal = NULL;
-    sp.path = "/tmp/t/THISIS~?.*";
+    sp.path = "/tmp/t/THISI?~?.*";
 
     found = 0;
     while(ldp_findFirstAndNext(sp, di)) {
@@ -121,14 +121,14 @@ void testFindFirstAndNext(void)
     // TEST 5: match single file without wildcards
     printf("\n\nMATCH 1 FILE WITHOUT WILDCARDS\n");
     sp.internal = NULL;
-    sp.path = "/tmp/t/THISIS~2.EXT";
+    sp.path = "/tmp/t/THISIZ~1.EXT";
     sp.attribs = 0xff;      // find anything
     sp.addUpDir = true;     // will add '.' and '..', so +2 items
 
     found = 0;
     while(ldp_findFirstAndNext(sp, di)) {
         found++;
-        assert(di.name == "THISIS~2.EXT");
+        assert(di.name == "THISIZ~1.EXT");
     }
     assert(found == 1);
     printf("MATCH 1 FILE WITHOUT WILDCARDS - OK!\n");

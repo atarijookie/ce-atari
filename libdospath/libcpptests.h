@@ -15,6 +15,7 @@ public:
     void longToShortAndBack(void);
     void testFeedingShortener(void);
     void testNamesCountLimiting(void);
+    void testSymlinks(void);
 };
 
 #endif

@@ -98,7 +98,8 @@ void DirTranslator::shortToLongPath(const std::string& shortPath, std::string& l
         }
     }
 
-    UtilsLib::joinStrings(longPathParts, longPath);        // join all output parts to one long path
+    UtilsLib::joinStrings(longPathParts, longPath);         // join all output parts to one long path
+    applySymlinkIfPossible(longPath);                       // apply symlink if possible
 }
 
 bool DirTranslator::longToShortFilename(const std::string &longHostPath, const std::string &longFname, std::string &shortFname)
@@ -521,4 +522,99 @@ bool DirTranslator::setDiskItem(SearchParams& sp, DiskItem& di, const std::strin
     }
 
     return true;                // success
+}
+
+// Create virtual symlink from source to destination. Use empty destination to remove symlink.
+void DirTranslator::symlink(const std::string& longPathSource, const std::string& longPathDest)
+{
+    std::string src = longPathSource;
+    UtilsLib::removeTrailingSeparator(src);     // remove '/' if needed
+
+    std::string dest = longPathDest;
+    UtilsLib::removeTrailingSeparator(dest);    // remove '/' if needed
+
+    std::map<std::string, std::string>::iterator it;
+    it = mapSymlinks.find(src);
+    bool exists = it != mapSymlinks.end();
+
+    if(dest.empty()) {                      // destination empty? this means remove symlink
+        if(exists) {                        // source was found in our map
+            UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::symlink - removing symlink for source: %s", src.c_str());
+            mapSymlinks.erase(src);         // remove it
+        }
+    } else {                                // destination not empty? this means add / update
+        if(exists) {    // exists? update
+            UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::symlink - updating symlink %s -> %s", src.c_str(), dest.c_str());
+            mapSymlinks[src] = dest;
+        } else {        // doesn't exist? insert
+            UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::symlink - adding symlink %s -> %s", src.c_str(), dest.c_str());
+            mapSymlinks.insert(std::pair<std::string,std::string>(src, dest));
+        }
+    }
+}
+
+void DirTranslator::applySymlinkIfPossible(std::string& inLongPath)
+{
+    bool foundMatch = false;
+    std::string src, dest;
+
+    // go through all the stored symlinks in mapSymlink
+    std::map<std::string, std::string>::iterator it;
+    for(it = mapSymlinks.begin(); it != mapSymlinks.end(); ++it) {          // go through the map
+        // do a quick check if inLongPath matches any source of symlink - this is quick as it's just comparing 2 string
+        src = it->first;
+        dest = it->second;
+        int res = strncmp(inLongPath.c_str(), src.c_str(), src.length());   // compare one symlink source to part of inLongPath
+
+        if(res != 0) {          // source was not completely found in inLongPath? skip the rest
+            continue;
+        }
+
+        // if symlink now seems to be at the start of the inLongPath, we now want to do a better but slower check
+        // if the symlink matches matches whole part of the path, or falsely matches part of of path, e.g.:
+        // inLongPath = "/tmp/sourceDir/something"
+        // source     = "/tmp/source"
+        // In This case we it's not really a match - source matches start of the inLongPath, but not the whole sourceDir,
+        // so this would be a false positive.
+
+        // split source into parts, see how many parts it has.
+        std::vector<std::string> srcParts;
+        UtilsLib::splitString(src, '/', srcParts);          // explode string to individual parts
+        unsigned int srcPartsCount = srcParts.size();       // count source parts
+
+        // split inLongPath into parts, but take only as many parts as the source has (e.g. only 2 in our example above).
+        std::vector<std::string> inParts;
+        UtilsLib::splitString(inLongPath, '/', inParts);    // explode string to individual parts
+
+        std::string inLongSubPath;
+        UtilsLib::joinStrings(inParts, inLongSubPath, srcPartsCount);   // create part of inLongPath made out of same count of parts as link source path
+
+        // now compare the right count of parts of source and inLongPath. If not a match, check next symlink.
+        res = strcmp(src.c_str(), inLongSubPath.c_str());
+
+        if(res == 0) {          // exact match on path was found, good!
+            foundMatch = true;
+            break;
+        }
+    }
+
+    // if an exact match was found, replace source in inLongPath with destination
+    if(foundMatch) {
+        std::string rest = inLongPath.substr(src.length());     // remove the source length from inLongPath, keep just rest
+        UtilsLib::mergeHostPaths(dest, rest);           // merge destination + rest, result will be stored in dest
+        UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::applySymlinkIfPossible - %s -> %s", inLongPath.c_str(), dest.c_str());
+        inLongPath = dest;                              // copy new path to inLongPath
+    }
+}
+
+// returns true if symlink for the source is present
+bool DirTranslator::gotSymlink(const std::string& longPathSource)
+{
+    std::string src = longPathSource;
+    UtilsLib::removeTrailingSeparator(src);     // remove '/' if needed
+
+    std::map<std::string, std::string>::iterator it;
+    it = mapSymlinks.find(src);
+    bool exists = it != mapSymlinks.end();
+    return exists;
 }
