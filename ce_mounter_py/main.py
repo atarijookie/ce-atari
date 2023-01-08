@@ -40,14 +40,14 @@ load_dotenv_config()                        # load dotenv before our files
 
 
 from shared import log_config, DEV_DISK_DIR, \
-    get_symlink_path_for_letter, setting_get_bool, unlink_everything_translated, letter_confdrive, \
-    unlink_everything_raw, settings_load, show_symlinked_dirs, is_zip_mounted, \
-    MOUNT_DIR_ZIP_FILE, symlink_if_needed, other_instance_running, unlink_without_fail, FILE_ROOT_DEV, \
+    get_symlink_path_for_letter, setting_get_bool, unlink_everything_translated, \
+    unlink_everything_raw, settings_load, show_symlinked_dirs, \
+    symlink_if_needed, other_instance_running, unlink_without_fail, FILE_ROOT_DEV, \
     load_one_setting, get_drives_bitno_from_settings, copy_and_symlink_config_dir
 from mount_usb_trans import get_usb_devices, find_and_mount_translated
 from mount_usb_raw import find_and_mount_raw
 from mount_hdd_image import mount_hdd_image
-from mount_on_cmd import mount_on_command
+from mount_on_cmd import mount_on_command, unmount_zip_file_if_source_not_exists
 from mount_shared import mount_shared
 from mount_user import mount_user_custom_folders
 
@@ -177,7 +177,8 @@ def find_and_mount_devices(dont_show_symlinked_dirs=False):
     else:                           # for translated mounts
         find_and_mount_translated(root_devs, part_devs)
 
-    mount_hdd_image()               # also try to mount HDD image
+    mount_hdd_image()                           # also try to mount HDD image
+    unmount_zip_file_if_source_not_exists()     # unmount ZIP file if it disappeared
 
     if not dont_show_symlinked_dirs:
         show_symlinked_dirs()       # show the mounts after possible remounts

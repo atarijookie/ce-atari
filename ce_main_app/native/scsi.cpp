@@ -39,8 +39,6 @@ void Scsi::setAcsiDataTrans(AcsiDataTrans *dt)
 
 void Scsi::findAttachedDisks(void)
 {
-    // TODO: trigger this from mounter when raw disks are changed
-
     std::string pathRaw = Utils::dotEnvValue("MOUNT_DIR_RAW");    // where the raw disks are symlinked
     Utils::mergeHostPaths(pathRaw, "/X");           // add placeholder
     int len = pathRaw.length();

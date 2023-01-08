@@ -37,6 +37,7 @@ DEV_DISK_DIR = '/dev/disk/by-path'
 
 MOUNT_DIR_SHARED = os.getenv('MOUNT_DIR_SHARED')        # where the shared drive will be mounted
 MOUNT_DIR_ZIP_FILE = os.getenv('MOUNT_DIR_ZIP_FILE')    # where the ZIP file will be mounted
+MOUNTED_ZIP_FILE_LINK = os.path.join(os.getenv('DATA_DIR'), "mounted_zip_file.lnk")
 
 
 def letter_shared():
@@ -254,6 +255,20 @@ def unlink_without_fail(path):
     return False
 
 
+def readlink_without_fail(path):
+    """ read the link, don't crash even if the file doesn't exist """
+
+    source = None
+    try:
+        source = os.readlink(path)
+    except FileNotFoundError:   # if it doesn't really exist, just ignore this exception (it's ok)
+        pass
+    except Exception as ex:     # log on other exceptions
+        app_log.warning(f'readlink_without_fail: path: {path} - exception: {str(ex)}')
+
+    return source
+
+
 def get_usb_drive_letters(all_letters):
     """ Get all the drive letters which can be used for USB drives, if they are free.
     This list holds also the occupied letters.
@@ -455,41 +470,42 @@ def is_mountpoint_mounted(mountpoint):
         if part.mountpoint == mountpoint:       # mountpoint found, return True
             return True
 
-    return False        # mountpoint not found
+    return False                                # mountpoint not found
 
 
 def is_zip_mounted():
     """ ZIP file mounted? """
-    return is_mountpoint_mounted(MOUNT_DIR_ZIP_FILE)
+    return is_mountpoint_mounted(MOUNT_DIR_ZIP_FILE)        # return is_mounted, source
 
 
 def is_shared_mounted():
     """ shared drive mounted? """
-    return is_mountpoint_mounted(MOUNT_DIR_SHARED)
+    is_mounted = is_mountpoint_mounted(MOUNT_DIR_SHARED)
+    return is_mounted
 
 
-def symlink_if_needed(mount_dir, symlink_dir):
-    """ This function creates symlink from mount_dir to symlink_dir, but tries to do it smart, e.g.:
-        - checks if the source really exists, doesn't try if it doesn't
+def symlink_if_needed(lnk_source, lnk_dest):
+    """ This function creates symlink from lnk_source to lnk_dest, but tries to do it smart, e.g.:
+        - checks if the lnk_source really exists, doesn't try if it doesn't
         - if the symlink doesn't exist, it will symlink it
         - if the symlink does exist, it checks where the link points, and when the link is what it should be, then it
           doesn't symlink anything, so it links only in cases where the link is wrong
     """
 
     # check if the source (mount) dir exists, fail if it doesn't
-    if not os.path.exists(mount_dir):
-        app_log.warning(f"symlink_if_needed: mount_dir {mount_dir} does not exists!")
+    if not os.path.exists(lnk_source):
+        app_log.warning(f"symlink_if_needed: mount_dir {lnk_source} does not exists!")
         return False
 
     symlink_it = False
 
-    if not os.path.exists(symlink_dir):     # symlink dir doesn't exist - symlink it
+    if not os.path.exists(lnk_dest):            # symlink dir doesn't exist - symlink it
         symlink_it = True
-    else:                                   # symlink dir does exist - check if it's pointing to right source
-        if os.path.islink(symlink_dir):             # if it's a symlink
-            source_dir = os.readlink(symlink_dir)   # read symlink
+    else:                                       # symlink dir does exist - check if it's pointing to right source
+        if os.path.islink(lnk_dest):            # if it's a symlink
+            source_dir = os.readlink(lnk_dest)  # read symlink
 
-            if source_dir != mount_dir:             # source of this link is not our mount dir
+            if source_dir != lnk_source:        # lnk_source of this link is not our mount dir
                 symlink_it = True
         else:       # not a symlink - delete it, symlink it
             symlink_it = True
@@ -499,12 +515,12 @@ def symlink_if_needed(mount_dir, symlink_dir):
         return False
 
     # should symlink now
-    unlink_without_fail(symlink_dir)        # try to delete it
+    unlink_without_fail(lnk_dest)        # try to delete it
 
     good = False
     try:
-        os.symlink(mount_dir, symlink_dir)  # symlink from mount path to symlink path
-        app_log.debug(f'symlink_if_needed: symlinked {mount_dir} -> {symlink_dir}')
+        os.symlink(lnk_source, lnk_dest)  # symlink from mount path to symlink path
+        app_log.debug(f'symlink_if_needed: symlinked {lnk_source} -> {lnk_dest}')
         good = True
     except Exception as ex:
         app_log.warning(f'symlink_if_needed: failed with: {type(ex).__name__} - {str(ex)}')

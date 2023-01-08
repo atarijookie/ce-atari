@@ -26,7 +26,10 @@ public:
     static void setLogLevel(int newLogLevel);
     static void setOutputToConsole(void);
     static void setDefaultLogFile(void);
+    static void setDefaultLogFileFromEnvValue(void);
     static void setLogFile(const char *path);
+
+    static void logRotateIfNeeded(const char *logFilePath);
     
 private:    
     static char logFilePath[128];

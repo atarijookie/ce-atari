@@ -127,8 +127,6 @@ void TranslatedDisk::setSettingsReloadProxy(SettingsReloadProxy *rp)
 
 void TranslatedDisk::findAttachedDisks(void)
 {
-    // TODO: trigger this from mounter when translated disks are changed
-
     std::string dirTrans = Utils::dotEnvValue("MOUNT_DIR_TRANS");    // where the translated disks are symlinked
     Utils::mergeHostPaths(dirTrans, "/X");          // add placeholder
     int len = dirTrans.length();

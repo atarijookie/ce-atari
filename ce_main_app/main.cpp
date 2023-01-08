@@ -62,16 +62,17 @@ int main(int argc, char *argv[])
 
     printf("\033[H\033[2J\n");
 
+    Debug::setDefaultLogFile();                                 // set some log file before .env is loaded
     initializeFlags();                                          // initialize flags
-
-    Utils::loadDotEnv();                                        // load dotEnv before setting default log file
-    Debug::setDefaultLogFile();
 
     loadDefaultArgumentsFromFile();                             // first parse default arguments from file
     parseCmdLineArguments(argc, argv);                          // then parse cmd line arguments and set global variables
-    Utils::screenShotVblEnabled(false);                         // screenshot vbl not enabled by default
-
     Debug::printfLogLevelString();
+
+    Utils::loadDotEnv();                                        // load dotEnv before setting default log file
+    Debug::setDefaultLogFileFromEnvValue();                     // set log after .env is loaded
+
+    Utils::screenShotVblEnabled(false);                         // screenshot vbl not enabled by default
 
     //------------------------------------
     // if should only show help and quit

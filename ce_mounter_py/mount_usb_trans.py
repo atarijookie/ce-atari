@@ -3,6 +3,7 @@ from loguru import logger as app_log
 from shared import get_symlink_path_for_letter, \
     get_free_letters, DEV_DISK_DIR, unlink_without_fail, symlink_if_needed, get_disk_partitions, \
     get_root_fs_device, trigger_reload_translated
+from mount_on_cmd import unmount_zip_file_if_source_not_exists
 
 
 def get_usb_devices():
@@ -219,3 +220,5 @@ def find_and_mount_translated(root_devs, part_devs):
 
     if got_something:           # if something was symlinked, the core should look for new translated drives
         trigger_reload_translated()
+
+    unmount_zip_file_if_source_not_exists()  # unmount ZIP file if it disappeared

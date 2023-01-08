@@ -787,11 +787,21 @@ std::string Utils::dotEnvValue(std::string key, const char* defValue)
     /* get value from dotEnv map for specified key */
 
     try {
-        std::string& value = dotEnv.at(key);             // get value
+        std::string& value = dotEnv.at(key);             // get value and return it (if found in map)
         return value;
     }
     catch (const std::out_of_range&) {
         Debug::out(LOG_DEBUG, "Utils::dotEnvValue - no value for key '%s' !", key.c_str());
+    }
+
+    // if got here, the value wasn't found in map, but it still could be a real env var, so try getting it
+    char* envVar = getenv(key.c_str());
+
+    if(envVar) {    // some real env var was found with this name?
+        static std::string retValueFromEnv;
+        retValueFromEnv = envVar;
+        Debug::out(LOG_DEBUG, "Utils::dotEnvValue - ...but found env var '%s' with value '%s'", key.c_str(), retValueFromEnv.c_str());
+        return retValueFromEnv;
     }
 
     // if value not found and default value was provided, use it; otherwise return empty string
@@ -814,16 +824,28 @@ int Utils::dotEnvSubstituteVars(void)
         std::string value = it->second;
 
         std::size_t varStart = value.find("${");       // var start tag
-        std::size_t varEnd = value.find("}");          // vag end tag
+        std::size_t varEnd = value.find("}");          // var end tag
 
         if(varStart != std::string::npos) {                 // start tag was found?
             std::string varName = value.substr(varStart + 2, varEnd - varStart - 2);    // get just var name
 
-            std::string varValue = Utils::dotEnvValue(varName);         // get variable value
-//          Debug::out(LOG_DEBUG, "Utils::dotEnvSubstituteVars - for var '%s' found value '%s'", varName.c_str(), varValue.c_str());
+            std::string defValue;
+            std::size_t varDef = varName.find(":-");    // check if this var name has also default value specified
+
+            //Debug::out(LOG_DEBUG, "Utils::dotEnvSubstituteVars - varName '%s'", varName.c_str());
+
+            if(varDef != std::string::npos) {           // if this variable name has also default value specified
+                std::string newVarName = varName.substr(0, varDef); // get just var name without default value
+                defValue = varName.substr(varDef + 2);              // get just the default value
+                //Debug::out(LOG_DEBUG, "Utils::dotEnvSubstituteVars - varName with default: '%s', varName '%s', defValue: '%s'", varName.c_str(), newVarName.c_str(), defValue.c_str());
+                varName = newVarName;                               // use the new var name
+            }
+
+            std::string varValue = Utils::dotEnvValue(varName, defValue.c_str());   // get variable value with possible default value
+            //Debug::out(LOG_DEBUG, "Utils::dotEnvSubstituteVars - for var '%s' found value '%s'", varName.c_str(), varValue.c_str());
 
             value.replace(varStart, varEnd - varStart + 1, varValue);   // replace variable in original value
-//          Debug::out(LOG_DEBUG, "Utils::dotEnvSubstituteVars - value after replacing var: '%s'", value.c_str());
+            //Debug::out(LOG_DEBUG, "Utils::dotEnvSubstituteVars - value after replacing var: '%s'", value.c_str());
 
             dotEnv[key] = value;        // store new value back to map
             found++;
@@ -889,7 +911,7 @@ bool Utils::loadDotEnvFrom(const char* path)
         std::string key, value;
         key = line;                 // key   is on [0 : eqlPos-1]
         value = line + eqlPos + 1;  // value is on [eqlPos+1 : ...]
-//      Debug::out(LOG_DEBUG, "Utils::loadDotEnv - found %s -> %s", key.c_str(), value.c_str());
+        Debug::out(LOG_DEBUG, "Utils::loadDotEnv - found %s -> %s", key.c_str(), value.c_str());
 
         dotEnv[key] = value;        // store to map
     }

@@ -3,6 +3,9 @@
 #include <string.h>
 #include <stdarg.h>
 #include <sys/time.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "global.h"
 #include "debug.h"
@@ -24,6 +27,13 @@ void Debug::setOutputToConsole(void)
 
 void Debug::setDefaultLogFile(void)
 {
+    // set default log file, without the need of dotEnv being loaded, so we can start logging as soon as possible,
+    // even during the the loading of dotEnv file
+    setLogFile("/var/log/ce/core.log");
+}
+
+void Debug::setDefaultLogFileFromEnvValue(void)
+{
     std::string logFilePath = Utils::dotEnvValue("LOG_DIR", "/var/log/ce");     // path to logs dir
     Utils::mergeHostPaths(logFilePath, "core.log");             // full path = dir + filename
     setLogFile(logFilePath.c_str());                            // use full path here
@@ -39,11 +49,12 @@ void Debug::printfLogLevelString(void)
     printf("\nLog level: ");
 
     switch(flags.logLevel) {
-        case LOG_OFF:   printf("OFF"); break;
-        case LOG_ERROR: printf("ERROR"); break;
-        case LOG_INFO:  printf("INFO"); break;
-        case LOG_DEBUG: printf("DEBUG"); break;
-        default:        printf("unknown!"); break;
+        case LOG_OFF:       printf("OFF"); break;
+        case LOG_ERROR:     printf("ERROR"); break;
+        case LOG_WARNING:   printf("WARNING"); break;
+        case LOG_INFO:      printf("INFO"); break;
+        case LOG_DEBUG:     printf("DEBUG"); break;
+        default:            printf("unknown!"); break;
     }
 
     printf("\n\n");
@@ -62,8 +73,9 @@ void Debug::out(int logLevel, const char *format, ...)
 
     if(g_outToConsole) {                    // should log to console? f is null
         f = NULL;
-    } else {                                // log to file? open the file
-        f = fopen(logFilePath, "a+t");
+    } else {                                    // log to file? open the file
+        Debug::logRotateIfNeeded(logFilePath);  // rotate log file if too big
+        f = fopen(logFilePath, "a+t");          // open the file
     }
 
     if(!f) {
@@ -166,4 +178,17 @@ void Debug::setLogLevel(int newLogLevel)
     flags.logLevel = newLogLevel;                               // new value to struct
 
     Utils::intToFileFromEnv(newLogLevel, "CORE_LOGLEVEL_FILE");        // new value to file
+}
+
+void Debug::logRotateIfNeeded(const char *logFilePath)
+{
+    struct stat attr;
+    int res = stat(logFilePath, &attr);             // get file stat
+
+    if(res == 0 && (attr.st_size >= (1024*1024))) {             // file too big?
+        std::string logFilePathOld = std::string(logFilePath) + ".1";       // construct old log filename
+        printf("will rotate log file: %s -> %s\n", logFilePath, logFilePathOld.c_str());
+        unlink(logFilePathOld.c_str());                         // if some previous old file exist, remove it
+        rename(logFilePath, logFilePathOld.c_str());            // rename current to old
+    }
 }
