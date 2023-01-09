@@ -105,7 +105,6 @@ class TranslatedDisk
 {
 private:
     static TranslatedDisk * instance;
-    static pthread_mutex_t mutex;
     TranslatedDisk(AcsiDataTrans *dt);
     virtual ~TranslatedDisk();
 
@@ -194,7 +193,7 @@ private:
     void onFsfirst(uint8_t *cmd);
     void onFsnext(uint8_t *cmd);
     bool buildGemdosFindstorageData(TFindStorage& fs, const std::string& hostSearchString, uint8_t findAttribs, bool isRootDir);    // helper function, not called from ST directly
-    static void diskItemToAtariFindStorageItem(DiskItem& di, uint8_t* buf);
+    void diskItemToAtariFindStorageItem(DiskItem& di, uint8_t* buf);
 
     // file and directory manipulation
     void onDfree(uint8_t *cmd);

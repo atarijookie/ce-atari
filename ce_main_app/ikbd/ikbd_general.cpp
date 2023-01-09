@@ -20,7 +20,6 @@
 #include "utils.h"
 #include "settings.h"
 #include <stdint.h>
-#include "periodicthread.h"
 #include "config/configstream.h"
 #include "chipinterface.h"
 

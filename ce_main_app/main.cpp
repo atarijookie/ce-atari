@@ -19,7 +19,6 @@
 #include "ikbd/ikbd.h"
 #include "update.h"
 #include "version.h"
-#include "periodicthread.h"
 #include "cmdsockthread.h"
 #include "display/displaythread.h"
 #include "floppy/floppyencoder.h"
@@ -178,7 +177,7 @@ void pthread_kill_join(const char* threadName, pthread_t& threadInfo)
 {
     printf("Stoping %s thread\n", threadName);
     pthread_kill(threadInfo, SIGINT);           // stop the select()
-    pthread_join(threadInfo, NULL);             // wait until periodic  thread finishes
+    pthread_join(threadInfo, NULL);             // wait until thread finishes
 }
 
 // instanceNo: number of core instance, used for separating folders and ports
@@ -188,7 +187,6 @@ int runCore(int instanceNo, bool localNotNetwork)
     CCoreThread *core;
     pthread_t   ikbdThreadInfo;
     pthread_t   floppyEncThreadInfo;
-    pthread_t   periodicThreadInfo;
     pthread_t   displayThreadInfo;
     pthread_t   cmdSockThreadInfo;
 
@@ -245,7 +243,6 @@ int runCore(int instanceNo, bool localNotNetwork)
 
     handlePthreadCreate("ikbd", &ikbdThreadInfo, (void*) ikbdThreadCode);
     handlePthreadCreate("floppy encode", &floppyEncThreadInfo, (void*) floppyEncodeThreadCode);
-    handlePthreadCreate("periodic", &periodicThreadInfo, (void*) periodicThreadCode);
     handlePthreadCreate("command socket", &cmdSockThreadInfo, (void*) cmdSockThreadCode);
 
     if(hasDisplay) {
@@ -266,7 +263,6 @@ int runCore(int instanceNo, bool localNotNetwork)
     floppyEncoder_stop();
     pthread_kill_join("ikbd", ikbdThreadInfo);
     pthread_kill_join("floppy encoder", floppyEncThreadInfo);
-    pthread_kill_join("periodic", periodicThreadInfo);
     pthread_kill_join("command socket", cmdSockThreadInfo);
 
     if(hasDisplay) {             // kill display thread

@@ -8,7 +8,6 @@
 #include "../global.h"
 #include "../debug.h"
 #include "../utils.h"
-#include "../periodicthread.h"
 #include "../acsidatatrans.h"
 #include "../translated/gemdos_errno.h"
 #include "floppysetup.h"

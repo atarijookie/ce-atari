@@ -15,7 +15,6 @@
 #include "settings.h"
 #include <stdint.h>
 #include "statusreport.h"
-#include "../periodicthread.h"
 #include "../config/configstream.h"
 #include "../display/displaythread.h"
 

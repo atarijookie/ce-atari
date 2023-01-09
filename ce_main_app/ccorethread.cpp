@@ -24,8 +24,6 @@
 #include "floppy/imagestorage.h"
 #include "floppy/floppyencoder.h"
 
-#include "periodicthread.h"
-
 #define DEV_CHECK_TIME_MS       3000
 #define UPDATE_CHECK_TIME       1000
 #define INET_IFACE_CHECK_TIME   1000

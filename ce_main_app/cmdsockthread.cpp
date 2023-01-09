@@ -18,7 +18,6 @@
 #include "debug.h"
 
 #include "global.h"
-#include "periodicthread.h"
 #include "floppy/imagesilo.h"
 #include "ccorethread.h"
 #include "native/scsi.h"

@@ -14,7 +14,6 @@
 #include "imagestorage.h"
 #include "floppysetup.h"
 #include "../utils.h"
-#include "../periodicthread.h"
 #include "../debug.h"
 
 extern SharedObjects shared;

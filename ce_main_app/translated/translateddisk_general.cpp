@@ -28,19 +28,18 @@
 
 extern THwConfig hwConfig;
 extern InterProcessEvents events;
+extern SharedObjects shared;
 
 TranslatedDisk * TranslatedDisk::instance = NULL;
 
-pthread_mutex_t TranslatedDisk::mutex = PTHREAD_MUTEX_INITIALIZER;
-
 void TranslatedDisk::mutexLock(void)
 {
-    pthread_mutex_lock(&mutex);
+    pthread_mutex_lock(&shared.mtxHdd);
 }
 
 void TranslatedDisk::mutexUnlock(void)
 {
-    pthread_mutex_unlock(&mutex);
+    pthread_mutex_unlock(&shared.mtxHdd);
 }
 
 TranslatedDisk * TranslatedDisk::getInstance(void)
@@ -637,12 +636,13 @@ bool TranslatedDisk::createFullAtariPath(std::string inPartialAtariPath, std::st
 
 bool TranslatedDisk::hasArchiveExtension(const std::string& longPath, std::string& archiveSubPath)
 {
-    std::string longPathCopy = longPath;                    // create a copy of the input long path
+    std::string longPathCopy = longPath;                        // create a copy of the input long path
     std::transform(longPathCopy.begin(), longPathCopy.end(), longPathCopy.begin(), ::tolower);  // path copy to lowercase
 
     std::size_t extPos = longPathCopy.find(".zip");             // find supported extension in lowercase copy
 
     if(extPos != std::string::npos) {                           // extension found?
+        longPathCopy = longPath;                                // create a copy of the input long path, but preserve upper / lower case this time
         archiveSubPath = longPathCopy.substr(0, extPos + 4);    // get substring containing only path to archive
         return true;            // supported archive was found
     }

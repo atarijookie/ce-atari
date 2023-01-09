@@ -2,6 +2,7 @@
 #define GLOBAL_H
 
 #include <stdint.h>
+#include <pthread.h>
 
 // commands sent from host to device
 #define CMD_CURRENT_SECTOR          0x50                                // followed by sector #
@@ -114,6 +115,25 @@ typedef struct {
 } InterProcessEvents;
 
 extern InterProcessEvents events;
+
+class Scsi;
+class ImageList;
+class ImageStorage;
+class ImageSilo;
+
+typedef struct {
+    Scsi            *scsi;
+    pthread_mutex_t mtxHdd;
+
+    ImageList       *imageList;
+    ImageStorage    *imageStorage;
+    ImageSilo       *imageSilo;
+    pthread_mutex_t  mtxImages;
+
+    bool mountRawNotTrans;
+} SharedObjects;
+
+extern SharedObjects shared;
 
 typedef struct {
     int linuxTermFd;

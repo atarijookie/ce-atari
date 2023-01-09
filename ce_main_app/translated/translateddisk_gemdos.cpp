@@ -216,6 +216,15 @@ void TranslatedDisk::diskItemToAtariFindStorageItem(DiskItem& di, uint8_t* buf)
     uint16_t atariTime = Utils::fileTimeToAtariTime(&di.datetime);
     uint16_t atariDate = Utils::fileTimeToAtariDate(&di.datetime);
 
+    if(useZipdirNotFile) {          // if ZIP DIRs are enabled
+        std::string archiveSubPath;
+        bool isArchive = hasArchiveExtension(di.name, archiveSubPath);  // check if this has archive extension (e.g. .zip)
+
+        if(isArchive) {             // if this is a supported archive, turn file into directory by adding FA_DIR
+            di.attribs |= FA_DIR;
+        }
+    }
+
     // GEMDOS File Attributes
     buf[0] = di.attribs;
 
