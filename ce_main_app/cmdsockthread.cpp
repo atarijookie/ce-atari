@@ -40,7 +40,7 @@ void handleSceencastAction(std::string& action, json& data);
 void handleDisksAction(std::string& action, json& data);
 void closeFifo(bool keybNotMouse);
 
-int createSocket(void)
+int createRecvSocket(void)
 {
 	// create a UNIX DGRAM socket
 	int sock = socket(AF_UNIX, SOCK_DGRAM, 0);
@@ -57,7 +57,7 @@ int createSocket(void)
     strcpy(addr.sun_path, sockPath.c_str());
     addr.sun_family = AF_UNIX;
 
-    int res = bind(sock, (struct sockaddr *) &addr, strlen(addr.sun_path) + sizeof (addr.sun_family));
+    int res = bind(sock, (struct sockaddr *) &addr, strlen(addr.sun_path) + sizeof(addr.sun_family));
     if (res < 0) {
 	    Debug::out(LOG_ERROR, "cmdSockThreadCode: Failed to bind command socket to %s - errno: %d", sockPath.c_str(), errno);
 	    return -1;
@@ -69,7 +69,7 @@ int createSocket(void)
 void *cmdSockThreadCode(void *ptr)
 {
     Debug::out(LOG_INFO, "Command Socket thread starting...");
-    int sock = createSocket();
+    int sock = createRecvSocket();
 
     if(sock < 0) {              // without socket this thread has no use
         return 0;
@@ -390,14 +390,45 @@ void handleSceencastAction(std::string& action, json& data)
 void handleDisksAction(std::string& action, json& data)
 {
     if(action == "reload_trans") {              // reload translated disks
-        pthread_mutex_lock(&shared.mtxScsi);
+        pthread_mutex_lock(&shared.mtxHdd);
         TranslatedDisk* translated = TranslatedDisk::getInstance();
         translated->findAttachedDisks();
-        pthread_mutex_unlock(&shared.mtxScsi);
+        pthread_mutex_unlock(&shared.mtxHdd);
     } else if(action == "reload_raw") {         // reload raw disks
-        pthread_mutex_lock(&shared.mtxScsi);
+        pthread_mutex_lock(&shared.mtxHdd);
         shared.scsi->findAttachedDisks();
-        pthread_mutex_unlock(&shared.mtxScsi);
+        pthread_mutex_unlock(&shared.mtxHdd);
+    } else if(action == "zip_mounted") {        // ZIP file was mounted?
+        if(data.contains("zip_path") && data.contains("mount_path") && data.contains("success")) {
+            std::string zip_path = data["zip_path"].get<std::string>();
+            std::string mount_path = data["mount_path"].get<std::string>();
+            bool success = data["success"].get<bool>();
+
+            if(success) {                       // on success
+                Debug::out(LOG_WARNING, "handleDisksAction: zip_mounted - adding symlink %s -> %s", zip_path.c_str(), mount_path.c_str());
+
+                pthread_mutex_lock(&shared.mtxHdd);
+                ldp_symlink(zip_path, mount_path);             // create virtual symlink from archive path to next mount path
+                pthread_mutex_unlock(&shared.mtxHdd);
+            } else {                            // on fail
+                Debug::out(LOG_WARNING, "handleDisksAction: zip_mounted - success says FALSE, ignoring message!");
+            }
+        } else {                                // on argument missing
+            Debug::out(LOG_WARNING, "handleDisksAction: zip_mounted - missing 'zip_path' or 'mount_path' or 'success' in message, ignoring message!");
+        }
+    } else if(action == "zip_unmounted") {      // ZIP file was unmounted?
+        if(data.contains("zip_path")) {
+            std::string zip_path = data["zip_path"].get<std::string>();
+
+            Debug::out(LOG_WARNING, "handleDisksAction: zip_unmounted - removing symlink for source %s", zip_path.c_str());
+
+            pthread_mutex_lock(&shared.mtxHdd);
+            std::string emptyStr;
+            ldp_symlink(zip_path, emptyStr);    // remove virtual symlink by setting destination to ''
+            pthread_mutex_unlock(&shared.mtxHdd);
+        } else {                                // on argument missing
+            Debug::out(LOG_WARNING, "handleDisksAction: zip_unmounted - missing 'zip_path' in message, ignoring message!");
+        }
     } else {
         Debug::out(LOG_WARNING, "handleDisksAction: unknown action '%s', ignoring message!", action.c_str());
     }

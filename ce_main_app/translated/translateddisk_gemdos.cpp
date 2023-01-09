@@ -116,9 +116,9 @@ void TranslatedDisk::onDsetpath(uint8_t *cmd)
     newAtariPath =        (char *) dataBuffer;
 
     bool        waitingForMount;
-    int         atariDriveIndex, zipDirNestingLevel;
+    int         atariDriveIndex;
     std::string fullAtariPath;
-    res = createFullAtariPathAndFullHostPath(newAtariPath, fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
+    res = createFullAtariPathAndFullHostPath(newAtariPath, fullAtariPath, atariDriveIndex, hostPath, waitingForMount);
 
     if(!res) {                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - newAtariPath: %s, createFullAtariPath failed!", newAtariPath.c_str());
@@ -273,9 +273,9 @@ void TranslatedDisk::onFsfirst(uint8_t *cmd)
     }
 
     bool        waitingForMount;
-    int         atariDriveIndex, zipDirNestingLevel;
+    int         atariDriveIndex;
     std::string fullAtariPath;
-    res = createFullAtariPathAndFullHostPath(atariSearchString, fullAtariPath, atariDriveIndex, hostSearchString, waitingForMount, zipDirNestingLevel);
+    res = createFullAtariPathAndFullHostPath(atariSearchString, fullAtariPath, atariDriveIndex, hostSearchString, waitingForMount);
 
     if(!res) {                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - atari search string: %s -- failed to create host path", atariSearchString.c_str());
@@ -300,11 +300,6 @@ void TranslatedDisk::onFsfirst(uint8_t *cmd)
     Utils::splitFilenameFromPath(hostSearchString, justPath, justSearchString);
 
     bool rootDir = isRootDir(justPath);
-
-    bool useZipdirNotFileForThisSubDir = useZipdirNotFile;          // by default - use this useZipdirNotFile flag, if we're not nested in ZIP DIRs too deep
-    if(zipDirNestingLevel >= MAX_ZIPDIR_NESTING) {                  // but if we are nested too deep, don't show ZIP files as DIRs anymore for this nested dir
-        useZipdirNotFileForThisSubDir = false;
-    }
 
     //now use the dir translator to get the dir content
     res = buildGemdosFindstorageData(tempFindStorage, hostSearchString, findAttribs, rootDir);
@@ -498,9 +493,9 @@ void TranslatedDisk::onDcreate(uint8_t *cmd)
     newAtariPath =        (char *) dataBuffer;
 
     bool        waitingForMount;
-    int         atariDriveIndex, zipDirNestingLevel;
+    int         atariDriveIndex;
     std::string fullAtariPath;
-    res = createFullAtariPathAndFullHostPath(newAtariPath, fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
+    res = createFullAtariPathAndFullHostPath(newAtariPath, fullAtariPath, atariDriveIndex, hostPath, waitingForMount);
 
     if(!res) {                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDcreate - newAtariPath: %s -- createFullAtariPath failed", newAtariPath.c_str());
@@ -513,15 +508,6 @@ void TranslatedDisk::onDcreate(uint8_t *cmd)
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDcreate -- waiting for mount, call this function again to succeed later.");
 
         dataTrans->setStatus(E_WAITING_FOR_MOUNT);
-        return;
-    }
-
-    //---------------
-    // if it's read only (or inside of ZIP DIR - that's also read only), quit
-    if(zipDirNestingLevel > 0) {
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onDcreate - newAtariPath: %s -- path is read only", newAtariPath.c_str());
-
-        dataTrans->setStatus(EACCDN);
         return;
     }
 
@@ -584,9 +570,9 @@ void TranslatedDisk::onDdelete(uint8_t *cmd)
     newAtariPath =        (char *) dataBuffer;
 
     bool        waitingForMount;
-    int         atariDriveIndex, zipDirNestingLevel;
+    int         atariDriveIndex;
     std::string fullAtariPath;
-    res = createFullAtariPathAndFullHostPath(newAtariPath, fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
+    res = createFullAtariPathAndFullHostPath(newAtariPath, fullAtariPath, atariDriveIndex, hostPath, waitingForMount);
 
     if(!res) {                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDdelete - newAtariPath: %s -- createFullAtariPath failed, the path doesn't bellong to us", newAtariPath.c_str());
@@ -599,13 +585,6 @@ void TranslatedDisk::onDdelete(uint8_t *cmd)
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDdelete -- waiting for mount, call this function again to succeed later.");
 
         dataTrans->setStatus(E_WAITING_FOR_MOUNT);
-        return;
-    }
-
-    if(zipDirNestingLevel > 0) {     // if it's read only (or inside of ZIP DIR - that's also read only), quit
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onDdelete - newAtariPath: %s -> hostPath: %s -- path is read only", newAtariPath.c_str(), hostPath.c_str());
-
-        dataTrans->setStatus(EACCDN);
         return;
     }
 
@@ -638,10 +617,9 @@ void TranslatedDisk::onFrename(uint8_t *cmd)
     int         atariDriveIndexOld, atariDriveIndexNew;
     std::string fullAtariPathOld,   fullAtariPathNew;
     bool        wfm1, wfm2;
-    int zipDirNestingLevel;
     std::string oldHostName, newHostName;
-    res  = createFullAtariPathAndFullHostPath(oldAtariName, fullAtariPathOld, atariDriveIndexOld, oldHostName, wfm1, zipDirNestingLevel);
-    res2 = createFullAtariPathAndFullHostPath(newAtariName, fullAtariPathNew, atariDriveIndexNew, newHostName, wfm2, zipDirNestingLevel);
+    res  = createFullAtariPathAndFullHostPath(oldAtariName, fullAtariPathOld, atariDriveIndexOld, oldHostName, wfm1);
+    res2 = createFullAtariPathAndFullHostPath(newAtariName, fullAtariPathNew, atariDriveIndexNew, newHostName, wfm2);
 
     if(wfm1) {                                                          // if the path will be available in a while, but we're waiting for mount to finish now
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFrename -- waiting for mount, call this function again to succeed later.");
@@ -658,13 +636,6 @@ void TranslatedDisk::onFrename(uint8_t *cmd)
     }
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::onFrename - rename %s to %s", oldHostName.c_str(), newHostName.c_str());
-
-    if(zipDirNestingLevel > 0) {                  // if it's read only (or inside of ZIP DIR - that's also read only), quit
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFrename - it's read only");
-
-        dataTrans->setStatus(EACCDN);
-        return;
-    }
 
     if(!hostPathExists(oldHostName, true)) {                        // old path does not exist? fail, NOT FOUND
         dataTrans->setStatus(EFILNF);
@@ -697,9 +668,9 @@ void TranslatedDisk::onFdelete(uint8_t *cmd)
     newAtariPath =        (char *) dataBuffer;
 
     bool        waitingForMount;
-    int         atariDriveIndex, zipDirNestingLevel;
+    int         atariDriveIndex;
     std::string fullAtariPath;
-    res = createFullAtariPathAndFullHostPath(newAtariPath, fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
+    res = createFullAtariPathAndFullHostPath(newAtariPath, fullAtariPath, atariDriveIndex, hostPath, waitingForMount);
 
     if(!res) {                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFdelete - %s - createFullAtariPath failed", newAtariPath.c_str());
@@ -712,13 +683,6 @@ void TranslatedDisk::onFdelete(uint8_t *cmd)
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFdelete  -- waiting for mount, call this function again to succeed later.");
 
         dataTrans->setStatus(E_WAITING_FOR_MOUNT);
-        return;
-    }
-
-    if(zipDirNestingLevel > 0) {     // if it's read only (or inside of ZIP DIR - that's also read only), quit
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFdelete - %s - it's read only", newAtariPath.c_str());
-
-        dataTrans->setStatus(EACCDN);
         return;
     }
 
@@ -795,9 +759,9 @@ void TranslatedDisk::onFattrib(uint8_t *cmd)
     atariName =           (char *) (dataBuffer + 2);    // get file name
 
     bool        waitingForMount;
-    int         atariDriveIndex, zipDirNestingLevel;
+    int         atariDriveIndex;
     std::string fullAtariPath;
-    res = createFullAtariPathAndFullHostPath(atariName, fullAtariPath, atariDriveIndex, hostName, waitingForMount, zipDirNestingLevel);
+    res = createFullAtariPathAndFullHostPath(atariName, fullAtariPath, atariDriveIndex, hostName, waitingForMount);
 
     if(!res) {                                                      // the path doesn't bellong to us?
         dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
@@ -913,9 +877,9 @@ void TranslatedDisk::onFcreate(uint8_t *cmd)
     atariName =           (char *) (dataBuffer + 1);                // get file name
 
     bool        waitingForMount;
-    int         atariDriveIndex, zipDirNestingLevel;
+    int         atariDriveIndex;
     std::string fullAtariPath;
-    res = createFullAtariPathAndFullHostPath(atariName, fullAtariPath, atariDriveIndex, hostName, waitingForMount, zipDirNestingLevel);
+    res = createFullAtariPathAndFullHostPath(atariName, fullAtariPath, atariDriveIndex, hostName, waitingForMount);
 
     if(!res) {                                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - createFullAtariPath failed", atariName.c_str());
@@ -928,13 +892,6 @@ void TranslatedDisk::onFcreate(uint8_t *cmd)
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate -- waiting for mount, call this function again to succeed later.");
 
         dataTrans->setStatus(E_WAITING_FOR_MOUNT);
-        return;
-    }
-
-    if(zipDirNestingLevel > 0) {                     // if it's read only (or inside of ZIP DIR - that's also read only), quit
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - it's read only", atariName.c_str());
-
-        dataTrans->setStatus(EACCDN);
         return;
     }
 
@@ -1042,9 +999,9 @@ void TranslatedDisk::onFopen(uint8_t *cmd)
     atariName =           (char *) (dataBuffer + 1);                // get file name
 
     bool        waitingForMount;
-    int         atariDriveIndex, zipDirNestingLevel;
+    int         atariDriveIndex;
     std::string fullAtariPath;
-    res = createFullAtariPathAndFullHostPath(atariName, fullAtariPath, atariDriveIndex, hostName, waitingForMount, zipDirNestingLevel);
+    res = createFullAtariPathAndFullHostPath(atariName, fullAtariPath, atariDriveIndex, hostName, waitingForMount);
 
     if(!res) {                                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - createFullAtariPath failed", atariName.c_str());
@@ -1060,7 +1017,7 @@ void TranslatedDisk::onFopen(uint8_t *cmd)
         return;
     }
 
-    if((mode & 0x07) != 0 && zipDirNestingLevel > 0) {      // if it's WRITE mode and read only (or inside of ZIP DIR - that's also read only), quit
+    if((mode & 0x07) != 0) {      // if it's WRITE mode and read only, quit
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - fopen mode is write, but file is read only, fail! ", atariName.c_str());
 
         dataTrans->setStatus(EACCDN);

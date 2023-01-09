@@ -140,7 +140,6 @@ extern ExternalServices externalServices;
 #define CE_CONF_TAR_JUST_FILENAME           "ce_conf.zip"
 
 #define MAX_ZIPDIR_ZIPFILE_SIZE             (5*1024*1024)
-#define MAX_ZIPDIR_NESTING                  3
 
 #define PATH_CE_DD_BS_L1                    "/ce/app/configdrive/drivers/ce_dd.bs"
 #define PATH_CE_DD_BS_L2                    "/ce/app/configdrive/drivers/ce_dd_l2.bs"

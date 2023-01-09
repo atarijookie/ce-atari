@@ -65,9 +65,9 @@ void TranslatedDisk::onPexec_createImage(uint8_t *cmd)
     atariName =           (char *) (dataBuffer + 2);                // get file name
 
     bool        waitingForMount;
-    int         atariDriveIndex, zipDirNestingLevel;
+    int         atariDriveIndex;
     std::string fullAtariPath;
-    res = createFullAtariPathAndFullHostPath(atariName, fullAtariPath, atariDriveIndex, hostName, waitingForMount, zipDirNestingLevel);
+    res = createFullAtariPathAndFullHostPath(atariName, fullAtariPath, atariDriveIndex, hostName, waitingForMount);
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_createImage() - will fake raw drive %c:", 'A' + atariDriveIndex);
     pexecDriveIndex = atariDriveIndex;                              // we will fake this drive index as RAW drive for Pexec() usage

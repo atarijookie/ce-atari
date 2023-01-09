@@ -485,9 +485,9 @@ void CCoreThread::handleAcsiCommand(uint8_t *bufIn)
     }
 
     if(!wasHandled) {           // if the command was not previously handled, it's probably just some SCSI command
-        pthread_mutex_lock(&shared.mtxScsi);
+        pthread_mutex_lock(&shared.mtxHdd);
         shared.scsi->processCommand(bufIn);                    // process the command
-        pthread_mutex_unlock(&shared.mtxScsi);
+        pthread_mutex_unlock(&shared.mtxHdd);
     }
 }
 
@@ -615,9 +615,9 @@ void CCoreThread::handleFwVersion_hans(void)
 
         setEnabledIDbits = true;                    // resend config 
 
-        pthread_mutex_lock(&shared.mtxScsi);
+        pthread_mutex_lock(&shared.mtxHdd);
         shared.scsi->updateTranslatedBootMedia();   // also update CE_DD bootsector with proper SCSI ID
-        pthread_mutex_unlock(&shared.mtxScsi);
+        pthread_mutex_unlock(&shared.mtxHdd);
 
         fillDisplayLines();                         // fill lines for front display
         saveHwConfig();                             // save the new config

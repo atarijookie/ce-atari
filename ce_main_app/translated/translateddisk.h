@@ -128,8 +128,8 @@ public:
 
     static void pathSeparatorAtariToHost(std::string &path);
 
-    bool createFullAtariPathAndFullHostPath(const std::string &inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel);
-    void createFullHostPath (const std::string &inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel);
+    bool createFullAtariPathAndFullHostPath(const std::string &inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount);
+    void createFullHostPath (const std::string &inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount);
 
     // for status report
     bool driveIsEnabled(int driveIndex);
@@ -264,19 +264,9 @@ private:
 
     //-----------------------------------
     // ZIP DIR stuff
-    ZipDirEntry *zipDirs[MAX_ZIP_DIRS];
-
     bool useZipdirNotFile;
-
-    void getZipDirMountPoint(int index, std::string &mountPoint);
-    int  getZipDirByMountPoint(std::string &searchedMountPoint);
-    bool zipDirAlreadyMounted(const char *zipFile, int &zipDirIndex);
-
+    bool hasArchiveExtension(const std::string& longPath, std::string& archiveSubPath);
     static bool isOkToMountThisAsZipDir(const char *zipFilePath);
-    void doZipDirMountOrStateCheck(bool isMounted, char *zipFilePath, int zipDirIndex, bool &waitingForMount);
-
-    void replaceHostPathWithZipDirPath(int inAtariDriveIndex, std::string &hostPath, bool &waitingForMount, int &zipDirNestingLevel);
-    void replaceHostPathWithZipDirPath_internal(std::string &hostPath, bool &waitingForMount, bool &containsZip);
     //-----------------------------------
     // helpers for find storage
     void initFindStorages(void);

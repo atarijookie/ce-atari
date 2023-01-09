@@ -88,10 +88,11 @@ public:
     static void textToFileFromEnv(const char* text, const char* envKeyForFileName); // text to text file specified in .env
 
     static void screenShotVblEnabled(bool enabled);
+
+    static void sendToMounter(const std::string& jsonString);
 private:
     static bool copyFileByHandles(FILE *from, FILE *to);
-
+    static void getDefaultValueFromVarName(std::string& varName, std::string& defValue, const std::string& delim);
 };
 
 #endif
-

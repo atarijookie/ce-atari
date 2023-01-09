@@ -11,7 +11,7 @@ class ImageSilo;
 
 typedef struct {
     Scsi            *scsi;
-    pthread_mutex_t mtxScsi;
+    pthread_mutex_t mtxHdd;
 
     ImageList       *imageList;
     ImageStorage    *imageStorage;

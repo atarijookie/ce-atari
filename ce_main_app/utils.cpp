@@ -18,6 +18,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <sys/select.h>
+#include <sys/un.h>
+#include <sys/socket.h>
+#include <fcntl.h>
 
 //--------
 // following includes are here for the code for getting IP address of interfaces
@@ -809,6 +813,20 @@ std::string Utils::dotEnvValue(std::string key, const char* defValue)
     return defValueStr;
 }
 
+void Utils::getDefaultValueFromVarName(std::string& varName, std::string& defValue, const std::string& delim)
+{
+    std::size_t varDef = varName.find(delim);    // check if this var name has also default value specified
+
+    //Debug::out(LOG_DEBUG, "Utils::getDefaultValueFromVarName - varName '%s'", varName.c_str());
+
+    if(varDef != std::string::npos) {           // if this variable name has also default value specified
+        std::string newVarName = varName.substr(0, varDef); // get just var name without default value
+        defValue = varName.substr(varDef + delim.length()); // get just the default value
+        //Debug::out(LOG_DEBUG, "Utils::getDefaultValueFromVarName - varName with default: '%s', varName '%s', defValue: '%s'", varName.c_str(), newVarName.c_str(), defValue.c_str());
+        varName = newVarName;                               // use the new var name
+    }
+}
+
 int Utils::dotEnvSubstituteVars(void)
 {
     /* go through the current dotEnv values and replace vars with values */
@@ -830,6 +848,9 @@ int Utils::dotEnvSubstituteVars(void)
             std::string varName = value.substr(varStart + 2, varEnd - varStart - 2);    // get just var name
 
             std::string defValue;
+            Utils::getDefaultValueFromVarName(varName, defValue, std::string(":-"));        // try the longer first
+            Utils::getDefaultValueFromVarName(varName, defValue, std::string("-"));         // then shorter next
+
             std::size_t varDef = varName.find(":-");    // check if this var name has also default value specified
 
             //Debug::out(LOG_DEBUG, "Utils::dotEnvSubstituteVars - varName '%s'", varName.c_str());
@@ -962,4 +983,32 @@ void Utils::screenShotVblEnabled(bool enabled)
 {
     events.screenShotVblEnabled = enabled;
     Utils::intToFileFromEnv((int) enabled, "SCREENSHOT_VBL_ENABLED_FILE");        // new value to file
+}
+
+void Utils::sendToMounter(const std::string& jsonString)
+{
+    std::string sockPath = Utils::dotEnvValue("MOUNT_SOCK_PATH");    // path to mounter socket
+
+	// create a UNIX DGRAM socket
+	int sockFd = socket(AF_UNIX, SOCK_DGRAM, 0);
+
+	if (sockFd < 0) {   // if failed to create socket
+	    Debug::out(LOG_ERROR, "sendToMounter: failed to create socket - errno: %d", errno);
+	    return;
+	}
+
+    struct sockaddr_un addr;
+    strcpy(addr.sun_path, sockPath.c_str());
+    addr.sun_family = AF_UNIX;
+
+    // try to send to mounter socket
+    int res = sendto(sockFd, jsonString.c_str(), jsonString.length() + 1, 0, (struct sockaddr *) &addr, sizeof(struct sockaddr_un));
+
+    if(res < 0) {       // if failed to send
+	    Debug::out(LOG_ERROR, "sendToMounter: sendto failed - errno: %d", errno);
+    } else {
+        Debug::out(LOG_DEBUG, "sendToMounter: sent to mounter: %s", jsonString.c_str());
+    }
+
+    close(sockFd);
 }
