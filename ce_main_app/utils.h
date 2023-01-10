@@ -87,6 +87,9 @@ public:
     static void textToFile(const char* text, const char* filePath);         // text to text file
     static void textToFileFromEnv(const char* text, const char* envKeyForFileName); // text to text file specified in .env
 
+    static void textFromFile(char* bfr, uint32_t bfrSize, const char* filePath, bool trimTrailing=true); // get one line from text file
+    static void trimTrail(char *bfr);
+
     static void screenShotVblEnabled(bool enabled);
 
     static void sendToMounter(const std::string& jsonString);

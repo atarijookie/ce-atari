@@ -979,6 +979,46 @@ void Utils::textToFile(const char* text, const char* filePath)
     fclose(f);                          // close file
 }
 
+void Utils::textFromFile(char* bfr, uint32_t bfrSize, const char* filePath, bool trimTrailing)
+{
+    /*
+        Read one line from text file specified by path, up to bfrSize of length.
+    */
+
+    if(!filePath || strlen(filePath) < 1) {     // null path or empty string path? quit
+        return;
+    }
+
+    FILE *f = fopen(filePath, "rt");    // open file
+
+    if(!f) {                            // could not open file? quit
+        return;
+    }
+
+    fgets(bfr, bfrSize, f);             // try to read
+    fclose(f);                          // close file
+
+    if(trimTrailing) {                  // if should also trim trailing white spaces, do that
+        Utils::trimTrail(bfr);
+    }
+}
+
+void Utils::trimTrail(char *bfr)
+{
+    /* trim trailing white spaces from the specified buffer */
+
+    int len = strlen(bfr);
+
+    for(int i = (len-1); i >= 0; i--) {
+        if(bfr[i] == '\n' || bfr[i] == '\r' || bfr[i] == '\t' || bfr[i] == ' ') {   // blank char found?
+            bfr[i] = 0;     // clear
+            continue;       // try next char
+        }
+
+        break;              // if got here, this char is not blank, wasn't cleared and we should stop
+    }
+}
+
 void Utils::screenShotVblEnabled(bool enabled)
 {
     events.screenShotVblEnabled = enabled;

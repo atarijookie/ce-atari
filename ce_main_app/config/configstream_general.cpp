@@ -29,8 +29,6 @@
 #include "config_commands.h"
 #include "../debug.h"
 
-#define APP_SOCK_PATH   "/var/run/ce"
-
 uint8_t isUpdateStartingFlag = 0;
 
 ConfigStream::ConfigStream()
@@ -160,15 +158,18 @@ void ConfigStream::connectToAppIndex(int nextAppIndex)
     uint8_t status = SCSI_ST_CHECK_CONDITION;   // default status to fail
 
     char sockPath[128];                     // construct filename for socket, e.g. /var/run/ce/app0.sock
-    sprintf(sockPath, "%s/app%d.sock", APP_SOCK_PATH, nextAppIndex);
+    std::string sockPathFormat = Utils::dotEnvValue("APPS_VIA_SOCK_PATHS");     // fetch format for app-via-sock path to sock
+    sprintf(sockPath, sockPathFormat.c_str(), nextAppIndex);                    // create path for nextAppIndex
 
     if (access(sockPath, F_OK) == 0) {      // socket path valid
+        Debug::out(LOG_DEBUG, "handleConfigStream -- CFG_CMD_SET_APP_INDEX -- connecting to app %d - path: %s", nextAppIndex, sockPath);
+
         appIndex = nextAppIndex;            // store next socket index
         closeFd(appFd);                     // close current socket
         connectIfNeeded();                  // open next socket
         status = SCSI_ST_OK;                // success!
     } else {                                // socket path not found
-        Debug::out(LOG_INFO, "handleConfigStream -- CFG_CMD_SET_APP_INDEX -- app %d with path %s does not exist", nextAppIndex, sockPath);
+        Debug::out(LOG_WARNING, "handleConfigStream -- CFG_CMD_SET_APP_INDEX -- app %d with path %s does not exist", nextAppIndex, sockPath);
     }
 
     dataTrans->setStatus(status);           // return status
@@ -176,27 +177,26 @@ void ConfigStream::connectToAppIndex(int nextAppIndex)
 
 void ConfigStream::readAppNames(void)
 {
-    dataTrans->setStatus(SCSI_ST_CHECK_CONDITION);      // default status is failure
+    std::string sockDescPathFormat = Utils::dotEnvValue("APPS_VIA_SOCK_DESCS");     // fetch format for app-via-sock path to description
 
-    char path[128];                     // construct filename for socket, e.g. /var/run/ce/app0.sock
-    sprintf(path, "%s/apps.txt", APP_SOCK_PATH);
-    FILE *f = fopen(path, "rt");
+    for(int i=0; i<6; i++) {
+        char descPath[128];
+        sprintf(descPath, sockDescPathFormat.c_str(), i);   // create path
 
-    if(!f) {            // failed to open file?
-        return;
-    }
+        char line[80];
+        memset(line, 0, sizeof(line));                      // clear line before reading
+        sprintf(line, "[F%d] ", i + 1);                     // generate key to switch here, e.g. [F1]
 
-    char line[80];
+        Utils::textFromFile(line + 5, sizeof(line) - 6, descPath);      // read in line from file
 
-    while(!feof(f)) {   // read while not end of file
-        memset(line, 0, sizeof(line));                  // clear line before reading
-        char* res = fgets(line, sizeof(line) - 1, f);     // read line from file
-
-        if(res > 0) {           // got some line? add it to response
-            dataTrans->addDataBfr(line, 80, false);
+        if(line[5] == 0) {                                  // empty description? clear the '[Fx] ' part
+            memset(line, 0, 5);
+        } else {                                            // got description? log it
+            Debug::out(LOG_DEBUG, "readAppNames - app: %d, desc: %s", i, line);
         }
+
+        dataTrans->addDataBfr(line, 80, false);             // add line to bfr
     }
-    fclose(f);
 
     dataTrans->padDataToMul16();            // pad buffer
     dataTrans->setStatus(SCSI_ST_OK);       // success
@@ -234,10 +234,11 @@ void ConfigStream::connectIfNeeded(void)
 
 int ConfigStream::openSocket(void)
 {
-    char fullname[128];
+    char sockPath[128];
 
     // construct filename for socket, e.g. /var/run/ce/app0.sock
-    sprintf(fullname, "%s/app%d.sock", APP_SOCK_PATH, appIndex);
+    std::string sockPathFormat = Utils::dotEnvValue("APPS_VIA_SOCK_PATHS");     // fetch format for app-via-sock path to sock
+    sprintf(sockPath, sockPathFormat.c_str(), appIndex);                    // create path for nextAppIndex
 
     struct sockaddr_un addr;
 
@@ -251,7 +252,7 @@ int ConfigStream::openSocket(void)
     // Construct server address, and make the connection.
     memset(&addr, 0, sizeof(struct sockaddr_un));
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, fullname, sizeof(addr.sun_path) - 1);
+    strncpy(addr.sun_path, sockPath, sizeof(addr.sun_path) - 1);
 
     // TODO: set 500 ms timeout!
 
