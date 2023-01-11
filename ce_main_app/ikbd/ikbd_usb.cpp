@@ -15,7 +15,7 @@
 #include "settings.h"
 #include <stdint.h>
 #include "statusreport.h"
-#include "../config/configstream.h"
+#include "../config/consoleappsstream.h"
 #include "../display/displaythread.h"
 
 #include "chipinterface.h"

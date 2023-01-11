@@ -26,6 +26,8 @@ void refreshScreen(void);
 BYTE setResolution(void);
 void showConnectionErrorMessage(void);
 void showMoreStreamIfNeeded(void);
+int getAndShowAvailableApps(void);
+void connectToAppIndex(uint8_t newAppIndex);
 
 BYTE atariKeysToSingleByte(BYTE vkey, BYTE key, int, int);
 BYTE ce_identify(BYTE ACSI_id);
@@ -102,7 +104,11 @@ int main(void)
     // ----------------- 
     // if the device is CosmosEx, do the remote console config
     hdIf.maxRetriesCount = 1;                                       // retry only once
-    
+
+    if(getAndShowAvailableApps() == FALSE) {                        // show available apps, let user choose. If should quit, quit
+        return 0;
+    }
+
     setResolution();                                                // send the current ST resolution for screen centering 
     showHomeScreen();                                               // get the home screen 
     
@@ -124,7 +130,7 @@ int main(void)
         }
     
         key = getKeyIfPossible();                                   // see if there's something waiting from keyboard 
-        
+
         if(key == 0) {                                              // nothing waiting from keyboard? 
             DWORD now   = getTicksAsUser();
             DWORD diff  = now - lastShowStreamTime;
@@ -138,37 +144,87 @@ int main(void)
             continue;                                               // try again 
         }
 
-        if(key == KEY_F8) {                                         // should switch between config and linux console?
-            Clear_home();                                           // clear the screen
-        
-            if(keyDownCommand == CFG_CMD_KEYDOWN) {                 // currently showing normal config?
-                Cursor_on();                                        // turn on cursor            
-                keyDownCommand = CFG_CMD_LINUXCONSOLE_GETSTREAM;    // switch to linux console
-                sendKeyDown(KEY_ENTER, keyDownCommand);             // send enter to show the command line
-            } else {                                                // showing linux console? 
-                keyDownCommand = CFG_CMD_KEYDOWN;                   // switch to normal config
-                refreshScreen();                                    // refresh the screen
-            }
-            
-            lastShowStreamTime = getTicksAsUser();                  // we just shown the stream, no need for refresh
+        // switching between apps using Fx keys
+        if(key >= KEY_F1 && key <= KEY_F9) {        // valid Fx key pressed
+            int index = key - KEY_F1;               // transform key to value 0-8
+            connectToAppIndex(index);               // switch to this app
             continue;
         }
-        
+
         if(key == KEY_F10) {                                        // should quit? 
             break;
         }
-        
-        if(key == KEY_F5 && keyDownCommand == CFG_CMD_KEYDOWN) {    // should refresh? and are we on the config part, not the linux console part? 
-            refreshScreen();
-            lastShowStreamTime = getTicksAsUser();                  // we just shown the stream, no need for refresh
-            continue;
-        }
-        
+
         sendKeyDown(key, keyDownCommand);                           // send this key to device
         lastShowStreamTime = getTicksAsUser();                      // we just shown the stream, no need for refresh
     }
     
     return 0;
+}
+//--------------------------------------------------
+void connectToAppIndex(uint8_t newAppIndex)
+{
+    // send command to CE to tell it which app (with newAppIndex) we want to use
+    BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_SET_APP_INDEX, 0};
+    cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)
+    cmd[5] = newAppIndex;
+    memset(pBuffer, 0, 512);                        // clear the buffer
+
+    hdIfCmdAsUser(1, cmd, 6, pBuffer, 1);           // send command to ST
+
+    if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE
+        showConnectionErrorMessage();
+        return;
+    }
+}
+//--------------------------------------------------
+int getAndShowAvailableApps(void)
+{
+    // send command to CE, fetch list of apps
+    BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_GET_APP_NAMES, 0};
+    cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)
+    memset(pBuffer, 0, 512);                        // clear the buffer
+
+    hdIfCmdAsUser(1, cmd, 6, pBuffer, 1);           // send command to ST
+
+    if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE
+        showConnectionErrorMessage();
+        return FALSE;
+    }
+
+    // show list of apps with a message
+    Clear_home();
+    (void) Cconws("\33pList of available CosmosEx tools\33q\n");
+    (void) Cconws("\33pPress F1-F9 to select or F10 to quit.\33p\n\n");
+    int i;
+    for(i=0; i<12; i++) {                           // go through the list of apps
+        char* pApp = (char*) pBuffer + i*40;        // 1 app has 40 chars for name, construct pointer to it
+
+        if(*pApp != 0) {                            // this position not empty? show it
+            (void) Cconws((char *) pApp);
+        }
+    }
+
+    // wait for a valid key
+    while(1) {
+        BYTE key = getKeyIfPossible();
+
+        if(key >= KEY_F1 && key <= KEY_F9) {                // valid Fx key pressed
+            int index = key - KEY_F1;                       // transform key to value 0-8
+            char* pApp = (char*) pBuffer + index*40;        // 1 app has 40 chars for name, construct pointer to it
+
+            if(*pApp != 0) {                                // this position not empty? use it!
+                connectToAppIndex(index);                   // switch to this app
+                break;
+            }
+        }
+
+        if(key == KEY_F10 || key == 'q' || key == 'Q') {    // user requested quit by key press? quit
+            return FALSE;
+        }
+    }
+
+    return TRUE;
 }
 //--------------------------------------------------
 void sendKeyDown(BYTE key, BYTE keyDownCommand)
@@ -196,37 +252,9 @@ void sendKeyDown(BYTE key, BYTE keyDownCommand)
     
     retrieveIsUpdateScreen((char *) pBuffer);       // get the flag isUpdateScreen from the end of the stream
     (void) Cconws((char *) pBuffer);                // now display the buffer
-    
-    if(keyDownCommand == CFG_CMD_LINUXCONSOLE_GETSTREAM) {  // if we're on the linux console stream, possibly show more data
-        showMoreStreamIfNeeded();                           // if there's a marker about more data, fetch it
-    }
 }
 //--------------------------------------------------
-void showMoreStreamIfNeeded(void)
-{
-    BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_LINUXCONSOLE_GETSTREAM, 0};
-    
-    cmd[0] = (deviceID << 5);                           // cmd[0] = ACSI_id + TEST UNIT READY (0)   
-    cmd[5] = 0;                                         // no key pressed 
-  
-    while(1) {
-        if(pBuffer[ (3 * 512) - 1 ] == LINUXCONSOLE_NO_MORE_DATA) {     // no more data? quit
-            break;
-        }
-    
-        memset(pBuffer, 0, 3 * 512);                    // clear the buffer 
-  
-        hdIfCmdAsUser(1, cmd, 6, pBuffer, 3);           // issue the KEYDOWN command and show the screen stream 
-    
-        if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
-            return;
-        }
-
-        (void) Cconws((char *) pBuffer);                // now display the buffer
-    }
-} 
-
-void showHomeScreen(void)                           
+void showHomeScreen(void)
 {
     BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_GO_HOME, 0};
     

@@ -7,13 +7,30 @@
 #include "../settingsreloadproxy.h"
 #include "../version.h"
 
-#define CONFIG_TEXT_FILE        "/tmp/ce_config.txt"
+// commands for HOSTMOD_CONFIG
+#define CFG_CMD_IDENTIFY            0
+#define CFG_CMD_KEYDOWN             1
+#define CFG_CMD_SET_RESOLUTION      2
+#define CFG_CMD_UPDATING_QUERY      3
+#define CFG_CMD_REFRESH             0xfe
+#define CFG_CMD_GO_HOME             0xff
 
-#define CONFIGSTREAM_ON_ATARI           0
-#define CONFIGSTREAM_IN_LINUX_CONSOLE   1
-#define CONFIGSTREAM_THROUGH_WEB        2
+#define CFG_CMD_SET_CFGVALUE        5
 
-#define FAILED_UPDATE_CHECK_TIME    (30 * 1000)
+#define CFG_CMD_LINUXCONSOLE_GETSTREAM  10
+
+#define CFG_CMD_GET_APP_NAMES       20
+#define CFG_CMD_SET_APP_INDEX       21
+
+// two values of a last byte of LINUXCONSOLE stream - more data, or no more data
+#define LINUXCONSOLE_NO_MORE_DATA   0x00
+#define LINUXCONSOLE_GET_MORE_DATA  0xda
+
+// types for CFG_CMD_SET_CFGVALUE
+#define CFGVALUE_TYPE_STRING    1
+#define CFGVALUE_TYPE_INT       2
+#define CFGVALUE_TYPE_BOOL      3
+#define CFGVALUE_TYPE_ST_PATH   4   // to be translated
 
 class AcsiDataTrans;
 
@@ -23,13 +40,14 @@ class AcsiDataTrans;
 
 #define READ_BUFFER_SIZE    (5 * 1024)
 
-class ConfigStream
+class ConsoleAppsStream
 {
 public:
-    ConfigStream();
-    ~ConfigStream();
+    ConsoleAppsStream();
+    ~ConsoleAppsStream();
 
     // functions which are called from the main loop
+    void houseKeeping(uint32_t now);
     void processCommand(uint8_t *cmd);
     void setAcsiDataTrans(AcsiDataTrans *dt);
     void setSettingsReloadProxy(SettingsReloadProxy *rp);

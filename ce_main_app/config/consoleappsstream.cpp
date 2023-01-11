@@ -25,13 +25,12 @@
 #include "../settings.h"
 #include "../utils.h"
 #include "keys.h"
-#include "configstream.h"
-#include "config_commands.h"
+#include "consoleappsstream.h"
 #include "../debug.h"
 
 uint8_t isUpdateStartingFlag = 0;
 
-ConfigStream::ConfigStream()
+ConsoleAppsStream::ConsoleAppsStream()
 {
     dataTrans   = NULL;
     reloadProxy = NULL;
@@ -41,22 +40,29 @@ ConfigStream::ConfigStream()
     appFd = -1;         // not connected
 }
 
-ConfigStream::~ConfigStream()
+ConsoleAppsStream::~ConsoleAppsStream()
 {
 
 }
 
-void ConfigStream::setAcsiDataTrans(AcsiDataTrans *dt)
+void ConsoleAppsStream::setAcsiDataTrans(AcsiDataTrans *dt)
 {
     dataTrans = dt;
 }
 
-void ConfigStream::setSettingsReloadProxy(SettingsReloadProxy *rp)
+void ConsoleAppsStream::setSettingsReloadProxy(SettingsReloadProxy *rp)
 {
     reloadProxy = rp;
 }
 
-void ConfigStream::processCommand(uint8_t *cmd)
+void ConsoleAppsStream::houseKeeping(uint32_t now)
+{
+    if((now - lastCmdTime) >= 3000) {       // no commands for apps for some time? disconnect app socket to let the app close
+        closeFd(appFd);
+    }
+}
+
+void ConsoleAppsStream::processCommand(uint8_t *cmd)
 {
     static uint8_t readBuffer[READ_BUFFER_SIZE];
     int streamCount;
@@ -96,7 +102,7 @@ void ConfigStream::processCommand(uint8_t *cmd)
         dataTrans->addDataBfr(readBuffer, streamCount, true);               // add data and status, with padding to multiple of 16 bytes
         dataTrans->setStatus(SCSI_ST_OK);
 
-        Debug::out(LOG_DEBUG, "handleConfigStream -- CFG_CMD_KEYDOWN -- %d bytes", streamCount);
+        Debug::out(LOG_DEBUG, "handleConsoleAppsStream -- CFG_CMD_KEYDOWN -- %d bytes", streamCount);
         break;
 
     case CFG_CMD_SET_RESOLUTION:
@@ -115,7 +121,7 @@ void ConfigStream::processCommand(uint8_t *cmd)
         sockWrite(appFd, bfr, 1);           // send to app
 
         dataTrans->setStatus(SCSI_ST_OK);
-        Debug::out(LOG_DEBUG, "handleConfigStream -- CFG_CMD_SET_RESOLUTION -- %d", cmd[5]);
+        Debug::out(LOG_DEBUG, "handleConsoleAppsStream -- CFG_CMD_SET_RESOLUTION -- %d", cmd[5]);
         break;
 
     case CFG_CMD_SET_CFGVALUE:
@@ -131,7 +137,7 @@ void ConfigStream::processCommand(uint8_t *cmd)
 
         dataTrans->setStatus(SCSI_ST_OK);
 
-        Debug::out(LOG_DEBUG, "handleConfigStream -- CFG_CMD_UPDATING_QUERY -- isUpdateStartingFlag: %d, updateComponentsWithValidityNibble: %x", isUpdateStartingFlag, updateComponentsWithValidityNibble);
+        Debug::out(LOG_DEBUG, "handleConsoleAppsStream -- CFG_CMD_UPDATING_QUERY -- isUpdateStartingFlag: %d, updateComponentsWithValidityNibble: %x", isUpdateStartingFlag, updateComponentsWithValidityNibble);
         break;
     }
 
@@ -153,7 +159,7 @@ void ConfigStream::processCommand(uint8_t *cmd)
     dataTrans->sendDataAndStatus();     // send all the stuff after handling, if we got any
 }
 
-void ConfigStream::connectToAppIndex(int nextAppIndex)
+void ConsoleAppsStream::connectToAppIndex(int nextAppIndex)
 {
     uint8_t status = SCSI_ST_CHECK_CONDITION;   // default status to fail
 
@@ -162,28 +168,28 @@ void ConfigStream::connectToAppIndex(int nextAppIndex)
     sprintf(sockPath, sockPathFormat.c_str(), nextAppIndex);                    // create path for nextAppIndex
 
     if (access(sockPath, F_OK) == 0) {      // socket path valid
-        Debug::out(LOG_DEBUG, "handleConfigStream -- CFG_CMD_SET_APP_INDEX -- connecting to app %d - path: %s", nextAppIndex, sockPath);
+        Debug::out(LOG_DEBUG, "handleConsoleAppsStream -- CFG_CMD_SET_APP_INDEX -- connecting to app %d - path: %s", nextAppIndex, sockPath);
 
         appIndex = nextAppIndex;            // store next socket index
         closeFd(appFd);                     // close current socket
         connectIfNeeded();                  // open next socket
         status = SCSI_ST_OK;                // success!
     } else {                                // socket path not found
-        Debug::out(LOG_WARNING, "handleConfigStream -- CFG_CMD_SET_APP_INDEX -- app %d with path %s does not exist", nextAppIndex, sockPath);
+        Debug::out(LOG_WARNING, "handleConsoleAppsStream -- CFG_CMD_SET_APP_INDEX -- app %d with path %s does not exist", nextAppIndex, sockPath);
     }
 
     dataTrans->setStatus(status);           // return status
 }
 
-void ConfigStream::readAppNames(void)
+void ConsoleAppsStream::readAppNames(void)
 {
     std::string sockDescPathFormat = Utils::dotEnvValue("APPS_VIA_SOCK_DESCS");     // fetch format for app-via-sock path to description
 
-    for(int i=0; i<6; i++) {
+    for(int i=0; i<12; i++) {
         char descPath[128];
         sprintf(descPath, sockDescPathFormat.c_str(), i);   // create path
 
-        char line[80];
+        char line[40];
         memset(line, 0, sizeof(line));                      // clear line before reading
         sprintf(line, "[F%d] ", i + 1);                     // generate key to switch here, e.g. [F1]
 
@@ -195,14 +201,14 @@ void ConfigStream::readAppNames(void)
             Debug::out(LOG_DEBUG, "readAppNames - app: %d, desc: %s", i, line);
         }
 
-        dataTrans->addDataBfr(line, 80, false);             // add line to bfr
+        dataTrans->addDataBfr(line, 40, false);             // add line to bfr
     }
 
     dataTrans->padDataToMul16();            // pad buffer
     dataTrans->setStatus(SCSI_ST_OK);       // success
 }
 
-int ConfigStream::getStream(uint8_t *bfr, int maxLen)
+int ConsoleAppsStream::getStream(uint8_t *bfr, int maxLen)
 {
     memset(bfr, 0, maxLen);                             // clear the buffer
 
@@ -223,7 +229,7 @@ int ConfigStream::getStream(uint8_t *bfr, int maxLen)
     return totalCnt;                                    // return the count of bytes used
 }
 
-void ConfigStream::connectIfNeeded(void)
+void ConsoleAppsStream::connectIfNeeded(void)
 {
     if(appFd > 0) {             // do nothing if connected
         return;
@@ -232,7 +238,7 @@ void ConfigStream::connectIfNeeded(void)
     appFd = openSocket();       // try to connect
 }
 
-int ConfigStream::openSocket(void)
+int ConsoleAppsStream::openSocket(void)
 {
     char sockPath[128];
 
@@ -263,7 +269,7 @@ int ConfigStream::openSocket(void)
     return sfd;
 }
 
-void ConfigStream::closeFd(int& fd)
+void ConsoleAppsStream::closeFd(int& fd)
 {
     if(fd > 0) {
         close(fd);
@@ -271,7 +277,7 @@ void ConfigStream::closeFd(int& fd)
     }
 }
 
-ssize_t ConfigStream::sockRead(int& fdIn, char* bfr, int bfrLen)
+ssize_t ConsoleAppsStream::sockRead(int& fdIn, char* bfr, int bfrLen)
 {
     if(fdIn < 0) {      // not connected? quit
         return 0;
@@ -297,7 +303,7 @@ ssize_t ConfigStream::sockRead(int& fdIn, char* bfr, int bfrLen)
     return sres;
 }
 
-ssize_t ConfigStream::sockWrite(int& fdOut, char* bfr, int count)
+ssize_t ConsoleAppsStream::sockWrite(int& fdOut, char* bfr, int count)
 {
     if(fdOut < 0) {      // not connected? quit
         return 0;
@@ -313,7 +319,7 @@ ssize_t ConfigStream::sockWrite(int& fdOut, char* bfr, int count)
     return sres;
 }
 
-int ConfigStream::filterVT100(char *bfr, int cnt)
+int ConsoleAppsStream::filterVT100(char *bfr, int cnt)
 {
     static char tmp[READ_BUFFER_SIZE];
     int i = 0, j = 0;
@@ -370,7 +376,7 @@ int ConfigStream::filterVT100(char *bfr, int cnt)
     return j;
 }
 
-void ConfigStream::atariKeyToConsoleKey(uint8_t atariKey, char *bfr, int &cnt)
+void ConsoleAppsStream::atariKeyToConsoleKey(uint8_t atariKey, char *bfr, int &cnt)
 {
     // TODO : translate to ASCII ? (vt52 behaviour)
     // DELETE = 0x7F  BACKSPACE = Ctrl+H = 0x08

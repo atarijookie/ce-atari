@@ -37,6 +37,20 @@ extern DebugVars    dbgVars;
 
 extern SharedObjects shared;
 
+struct TLastFwInfoTime {
+    uint32_t hans;
+    uint32_t franz;
+    uint32_t nextDisplay;
+
+    uint32_t hansResetTime;
+    uint32_t franzResetTime;
+
+    int     progress;
+};
+
+TLastFwInfoTime lastFwInfoTime;
+LoadTracker load;
+
 CCoreThread::CCoreThread()
 {
     Update::initialize();
@@ -82,7 +96,7 @@ CCoreThread::CCoreThread()
 
     misc.setDataTrans(dataTrans);
 
-    configStream = new ConfigStream();
+    configStream = new ConsoleAppsStream();
     configStream->setAcsiDataTrans(dataTrans);
     configStream->setSettingsReloadProxy(&settingsReloadProxy);
 }
@@ -159,35 +173,19 @@ void CCoreThread::run(void)
     Debug::out(LOG_DEBUG, "Will check for Hans and Franz alive: %s", (shouldCheckHansFranzAlive ? "yes" : "no") );
     //------------------------------
 
-    uint32_t getHwInfoTimeout      = Utils::getEndTime(3000);                  // create a time when we already should have info about HW, and if we don't have that by that time, then fail
+    uint32_t getHwInfoTimeout = Utils::getEndTime(3000);                  // create a time when we already should have info about HW, and if we don't have that by that time, then fail
 
-    struct {
-        uint32_t hans;
-        uint32_t franz;
-        uint32_t nextDisplay;
+    lastFwInfoTime.nextDisplay = Utils::getEndTime(1000);
+    lastFwInfoTime.hansResetTime = Utils::getCurrentMs();
+    lastFwInfoTime.franzResetTime = Utils::getCurrentMs();
 
-        uint32_t hansResetTime;
-        uint32_t franzResetTime;
-
-        int     progress;
-    } lastFwInfoTime;
-    char progChars[4] = {'|', '/', '-', '\\'};
-
-    lastFwInfoTime.hans         = 0;
-    lastFwInfoTime.franz        = 0;
-    lastFwInfoTime.nextDisplay  = Utils::getEndTime(1000);
-    lastFwInfoTime.progress     = 0;
-
-    lastFwInfoTime.hansResetTime    = Utils::getCurrentMs();
-    lastFwInfoTime.franzResetTime   = Utils::getCurrentMs();
+    uint32_t nextHousekeeping = Utils::getEndTime(1000);
 
     bool needsAction;
     bool hardNotFloppy;
 
     uint32_t nextFloppyEncodingCheck   = Utils::getEndTime(1000);
     //bool prevFloppyEncodingRunning  = false;
-
-    LoadTracker load;
 
     while(sigintReceived == 0) {
         bool gotAtn = false;                                            // no ATN received yet?
@@ -201,51 +199,14 @@ void CCoreThread::run(void)
         uint32_t now = Utils::getCurrentMs();
         if(now >= lastFwInfoTime.nextDisplay) {
             lastFwInfoTime.nextDisplay  = Utils::getEndTime(1000);
+            displayStatusToConsole(now);
+        }
 
-            //-------------
-            // calculate load, show message if needed
-            load.calculate();                                           // calculate load
+        // minor house-keeping tasks might be launched here, just be sure they take little time to finish
+        if(now >= nextHousekeeping) {
+            nextHousekeeping = Utils::getEndTime(1000);
 
-            if(load.suspicious) {                                       // load is suspiciously high?
-                Debug::out(LOG_DEBUG, ">>> Suspicious core cycle load -- cycle time: %4d ms, load: %3d %%", load.cycle.total, load.loadPercents);
-                printf(">>> Suspicious core cycle load -- cycle time: %4d ms, load: %3d %%\n", load.cycle.total, load.loadPercents);
-
-                lastFwInfoTime.hansResetTime    = now;
-                lastFwInfoTime.franzResetTime   = now;
-                }
-            //-------------
-
-            float hansTime  = ((float)(now - lastFwInfoTime.hans))  / 1000.0f;
-            float franzTime = ((float)(now - lastFwInfoTime.franz)) / 1000.0f;
-
-            hansTime    = (hansTime  < 15.0f) ? hansTime  : 15.0f;
-            franzTime   = (franzTime < 15.0f) ? franzTime : 15.0f;
-
-            bool hansAlive  = (hansTime < 3.0f);
-            bool franzAlive = (franzTime < 3.0f);
-
-            int chipIfType = chipInterface->chipInterfaceType();
-            if(chipIfType == CHIP_IF_V1_V2) {       // v1 v2 - with Hans and Franz
-                printf("\033[2K  [ %c ]  Hans: %s, Franz: %s\033[A\n", progChars[lastFwInfoTime.progress], hansAlive ? "LIVE" : "DEAD", franzAlive ? "LIVE" : "DEAD");
-            }
-
-            lastFwInfoTime.progress = (lastFwInfoTime.progress + 1) % 4;
-
-            if(!hansAlive && !flags.noReset && (now - lastFwInfoTime.hansResetTime) >= 3000) {
-                printf("\033[2KHans not alive, resetting Hans.\n");
-                Debug::out(LOG_INFO, "Hans not alive, resetting Hans.");
-                lastFwInfoTime.hansResetTime = now;
-                chipInterface->resetHDD();
-            }
-
-            if(!franzAlive && !flags.noReset && (now - lastFwInfoTime.franzResetTime) >= 3000) {
-                printf("\033[2KFranz not alive, resetting Franz.\n");
-                Debug::out(LOG_INFO, "Franz not alive, resetting Franz.");
-                lastFwInfoTime.franzResetTime = now;
-                chipInterface->resetFDD();
-            }
-
-            load.clear();                       // clear load counter
+            configStream->houseKeeping(now);
         }
 
         // should we check if Hans and Franz are alive?
@@ -286,36 +247,9 @@ void CCoreThread::run(void)
 
         needsAction = chipInterface->actionNeeded(hardNotFloppy, inBuff);
 
-        if(needsAction && hardNotFloppy) {    // hard drive needs action?
-            gotAtn = true;  // we've some ATN
-
-            switch(inBuff[3]) {
-                case ATN_FW_VERSION:
-                    statuses.hans.aliveTime = now;
-                    statuses.hans.aliveSign = ALIVE_FWINFO;
-
-                    lastFwInfoTime.hans = Utils::getCurrentMs();
-                    handleFwVersion_hans();
-                    break;
-
-                case ATN_ACSI_COMMAND:
-                    dbgVars.isInHandleAcsiCommand = 1;
-
-                    statuses.hdd.aliveTime  = now;
-                    statuses.hdd.aliveSign  = ALIVE_RW;
-
-                    statuses.hans.aliveTime = now;
-                    statuses.hans.aliveSign = ALIVE_CMD;
-
-                    handleAcsiCommand(inBuff + 8);
-
-                    dbgVars.isInHandleAcsiCommand = 0;
-                break;
-
-            default:
-                Debug::out(LOG_ERROR, "CCoreThread received weird ATN code %02x waitForATN()", inBuff[3]);
-                break;
-            }
+        if(needsAction && hardNotFloppy) {      // hard drive needs action?
+            gotAtn = true;                      // we've some ATN
+            handleHdd(now, inBuff);
         }
 
         if(events.insertSpecialFloppyImageId != 0) {                       // very stupid way of letting web IF to insert special image
@@ -330,40 +264,7 @@ void CCoreThread::run(void)
 
         if(needsAction && !hardNotFloppy) {         // floppy drive needs action?
             gotAtn = true;                          // we've some ATN
-
-            switch(inBuff[3]) {
-            case ATN_FW_VERSION:                    // device has sent FW version
-                statuses.franz.aliveTime = now;
-                statuses.franz.aliveSign = ALIVE_FWINFO;
-
-                lastFwInfoTime.franz = Utils::getCurrentMs();
-                handleFwVersion_franz();
-                break;
-
-            case ATN_SECTOR_WRITTEN:                // device has sent written sector data
-                statuses.fdd.aliveTime   = now;
-                statuses.fdd.aliveSign   = ALIVE_WRITE;
-
-                statuses.franz.aliveTime = now;
-                statuses.franz.aliveSign = ALIVE_WRITE;
-
-                handleSectorWritten();
-                break;
-
-            case ATN_SEND_TRACK:                    // device requests data of a whole track
-                statuses.franz.aliveTime = now;
-                statuses.franz.aliveSign = ALIVE_READ;
-
-                statuses.fdd.aliveTime   = now;
-                statuses.fdd.aliveSign   = ALIVE_READ;
-
-                handleSendTrack(inBuff + 8);
-                break;
-
-            default:
-                Debug::out(LOG_ERROR, "CCoreThread received weird ATN code %02x waitForATN()", inBuff[3]);
-                break;
-            }
+            handleFdd(now, inBuff);
         }
 
         load.busy.markEnd();                        // mark the end of the busy part of the code
@@ -372,6 +273,124 @@ void CCoreThread::run(void)
             Utils::sleepMs(1);                        // wait 1 ms...
         }
     }
+}
+
+void CCoreThread::handleHdd(uint32_t now, uint8_t* inBuff)
+{
+    switch(inBuff[3]) {
+        case ATN_FW_VERSION:
+            statuses.hans.aliveTime = now;
+            statuses.hans.aliveSign = ALIVE_FWINFO;
+
+            lastFwInfoTime.hans = Utils::getCurrentMs();
+            handleFwVersion_hans();
+            break;
+
+        case ATN_ACSI_COMMAND:
+            dbgVars.isInHandleAcsiCommand = 1;
+
+            statuses.hdd.aliveTime  = now;
+            statuses.hdd.aliveSign  = ALIVE_RW;
+
+            statuses.hans.aliveTime = now;
+            statuses.hans.aliveSign = ALIVE_CMD;
+
+            handleAcsiCommand(inBuff + 8);
+
+            dbgVars.isInHandleAcsiCommand = 0;
+        break;
+
+    default:
+        Debug::out(LOG_ERROR, "CCoreThread received weird ATN code %02x waitForATN()", inBuff[3]);
+        break;
+    }
+}
+
+void CCoreThread::handleFdd(uint32_t now, uint8_t* inBuff)
+{
+    switch(inBuff[3]) {
+    case ATN_FW_VERSION:                    // device has sent FW version
+        statuses.franz.aliveTime = now;
+        statuses.franz.aliveSign = ALIVE_FWINFO;
+
+        lastFwInfoTime.franz = Utils::getCurrentMs();
+        handleFwVersion_franz();
+        break;
+
+    case ATN_SECTOR_WRITTEN:                // device has sent written sector data
+        statuses.fdd.aliveTime   = now;
+        statuses.fdd.aliveSign   = ALIVE_WRITE;
+
+        statuses.franz.aliveTime = now;
+        statuses.franz.aliveSign = ALIVE_WRITE;
+
+        handleSectorWritten();
+        break;
+
+    case ATN_SEND_TRACK:                    // device requests data of a whole track
+        statuses.franz.aliveTime = now;
+        statuses.franz.aliveSign = ALIVE_READ;
+
+        statuses.fdd.aliveTime   = now;
+        statuses.fdd.aliveSign   = ALIVE_READ;
+
+        handleSendTrack(inBuff + 8);
+        break;
+
+    default:
+        Debug::out(LOG_ERROR, "CCoreThread received weird ATN code %02x waitForATN()", inBuff[3]);
+        break;
+    }
+}
+
+void CCoreThread::displayStatusToConsole(uint32_t now)
+{
+    char progChars[4] = {'|', '/', '-', '\\'};
+
+    //-------------
+    // calculate load, show message if needed
+    load.calculate();                                           // calculate load
+
+    if(load.suspicious) {                                       // load is suspiciously high?
+        Debug::out(LOG_DEBUG, ">>> Suspicious core cycle load -- cycle time: %4d ms, load: %3d %%", load.cycle.total, load.loadPercents);
+        printf(">>> Suspicious core cycle load -- cycle time: %4d ms, load: %3d %%\n", load.cycle.total, load.loadPercents);
+
+        lastFwInfoTime.hansResetTime    = now;
+        lastFwInfoTime.franzResetTime   = now;
+        }
+    //-------------
+
+    float hansTime  = ((float)(now - lastFwInfoTime.hans))  / 1000.0f;
+    float franzTime = ((float)(now - lastFwInfoTime.franz)) / 1000.0f;
+
+    hansTime  = (hansTime  < 15.0f) ? hansTime  : 15.0f;
+    franzTime = (franzTime < 15.0f) ? franzTime : 15.0f;
+
+    bool hansAlive  = (hansTime < 3.0f);
+    bool franzAlive = (franzTime < 3.0f);
+
+    int chipIfType = chipInterface->chipInterfaceType();
+    if(chipIfType == CHIP_IF_V1_V2) {       // v1 v2 - with Hans and Franz
+        printf("\033[2K  [ %c ]  Hans: %s, Franz: %s\033[A\n", progChars[lastFwInfoTime.progress], hansAlive ? "LIVE" : "DEAD", franzAlive ? "LIVE" : "DEAD");
+    }
+
+    lastFwInfoTime.progress = (lastFwInfoTime.progress + 1) % 4;
+
+    if(!hansAlive && !flags.noReset && (now - lastFwInfoTime.hansResetTime) >= 3000) {
+        printf("\033[2KHans not alive, resetting Hans.\n");
+        Debug::out(LOG_INFO, "Hans not alive, resetting Hans.");
+        lastFwInfoTime.hansResetTime = now;
+        chipInterface->resetHDD();
+    }
+
+    if(!franzAlive && !flags.noReset && (now - lastFwInfoTime.franzResetTime) >= 3000) {
+        printf("\033[2KFranz not alive, resetting Franz.\n");
+        Debug::out(LOG_INFO, "Franz not alive, resetting Franz.");
+        lastFwInfoTime.franzResetTime = now;
+        chipInterface->resetFDD();
+    }
+
+    load.clear();                       // clear load counter
 }
 
 void CCoreThread::handleAcsiCommand(uint8_t *bufIn)

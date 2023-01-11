@@ -11,7 +11,7 @@
 #include <errno.h>
 #include <limits.h>
 
-#include "config/configstream.h"
+#include "config/consoleappsstream.h"
 #include "settings.h"
 #include "global.h"
 #include "ccorethread.h"

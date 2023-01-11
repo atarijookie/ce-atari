@@ -20,7 +20,7 @@
 #include "utils.h"
 #include "settings.h"
 #include <stdint.h>
-#include "config/configstream.h"
+#include "config/consoleappsstream.h"
 #include "chipinterface.h"
 
 #include "ikbd.h"

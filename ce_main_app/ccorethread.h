@@ -7,7 +7,7 @@
 #include "settingsreloadproxy.h"
 #include "isettingsuser.h"
 
-#include "config/configstream.h"
+#include "config/consoleappsstream.h"
 #include "floppy/floppysetup.h"
 #include "misc/misc.h"
 
@@ -39,7 +39,7 @@ private:
     bool running;
 
     AcsiDataTrans   *dataTrans;
-    ConfigStream    *configStream;
+    ConsoleAppsStream    *configStream;
 
     //-----------------------------------
     // settings and config stuff
@@ -53,8 +53,9 @@ private:
     AcsiIDinfo      acsiIdInfo;
     RetryModule     *retryMod;
 
+    void handleHdd(uint32_t now, uint8_t* inBuff);
     void handleAcsiCommand(uint8_t *bufIn);
-    void handleConfigStream(uint8_t *cmd);
+    void handleConsoleAppsStream(uint8_t *cmd);
 
     //-----------------------------------
     // handle FW version
@@ -80,6 +81,7 @@ private:
     int                 newFloppyImageLed;
     int                 newFloppyImageLedAfterEncode;
 
+    void handleFdd(uint32_t now, uint8_t* inBuff);
     void handleSendTrack(uint8_t *inBuf);
     void handleSectorWritten(void);
 
@@ -99,6 +101,7 @@ private:
     void sharedObjects_destroy(void);
 
     void fillDisplayLines(void);
+    void displayStatusToConsole(uint32_t now);
 };
 
 class LoadTracker {
