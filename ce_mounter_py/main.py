@@ -8,7 +8,7 @@ import threading, queue
 import traceback
 from datetime import datetime
 from setproctitle import setproctitle
-from wrapt_timeout_decorator import timeout
+#from wrapt_timeout_decorator import timeout
 from dotenv import load_dotenv
 
 
@@ -72,8 +72,8 @@ def worker():
                 funct()
             else:               # arguments provided? use them
                 funct(args)
-        except TimeoutError:
-            app_log.warning(f'The function {funct.__name__} was terminated with TimeoutError')
+#        except TimeoutError:
+#            app_log.warning(f'The function {funct.__name__} was terminated with TimeoutError')
         except Exception as ex:
             app_log.warning(f'The function {funct.__name__} has crashed: {type(ex).__name__} - {str(ex)}')
             tb = traceback.format_exc()
@@ -163,7 +163,7 @@ def reload_settings_mount_everything():
     show_symlinked_dirs()           # show the mounts after possible remounts
 
 
-@timeout(10)
+#@timeout(10)
 def find_and_mount_devices(dont_show_symlinked_dirs=False):
     """ look for USB devices, find those which are not mounted yet, find a mount point for them, mount them """
     mount_raw_not_trans = setting_get_bool('MOUNT_RAW_NOT_TRANS')

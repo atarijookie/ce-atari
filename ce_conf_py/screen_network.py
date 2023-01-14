@@ -274,6 +274,18 @@ def load_network_settings():
         shared.settings['WIFI_PSK'] = setts['WIFI_PSK']
 
 
+def nmcli_present_and_running():
+    """ check for presence of nmcli and if the nmcli works """
+    _, res = system_custom('which nmcli')         # figure out if we got nmcli installed
+    got_nmcli = res == 0
+
+    if got_nmcli:    # if got nmcli present, just run it once - it will return error in case the network manager is not running
+        _, res = system_custom('nmcli')
+        got_nmcli = res == 0
+
+    return got_nmcli
+
+
 def network_create(button):
     # if saving thread still running, don't show network screen
     if shared.thread_save_running:
@@ -281,9 +293,7 @@ def network_create(button):
                "Your last network changes are still being applied. Please try again in a moment.")
         return
 
-    _, res = system_custom('which nmcli')         # figure out if we got nmcli installed
-    got_nmcli = res == 0
-
+    got_nmcli = nmcli_present_and_running()    # check if nmcli present and works
     settings_load()
 
     wifi = None
@@ -364,7 +374,7 @@ def network_create(button):
 
     if not got_nmcli:       # without nmcli show warning
         dialog(shared.main_loop, shared.current_body,
-               "nmcli tool not installed. This setting screen doesn't work without it.")
+               "nmcli not installed or network manager not running. This setting screen doesn't work without it.")
 
 
 def on_net_checkbox_changed(widget, state):
@@ -567,8 +577,7 @@ def network_save(button):
         Proceeds with saving if everything looks ok.
     """
 
-    _, res = system_custom('which nmcli')         # figure out if we got nmcli installed
-    got_nmcli = res == 0
+    got_nmcli = nmcli_present_and_running()    # check if nmcli present and works
 
     if not got_nmcli:                   # no nmcli? just quit now
         back_to_main_menu(None)

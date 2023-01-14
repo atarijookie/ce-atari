@@ -2,7 +2,7 @@ import os
 import shutil
 from pythonping import ping
 from loguru import logger as app_log
-from wrapt_timeout_decorator import timeout
+#from wrapt_timeout_decorator import timeout
 from shared import setting_get_bool, get_symlink_path_for_letter, umount_if_mounted, \
     text_to_file, text_from_file, letter_shared, unlink_without_fail, FILE_MOUNT_CMD_SAMBA, FILE_MOUNT_CMD_NFS, \
     MOUNT_SHARED_CMD_LAST, load_one_setting, MOUNT_DIR_SHARED, is_shared_mounted, symlink_if_needed, \
@@ -49,7 +49,7 @@ def mount_shared():
         trigger_reload_translated()
 
 
-@timeout(10)
+#@timeout(10)
 def mount_shared_internal():
     """ this function checks for shared drive settings, mounts drive if needed """
     shared_enabled = setting_get_bool('SHARED_ENABLED')

@@ -67,8 +67,11 @@ def get_image_slots():
 
     # assign the txt_image_content from the response we got
     for i in range(3):
-        cont = contents.get(txt_image_name[i], '')
-        txt_image_content.append(cont)
+        if len(txt_image_name) > i:
+            cont = contents.get(txt_image_name[i], '')
+            txt_image_content.append(cont)
+        else:
+            txt_image_content.append('')
 
 
 def on_show_image_slots(button):
@@ -175,7 +178,7 @@ def on_insert(button, index):
 
     storage_path = shared.get_storage_path()    # will open download storage path
 
-    if not os.path.exists(storage_path):        # storage path seems to be invalid, use this instead
+    if not storage_path or not os.path.exists(storage_path):        # storage path seems to be invalid, use this instead
         storage_path = '/mnt'
 
     shared.view_object.on_show_selected_list(button, storage_path)

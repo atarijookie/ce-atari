@@ -1,6 +1,6 @@
 import os
 from loguru import logger as app_log
-from wrapt_timeout_decorator import timeout
+#from wrapt_timeout_decorator import timeout
 from shared import get_symlink_path_for_letter, \
     text_from_file, symlink_if_needed, trigger_reload_translated
 
@@ -48,7 +48,7 @@ def get_user_custom_mounts_letters():
     return custom_letters
 
 
-@timeout(10)
+#@timeout(10)
 def mount_user_custom_folders():
     """ if the user has specified custom mounts in the os.getenv('FILE_MOUNT_USER') (e.g. drive letter pointing to SSD drive,
         then symlink these folders as user requested """

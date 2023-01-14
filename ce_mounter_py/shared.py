@@ -7,7 +7,7 @@ import psutil
 import subprocess
 import socket
 from functools import partial
-from wrapt_timeout_decorator import timeout
+#from wrapt_timeout_decorator import timeout
 from loguru import logger as app_log
 
 
@@ -58,7 +58,7 @@ def log_config():
     app_log.add(log_file, format="{time:YYYY-MM-DD HH:mm:ss} {level: <7} {message}", rotation="1 MB", retention=1)
 
 
-@timeout(1)
+#@timeout(1)
 def log_all_changed_settings(settings1: dict, settings2: dict):
     """ go through the supplied list of keys and log changed keys """
 
@@ -88,7 +88,7 @@ def setting_changed_on_keys(keys: list, settings1: dict, settings2: dict):
     return False
 
 
-@timeout(1)
+#@timeout(1)
 def load_old_settings():
     """ Load the old settings from .json file. We want to load the old settings so we can see which settings changed
     compared to the current ones. We cannot keep them in simple global variable because the settings loading
@@ -103,7 +103,7 @@ def load_old_settings():
     return settinx
 
 
-@timeout(1)
+#@timeout(1)
 def save_old_settings(settinx):
     """ save the old settings to .json file. """
     settings_json = json.dumps(settinx)
@@ -132,7 +132,7 @@ def load_one_setting(setting_name, default_value=None):
     return default_value
 
 
-@timeout(1)
+#@timeout(1)
 def load_current_settings():
     settinx = deepcopy(settings_default)       # fill settings with default values before loading
 
@@ -147,7 +147,7 @@ def load_current_settings():
     return settinx
 
 
-@timeout(1)
+#@timeout(1)
 def detect_settings_change(settings_current, settings_old):
     # find out if setting groups changed
 

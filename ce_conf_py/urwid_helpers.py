@@ -110,7 +110,7 @@ def create_header_footer(header_text, footer_text=None):
     header = urwid.Padding(header, 'center', 40)
 
     if footer_text is None:
-        footer_text = 'F5 - refresh, Ctrl+C or F10 - quit'
+        footer_text = 'Ctrl+C or F10 - quit'
 
     footer = urwid.AttrMap(urwid.Text(footer_text, align='center'), 'reversed')
     footer = urwid.Padding(footer, 'center', 40)

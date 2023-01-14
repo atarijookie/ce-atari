@@ -1,7 +1,7 @@
 import os
 import traceback
 from loguru import logger as app_log
-from wrapt_timeout_decorator import timeout
+#from wrapt_timeout_decorator import timeout
 from shared import umount_if_mounted, \
     unlink_without_fail, show_symlinked_dirs, MOUNT_DIR_ZIP_FILE, is_zip_mounted, \
     send_to_core, readlink_without_fail, MOUNTED_ZIP_FILE_LINK, symlink_if_needed
@@ -101,7 +101,7 @@ def unmount_folder(msg):
         app_log.warning(tb)
 
 
-@timeout(10)
+#@timeout(10)
 def mount_on_command(msg):
     """ go through list of expected commands from CE main app and execute all the found ones """
 
