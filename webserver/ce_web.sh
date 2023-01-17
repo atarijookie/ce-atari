@@ -48,23 +48,26 @@ if [ "$python_version_ok" -eq "0" ]; then
   exit
 fi
 
+hname=$( hostname )           # get hostname into variable, as $HOSTNAME seems to be missing in some cases
+venv_dir="venv_$hname"        # venv dir with hostname so multiple venvs can be present when this folder is shared
+
 # if virtualenv doesn't exist, create it
-if [ ! -d "./venv/bin" ]; then
+if [ ! -d "./$venv_dir/bin" ]; then
   echo "Creating python virtual environment"
-  python3 -m venv venv                            # new way to create venv since python 3.6
-  . ./venv/bin/activate                           # activate virtualenv
+  python3 -m venv $venv_dir                       # new way to create venv since python 3.6
+  . ./$venv_dir/bin/activate                      # activate virtualenv
 
   echo "Installing required packages."
   python3 -m pip install -r requirements.txt      # install requirements
 fi
 
-if [ ! -f "./venv/bin/activate" ]; then   # virtualenv still missing?
+if [ ! -f "./$venv_dir/bin/activate" ]; then      # virtualenv still missing?
   echo "python3 virtualenv missing, cannot continue"
   exit
 fi
 
 echo "Starting the webserver"
-. ./venv/bin/activate       # activate virtualenv
+. ./$venv_dir/bin/activate       # activate virtualenv
 
 # generate random secret key for flask if it doesn't exist
 if [ ! -f "/var/run/ce/flask_secret_key" ]; then
