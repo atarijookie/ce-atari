@@ -76,10 +76,13 @@ check_if_pid_running()
 {
     # Function checks if the supplied PID from file in $1 is running.
 
-    pid_number=$( cat $1 2> /dev/null )    # get previous PID from file if possible
-    found=$( ps -A | grep "$pid_number" | wc -l )       # this will return 1 on PID exists and 0 or total_number_of_processes when PID doesn't exist
+    if [ ! -f $1 ]; then            # .pid file non-existent? not running then
+        return "0"
+    fi
 
-    if [ "$found" = "1" ]; then     # found? report 1
+    pid_number=$( cat $1 2> /dev/null )     # get previous PID from file if possible
+
+    if [ -d "/proc/$pid_number/" ]; then    # if directory in /proc exists, process is running (this is faster on RPi than using 'ps' command)
         echo "1"
     else                            # not found? report 0
         echo "0"
@@ -93,8 +96,6 @@ handle_service()
     # $2 - path to config file of the service
 
     pid_file=$( get_setting_from_file PID_FILE $2 )
-    exec_cmd=$( get_setting_from_file EXEC_CMD $2 )
-    desc_cmd=$( get_setting_from_file DESC_CMD $2 )
 
     # now always check first if the app is running
     app_running=$( check_if_pid_running $pid_file )
@@ -113,6 +114,9 @@ handle_service()
 
     # should start?
     if [ "$1" = "start" ]; then
+        exec_cmd=$( get_setting_from_file EXEC_CMD $2 )
+        desc_cmd=$( get_setting_from_file DESC_CMD $2 )
+
         if [ "$app_running" != "1" ]; then          # not running? start
             printf "    %-20s starting\n" "$service_name"
             dir_before=$( pwd )                     # remember current dir
