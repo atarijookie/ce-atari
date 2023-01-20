@@ -186,6 +186,7 @@ void CCoreThread::run(void)
 
     uint32_t nextFloppyEncodingCheck   = Utils::getEndTime(1000);
     //bool prevFloppyEncodingRunning  = false;
+    load.clear();                       // clear load counter
 
     while(sigintReceived == 0) {
         bool gotAtn = false;                                            // no ATN received yet?

@@ -42,34 +42,59 @@ mkdir -p $SETTINGS_DIR
 show_help()
 {
     echo ""
-    echo "This is CosmosEx helper script. Allowed commands are:"
-    echo "  start  - start all the required CosmosEx services"
-    echo "  stop   - stop all the running CosmosEx services "
-    echo "  status - show what CosmosEx services are running"
-    echo "  config - run the CosmosEx configuration tool"
-    echo "  help   - this help message"
+    echo "CosmosEx helper script."
+    echo "Usage: ce command [options]"
+    echo ""
+    echo "Commands:"
+    echo "  u, start   - start all the required CosmosEx services"
+    echo "  d, stop    - stop all the running CosmosEx services "
+    echo "  r, restart - restart all the required CosmosEx services"
+    echo "  s, status  - show what CosmosEx services are running"
+    echo "  c, config  - run the CosmosEx configuration tool"
+    echo "  ?, help    - this help message"
+    echo ""
+    echo "Options:"
+    echo "   [name of service] - start / stop / restart only service with this name"
     echo ""
 }
 
 # no supported command was used? Show help.
-if [ "$1" != "status" ] && [ "$1" != "start" ] && [ "$1" != "stop" ] && \
-   [ "$1" != "conf" ] && [ "$1" != "config" ] && \
-   [ "$1" != "help" ] && [ "$1" != "--help" ]; then
+if [ "$1" != "status" ] && [ "$1" != "s" ] && \
+   [ "$1" != "start" ] && [ "$1" != "u" ] && \
+   [ "$1" != "restart" ] && [ "$1" != "r" ] && \
+   [ "$1" != "stop" ] && [ "$1" != "d" ] && \
+   [ "$1" != "conf" ] && [ "$1" != "config" ] && [ "$1" != "c" ] && \
+   [ "$1" != "help" ] && [ "$1" != "--help" ] && [ "$1" != "?" ]; then
   show_help
   exit 1
 fi
 
 # help was requested? Show help.
-if [ "$1" = "help" ] || [ "$1" = "--help" ]; then
+if [ "$1" = "help" ] || [ "$1" = "--help" ] || [ "$1" = "?" ]; then
   show_help
   exit 0
 fi
 
 # Should run the config tool? Run it!
-if [ "$1" = "conf" ] || [ "$1" = "config" ]; then
+if [ "$1" = "conf" ] || [ "$1" = "config" ] || [ "$1" = "c" ]; then
   cd /ce/services/config/
   ./ce_conf.sh
   exit 0
+fi
+
+# restart command?
+if [ "$1" = "restart" ] || [ "$1" = "r" ]; then
+    $0 stop $2      # first stop
+    sleep 1         # wait a while
+    $0 start $2     # then start
+fi
+
+# if instead of individual services 'minimal' was specified, start only minimal services needed for core
+if [ "$2" = "m" ] || [ "$2" = "min" ] || [ "$2" = "minimal" ]; then
+    $0 $1 mounter
+    $0 $1 taskq
+    $0 $1 core
+    exit 0
 fi
 
 check_if_pid_running()
@@ -104,7 +129,7 @@ handle_service()
     service_name=$( basename $service_dir )     # name of the service, deducted from the service dir, e.g.: /ce/services/mounter dir will result in 'mounter'
 
     # should just report status?
-    if [ "$1" = "status" ]; then
+    if [ "$1" = "status" ] || [ "$1" = "s" ]; then
         if [ "$app_running" = "1" ]; then
             printf "    %-20s [ UP ]\n" "$service_name"
         else
@@ -113,7 +138,7 @@ handle_service()
     fi
 
     # should start?
-    if [ "$1" = "start" ]; then
+    if [ "$1" = "start" ] || [ "$1" = "u" ]; then
         exec_cmd=$( get_setting_from_file EXEC_CMD $2 )
         desc_cmd=$( get_setting_from_file DESC_CMD $2 )
 
@@ -134,11 +159,13 @@ handle_service()
     fi
 
     # should stop?
-    if [ "$1" = "stop" ]; then
+    if [ "$1" = "stop" ] || [ "$1" = "d" ]; then
         if [ "$app_running" = "1" ]; then       # is running? stop
             printf "    %-20s stopping\n" "$service_name"
             app_pid_number=$( cat $pid_file 2> /dev/null )
-            kill -9 "$app_pid_number" > /dev/null 2>&1
+            kill -2 "$app_pid_number" > /dev/null 2>&1      # SIGHUP
+            sleep 0.5s                                      # short time to possibly handle HUP
+            kill -9 "$app_pid_number" > /dev/null 2>&1      # SIGKILL
         else
             printf "    %-20s not running\n" "$service_name"
         fi
@@ -148,11 +175,11 @@ handle_service()
 # go through all the service config files and start / stop / status those services
 echo ""
 
-if [ "$1" = "start" ]; then
+if [ "$1" = "start" ] || [ "$1" = "u" ]; then
     echo "Starting CosmosEx services:"
-elif [ "$1" = "stop" ]; then
+elif [ "$1" = "stop" ] || [ "$1" = "d" ]; then
     echo "Stopping CosmosEx services:"
-elif [ "$1" = "status" ]; then
+elif [ "$1" = "status" ] || [ "$1" = "s" ]; then
     echo "CosmosEx services statuses:"
 fi
 

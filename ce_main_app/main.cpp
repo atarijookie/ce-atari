@@ -219,10 +219,6 @@ int runCore(int instanceNo, bool localNotNetwork)
 
     Version::getRaspberryPiInfo();                                  // fetch model, revision, serial of RPi
 
-    if(localNotNetwork) {
-        Update::createNewScripts();                                 // update the scripts if needed
-    }
-
 //  system("sudo echo none > /sys/class/leds/led0/trigger");        // disable usage of GPIO 23 (pin 16) by LED
 
     printf("Starting threads\n");

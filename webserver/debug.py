@@ -48,6 +48,26 @@ def get_logfile(filename):
     return send_file(log_path)
 
 
+@debug.route('/core/<path:filename>', methods=['GET'])
+def get_corefile(filename):
+    """ fetch single core file """
+    core_dir = os.getenv('CORE_SERVICE_PATH')                   # retrieve core dir from env
+    core_path = None
+
+    for subdir in ['', 'configdrive', 'configdrive/drivers']:   # check in these additional subdirs
+        core_path = os.path.join(core_dir, subdir, filename)    # construct full path
+
+        if os.path.exists(core_path) and os.path.isfile(core_path):     # exists and is a file? found it
+            break
+
+        core_path = None        # not a valid path
+
+    if not core_path:           # requested file not found? fail
+        abort(400, f"file {filename} not found or not a file!")
+
+    return send_file(core_path)
+
+
 @debug.route('/status', methods=['GET'])
 def get_statusfile():
     """ fetch status file  """

@@ -1,0 +1,36 @@
+#! /bin/sh
+# /etc/init.d/cosmosex
+
+### BEGIN INIT INFO
+# Provides: cosmosex
+# Required-Start:    $local_fs $remote_fs
+# Required-Stop:
+# Default-Start:     S
+# Default-Stop:      0 1 6
+# Short-Description: Start Cosmosex run loop
+# Description: Cosmosex is started and monitored via cesuper.sh. 
+### END INIT INFO
+
+# If you want a command to always run, put it here
+
+# Carry out specific functions when asked to by the system
+case "$1" in
+start)
+echo "Starting cosmosex"
+# run application you want to start
+/ce/app/cosmosex > /dev/null 2>&1 & #start directly, shaves off some ms from boot
+/ce/ce_start.sh  > /dev/null 2>&1 &
+;;
+stop)
+echo "Stopping cosmosex"
+# kill application you want to stop
+killall cesuper.sh
+killall cosmosex
+;;
+*)
+echo "Usage: /etc/init.d/cosmosex {start|stop}"
+exit 1
+;;
+esac
+
+exit 0 

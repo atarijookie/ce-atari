@@ -209,24 +209,3 @@ void Update::removeSimpleTextFile(const char *path)
 {
     unlink(path);
 }
-
-void Update::createNewScripts(void)
-{
-    // avoid running more than once by a simple bool
-    static bool wasRunOnce = false;         // make sure this runs only once - not needed to run it more times
-
-    if(wasRunOnce) {                        // if it was already runned, quit
-        Debug::out(LOG_DEBUG, "Update::createNewScripts() - won't try to update scripts, already tried that once during this app run");
-        return;
-    }
-
-    wasRunOnce = true;                      // mark that we've runned this once
-
-    // it seems that we should update the scripts, so update them
-    printf("Will try to update scripts\n");
-    Debug::out(LOG_DEBUG, "Update::createNewScripts() - will try to update scripts");
-
-    // run the script
-    system("chmod 755 /ce/app/shellscripts/copynewscripts.sh");             // make the copying script executable
-    system("/ce/app/shellscripts/copynewscripts.sh ");                      // execute the copying script
-}

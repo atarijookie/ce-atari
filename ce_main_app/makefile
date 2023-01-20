@@ -121,7 +121,7 @@ all:	$(TARGET)
 $(TARGET): $(LDLIBS) $(OBJS) $(HDRS)
 	$(CXX_LINK) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $@ $(LDLIBS)
 #	$(STRIP) -s $@
-	@ln -sf $(TARGET) ./cosmosex        # create symlink from cosmosex_[NAME_OF_DISTRO] to just cosmosex
+	@ln -sf $(CURDIR)/$(TARGET) ./core/cosmosex        # create symlink from cosmosex_[NAME_OF_DISTRO] to just cosmosex
 
 print-%:	; @echo $* = $($*)
 
