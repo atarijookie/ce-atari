@@ -146,8 +146,20 @@ void Utils::fileDateTimeToHostTime(uint16_t atariDate, uint16_t atariTime, struc
                                 //  but can be up to 60 to allow for leap seconds.
 }
 
+std::string Utils::mergeHostPaths2(const std::string& head, const std::string& tail)
+{
+    // this method creates merged path, and it doesn't modifiy head:    rev_val = head + tail
+
+    static std::string retVal;              // static string, which will be used as return value
+    retVal = head;                          // copy of head into return value, so we won't modify head
+    Utils::mergeHostPaths(retVal, tail);    // merge retVal (head) with tail
+    return retVal;                          // return merged value
+}
+
 void Utils::mergeHostPaths(std::string &dest, const std::string &tail)
 {
+    // this method creates merged path, but it modifies dest:     dest = dest + tail
+
     if(dest.empty()) {      // if the 1st part is empty, then result is just the 2nd part
         dest = tail;
         return;
@@ -932,7 +944,7 @@ bool Utils::loadDotEnvFrom(const char* path)
         std::string key, value;
         key = line;                 // key   is on [0 : eqlPos-1]
         value = line + eqlPos + 1;  // value is on [eqlPos+1 : ...]
-        Debug::out(LOG_DEBUG, "Utils::loadDotEnv - found %s -> %s", key.c_str(), value.c_str());
+        //Debug::out(LOG_DEBUG, "Utils::loadDotEnv - found %s -> %s", key.c_str(), value.c_str());
 
         dotEnv[key] = value;        // store to map
     }

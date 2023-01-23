@@ -20,7 +20,7 @@ Scsi::Scsi(void)
     dataBuffer2 = new uint8_t[SCSI_BUFFER_SIZE];
 
     for(i=0; i<8; i++) {
-        clearDevInfo(i);
+        clearDevInfo(i, true);
     }
 
     findAttachedDisks();
@@ -39,6 +39,8 @@ void Scsi::setAcsiDataTrans(AcsiDataTrans *dt)
 
 void Scsi::findAttachedDisks(void)
 {
+    Debug::out(LOG_DEBUG, "Scsi::findAttachedDisks() - starting");
+
     std::string pathRaw = Utils::dotEnvValue("MOUNT_DIR_RAW");    // where the raw disks are symlinked
     Utils::mergeHostPaths(pathRaw, "/X");           // add placeholder
     int len = pathRaw.length();
@@ -53,8 +55,10 @@ void Scsi::findAttachedDisks(void)
         bool isFile = Utils::fileExists(pathRaw);   // if it's a file, then it's an image
         bool isDev = Utils::devExists(pathRaw);     // device is a device is a device is a device ;)
 
+        Debug::out(LOG_DEBUG, "Scsi::findAttachedDisks() - ID %d - isBoot: %d, isFile: %d, isDev: %d", i, isBoot, isFile, isDev);
+
         if(!isFile && !isDev && !isBoot) {          // not a file, not a dev, not a CE_DD boot?
-            clearDevInfo(i);
+            clearDevInfo(i, false);
             continue;
         }
 
@@ -64,12 +68,26 @@ void Scsi::findAttachedDisks(void)
         if(isFile) {        // file means image
             devInfo[i].hostSourceType = SOURCETYPE_IMAGE;
             devInfo[i].accessType = SCSI_ACCESSTYPE_FULL;
+
+            ImageFileMedia *media = new ImageFileMedia();       // image access media
+            media->iopen(pathRaw.c_str(), false);               // open it
+            devInfo[i].dataMedia = media;                       // assign
+
+            Debug::out(LOG_DEBUG, "Scsi::findAttachedDisks() - ID %d -> IMAGE", i);
         } else if(isDev) {  // device is device
             devInfo[i].hostSourceType = SOURCETYPE_DEVICE;
             devInfo[i].accessType = SCSI_ACCESSTYPE_FULL;
+
+            DeviceMedia *media = new DeviceMedia();             // device access media
+            media->iopen(pathRaw.c_str(), false);               // open it
+            devInfo[i].dataMedia = media;                       // assign
+
+            Debug::out(LOG_DEBUG, "Scsi::findAttachedDisks() - ID %d -> DEVICE", i);
         } else if(isBoot) { // boot media here
             devInfo[i].hostSourceType = SOURCETYPE_IMAGE_TRANSLATEDBOOT;
             devInfo[i].accessType = SCSI_ACCESSTYPE_READ_ONLY;
+            devInfo[i].dataMedia = &tranBootMedia;
+            Debug::out(LOG_DEBUG, "Scsi::findAttachedDisks() - ID %d -> TranslatedBoot", i);
 
             tranBootMedia.updateBootsectorConfigWithACSIid(i);        // update boot sector config with ACSI ID
         } else {            // we don't know
@@ -80,7 +98,7 @@ void Scsi::findAttachedDisks(void)
     }
 }
 
-void Scsi::clearDevInfo(int index)
+void Scsi::clearDevInfo(int index, bool noDelete)
 {
     if(index < 0 || index >= MAX_ATTACHED_MEDIA) {
         return;
@@ -89,7 +107,13 @@ void Scsi::clearDevInfo(int index)
     devInfo[index].enabled = false;
     devInfo[index].hostSourceType = SOURCETYPE_NONE;
     devInfo[index].accessType = SCSI_ACCESSTYPE_NO_DATA;
-    devInfo[index].dataMedia = NULL;
+
+    if(!noDelete && devInfo[index].dataMedia) {     // if we should delete if something is found and it's not null
+        devInfo[index].dataMedia->iclose();         // close if it was open
+        delete devInfo[index].dataMedia;            // delete it
+    }
+
+    devInfo[index].dataMedia = NULL;                // pointer to NULL
     devInfo[index].dataMediaDynamicallyAllocated = false;
 }
 

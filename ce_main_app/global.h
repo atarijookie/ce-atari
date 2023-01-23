@@ -1,6 +1,7 @@
 #ifndef GLOBAL_H
 #define GLOBAL_H
 
+#include <string>
 #include <stdint.h>
 #include <pthread.h>
 
@@ -145,14 +146,14 @@ extern ExternalServices externalServices;
 
 //////////////////////////////////////////////////////
 
+void preloadGlobalsFromDotEnv(void);
+
 #define SPECIAL_FDD_IMAGE_CE_CONF       100
 #define SPECIAL_FDD_IMAGE_FDD_TEST      101
 
-#define CE_CONF_FDD_IMAGE_PATH_AND_FILENAME     "/ce/app/ce_conf.st"
 #define CE_CONF_FDD_IMAGE_PATH_AND_FILENAME_TMP "/tmp/ce_conf.st"
 #define CE_CONF_FDD_IMAGE_JUST_FILENAME         "ce_conf.st"
 
-#define FDD_TEST_IMAGE_PATH_AND_FILENAME        "/ce/app/fdd_test.st"
 #define FDD_TEST_IMAGE_PATH_AND_FILENAME_TMP    "/tmp/fdd_test.st"
 #define FDD_TEST_IMAGE_JUST_FILENAME            "fdd_test.st"
 
@@ -161,14 +162,7 @@ extern ExternalServices externalServices;
 
 #define MAX_ZIPDIR_ZIPFILE_SIZE             (5*1024*1024)
 
-#define PATH_CE_DD_BS_L1                    "/ce/app/configdrive/drivers/ce_dd.bs"
-#define PATH_CE_DD_BS_L2                    "/ce/app/configdrive/drivers/ce_dd_l2.bs"
-
-#define PATH_CE_DD_PRG_PATH_AND_FILENAME    "/ce/app/configdrive/drivers/ce_dd.prg"
 #define PATH_CE_DD_PRG_JUST_FILENAME        "ce_dd.prg"
-
-#define PATH_CE_CONF_PRG_PATH_AND_FILENAME  "/ce/app/configdrive/ce_conf.tos"
-#define PATH_CE_CONF_PRG_JUST_FILENAME      "ce_conf.tos"
 
 #define PATH_ATARI_CE_FDD_TTP               "CE_FDD.TTP"
 #define PATH_ATARI_CE_HDIMG_TTP             "CE_HDIMG.TTP"
@@ -176,6 +170,15 @@ extern ExternalServices externalServices;
 
 #define NETSERVER_WEBROOT                   "/tmp/ce_netserver_webroot"
 #define NETSERVER_WEBROOT_INDEX             NETSERVER_WEBROOT "/index.html"
+
+// These were global const string constants, but now they depend on .env content, so they are now
+// loaded on app start and used when needed.
+extern std::string corePath;
+extern std::string CE_CONF_FDD_IMAGE_PATH_AND_FILENAME;
+extern std::string FDD_TEST_IMAGE_PATH_AND_FILENAME;
+extern std::string PATH_CE_DD_BS_L1;
+extern std::string PATH_CE_DD_BS_L2;
+extern std::string PATH_CE_DD_PRG_PATH_AND_FILENAME;
 
 #endif // GLOBAL_H
 

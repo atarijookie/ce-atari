@@ -154,7 +154,7 @@ const char *Update::getPropperXilinxTag(void)
 void Update::createFloppyTestImage(void)
 {
     // open the file and write to it
-    FILE *f = fopen(FDD_TEST_IMAGE_PATH_AND_FILENAME, "wb");
+    FILE *f = fopen(FDD_TEST_IMAGE_PATH_AND_FILENAME.c_str(), "wb");
 
     if(!f) {
         Debug::out(LOG_ERROR, "Failed to create floppy test image!");

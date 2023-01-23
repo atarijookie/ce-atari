@@ -138,7 +138,7 @@ private:
     bool compareSectors (uint32_t startSectorNo, uint32_t sectorCount);
     bool eraseMedia(void);
 
-    void clearDevInfo(int index);
+    void clearDevInfo(int index, bool noDelete);
 
     const char *getCommandName(uint8_t cmd);
 };

@@ -73,15 +73,18 @@ CCoreThread::CCoreThread()
 
     sharedObjects_create();
 
-    // now register all the objects which use some settings in the proxy
-    settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_ACSI);
-    settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_FLOPPYIMGS);
-    settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_FLOPPYCONF);
-    settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_FLOPPY_SLOT);
-    settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_TRANSLATED);
-    settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_SCSI_IDS);
+    // update CE_DD bootsector with proper SCSI ID
+    shared.scsi->updateTranslatedBootMedia();
 
-    settingsReloadProxy.addSettingsUser((ISettingsUser *) shared.scsi,          SETTINGSUSER_ACSI);
+    // now register all the objects which use some settings in the proxy
+    settingsReloadProxy.addSettingsUser((ISettingsUser *) this, SETTINGSUSER_ACSI);
+    settingsReloadProxy.addSettingsUser((ISettingsUser *) this, SETTINGSUSER_FLOPPYIMGS);
+    settingsReloadProxy.addSettingsUser((ISettingsUser *) this, SETTINGSUSER_FLOPPYCONF);
+    settingsReloadProxy.addSettingsUser((ISettingsUser *) this, SETTINGSUSER_FLOPPY_SLOT);
+    settingsReloadProxy.addSettingsUser((ISettingsUser *) this, SETTINGSUSER_TRANSLATED);
+    settingsReloadProxy.addSettingsUser((ISettingsUser *) this, SETTINGSUSER_SCSI_IDS);
+
+    settingsReloadProxy.addSettingsUser((ISettingsUser *) shared.scsi, SETTINGSUSER_ACSI);
 
     settingsReloadProxy.addSettingsUser((ISettingsUser *) TranslatedDisk::getInstance(), SETTINGSUSER_TRANSLATED);
     settingsReloadProxy.addSettingsUser((ISettingsUser *) TranslatedDisk::getInstance(), SETTINGSUSER_SHARED);

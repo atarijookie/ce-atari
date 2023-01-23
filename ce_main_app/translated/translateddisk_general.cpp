@@ -119,6 +119,8 @@ void TranslatedDisk::setSettingsReloadProxy(SettingsReloadProxy *rp)
 
 void TranslatedDisk::findAttachedDisks(void)
 {
+    Debug::out(LOG_DEBUG, "TranslatedDisk::findAttachedDisks starting");
+
     std::string dirTrans = Utils::dotEnvValue("MOUNT_DIR_TRANS");    // where the translated disks are symlinked
     Utils::mergeHostPaths(dirTrans, "/X");          // add placeholder
     int len = dirTrans.length();
@@ -137,6 +139,8 @@ void TranslatedDisk::findAttachedDisks(void)
         conf[i].currentAtariPath = HOSTPATH_SEPAR_STRING;
         conf[i].mediaChanged = true;
         conf[i].label = "Device Label Here";        // Utils::getDeviceLabel(devicePath);
+
+        Debug::out(LOG_DEBUG, "TranslatedDisk::findAttachedDisks: [%d] %c: -> %s", i, i + 65, dirTrans.c_str());
     }
 
     Settings s;

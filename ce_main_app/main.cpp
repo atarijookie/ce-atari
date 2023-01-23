@@ -72,6 +72,7 @@ int main(int argc, char *argv[])
     Debug::setDefaultLogFileFromEnvValue();                     // set log after .env is loaded
 
     Utils::screenShotVblEnabled(false);                         // screenshot vbl not enabled by default
+    preloadGlobalsFromDotEnv();
 
     //------------------------------------
     // if should only show help and quit

@@ -40,18 +40,18 @@ bool TranslatedBootMedia::loadDataIntoBuffer(void)
 
     //-------------
     // load Level 1 bootsector
-    f = fopen(PATH_CE_DD_BS_L1, "rb");
+    f = fopen(PATH_CE_DD_BS_L1.c_str(), "rb");
 
     if(!f) {
-        Debug::out(LOG_ERROR, "TranslatedBootMedia - failed to open Level 1 bootsector file: %s", PATH_CE_DD_BS_L1);
+        Debug::out(LOG_ERROR, "TranslatedBootMedia - failed to open Level 1 bootsector file: %s", PATH_CE_DD_BS_L1.c_str());
         return false;
     }
-    Debug::out(LOG_DEBUG, "TranslatedBootMedia - loaded Level 1 bootsector file: %s", PATH_CE_DD_BS_L1);
+    Debug::out(LOG_DEBUG, "TranslatedBootMedia - loaded Level 1 bootsector file: %s", PATH_CE_DD_BS_L1.c_str());
 
     bytesRead = fread(&imageBuffer[0], 1, 512, f);
 
     if(bytesRead != 512) {
-        Debug::out(LOG_ERROR, "TranslatedBootMedia - didn't read 512 bytes from Level 1 bootsector file: %s", PATH_CE_DD_BS_L1);
+        Debug::out(LOG_ERROR, "TranslatedBootMedia - didn't read 512 bytes from Level 1 bootsector file: %s", PATH_CE_DD_BS_L1.c_str());
         return false;
     }
 
@@ -60,27 +60,27 @@ bool TranslatedBootMedia::loadDataIntoBuffer(void)
     hwHddIfaceCurrent = hwConfig.hddIface;     // store for which HDD IF it was prepared
     //-------------
     // load Level 2 bootsector
-    f = fopen(PATH_CE_DD_BS_L2, "rb");
+    f = fopen(PATH_CE_DD_BS_L2.c_str(), "rb");
 
     if(!f) {
-        Debug::out(LOG_ERROR, "TranslatedBootMedia - failed to open Level 2 bootsector file: %s", PATH_CE_DD_BS_L2);
+        Debug::out(LOG_ERROR, "TranslatedBootMedia - failed to open Level 2 bootsector file: %s", PATH_CE_DD_BS_L2.c_str());
         return false;
     }
 
     bytesRead = fread(&imageBuffer[512], 1, 512, f);
 
     if(bytesRead != 512) {
-        Debug::out(LOG_ERROR, "TranslatedBootMedia - didn't read 512 bytes from Level 2 bootsector file: %s", PATH_CE_DD_BS_L2);
+        Debug::out(LOG_ERROR, "TranslatedBootMedia - didn't read 512 bytes from Level 2 bootsector file: %s", PATH_CE_DD_BS_L2.c_str());
         return false;
     }
 
     fclose(f);
     //-------------
     // read the CosmosEx driver into buffer
-    f = fopen(PATH_CE_DD_PRG_PATH_AND_FILENAME, "rb");
+    f = fopen(PATH_CE_DD_PRG_PATH_AND_FILENAME.c_str(), "rb");
 
     if(!f) {
-        Debug::out(LOG_ERROR, "TranslatedBootMedia - failed to open %s", PATH_CE_DD_PRG_PATH_AND_FILENAME);
+        Debug::out(LOG_ERROR, "TranslatedBootMedia - failed to open %s", PATH_CE_DD_PRG_PATH_AND_FILENAME.c_str());
         return false;
     }
 
