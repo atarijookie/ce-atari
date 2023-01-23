@@ -146,6 +146,12 @@ void Utils::fileDateTimeToHostTime(uint16_t atariDate, uint16_t atariTime, struc
                                 //  but can be up to 60 to allow for leap seconds.
 }
 
+std::string Utils::mergeHostPaths3(const std::string& head, const char* tail)
+{
+    std::string tailStr(tail);
+    return Utils::mergeHostPaths2(head, tailStr);
+}
+
 std::string Utils::mergeHostPaths2(const std::string& head, const std::string& tail)
 {
     // this method creates merged path, and it doesn't modifiy head:    rev_val = head + tail

@@ -19,7 +19,6 @@
 #include "statusreport.h"
 #include "display/displaythread.h"
 
-#include "floppy/imagelist.h"
 #include "floppy/imagesilo.h"
 #include "floppy/imagestorage.h"
 #include "floppy/floppyencoder.h"
@@ -121,7 +120,6 @@ void CCoreThread::sharedObjects_create(void)
     TranslatedDisk * translated = TranslatedDisk::createInstance(dataTrans);
     translated->setSettingsReloadProxy(&settingsReloadProxy);
 
-    shared.imageList = new ImageList();
     shared.imageSilo = new ImageSilo();
     shared.imageStorage = new ImageStorage();
 }
@@ -132,9 +130,6 @@ void CCoreThread::sharedObjects_destroy(void)
     shared.scsi = NULL;
 
     TranslatedDisk::deleteInstance();
-
-    delete shared.imageList;
-    shared.imageList = NULL;
 
     delete shared.imageSilo;
     shared.imageSilo = NULL;

@@ -5,30 +5,34 @@
 
 #include "../global.h"
 #include "../debug.h"
+#include "../utils.h"
 #include "desktopcreator.h"
 
 void DesktopCreator::createToFile(DesktopConfig *dc)
 {
     char tmp[10240];
     int len = createToBuffer(tmp, 10240, dc);
-    
-    unlink("/tmp/configdrive/DESKTOP.INF");                 // delete old files
-    unlink("/tmp/configdrive/NEWDESK.INF");
+
+    std::string desktopInf = Utils::mergeHostPaths3(CONFIG_DRIVE_PATH, "DESKTOP.INF");
+    std::string newdeskInf = Utils::mergeHostPaths3(CONFIG_DRIVE_PATH, "NEWDESK.INF");
+
+    unlink(desktopInf.c_str());                 // delete old files
+    unlink(newdeskInf.c_str());
     
     FILE *f;
     if(dc->tosVersion < TOSVER205) {            // for TOS 1.xx
-        Debug::out(LOG_DEBUG, "DesktopCreator::createToFile() -- will create /tmp/configdrive/DESKTOP.INF");
-        f = fopen("/tmp/configdrive/DESKTOP.INF", "wt");
+        Debug::out(LOG_DEBUG, "DesktopCreator::createToFile() -- will create %s", desktopInf.c_str());
+        f = fopen(desktopInf.c_str(), "wt");
     } else {                                    // for TOS 2.xx and up
-        Debug::out(LOG_DEBUG, "DesktopCreator::createToFile() -- will create /tmp/configdrive/NEWDESK.INF");
-        f = fopen("/tmp/configdrive/NEWDESK.INF", "wt");
+        Debug::out(LOG_DEBUG, "DesktopCreator::createToFile() -- will create %s", newdeskInf.c_str());
+        f = fopen(newdeskInf.c_str(), "wt");
     }
-    
+
     if(!f) {                                    // if failed to create file, quit
         Debug::out(LOG_DEBUG, "DesktopCreator::createToFile() -- failed to create file .INF file!");
         return;
     }
-    
+
     fwrite(tmp, 1, len, f);                     // write content and close file    
     fclose(f);
 }

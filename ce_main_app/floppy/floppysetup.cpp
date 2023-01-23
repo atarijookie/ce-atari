@@ -12,7 +12,6 @@
 #include "../translated/gemdos_errno.h"
 #include "floppysetup.h"
 #include "imagesilo.h"
-#include "imagelist.h"
 #include "imagestorage.h"
 #include "floppysetup_commands.h"
 
@@ -111,60 +110,20 @@ void FloppySetup::processCommand(uint8_t *command)
 void FloppySetup::searchInit(void)
 {
     screenResolution = cmd[5];              // current resolution on Atari ST
-
-    if(!shared.imageList->exists()) {        // if the file does not yet exist, tell ST that we're downloading
-        dataTrans->setStatus(FDD_DN_LIST);
-        return;
-    }
-
-    if(!shared.imageList->getIsLoaded()) {  // if list is not loaded yet
-        if(!shared.imageList->loadList()) { // try to load the list, if failed, error
-            dataTrans->setStatus(FDD_ERROR);
-            return;
-        }
-    }
-
-    dataTrans->setStatus(FDD_OK);           // done
+    dataTrans->setStatus(FDD_ERROR);        // image list no longer part of core, always error
 }
 
 void FloppySetup::searchString(void)
 {
     dataTrans->recvData(bfr64k, 512);       // get one sector from ST
-
-    shared.imageList->search((char *) bfr64k);	// try to search for this string
-
     dataTrans->setStatus(FDD_OK);           // done
 }
 
 void FloppySetup::searchResult(void)
 {
-	int pageSize = cmd[5];              // page size
-    int page = Utils::getWord(cmd + 6); // retrieve # of page (0 .. max page - 1)
+//	int pageSize = cmd[5];              // page size
+//  int page = Utils::getWord(cmd + 6); // retrieve # of page (0 .. max page - 1)
 
-    int pageStart   = page * pageSize;              // starting index of this page
-    int pageEnd     = (page + 1) * pageSize;        // ending index of this page (actually start of new page)
-
-    int results = shared.imageList->getSearchResultsCount();
-
-    pageStart   = MIN(pageStart,    results);
-    pageEnd     = MIN(pageEnd,      results);
-
-    int realPage    = pageStart / pageSize;         // calculate the real page number
-    int totalPages  = (results   / pageSize) + 1;   // calculate the count of pages we have
-
-    dataTrans->addDataWord((uint16_t) realPage);        // byte 0, 1: real page
-    dataTrans->addDataWord((uint16_t) totalPages);      // byte 2, 3: total pages
-
-    memset(bfr64k, 0, 1024);
-
-    // now get the search results - 68 bytes per line
-    int offset = 0;
-    for(int i=pageStart; i<pageEnd; i++) {
-        shared.imageList->getResultByIndex(i, (char *) (bfr64k + offset), screenResolution);
-        offset += 68;
-    }
-
-    dataTrans->addDataBfr(bfr64k, pageSize * 68, true);
     dataTrans->setStatus(FDD_OK);                   // done
 }
 
@@ -172,51 +131,8 @@ void FloppySetup::searchInsertToSlot(void)
 {
     dataTrans->recvData(bfr64k, 512);   // read data
 
-    bool bres = shared.imageStorage->doWeHaveStorage();
-
-    if(!bres) {         // don't have storage? fail
-        dataTrans->setStatus(FDD_ERROR);
-        return;
-    }
-
-	int pageSize = (int) bfr64k[0];			// 0   : items per page
-    int page = Utils::getWord(bfr64k + 1);	// 1, 2: page number
-    int rowNo = (int) bfr64k[3];			// 3   : row number on page
-    int slotNo = (int) bfr64k[4];			// 4   : slot number
-
-    if(slotNo < 0 || slotNo > 2) {         // slot out of range? fail
-        dataTrans->setStatus(FDD_ERROR);
-        return;
-    }
-
-    int itemIndex = (page * pageSize) + rowNo;
-
-    std::string imageName;      // get image name by index of item
-    bres = shared.imageList->getImageNameFromResultsByIndex(itemIndex, imageName);
-
-    if(!bres) {         // couldn't get image name? fail
-        dataTrans->setStatus(FDD_ERROR);
-        return;
-    }
-
-    // check if we got this floppy image file, and if we don't - fail
-    bres = shared.imageStorage->weHaveThisImage(imageName.c_str());
-
-    if(!bres) {          // we don't have this image, quit
-        dataTrans->setStatus(FDD_ERROR);
-        return;
-    }
-
-    // get local path for this image
-    std::string localImagePath;
-    shared.imageStorage->getImageLocalPath(imageName.c_str(), localImagePath);
-
-    // set floppy image to slot
-    std::string sPath, sFile, sEmpty;
-    Utils::splitFilenameFromPath(localImagePath, sPath, sFile);
-    shared.imageSilo->add(slotNo, sFile, localImagePath, sEmpty, true);
-
-    dataTrans->setStatus(FDD_OK);               // done
+    dataTrans->setStatus(FDD_ERROR);
+    return;
 }
 
 void FloppySetup::downloadOnDevice(void)
@@ -597,7 +513,6 @@ void FloppySetup::downloadDone(void)
 
 void FloppySetup::searchRefreshList(void)
 {
-    shared.imageList->refreshList();
 
     dataTrans->setStatus(FDD_OK);
 }

@@ -11,7 +11,6 @@
 #include "settings.h"
 #include "update.h"
 #include "utils.h"
-#include "floppy/imagelist.h"
 
 Versions Update::versions;
 
@@ -24,7 +23,6 @@ void Update::initialize(void)
 
     Update::versions.app.fromString(                (char *) appVersion);
     Update::versions.xilinx.fromFirstLineOfFile(    (char *) XILINX_VERSION_FILE, false);   // xilinx version file without dashes
-    Update::versions.imageList.fromFirstLineOfFile( (char *) IMAGELIST_LOCAL);
 }
 
 bool Update::createUpdateScript(bool withLinuxRestart, bool withForceXilinx)

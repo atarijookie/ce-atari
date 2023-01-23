@@ -118,7 +118,6 @@ typedef struct {
 extern InterProcessEvents events;
 
 class Scsi;
-class ImageList;
 class ImageStorage;
 class ImageSilo;
 
@@ -126,7 +125,6 @@ typedef struct {
     Scsi            *scsi;
     pthread_mutex_t mtxHdd;
 
-    ImageList       *imageList;
     ImageStorage    *imageStorage;
     ImageSilo       *imageSilo;
     pthread_mutex_t  mtxImages;
@@ -157,12 +155,7 @@ void preloadGlobalsFromDotEnv(void);
 #define FDD_TEST_IMAGE_PATH_AND_FILENAME_TMP    "/tmp/fdd_test.st"
 #define FDD_TEST_IMAGE_JUST_FILENAME            "fdd_test.st"
 
-#define CE_CONF_TAR_PATH_AND_FILENAME       "/ce/app/ce_conf.zip"
-#define CE_CONF_TAR_JUST_FILENAME           "ce_conf.zip"
-
 #define MAX_ZIPDIR_ZIPFILE_SIZE             (5*1024*1024)
-
-#define PATH_CE_DD_PRG_JUST_FILENAME        "ce_dd.prg"
 
 #define PATH_ATARI_CE_FDD_TTP               "CE_FDD.TTP"
 #define PATH_ATARI_CE_HDIMG_TTP             "CE_HDIMG.TTP"
@@ -179,6 +172,7 @@ extern std::string FDD_TEST_IMAGE_PATH_AND_FILENAME;
 extern std::string PATH_CE_DD_BS_L1;
 extern std::string PATH_CE_DD_BS_L2;
 extern std::string PATH_CE_DD_PRG_PATH_AND_FILENAME;
+extern std::string CONFIG_DRIVE_PATH;
 
 #endif // GLOBAL_H
 

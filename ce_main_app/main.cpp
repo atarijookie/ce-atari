@@ -63,6 +63,7 @@ int main(int argc, char *argv[])
 
     Debug::setDefaultLogFile();                                 // set some log file before .env is loaded
     initializeFlags();                                          // initialize flags
+    Debug::out(LOG_INFO, "\n\n"); Debug::out(LOG_INFO, "---------------------------------------------------");
 
     loadDefaultArgumentsFromFile();                             // first parse default arguments from file
     parseCmdLineArguments(argc, argv);                          // then parse cmd line arguments and set global variables
@@ -215,8 +216,7 @@ int runCore(int instanceNo, bool localNotNetwork)
     char appVersion[16];
     Version::getAppVersion(appVersion);
 
-    Debug::out(LOG_INFO, "\n\n---------------------------------------------------");
-    Debug::out(LOG_INFO, "CosmosEx starting, version: %s", appVersion);
+    Debug::out(LOG_INFO, "CosmosEx core starting, version: %s", appVersion);
 
     Version::getRaspberryPiInfo();                                  // fetch model, revision, serial of RPi
 
@@ -226,12 +226,6 @@ int runCore(int instanceNo, bool localNotNetwork)
 
     Utils::setTimezoneVariable_inThisContext();
 
-    //-------------
-    // Copy the configdrive to /tmp so we can change the content as needed.
-    // This must be done before new CCoreThread because it reads the data from /tmp/configdrive
-    system("rm -rf /tmp/configdrive");                      // remove any old content
-    system("mkdir /tmp/configdrive");                       // create dir
-    system("cp -r /ce/app/configdrive/* /tmp/configdrive"); // copy new content
     //-------------
     core = new CCoreThread();
 

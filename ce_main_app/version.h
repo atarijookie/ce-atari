@@ -46,7 +46,6 @@ typedef struct {
             Version hans;
             Version xilinx;
             Version franz;
-            Version imageList;
     } Versions;
 
 #endif

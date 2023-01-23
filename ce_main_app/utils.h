@@ -28,8 +28,9 @@ public:
     static uint16_t fileTimeToAtariTime(struct tm *ptm);
     static uint16_t fileTimeToAtariDate(struct tm *ptm);
 
-    static std::string mergeHostPaths2(const std::string& head, const std::string& tail);   // this doesn't modify head
     static void mergeHostPaths(std::string &dest, const std::string &tail);                 // this modifies dest
+    static std::string mergeHostPaths2(const std::string& head, const std::string& tail);   // this doesn't modify head
+    static std::string mergeHostPaths3(const std::string& head, const char* tail);
     static void splitFilenameFromPath(const std::string &pathAndFile, std::string &path, std::string &file);
     static void splitFilenameFromExt(const std::string &filenameAndExt, std::string &filename, std::string &ext);
     static void splitToTwoByDelim(const std::string &input, std::string &beforeDelim, std::string &afterDelim, char delim);
