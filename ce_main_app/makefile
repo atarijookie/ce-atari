@@ -21,25 +21,14 @@ LDLIBS = -ldospath -lrt -lanl -lpthread -ldl -lutil
 ifeq ($(ONPC),yes)
     OBJDIR = obj/onpc
     CFLAGS += -DONPC -I./
-    TARGET = cosmosex_onpc
+    TARGET = cosmosex
     LDLIBS += -ldl
 else
     LDLIBS	+= -lbcm2835
     CFLAGS += -I./
-    DISTRO := $(shell ./whichdistro.sh )
-    ifeq ($(DISTRO),jessie)
-        OBJDIR = obj/raspbian_jessie
-        TARGET  =  cosmosex_raspbian_jessie
-        LDLIBS += -ldl
-        CFLAGS += -DDISTRO_RASPBIAN
-        CFLAGS += -DDISTRO_JESSIE
-    else
-        OBJDIR = obj/raspbian_stretch
-        TARGET =  cosmosex_raspbian_stretch
-        LDLIBS += -ldl
-        CFLAGS += -DDISTRO_RASPBIAN
-        CFLAGS += -DDISTRO_STRETCH
-    endif
+    OBJDIR = obj/raspbian
+    TARGET =  cosmosex_raspbian
+    LDLIBS += -ldl
     # add search path for libbcm2835.a
     # /usr/local/bin on rpi or more exotic path when cross-compiling
     VPATH += $(shell for d in `$(ACTUAL_CC) -print-search-dirs | \
@@ -121,7 +110,7 @@ all:	$(TARGET)
 $(TARGET): $(LDLIBS) $(OBJS) $(HDRS)
 	$(CXX_LINK) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $@ $(LDLIBS)
 #	$(STRIP) -s $@
-	@ln -sf $(CURDIR)/$(TARGET) ./core/cosmosex        # create symlink from cosmosex_[NAME_OF_DISTRO] to just cosmosex
+	@ln -sf $(CURDIR)/$(TARGET) ./core/cosmosex     # create symlink from whatever the output target is to just cosmosex
 
 print-%:	; @echo $* = $($*)
 

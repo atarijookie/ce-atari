@@ -688,8 +688,6 @@ void CCoreThread::handleFwVersion_hans(void)
     if(chipIfType == CHIP_IF_V1_V2) {
         // if Xilinx HW vs FW mismatching, flash Xilinx again to fix the situation
         if(hwConfig.fwMismatch) {
-            Update::createUpdateXilinxScript();
-
             Debug::out(LOG_ERROR, ">>> Terminating app, because there's Xilinx HW vs FW mismatch! <<<\n");
             sigintReceived = 1;
             return;
@@ -907,7 +905,7 @@ void CCoreThread::handleRecoveryCommands(int recoveryLevel)
         case 2: // delete settings, set network to DHCP
                 Debug::out(LOG_INFO, ">>> CCoreThread::handleRecoveryCommands -- LEVEL 2 - removing settings, restarting whole linux <<<\n");
 
-                deleteSettingAndSetNetworkToDhcp();         // delete all settings, set network to DHCP
+                deleteSetting();         // delete all settings, set network to DHCP
 
                 Debug::out(LOG_INFO, ">>> Terminating app and will reboot device, because app settings and network settings changed <<<\n");
 
@@ -919,9 +917,7 @@ void CCoreThread::handleRecoveryCommands(int recoveryLevel)
         case 3: // like 2, but also flash first firmware
                 Debug::out(LOG_INFO, ">>> CCoreThread::handleRecoveryCommands -- LEVEL 3 - removing settings, flashing first FW <<<\n");
 
-                deleteSettingAndSetNetworkToDhcp();         // delete all settings, set network to DHCP
-
-                Update::createFlashFirstFwScript(true);     // create flash first fw script -- with linux reboot
+                deleteSetting();         // delete all settings, set network to DHCP
 
                 Debug::out(LOG_INFO, ">>> Terminating app, because will do flashFirstFw as a part of handleRecoveryCommands() ! <<<\n");
                 sigintReceived = 1;                         // turn off app
@@ -967,7 +963,7 @@ void CCoreThread::insertSpecialFloppyImage(int specialImageId)
     newFloppyImageLedAfterEncode = 0;
 }
 
-void CCoreThread::deleteSettingAndSetNetworkToDhcp(void)
+void CCoreThread::deleteSetting(void)
 {
     // delete settings
     system("rm -f /ce/settings/*");

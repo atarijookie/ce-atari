@@ -90,7 +90,7 @@ private:
     //----------------------------------
     // recovery stuff
     void handleRecoveryCommands(int recoveryLevel);
-    void deleteSettingAndSetNetworkToDhcp(void);
+    void deleteSetting(void);
     void insertSpecialFloppyImage(int specialImageId);
 
     //----------------------------------

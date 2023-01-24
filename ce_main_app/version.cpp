@@ -181,11 +181,7 @@ void Version::getRaspberryPiInfo(void)
     system("cat /proc/cpuinfo | grep 'Serial' | tr -d ' ' | awk -F ':' '{print $2}' > /tmp/rpiserial.txt");
     system("cat /proc/cpuinfo | grep 'Revision' | tr -d ' ' | awk -F ':' '{print $2}' > /tmp/rpirevision.txt");
 
-    #ifdef DISTRO_STRETCH
     system("dmesg | grep 'Machine model' | awk -F 'model: ' '{print $2}' > /tmp/rpimodel.txt");
-    #else
-    system("dmesg | grep 'Machine model' | awk -F ': ' '{print $2}' > /tmp/rpimodel.txt");
-    #endif
 
     // read in the data
     readLineFromFile("/tmp/rpiserial.txt",      rpiConfig.serial,   20, "unknown");

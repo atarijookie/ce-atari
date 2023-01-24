@@ -1070,3 +1070,40 @@ void Utils::sendToMounter(const std::string& jsonString)
 
     close(sockFd);
 }
+
+void Utils::createFloppyTestImage(void)
+{
+    // open the file and write to it
+    FILE *f = fopen(FDD_TEST_IMAGE_PATH_AND_FILENAME.c_str(), "wb");
+
+    if(!f) {
+        Debug::out(LOG_ERROR, "Failed to create floppy test image!");
+        printf("Failed to create floppy test image!\n");
+        return;
+    }
+
+    // first fill the write buffer with simple counter
+    uint8_t writeBfr[512];
+    int i;
+    for(i=0; i<512; i++) {
+        writeBfr[i] = (uint8_t) i;
+    }
+
+    // write one sector after another...
+    int sector, track, side;
+    for(track=0; track<80; track++) {
+        for(side=0; side<2; side++) {
+            for(sector=1; sector<10; sector++) {
+                // customize write data
+                writeBfr[0] = track;
+                writeBfr[1] = side;
+                writeBfr[2] = sector;
+
+                fwrite(writeBfr, 1, 512, f);
+            }
+        }
+    }
+
+    // close file and we're done
+    fclose(f);
+}

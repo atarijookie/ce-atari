@@ -185,7 +185,7 @@ void ConsoleAppsStream::readAppNames(void)
 {
     std::string sockDescPathFormat = Utils::dotEnvValue("APPS_VIA_SOCK_DESCS");     // fetch format for app-via-sock path to description
 
-    for(int i=0; i<12; i++) {
+    for(int i=0; i<9; i++) {
         char descPath[128];
         sprintf(descPath, sockDescPathFormat.c_str(), i);   // create path
 
@@ -197,6 +197,7 @@ void ConsoleAppsStream::readAppNames(void)
 
         if(line[5] == 0) {                                  // empty description? clear the '[Fx] ' part
             memset(line, 0, 5);
+            Debug::out(LOG_DEBUG, "readAppNames - app: %d, not present", i);
         } else {                                            // got description? log it
             Debug::out(LOG_DEBUG, "readAppNames - app: %d, desc: %s", i, line);
         }
@@ -214,16 +215,17 @@ int ConsoleAppsStream::getStream(uint8_t *bfr, int maxLen)
 
     int totalCnt = 0;
 
-    // first turn off the cursor to avoid cursor blinking on the screen
-    *bfr++ = 27;
-    *bfr++ = 'f';       // CUR_OFF
-    totalCnt += 2;
+//    // first turn off the cursor to avoid cursor blinking on the screen
+//    *bfr++ = 27;
+//    *bfr++ = 'f';       // CUR_OFF
+//    totalCnt += 2;
 
     ssize_t res = sockRead(appFd, (char *) bfr, maxLen);
 
-    bfr += res;     // move pointer forward 
+    bfr += res;         // move pointer forward
+    totalCnt += res;    // update the count
 
-    *bfr++ = 0;     // store update components - not updating anything
+    *bfr++ = 0;         // store update components - not updating anything
     totalCnt++;
 
     return totalCnt;                                    // return the count of bytes used

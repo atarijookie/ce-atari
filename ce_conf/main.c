@@ -194,14 +194,15 @@ int getAndShowAvailableApps(void)
 
     // show list of apps with a message
     Clear_home();
-    (void) Cconws("\33pList of available CosmosEx tools\33q\n");
-    (void) Cconws("\33pPress F1-F9 to select or F10 to quit.\33p\n\n");
+    (void) Cconws("\33pList of available CosmosEx tools     \33q\n\r");
+    (void) Cconws("\33pPress F1-F9 to select or F10 to quit.\33q\r\n\r\n");
     int i;
-    for(i=0; i<12; i++) {                           // go through the list of apps
+    for(i=0; i<9; i++) {                           // go through the list of apps
         char* pApp = (char*) pBuffer + i*40;        // 1 app has 40 chars for name, construct pointer to it
 
         if(*pApp != 0) {                            // this position not empty? show it
             (void) Cconws((char *) pApp);
+            (void) Cconws("\r\n");
         }
     }
 

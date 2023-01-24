@@ -45,8 +45,6 @@ SharedObjects       shared;
 ChipInterface*      chipInterface;
 ExternalServices    externalServices;
 
-const char *distroString = "Raspbian";
-
 bool otherInstanceIsRunning(void);
 int  singleInstanceSocketFd;
 
@@ -211,18 +209,15 @@ int runCore(int instanceNo, bool localNotNetwork)
     //------------------------------------
     // normal app run follows
     Debug::printfLogLevelString();
-    printf("\nCosmosEx main app starting on %s...\n", distroString);
 
     char appVersion[16];
     Version::getAppVersion(appVersion);
-
     Debug::out(LOG_INFO, "CosmosEx core starting, version: %s", appVersion);
+    printf("\nCosmosEx core starting, version: %s\n", appVersion);
 
     Version::getRaspberryPiInfo();                                  // fetch model, revision, serial of RPi
 
 //  system("sudo echo none > /sys/class/leds/led0/trigger");        // disable usage of GPIO 23 (pin 16) by LED
-
-    printf("Starting threads\n");
 
     Utils::setTimezoneVariable_inThisContext();
 
