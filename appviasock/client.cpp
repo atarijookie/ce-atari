@@ -25,6 +25,7 @@ int openSocket(const char *fullSockPath);
 void closeFd(int& fd);
 volatile sig_atomic_t sigintReceived = 0;
 bool lowRes = false;            // if true, show low resolution, if false show mid resolution (starts default in mid res)
+void appendToV100log(char* bfr, int len);
 
 void sigint_handler(int sig)
 {
@@ -36,7 +37,7 @@ void setTerminalOptions(void)
 {
     struct termios ctrl;
     tcgetattr(STDIN_FILENO, &ctrl);
-    ctrlOriginal = ctrl;        // make copy of original settins
+    ctrlOriginal = ctrl;        // make copy of original settings
 
     ctrl.c_lflag &= ~ICANON;    // turning off canonical mode makes input unbuffered
     ctrl.c_lflag &= ~ECHO;      // turn off echo on master's side
@@ -89,6 +90,19 @@ ssize_t forwardData(int& fdIn, int& fdOut, char* bfr, int bfrLen, bool fromSock)
     }
 
     if(fromSock) {      // if from sock to pty, then use write to send data to pty
+    /*
+    Note!
+    The following commented out block is left here intentionally - it's used to find and store VT100 sequences
+    to file, so they can be picked up by vt100_to_vt52.cpp, where the conversion is tested (in case if it's needed).
+    */
+//        for(int i=0; i<bytesRead; i++) {    // go through the received data
+//            if(bfr[i] == 27) {              // found ESC?
+//                int rest = bytesRead - i;
+//                int logCnt = MIN(12, rest);
+//                appendToV100log(bfr + i, logCnt);   // log it
+//            }
+//        }
+
         sres = write(fdOut, (const void *)bfr, bytesRead);
     } else {
         sres = send(fdOut, (const void *)bfr, bytesRead, MSG_NOSIGNAL);
@@ -187,4 +201,39 @@ void closeFd(int& fd)
         close(fd);
         fd = 0;
     }
+}
+
+void appendToV100logWhere(char* bfr, int len, bool txtNotRaw)
+{
+    // log to txt or raw file based on flag
+    FILE *f = fopen(txtNotRaw ? "/tmp/vt100.txt" : "/tmp/vt100.raw", "at");
+
+    if(!f) {
+        return;
+    }
+
+    if(txtNotRaw) {         // for txt format also add hex dump
+        for(int i=0; i<len; i++) {
+            fprintf(f, "%02X ", bfr[i]);
+        }
+
+        fprintf(f, " -- ");
+    }
+
+    for(int i=0; i<len; i++) {
+        if(txtNotRaw) {     // txt format
+            fprintf(f, "%c", (bfr[i] >= 32) ? bfr[i] : '.');
+        } else {            // raw format
+            fprintf(f, "%c", bfr[i]);
+        }
+    }
+
+    fprintf(f, "\n");
+    fclose(f);
+}
+
+void appendToV100log(char* bfr, int len)
+{
+    appendToV100logWhere(bfr, len, true);
+    appendToV100logWhere(bfr, len, false);
 }

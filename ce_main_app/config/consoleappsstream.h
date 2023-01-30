@@ -74,7 +74,7 @@ private:
 
     uint32_t lastCmdTime;
    
-    int  filterVT100(char *bfr, int cnt);
+    int convertVT100toVT52(char *bfrIn, int cnt);
     void atariKeyToConsoleKey(uint8_t atariKey, char *bfr, int &cnt);
 
     void connectIfNeeded(void);

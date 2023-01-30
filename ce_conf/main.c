@@ -54,7 +54,8 @@ BYTE deviceID;                          // bus ID from 0 to 7
 BYTE cosmosExNotCosmoSolo;              // 0 means CosmoSolo, 1 means CosmosEx
 //--------------------------------------------------
 
-#define BUFFER_SIZE         (4*512)
+#define BUFFER_SECTORS      6
+#define BUFFER_SIZE         (BUFFER_SECTORS * 512 + 4)
 BYTE myBuffer[BUFFER_SIZE];
 BYTE *pBuffer;
 
@@ -225,19 +226,20 @@ int getAndShowAvailableApps(void)
         }
     }
 
+    Clear_home();
     return TRUE;
 }
 //--------------------------------------------------
 void sendKeyDown(BYTE key, BYTE keyDownCommand)
 {
     BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, keyDownCommand, 0};
-    
+
     cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)   
     cmd[5] = key;                                   // store the pressed key to cmd[5] 
-  
+
     memset(pBuffer, 0, 512);                        // clear the buffer 
   
-    hdIfCmdAsUser(1, cmd, 6, pBuffer, 3);           // issue the KEYDOWN command and show the screen stream 
+    hdIfCmdAsUser(1, cmd, 6, pBuffer, BUFFER_SECTORS);  // issue the KEYDOWN command and show the screen stream
     
     if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
         showConnectionErrorMessage();
@@ -262,7 +264,7 @@ void showHomeScreen(void)
     cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)   
     memset(pBuffer, 0, 512);                        // clear the buffer 
   
-    hdIfCmdAsUser(1, cmd, 6, pBuffer, 3);             // issue the GO_HOME command and show the screen stream 
+    hdIfCmdAsUser(1, cmd, 6, pBuffer, BUFFER_SECTORS);  // issue the GO_HOME command and show the screen stream
     
     if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
         showConnectionErrorMessage();
@@ -294,7 +296,7 @@ BYTE showHomeScreenSimple(void)
     cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)   
     memset(pBuffer, 0, 512);                        // clear the buffer 
   
-    hdIfCmdAsUser(1, cmd, 6, pBuffer, 3);           // issue the GO_HOME command and show the screen stream 
+    hdIfCmdAsUser(1, cmd, 6, pBuffer, BUFFER_SECTORS);  // issue the GO_HOME command and show the screen stream
     
     if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
         return FALSE;
@@ -313,7 +315,7 @@ void refreshScreen(void)
     cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)   
     memset(pBuffer, 0, 512);                        // clear the buffer 
   
-    hdIfCmdAsUser(1, cmd, 6, pBuffer, 3);           // issue the REFRESH command and show the screen stream 
+    hdIfCmdAsUser(1, cmd, 6, pBuffer, BUFFER_SECTORS);      // issue the REFRESH command and show the screen stream
     
     if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
         showConnectionErrorMessage();
