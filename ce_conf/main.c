@@ -136,10 +136,9 @@ int main(void)
             DWORD now   = getTicksAsUser();
             DWORD diff  = now - lastShowStreamTime;
             
-            if(diff > 200) {                  // last time the stream was shown was (at least) one second ago? do refresh...
-                sendKeyDown(0, keyDownCommand);                     // display a new stream (if something changed) 
-
+            if(diff > 25) {                  // last time the stream was 25/200 of a second ago? do refresh...
                 lastShowStreamTime = now;                           // we just shown the stream, no need for refresh
+                sendKeyDown(0, keyDownCommand);                     // display a new stream (if something changed)
             }
 
             continue;                                               // try again 
