@@ -61,6 +61,7 @@ private:
 
     int appIndex;       // index of app to which we want to connect, e.g. 0 for /var/run/ce/app0.sock
     int appFd;          // file descriptor for socket connected to app
+    bool hasConnected;  // if we have just connected and maybe we should clear screen
 
     AcsiDataTrans       *dataTrans;
     SettingsReloadProxy *reloadProxy;

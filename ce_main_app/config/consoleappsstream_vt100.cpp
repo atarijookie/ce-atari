@@ -175,8 +175,8 @@ void vt100longer(char* bfrIn, char* bfrOut, int& moveIn, int& moveOut)
                 memcpy(bfrOut, "\033H", 2);
             } else {
                 memcpy(bfrOut, "\033Y", 2);    // ESC + [ + row ; col + H - move cursor to position
-                bfrOut[2] = ' ' + v1;
-                bfrOut[3] = ' ' + v2;
+                bfrOut[2] = ' ' + v1 - 1;
+                bfrOut[3] = ' ' + v2 - 1;
                 moveOut = 4;
             }
         }; break;

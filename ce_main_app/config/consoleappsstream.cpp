@@ -38,6 +38,8 @@ ConsoleAppsStream::ConsoleAppsStream()
     lastCmdTime = 0;
     appIndex = 0;       // start with app0
     appFd = -1;         // not connected
+
+    hasConnected = false;   // has not connected yet
 }
 
 ConsoleAppsStream::~ConsoleAppsStream()
@@ -95,6 +97,11 @@ void ConsoleAppsStream::processCommand(uint8_t *cmd)
             int  consoleKeysLength = 0;
             atariKeyToConsoleKey(cmd[5], consoleKeys, consoleKeysLength);   // convert key from Atari pseudo key to console key
             sockWrite(appFd, consoleKeys, consoleKeysLength);               // send to app
+        }
+
+        if(hasConnected) {                              // if this has connected to new / other app, we should clear ST screen
+            hasConnected = false;                       // don't clear screen until next connect
+            dataTrans->addDataBfr("\033E", 2, false);   // add clear screen VT52 command, don't pad yet
         }
 
         int readCount = MIN(READ_BUFFER_SIZE, (6 * 512));                   // less from: size of buffer vs size which ST will try to get
@@ -246,6 +253,10 @@ void ConsoleAppsStream::connectIfNeeded(void)
     }
 
     appFd = openSocket();       // try to connect
+
+    if(appFd != -1) {
+        hasConnected = true;
+    }
 }
 
 int ConsoleAppsStream::openSocket(void)
