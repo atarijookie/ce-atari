@@ -403,15 +403,22 @@ def get_dir_usage(custom_letters, search_dir, name):
     name_to_usage = {letter_shared(): "shared drive",
                      letter_confdrive(): "config drive"}
 
-    for c_letter in custom_letters:                             # insert custom letters into name_to_usage
+    for c_letter in custom_letters:                 # insert custom letters into name_to_usage
         name_to_usage[c_letter] = "custom drive"
 
     usage = name_to_usage.get(name, "USB drive")
 
-    fullpath = os.path.join(search_dir, name)       # create full path to this dir
+    trans_path = fullpath = os.path.join(search_dir, name)       # create full path to this dir
 
     if os.path.islink(fullpath):                    # if this is a link, read source of the link
         fullpath = os.readlink(fullpath)
+
+    desc_path = trans_path + ".desc"                # construct where the description of this disk should be stored
+    desc_curr = text_from_file(desc_path)           # get current description
+    desc_new = os.path.basename(fullpath)           # construct new description (currently just linux disk name)
+
+    if desc_curr != desc_new:                       # the new description is different than current one? store new
+        text_to_file(desc_new, desc_path)
 
     res = f"({usage})".ljust(20) + fullpath
     return res
@@ -437,6 +444,11 @@ def get_and_show_symlinks(search_dir, fun_on_each_found):
         dirs = sorted(dirs)                     # sort results
 
         for one_dir in dirs:
+            full_path = os.path.join(search_dir, one_dir)       # construct full path to dir
+
+            if os.path.isfile(full_path) and not os.path.islink(full_path):     # skip files - they are not drives
+                continue
+
             desc = '' if not fun_on_each_found else fun_on_each_found(search_dir, one_dir)  # get description if got function
             app_log.info(f" * {one_dir} {desc}")
     else:                                       # nothing was found

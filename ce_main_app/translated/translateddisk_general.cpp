@@ -121,28 +121,6 @@ void TranslatedDisk::findAttachedDisks(void)
 {
     Debug::out(LOG_DEBUG, "TranslatedDisk::findAttachedDisks starting");
 
-    std::string dirTrans = Utils::dotEnvValue("MOUNT_DIR_TRANS");    // where the translated disks are symlinked
-    Utils::mergeHostPaths(dirTrans, "/X");          // add placeholder
-    int len = dirTrans.length();
-
-    for(int i=2; i<MAX_DRIVES; i++) {               // go through all the possible drives
-        dirTrans[len - 1] = (char) (65 + i);        // replace placeholder / drive character with the current drive char
-
-        if(!Utils::dirExists(dirTrans)) {           // dir doesn't exist? skip rest
-            conf[i].enabled = false;                // not enabled
-            continue;
-        }
-
-        // fill in device info accordingly
-        conf[i].enabled = true;
-        conf[i].hostRootPath = dirTrans;
-        conf[i].currentAtariPath = HOSTPATH_SEPAR_STRING;
-        conf[i].mediaChanged = true;
-        conf[i].label = "Device Label Here";        // Utils::getDeviceLabel(devicePath);
-
-        Debug::out(LOG_DEBUG, "TranslatedDisk::findAttachedDisks: [%d] %c: -> %s", i, i + 65, dirTrans.c_str());
-    }
-
     Settings s;
     char driveFirst, driveShared, driveConfig;
 
@@ -150,11 +128,46 @@ void TranslatedDisk::findAttachedDisks(void)
     driveShared = s.getChar("DRIVELETTER_SHARED",    -1);
     driveConfig = s.getChar("DRIVELETTER_CONFDRIVE", 'O');
 
-    driveLetters.firstTranslated    = driveFirst - 'A';
-    driveLetters.shared             = driveShared - 'A';
-    driveLetters.confDrive          = driveConfig - 'A';
+    driveLetters.firstTranslated = driveFirst - 'A';
+    driveLetters.shared          = driveShared - 'A';
+    driveLetters.confDrive       = driveConfig - 'A';
 
     useZipdirNotFile = s.getBool("USE_ZIP_DIR", 1);
+
+    std::string dirTrans = Utils::dotEnvValue("MOUNT_DIR_TRANS");    // where the translated disks are symlinked
+    Utils::mergeHostPaths(dirTrans, "/X");          // add placeholder
+    int len = dirTrans.length();
+
+    std::string fileWithDesc = dirTrans + ".desc";  // file with description will have .desc added to path
+
+    for(int i=2; i<MAX_DRIVES; i++) {               // go through all the possible drives
+        dirTrans[len - 1] = (char) (65 + i);        // replace placeholder / drive character with the current drive char
+        fileWithDesc[len - 1] = (char) (65 + i);    // replace placeholder / drive character with the current drive char
+
+        if(!Utils::dirExists(dirTrans)) {           // dir doesn't exist? skip rest
+            conf[i].enabled = false;                // not enabled
+            continue;
+        }
+
+        char diskLabel[32];
+        if(i == driveLetters.shared) {              // for shared drive use fixed value
+            strcpy(diskLabel, "Shared Drive");
+        } else if(i == driveLetters.confDrive) {    // for config drive use fixed value
+            strcpy(diskLabel, "Config Drive");
+        } else {                                    // for other drives - try to get description from .desc file
+            memset(diskLabel, 0, sizeof(diskLabel));
+            Utils::textFromFile(diskLabel, sizeof(diskLabel) - 1, fileWithDesc.c_str());    // try to read disk description from file
+        }
+
+        // fill in device info accordingly
+        conf[i].enabled = true;
+        conf[i].hostRootPath = dirTrans;
+        conf[i].currentAtariPath = HOSTPATH_SEPAR_STRING;
+        conf[i].mediaChanged = true;
+        conf[i].label = diskLabel;              // store disk description
+
+        Debug::out(LOG_DEBUG, "TranslatedDisk::findAttachedDisks: [%d] %c: -> %s", i, i + 65, dirTrans.c_str());
+    }
 }
 
 void TranslatedDisk::processCommand(uint8_t *cmd)
@@ -277,22 +290,24 @@ void TranslatedDisk::onGetMounts(uint8_t *cmd)
 {
     char tmp[256];
     std::string mounts;
-    int index;
-
-    static const char *trTypeStr[4] = {"", "USB drive", "shared drive", "config drive"};
     const char *mountStr;
 
     for(int i=2; i<MAX_DRIVES; i++) {       // create enabled drive bits
         if(conf[i].enabled) {
-            index = 1;
-        } else {
-            index = 0;
+            if(i == driveLetters.shared) {              // for shared drive
+                mountStr = "shared drive";
+            } else if(i == driveLetters.confDrive) {    // for config drive
+                mountStr = "config drive";
+            } else {                                    // for other drives - USB Drive
+                mountStr = "USB drive";
+            }
+        } else {        // not enabled drive - empty type
+            mountStr = "";
         }
 
-        mountStr = trTypeStr[index];
-        if(conf[i].label.empty()) {
+        if(conf[i].label.empty()) {             // no label directly in this drive? don't show it
             sprintf(tmp, "%c: %s\n", ('A' + i), mountStr);
-        } else {
+        } else {                                // got label from this drive? use it
             sprintf(tmp, "%c: %s (%s)\n", ('A' + i), conf[i].label.c_str(), mountStr);
         }
 
