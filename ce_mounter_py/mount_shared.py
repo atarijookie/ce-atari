@@ -23,11 +23,9 @@ def get_shared_mount_command(nfs_not_samba):
 
     if not os.path.exists(mount_cmd_file):      # if the file doesn't exist, write default command in that file
         if nfs_not_samba:   # NFS shared drive
-            default_cmd = ('mount -t nfs -o username={username},password={password},vers=3 '
-                           '{server_address}:/{path_on_server} {mount_path}')
+            default_cmd = 'mount -t nfs -o vers=3 {options} {server_address}:/{path_on_server} {mount_path}'
         else:               # cifs / samba / windows share
-            default_cmd = ('mount -t cifs -o username={username},password={password} '
-                           '//{server_address}/{path_on_server} {mount_path}')
+            default_cmd = 'mount -t cifs {options} //{server_address}/{path_on_server} {mount_path}'
 
         app_log.debug(f"get_shared_mount_command: mount_cmd_file {mount_cmd_file} does not exist")
         app_log.debug(f"get_shared_mount_command: will write this cmd in that file: {default_cmd}")
@@ -49,9 +47,22 @@ def mount_shared():
         trigger_reload_translated()
 
 
-#@timeout(10)
-def mount_shared_internal():
-    """ this function checks for shared drive settings, mounts drive if needed """
+def options_string(username, password):
+    """ use the supplied username and password to generate options string for mount command """
+
+    options = ""
+
+    if username:        # add username to options if supplied
+        options += f" -o username={username} "
+
+    if password:        # add password to options if supplied
+        options += f" -o password={password} "
+
+    return options
+
+
+def check_if_should_mount():
+    """ This function checks if we should mount a shared drive or not, and returns all the needed params for mount """
     shared_enabled = setting_get_bool('SHARED_ENABLED')
     mount_path = MOUNT_DIR_SHARED              # get where it should be mounted
     symlink_path = get_symlink_path_for_letter(letter_shared())       # where the shared drive will be symlinked
@@ -63,7 +74,7 @@ def mount_shared_internal():
         if os.path.exists(mount_path):      # got the mount path? do the umount
             umount_if_mounted(mount_path, delete=True)   # possibly umount
 
-        return False
+        return False, False, "", symlink_path, mount_path
 
     addr = load_one_setting('SHARED_ADDRESS')
     path_ = load_one_setting('SHARED_PATH')
@@ -72,19 +83,22 @@ def mount_shared_internal():
 
     if not addr or not path_:   # address or path not provided? don't do the rest
         app_log.debug(f"mount_shared: addr={addr}, path={path_}. not mounting")
-        return False
+        return False, False, "", symlink_path, mount_path
 
     # ping addr to see if it's alive, don't mount if not alive
     resp = ping(addr, timeout=1, count=1)       # ping only once
 
     if resp.packets_lost > 0:                   # if the only packet was lost, don't mount
         app_log.info(f"mount_shared: ping didn't get response from {addr}, not mounting")
-        return False
+        return False, False, "", symlink_path, mount_path
 
+    options = options_string(user, pswd)        # generate username + password options string
     nfs_not_samba = setting_get_bool('SHARED_NFS_NOT_SAMBA')
     cmd = get_shared_mount_command(nfs_not_samba)       # get the default / customized mount command and format it
-    cmd = cmd.format(username=user, password=pswd, server_address=addr, path_on_server=path_, mount_path=mount_path)
-    cmd = cmd.strip()       # remove trailing and leading whitespaces
+    cmd = cmd.format(options=options, server_address=addr, path_on_server=path_, mount_path=mount_path)
+    cmd = cmd.strip()           # remove trailing and leading whitespaces
+    cmd = "timeout 5s " + cmd   # prepend timeout to limit mount duration
+    app_log.debug(f"mount_shared - mount command: {cmd}")
 
     # check if shared is mounted, if not mounted, do mount anyway, even if cmd is the same below
     is_mounted = is_shared_mounted()
@@ -96,12 +110,18 @@ def mount_shared_internal():
 
     if is_mounted and cmd == mount_shared_cmd_last:     # if is mounted and command not changed, don't remount
         app_log.info(f"mount_shared: mount command not changed, not mounting")
-        good = symlink_if_needed(mount_path, symlink_path)     # create symlink, but only if needed
-        return good
+        symlink_good = symlink_if_needed(mount_path, symlink_path)     # create symlink, but only if needed
+        return False, symlink_good, "", symlink_path, mount_path
 
     text_to_file(cmd, MOUNT_SHARED_CMD_LAST)     # store this cmd
+    return True, False, cmd, symlink_path, mount_path
 
-    mount_log_file = os.path.join(os.getenv('LOG_DIR'), 'mount.log')
+
+def do_the_actual_mount(cmd, symlink_path, mount_path):
+    """ This function tries to mount the shared drive using the supplied arguments """
+
+    log_dir = os.getenv('LOG_DIR')
+    mount_log_file = os.path.join(log_dir, 'mount.log')
     cmd += f" > {mount_log_file} 2>&1 "     # append writing of stdout and stderr to file
 
     # command changed, we should execute it
@@ -120,12 +140,33 @@ def mount_shared_internal():
 
         symlink_if_needed(mount_path, symlink_path)     # create symlink, but only if needed
     except Exception as exc:
-        app_log.info(f'mount_shared: mount failed : {str(exc)}')
+        app_log.warning(f'mount_shared: mount failed : {str(exc)}')
 
     if not good:        # mount failed, copy mount log
+        app_log.warning(f'mount_shared FAILED! Will now copy log files to mount path {mount_path}')
+
         try:
-            shutil.copy(mount_log_file, mount_path)
+            shutil.copy(mount_log_file, mount_path)                 # copy the mount log
+
+            dmesg_file = f"{log_dir}/dmesg.txt"                     # get last few dmesg lines into this file
+            os.system(f"dmesg | tail -n 20 > {dmesg_file} 2>&1")
+            shutil.copy(dmesg_file, mount_path)                     # copy the dmesg file to mount dir
         except Exception as exc:
-            app_log.info(f'mount_shared: copy of log file failed : {str(exc)}')
+            app_log.warning(f'mount_shared: copy of log file failed : {str(exc)}')
 
     return good
+
+
+def mount_shared_internal():
+    """ this function checks for shared drive settings, mounts drive if needed """
+
+    # check if we should mount or not
+    should_mount, symlink_good, cmd, symlink_path, mount_path = check_if_should_mount()
+
+    # if we don't need to mount, return if we did at least symlink with success
+    if not should_mount:
+        return symlink_good
+
+    # something has changed, shared drive is enabled, we should try to mount
+    mount_good = do_the_actual_mount(cmd, symlink_path, mount_path)
+    return mount_good

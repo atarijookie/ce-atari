@@ -105,9 +105,9 @@ def mount_device_to_mnt(device):
     mount_dir = os.path.join("/mnt", just_dev_name)     # '/mnt' + 'sda1' = /mnt/sda1
     os.makedirs(mount_dir, exist_ok=True)               # create mount dir if it doesn't exist
 
-    mnt_log_file = os.path.join(LOG_DIR, f'mount_{just_dev_name}.log')
+    mnt_log_file = os.path.join(os.getenv('LOG_DIR'), f'mount_{just_dev_name}.log')
 
-    mount_cmd = f"mount -v {device} {mount_dir} > {mnt_log_file} 2>&1"
+    mount_cmd = f"timeout 5s mount -v {device} {mount_dir} > {mnt_log_file} 2>&1"
     app_log.info(f'mount_device_to_mnt: mount_cmd: {mount_cmd}')
 
     status = os.system(mount_cmd)       # do the mount

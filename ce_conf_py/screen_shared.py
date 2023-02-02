@@ -96,7 +96,9 @@ def shared_drive_save(button):
         good = False
 
         try:
-            ip_str = setting_get_str('SHARED_ADDRESS')
+            ip_str = setting_get_str('SHARED_ADDRESS')          # fetch value
+            ip_str = ip_str.strip()                             # remove trailing and leading spaces
+            shared.settings_changed['SHARED_ADDRESS'] = ip_str  # store back
             IP(ip_str)      # let IPy try to read the addr
             good = True
         except Exception as exc:

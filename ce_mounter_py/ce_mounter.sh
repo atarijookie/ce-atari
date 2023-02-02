@@ -1,9 +1,9 @@
 #!/bin/sh
 
-# check if running as root
+# check if running as root, and if not, execute this script with sudo
 if [ $(id -u) != 0 ]; then
-  echo "Please run this as root"
-  exit
+  sudo $0 "$@"
+  exit 0
 fi
 
 # check if got fuse-zip
