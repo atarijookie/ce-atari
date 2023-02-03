@@ -52,6 +52,10 @@ def get_mounts():
     partitions = get_disk_partitions()              # get existing mounted partitions
     mounts = []
 
+    ignored_devs_and_mounts = os.getenv('MOUNT_DEVICES_IGNORED', '')    # fetch list of ignored devices from .env
+    ignored_devs_and_mounts = ignored_devs_and_mounts.split(',')        # split string with multiple items to list
+    app_log.debug(f"get_mounts - list of ignored devices/mounts: {ignored_devs_and_mounts}")
+
     for part in partitions:
         # not a /dev mount or root fs mount? skip it
         if not part.device.startswith('/dev/') or part.mountpoint == '/':
@@ -63,6 +67,17 @@ def get_mounts():
 
         # ignore devices starting with these MOUNT POINTS
         if any(part.mountpoint.startswith(ignored) for ignored in ['/boot', '/run']):
+            continue
+
+        skip = False
+        for ignored in ignored_devs_and_mounts:         # check all ignored devs / mounts
+            if part.device.endswith(ignored) or part.mountpoint.endswith(ignored):      # matching dev or mount?
+                app_log.debug(f"get_mounts - ignoring device: {part.device}, mountpoint: {part.mountpoint} because "
+                              f"it matches: {ignored}")
+                skip = True     # ignore it
+                break
+
+        if skip:                # should ignore? continue loop
             continue
 
         dev_dir = part.device, part.mountpoint  # get device and mount point

@@ -4,7 +4,7 @@ from loguru import logger as app_log
 #from wrapt_timeout_decorator import timeout
 from shared import umount_if_mounted, \
     unlink_without_fail, show_symlinked_dirs, MOUNT_DIR_ZIP_FILE, is_zip_mounted, \
-    send_to_core, readlink_without_fail, MOUNTED_ZIP_FILE_LINK, symlink_if_needed
+    send_to_core, readlink_without_fail, MOUNTED_ZIP_FILE_LINK, symlink_if_needed, trigger_reload_translated
 
 
 def unmount_zip_file_if_source_not_exists():
@@ -95,6 +95,8 @@ def unmount_folder(msg):
 
         if source and os.path.exists(source):       # if the symlink source exists
             umount_if_mounted(source)
+
+        trigger_reload_translated()                 # core should check for drive changes now
     except Exception as ex:
         tb = traceback.format_exc()
         app_log.warning(f'unmount_folder: failed with exception: {str(ex)}')

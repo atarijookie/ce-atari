@@ -115,8 +115,11 @@ def sock_receiver():
     while True:
         try:
             data, address = sock.recvfrom(1024)                 # receive message
+            data = data.decode('utf-8')                         # from b string to str
+            data = data.replace("\x00", "")                     # remove any trailing zero terminators
+            app_log.debug(f'received data: \'{data}\'')
             message = json.loads(data)                          # convert from json string to dictionary
-            app_log.debug(f'received message: {message}')
+            app_log.debug(f'received message after json.loads: {message}')
 
             task_queue.put({'function': mount_on_command, 'args': message})
         except socket.timeout:          # when socket fails to receive data
@@ -125,7 +128,9 @@ def sock_receiver():
             app_log.error("Got keyboard interrupt, terminating.")
             break
         except Exception as ex:
-            app_log.warning(f"got exception: {str(ex)}")
+            tb = traceback.format_exc()
+            app_log.warning(f"sock_receiver - got exception: {str(ex)}")
+            app_log.warning(tb)
 
 
 def handle_read_callback(ntfr):

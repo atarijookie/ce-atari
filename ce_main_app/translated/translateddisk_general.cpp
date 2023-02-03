@@ -275,13 +275,35 @@ void TranslatedDisk::onUnmountDrive(uint8_t *cmd)
     int drive = cmd[5];
 
     if(drive < 2 || drive > 15) {               // index out of range?
+        Debug::out(LOG_WARNING, "onUnmountDrive -- drive number %d is out of range, not unmounting", drive);
         dataTrans->setStatus(EDRVNR);
+        return;
+    }
+
+    if(!conf[drive].enabled) {                  // skip if drive not enabled
+        Debug::out(LOG_WARNING, "onUnmountDrive -- drive number %d is not enabled, not unmounting", drive);
+        dataTrans->setStatus(E_OK);             // respond with OK
         return;
     }
 
     Debug::out(LOG_DEBUG, "onUnmountDrive -- drive: %d, hostRootPath: %s", drive, conf[drive].hostRootPath.c_str());
 
-    // TODO: unmount here
+    if(!Utils::dirExists(conf[drive].hostRootPath)) {   // dir doesn't exist? skip rest
+        Debug::out(LOG_WARNING, "onUnmountDrive -- dir doesn't exist: %s , not unmounting", conf[drive].hostRootPath.c_str());
+        dataTrans->setStatus(E_OK);             // respond with OK
+        return;
+    }
+
+    // if this is not a conf drive and shared drive, we can trigger unmount
+    if(drive != driveLetters.shared && drive != driveLetters.confDrive) {
+        // send command to mounter to mount this archive
+        std::string jsonString = "{\"cmd_name\": \"unmount\", \"path\": \"";
+        jsonString += conf[drive].hostRootPath;     // add drive path
+        jsonString += "\"}";
+        Utils::sendToMounter(jsonString);
+    } else {
+        Debug::out(LOG_WARNING, "onUnmountDrive -- drive number %d is shared drive or config drive, not unmounting", drive);
+    }
 
     dataTrans->setStatus(E_OK);
 }
@@ -305,10 +327,14 @@ void TranslatedDisk::onGetMounts(uint8_t *cmd)
             mountStr = "";
         }
 
-        if(conf[i].label.empty()) {             // no label directly in this drive? don't show it
-            sprintf(tmp, "%c: %s\n", ('A' + i), mountStr);
-        } else {                                // got label from this drive? use it
-            sprintf(tmp, "%c: %s (%s)\n", ('A' + i), conf[i].label.c_str(), mountStr);
+        if(conf[i].enabled) {
+            if(conf[i].label.empty()) {             // no label directly in this drive? don't show it
+                sprintf(tmp, "%c: %s\n", ('A' + i), mountStr);
+            } else {                                // got label from this drive? use it
+                sprintf(tmp, "%c: %s (%s)\n", ('A' + i), conf[i].label.c_str(), mountStr);
+            }
+        } else {
+            sprintf(tmp, "%c:\n", ('A' + i));
         }
 
         mounts += tmp;
@@ -1059,8 +1085,13 @@ const char *TranslatedDisk::functionCodeToName(int code)
         case BIOS_Mediach:              return "BIOS_Mediach";
         case BIOS_Getbpb:               return "BIOS_Getbpb";
 
+        case ACC_GET_MOUNTS:            return "ACC_GET_MOUNTS";
+        case ACC_UNMOUNT_DRIVE:         return "ACC_UNMOUNT_DRIVE";
         case TEST_READ:                 return "TEST_READ";
         case TEST_WRITE:                return "TEST_WRITE";
+        case TEST_GET_ACSI_IDS:         return "TEST_GET_ACSI_IDS";
+        case TEST_SET_ACSI_ID:          return "TEST_SET_ACSI_ID";
+
         default:                        return "unknown";
     }
 }
