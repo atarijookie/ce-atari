@@ -92,6 +92,8 @@ public:
     static void textFromFile(char* bfr, uint32_t bfrSize, const char* filePath, bool trimTrailing=true); // get one line from text file
     static void trimTrail(char *bfr);
 
+    static bool endsWith(std::string const& value, const char* ending);
+
     static void screenShotVblEnabled(bool enabled);
     static void createFloppyTestImage(void);
 

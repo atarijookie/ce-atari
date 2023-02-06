@@ -1107,3 +1107,15 @@ void Utils::createFloppyTestImage(void)
     // close file and we're done
     fclose(f);
 }
+
+bool Utils::endsWith(std::string const& value, const char* ending)
+{
+    size_t lenEnding = strlen(ending);
+
+    if (lenEnding > value.size()) {     // ending longer than value? surely doesn't end with ending
+        return false;
+    }
+
+    // compare this value at its end with the ending
+    return (value.compare(value.size() - lenEnding, lenEnding, ending) == 0);
+}

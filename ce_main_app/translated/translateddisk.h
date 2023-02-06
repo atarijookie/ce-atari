@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <string>
 #include <time.h>
+#include <vector>
+#include <string>
 
 #include "../isettingsuser.h"
 #include "../settings.h"
@@ -261,8 +263,12 @@ private:
     //-----------------------------------
     // ZIP DIR stuff
     bool useZipdirNotFile;
-    bool hasArchiveExtension(const std::string& longPath, std::string& archiveSubPath);
+    bool hasArchiveExtension(const std::string& longPath);
     static bool isOkToMountThisAsZipDir(const char *zipFilePath);
+
+    void fillSupportedArchiveExtensionsIfNeeded(void);
+    std::vector<std::string> supportedArchiveExtensions;
+
     //-----------------------------------
     // helpers for find storage
     void initFindStorages(void);

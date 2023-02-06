@@ -6,13 +6,6 @@ if [ $(id -u) != 0 ]; then
   exit 0
 fi
 
-# check if got fuse-zip
-got_fuse_zip=$( which fuse-zip )
-if [ $? -ne 0 ]; then
-  echo "fuse-zip not found"
-  exit
-fi
-
 # check if have python3
 echo "Checking for python3 presence"
 which python3 > /dev/null 2>&1

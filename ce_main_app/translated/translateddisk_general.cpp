@@ -676,20 +676,43 @@ bool TranslatedDisk::createFullAtariPath(std::string inPartialAtariPath, std::st
     }
 }
 
-bool TranslatedDisk::hasArchiveExtension(const std::string& longPath, std::string& archiveSubPath)
+void TranslatedDisk::fillSupportedArchiveExtensionsIfNeeded(void)
+{
+    if(supportedArchiveExtensions.size() > 0) {       // if already got some value here, no need to fill it again
+        return;
+    }
+
+    std::string extensions = Utils::dotEnvValue("MOUNT_ARCHIVES_SUPPORTED");    // get supported extensions from .env
+    Utils::splitString(extensions, ',', supportedArchiveExtensions);    // split coma separated string into std::vector
+
+    if(supportedArchiveExtensions.size() == 0) {        // still nothing in this vector? just add .zip as default
+         supportedArchiveExtensions.push_back(".zip");
+    }
+
+    Debug::out(LOG_DEBUG, "TranslatedDisk::fillSupportedArchiveExtensionsIfNeeded - filled in these supported extensions:");
+    for (auto it = begin(supportedArchiveExtensions); it != end(supportedArchiveExtensions); ++it) {
+        const char* oneExt = it->c_str();
+        Debug::out(LOG_DEBUG, "TranslatedDisk::fillSupportedArchiveExtensionsIfNeeded - %s", oneExt);
+    }
+}
+
+bool TranslatedDisk::hasArchiveExtension(const std::string& longPath)
 {
     std::string longPathCopy = longPath;                        // create a copy of the input long path
     std::transform(longPathCopy.begin(), longPathCopy.end(), longPathCopy.begin(), ::tolower);  // path copy to lowercase
 
-    std::size_t extPos = longPathCopy.find(".zip");             // find supported extension in lowercase copy
+    fillSupportedArchiveExtensionsIfNeeded();                   // fill supported archive extensions if needed
 
-    if(extPos != std::string::npos) {                           // extension found?
-        longPathCopy = longPath;                                // create a copy of the input long path, but preserve upper / lower case this time
-        archiveSubPath = longPathCopy.substr(0, extPos + 4);    // get substring containing only path to archive
-        return true;            // supported archive was found
+    for (auto it = begin(supportedArchiveExtensions); it != end(supportedArchiveExtensions); ++it) {
+        const char* oneExt = it->c_str();
+
+        if(Utils::endsWith(longPathCopy, oneExt)) {                 // extension found at end?
+            Debug::out(LOG_DEBUG, "TranslatedDisk::hasArchiveExtension - file %s has supported archive extension %s, it's an archive", longPath.c_str(), oneExt);
+            return true;        // supported archive was found
+        }
     }
 
-    archiveSubPath.clear();
+    Debug::out(LOG_DEBUG, "TranslatedDisk::hasArchiveExtension - file %s doesn't have any supported archive extension", longPath.c_str());
     return false;               // supported archive not found
 }
 
@@ -706,27 +729,29 @@ void TranslatedDisk::createFullHostPath(const std::string &inFullAtariPath, int 
     Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - shortPath: %s -> outFullHostPath: %s", shortPath.c_str(), outFullHostPath.c_str());
 
     if(useZipdirNotFile) {                                      // if ZIP DIRs are enabled
-        std::string archiveSubPath;
-        bool hasArchive = hasArchiveExtension(outFullHostPath, archiveSubPath);     // archive in this long path?
+        bool hasArchive = hasArchiveExtension(outFullHostPath); // archive in this long path?
 
         if(hasArchive) {                                                // it's an archive, handle it
-            bool gotThisSymlink = ldp_gotSymlink(archiveSubPath);       // see if symlink for this archive was added
+            bool gotThisSymlink = ldp_gotSymlink(outFullHostPath);       // see if symlink for this archive was added
 
             if(!gotThisSymlink) {       // if don't have this symlink, we need to mount this archive
-                Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - will now create symlink for %s", archiveSubPath.c_str());
+                Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - will now create symlink for %s", outFullHostPath.c_str());
+                std::string pathToArchiveFile = outFullHostPath;        // make a copy of this path to file, because below we will replace it with symlink path
 
                 // create virtual symlink in libdospath
                 std::string nextMountPath = Utils::dotEnvValue("MOUNT_DIR_ZIP_FILE");   // get where the next ZIP file will be mounted
-                ldp_symlink(archiveSubPath, nextMountPath);             // create virtual symlink from archive path to next mount path
+                Utils::mkpath(nextMountPath.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);    // make dir where the ZIP will be mounted
+
+                ldp_symlink(outFullHostPath, nextMountPath);            // create virtual symlink from archive path to next mount path
                 ldp_shortToLongPath(shortPath, outFullHostPath, true);  // now do the short path to long path translation again, which will apply the new symlink
 
                 // send command to mounter to mount this archive
                 std::string jsonString = "{\"cmd_name\": \"mount_zip\", \"path\": \"";
-                jsonString += archiveSubPath;                           // add archiveSubPath
+                jsonString += pathToArchiveFile;                        // add path to archive file we should now mount
                 jsonString += "\"}";
                 Utils::sendToMounter(jsonString);                       // send to socket
             } else {                    // got this symlink already
-                Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - already have symlink %s", archiveSubPath.c_str());
+                Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - already have symlink %s", outFullHostPath.c_str());
             }
         }
     }

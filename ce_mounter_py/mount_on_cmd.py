@@ -33,8 +33,35 @@ def unmount_zip_file_if_source_not_exists():
     send_to_core(item)
 
 
+def is_supported_archive(archive_path):
+    """ Function checks if the supplied archive name has one of the allowed / supported archive extension. """
+
+    supported_exts = os.getenv('MOUNT_ARCHIVES_SUPPORTED', 'zip')   # get list of supported archive extensions
+    supported_exts = supported_exts.split(',')                      # split list into items
+    supported_exts = [ext.lower() for ext in supported_exts]        # all to lowercase
+
+    fname = os.path.basename(archive_path)  # extract just filename from whole path
+    fname = fname.lower()                   # to lowercase
+
+    # this is supported archive, if this filename ends with any of supported extensions
+    is_supported = any([fname.endswith(ext) for ext in supported_exts])
+
+    if not is_supported:        # add additional warning message to log if extension not supported
+        app_log.warning(f'mount_zip_file: archive {fname}  does not have any of supported exts: {supported_exts}')
+
+    return is_supported
+
+
 def mount_zip_file(msg):
     """ mount ZIP file if possible """
+
+    # get name of tool which we should use for mounting archives
+    archive_tool = os.getenv('MOUNT_ARCHIVES_TOOL', 'fuse-zip')
+
+    if os.system(f'which {archive_tool}') != 0:        # we don't have the tool installed?
+        app_log.error(f'mount_zip_file: archive mounting tool {archive_tool} not installed, cannot mount archives!')
+        return
+
     zip_path_new = msg.get('path')
 
     if not os.path.exists(zip_path_new):  # got path, but it doesn't exist?
@@ -50,6 +77,10 @@ def mount_zip_file(msg):
         app_log.info(f'mount_zip_file: this ZIP file: {zip_path_old} is already mounted, not remounting')
         return
 
+    if not is_supported_archive(zip_path_new):  # this is not a supported archive? fail
+        app_log.warning(f'mount_zip_file: this file: {zip_path_new} doesn\'t have supported file extension')
+        return
+
     mount_path = MOUNT_DIR_ZIP_FILE         # get where it should be mounted
 
     if mounted:
@@ -61,7 +92,7 @@ def mount_zip_file(msg):
 
     os.makedirs(mount_path, exist_ok=True)  # create mount dir
 
-    mount_cmd = f'fuse-zip {zip_path_new} {mount_path}'  # construct mount command
+    mount_cmd = f'{archive_tool} {zip_path_new} {mount_path}'  # construct mount command
 
     good = False
     try:  # try to mount it
