@@ -62,7 +62,7 @@ typedef struct {
 } DiskItem;
 
 extern "C" {
-    void ldp_setParam(int paramNo, int paramVal);
+    void ldp_setParam(int paramNo, uint64_t paramVal);
     void ldp_shortToLongPath(const std::string& shortPath, std::string& longPath, bool refreshOnMiss);
     void ldp_updateFileName(const std::string& hostPath, const std::string& oldFileName, const std::string& newFileName);
     bool ldp_findFirstAndNext(SearchParams& sp, DiskItem& di);

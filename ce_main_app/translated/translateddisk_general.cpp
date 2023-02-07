@@ -647,7 +647,7 @@ bool TranslatedDisk::createFullAtariPath(std::string inPartialAtariPath, std::st
         outFullAtariPath = inPartialAtariPath.substr(2);               // required atari path is absolute path, without drive letter and ':'
 
         removeDoubleDots(outFullAtariPath);                            // search for '..' and simplify the path
-        Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - with    drive letter, absolute path : %s, drive index: %d => %s", inPartialAtariPath.c_str(), outAtariDriveIndex, outFullAtariPath.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - with drive letter, absolute path : %s, drive index: %d => %s", inPartialAtariPath.c_str(), outAtariDriveIndex, outFullAtariPath.c_str());
         return true;
     }
 
@@ -712,15 +712,24 @@ bool TranslatedDisk::hasArchiveExtension(const std::string& longPath)
         }
     }
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::hasArchiveExtension - file %s doesn't have any supported archive extension", longPath.c_str());
+    //Debug::out(LOG_DEBUG, "TranslatedDisk::hasArchiveExtension - file %s doesn't have any supported archive extension", longPath.c_str());
     return false;               // supported archive not found
 }
 
 void TranslatedDisk::createFullHostPath(const std::string &inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount)
 {
-    waitingForMount     = false;
+    /*
+    This method will take in short (Atari) path, will convert it to host path (where the Atari path is mapped), then will use the
+    libDOSpath to convert that short path to long path. If mounting of archives (e.g. ZIP files) is not enabled, the code ends at that point.
+    With mounting of archives enabled it will check if we got this archive file already mounted - if we do, we will return the current
+    status of waiting for a mount in waitingForMount variable, and if we don't have this archive mounted, then we will
+    send a request to mount this archive to the mounter component.
+    The mounter component will tell us later when the mount finishes and we will then flip the flag in archiveMounted from false to true.
+    */
 
-    std::string root = conf[inAtariDriveIndex].hostRootPath;        // get root path
+    waitingForMount = false;    // start by assuming that we're not waiting for a mount
+
+    std::string root = conf[inAtariDriveIndex].hostRootPath;    // get root path
 
     std::string shortPath = root;
     Utils::mergeHostPaths(shortPath, inFullAtariPath);          // short path = root + full atari path
@@ -728,32 +737,49 @@ void TranslatedDisk::createFullHostPath(const std::string &inFullAtariPath, int 
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - shortPath: %s -> outFullHostPath: %s", shortPath.c_str(), outFullHostPath.c_str());
 
-    if(useZipdirNotFile) {                                      // if ZIP DIRs are enabled
-        bool hasArchive = hasArchiveExtension(outFullHostPath); // archive in this long path?
+    if(!useZipdirNotFile) {     // mounting of archives not enabled? quit now
+        return;
+    }
 
-        if(hasArchive) {                                                // it's an archive, handle it
-            bool gotThisSymlink = ldp_gotSymlink(outFullHostPath);       // see if symlink for this archive was added
+    bool isArchive = hasArchiveExtension(outFullHostPath);      // is this an archive in this long path?
 
-            if(!gotThisSymlink) {       // if don't have this symlink, we need to mount this archive
-                Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - will now create symlink for %s", outFullHostPath.c_str());
-                std::string pathToArchiveFile = outFullHostPath;        // make a copy of this path to file, because below we will replace it with symlink path
+    if(!isArchive) {            // not an archive, quit now
+        return;
+    }
 
-                // create virtual symlink in libdospath
-                std::string nextMountPath = Utils::dotEnvValue("MOUNT_DIR_ZIP_FILE");   // get where the next ZIP file will be mounted
-                Utils::mkpath(nextMountPath.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);    // make dir where the ZIP will be mounted
+    // if archiveMounted contains this path, we're sent a request to mount it already
+    bool requestedMountAlready = archiveMounted.find(outFullHostPath) != archiveMounted.end();
 
-                ldp_symlink(outFullHostPath, nextMountPath);            // create virtual symlink from archive path to next mount path
-                ldp_shortToLongPath(shortPath, outFullHostPath, true);  // now do the short path to long path translation again, which will apply the new symlink
+    if(requestedMountAlready) {
+        waitingForMount = !archiveMounted[outFullHostPath]; // if not mounted yet, then still waiting for mount
+        Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - already have requested mount of %s, waitingForMount: %s", outFullHostPath.c_str(), waitingForMount ? "true" : "false");
+        return;
+    }
 
-                // send command to mounter to mount this archive
-                std::string jsonString = "{\"cmd_name\": \"mount_zip\", \"path\": \"";
-                jsonString += pathToArchiveFile;                        // add path to archive file we should now mount
-                jsonString += "\"}";
-                Utils::sendToMounter(jsonString);                       // send to socket
-            } else {                    // got this symlink already
-                Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - already have symlink %s", outFullHostPath.c_str());
-            }
+    // if not requested mount of this archive yet, we need to mount this archive
+    Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - will now request mounting of %s archive", outFullHostPath.c_str());
+    std::string pathToArchiveFile = outFullHostPath;        // make a copy of this path to file, because below we will replace it with symlink path
+    archiveMounted[pathToArchiveFile] = false;              // this archive is not mounted yet
+
+    // send command to mounter to mount this archive
+    std::string jsonString = "{\"cmd_name\": \"mount_zip\", \"path\": \"";
+    jsonString += pathToArchiveFile;                        // add path to archive file we should now mount
+    jsonString += "\"}";
+    Utils::sendToMounter(jsonString);                       // send to socket
+}
+
+void TranslatedDisk::handleZipMounted(std::string& zip_path, std::string& mount_path)
+{
+    // Call this method when some (ZIP) archive with zip_path got mounted to mount_path.
+    // Empty mount_path means unmounted, non-empty mount_path means mounted.
+    ldp_symlink(zip_path, mount_path);  // add or remove symlink from zip_path (remove if mount_path is empty)
+
+    if(mount_path.empty()) {        // Empty mount_path means unmounted
+        if(archiveMounted.find(zip_path) != archiveMounted.end()) {     // we got this path in our map? erase it now
+            archiveMounted.erase(zip_path);
         }
+    } else {                        // non-empty mount_path means mounted
+        archiveMounted[zip_path] = true;        // we're mounted now
     }
 }
 

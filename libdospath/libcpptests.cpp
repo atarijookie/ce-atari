@@ -123,7 +123,7 @@ void TestClass::testFeedingShortener(void)
 void TestClass::testNamesCountLimiting(void)
 {
     printf("TEST: testNamesCountLimiting\n");
-    int foundCount, removed;
+    int removed;
 
     system("rm -rf   /tmp/a   /tmp/b   /tmp/c   /tmp/d   /tmp/e   /tmp/f");            // remove this test dir with all contents
     system("mkdir -p /tmp/a   /tmp/b   /tmp/c   /tmp/d   /tmp/e   /tmp/f");
@@ -168,7 +168,7 @@ void TestClass::testNamesCountLimiting(void)
     fs2->lastAccessTime = 3;
     fs3->lastAccessTime = 1;
 
-    FilenameShortener *fs4 = dt->getShortenerForPath("/tmp/d");     // now this will try to create new shortener and also do the clean up
+    dt->getShortenerForPath("/tmp/d");     // now this will try to create new shortener and also do the clean up
     fs3 = NULL;                     // don't use this pointer, this shortener was just removed!
 
     // now that the clean up happened, the shortener with lowest access time should be removed, the count should change from 93 - 31 + 1 = 63

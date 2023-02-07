@@ -20,7 +20,9 @@
 #include "utilslib.h"
 #include "libdospath.h"
 
-bool logsEnabled = false;
+int logLevelConsole = 0;   // disabled by default
+int logLevelFile = 0;      // disabled by default
+std::string logFilePath = "/tmp/libdospath.log";        // default log file
 
 uint32_t UtilsLib::getCurrentMs(void)
 {
@@ -230,16 +232,45 @@ bool UtilsLib::fileExists(std::string &hostPath)
 
 void UtilsLib::out(int logLevel, const char *format, ...)
 {
-    if(!logsEnabled) {
-        return;
-    }
-
     va_list args;
     va_start(args, format);
 
-    vprintf(format, args);
-    printf("\n");
+    // log to console
+    if(logLevel <= logLevelConsole) {   // log level equal or below allowed console value? log to console
+        vprintf(format, args);
+        printf("\n");
+    }
+
+    // log to file
+    if(logLevel <= logLevelFile) {      // log level equal or below allowed file value? log to file
+        logRotateIfNeeded();
+
+        FILE *f = fopen(logFilePath.c_str(), "a+t");        // try to open the file
+
+        if(f) {                         // file opened? write to file
+            vfprintf(f, format, args);
+            fprintf(f, "\n");
+            fclose(f);
+        } else {                        // failed to open the file? write to console
+            vprintf(format, args);
+            printf("\n");
+        }
+    }
+
     va_end(args);
+}
+
+void UtilsLib::logRotateIfNeeded(void)
+{
+    struct stat attr;
+    int res = stat(logFilePath.c_str(), &attr);                 // get file stat
+
+    if(res == 0 && (attr.st_size >= (1024*1024))) {             // file too big?
+        std::string logFilePathOld = logFilePath + ".1";        // construct old log filename
+        printf("will rotate log file: %s -> %s\n", logFilePath.c_str(), logFilePathOld.c_str());
+        unlink(logFilePathOld.c_str());                         // if some previous old file exist, remove it
+        rename(logFilePath.c_str(), logFilePathOld.c_str());            // rename current to old
+    }
 }
 
 void UtilsLib::toHostSeparators(std::string &path)

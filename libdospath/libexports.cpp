@@ -12,21 +12,34 @@
 #include "libcpptests.h"
 
 DirTranslator* dt = NULL;
-extern bool logsEnabled;
+extern int logLevelConsole;
+extern int logLevelFile;
+extern std::string logFilePath;
 extern int MAX_NAMES_IN_TRANSLATOR;
 
 /*
     Call this function to set other than default value to some lib param
 
     paramNo     meaning                         paramVal
-    0           log to console on/off           0/1
-    1           maximum names stored in ram     0-max_int_value
+    0           set log level to console        0-4, 0 means logs off, 4 means debug logs
+    1           set log level to file           0-4, 0 means logs off, 4 means debug logs
+    2           set log file path               pointer to file path
+    3           maximum names stored in ram     0-max_int_value
 */
-extern "C" void ldp_setParam(int paramNo, int paramVal)
+extern "C" void ldp_setParam(int paramNo, uint64_t paramVal)
 {
     switch(paramNo) {
-        case 0:     logsEnabled = paramVal;     break;
-        case 1:     MAX_NAMES_IN_TRANSLATOR = paramVal; break;
+        case 0:     logLevelConsole = (int) paramVal; break;
+        case 1:     logLevelFile = (int) paramVal; break;
+        case 2:     logFilePath = (char*) paramVal; break;
+        case 3:     MAX_NAMES_IN_TRANSLATOR = (int) paramVal; break;
+    }
+
+    // calling of ldp_setParam() will always output to console and file
+    if(paramNo == 2) {      // for cases when paramVal is a string
+        UtilsLib::out(-1, "ldp_setParam - paramNo: %d, paramVal: %s (0x%08x)", paramNo, (char*) paramVal, (int) paramVal);
+    } else {                // for cases when paramVal is an integer
+        UtilsLib::out(-1, "ldp_setParam - paramNo: %d, paramVal: %d", paramNo, (int) paramVal);
     }
 }
 
@@ -35,7 +48,7 @@ extern "C" void ldp_setParam(int paramNo, int paramVal)
     with short file name and the function will convert if to long file name, which
     then can be used by host OS file functions to access the file
 
-    :param shortPath: incomming short path
+    :param shortPath: incoming short path
     :param longPath: outgoing long path
 
     :param refreshOnMiss: If true, then dict-miss (cache-miss) of short filename will trigger refresh of that dir translator.

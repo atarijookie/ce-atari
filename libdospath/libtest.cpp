@@ -170,7 +170,7 @@ void testFindFirstAndNext(void)
 
 int main(int argc, char**argv)
 {
-    ldp_setParam(0, 1);     // enable logging
+    ldp_setParam(0, 4);     // enable console logging
 
     testShortToLongName();
 

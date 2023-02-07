@@ -6,6 +6,7 @@
 #include <string>
 #include <time.h>
 #include <vector>
+#include <map>
 #include <string>
 
 #include "../isettingsuser.h"
@@ -138,6 +139,7 @@ public:
 	}
 
     void fillDisplayLines(void);
+    void handleZipMounted(std::string& zip_path, std::string& mount_path);  // Call this method when some (ZIP) archive with zip_path got mounted to mount_path.
 
 private:
     AcsiDataTrans       *dataTrans;
@@ -267,8 +269,8 @@ private:
     static bool isOkToMountThisAsZipDir(const char *zipFilePath);
 
     void fillSupportedArchiveExtensionsIfNeeded(void);
-    std::vector<std::string> supportedArchiveExtensions;
-
+    std::vector<std::string> supportedArchiveExtensions;        // vector of strings holding supported archive extensions from MOUNT_ARCHIVES_SUPPORTED
+    std::map<std::string, bool> archiveMounted;                 // map of archive path to flag, so we can tell if this archive is already mounted
     //-----------------------------------
     // helpers for find storage
     void initFindStorages(void);

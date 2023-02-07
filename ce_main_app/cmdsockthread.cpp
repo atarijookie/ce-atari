@@ -407,7 +407,8 @@ void handleDisksAction(std::string& action, json& data)
                 Debug::out(LOG_WARNING, "handleDisksAction: zip_mounted - adding symlink %s -> %s", zip_path.c_str(), mount_path.c_str());
 
                 pthread_mutex_lock(&shared.mtxHdd);
-                ldp_symlink(zip_path, mount_path);             // create virtual symlink from archive path to next mount path
+                TranslatedDisk* translated = TranslatedDisk::getInstance();
+                translated->handleZipMounted(zip_path, mount_path);         // create virtual symlink from archive path to next mount path
                 pthread_mutex_unlock(&shared.mtxHdd);
             } else {                            // on fail
                 Debug::out(LOG_WARNING, "handleDisksAction: zip_mounted - success says FALSE, ignoring message!");
@@ -423,7 +424,8 @@ void handleDisksAction(std::string& action, json& data)
 
             pthread_mutex_lock(&shared.mtxHdd);
             std::string emptyStr;
-            ldp_symlink(zip_path, emptyStr);    // remove virtual symlink by setting destination to ''
+            TranslatedDisk* translated = TranslatedDisk::getInstance();
+            translated->handleZipMounted(zip_path, emptyStr);     // remove virtual symlink by setting destination to ''
             pthread_mutex_unlock(&shared.mtxHdd);
         } else {                                // on argument missing
             Debug::out(LOG_WARNING, "handleDisksAction: zip_unmounted - missing 'zip_path' in message, ignoring message!");

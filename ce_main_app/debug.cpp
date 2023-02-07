@@ -10,6 +10,7 @@
 #include "global.h"
 #include "debug.h"
 #include "utils.h"
+#include "../libdospath/libdospath.h"
 
 uint32_t prevLogOut;
 
@@ -176,6 +177,7 @@ void Debug::setLogLevel(int newLogLevel)
 
     Debug::out(LOG_INFO, "Switching LOG LEVEL from %d to %d", flags.logLevel, newLogLevel);
     flags.logLevel = newLogLevel;                               // new value to struct
+    ldp_setParam(1, (uint64_t) flags.logLevel);                 // libDOSpath - set new log level to file
 
     Utils::intToFileFromEnv(newLogLevel, "CORE_LOGLEVEL_FILE");        // new value to file
 }

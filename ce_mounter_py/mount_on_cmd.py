@@ -73,9 +73,8 @@ def mount_zip_file(msg):
 
     app_log.info(f'mount_zip_file: is some ZIP already mounted? {mounted}, source: {zip_path_old}')
 
-    if zip_path_new == zip_path_old:        # zip file not changed? ignore rest
-        app_log.info(f'mount_zip_file: this ZIP file: {zip_path_old} is already mounted, not remounting')
-        return
+    # do the re-mount even if the ZIP file didn't change - this might be after mounter or core restart,
+    # we need to do this
 
     if not is_supported_archive(zip_path_new):  # this is not a supported archive? fail
         app_log.warning(f'mount_zip_file: this file: {zip_path_new} doesn\'t have supported file extension')

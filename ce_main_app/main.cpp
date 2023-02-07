@@ -25,6 +25,7 @@
 #include "chipinterface_v1_v2/chipinterface12.h"
 #include "chipinterface_network/chipinterfacenetwork.h"
 #include "chipinterface_dummy/chipinterfacedummy.h"
+#include "../libdospath/libdospath.h"
 
 volatile sig_atomic_t sigintReceived = 0;
 void sigint_handler(int sig);
@@ -69,6 +70,12 @@ int main(int argc, char *argv[])
 
     Utils::loadDotEnv();                                        // load dotEnv before setting default log file
     Debug::setDefaultLogFileFromEnvValue();                     // set log after .env is loaded
+
+    ldp_setParam(1, (uint64_t) flags.logLevel);                         // libDOSpath - set log level to file
+    std::string logDir = Utils::dotEnvValue("LOG_DIR", "/var/log/ce");  // path to logs dir
+    Utils::mergeHostPaths(logDir, "libdospath.log");                    // full path = logs dir + filename
+    ldp_setParam(2, (uint64_t) logDir.c_str());                         // libDOSpath - set log file path
+    Debug::out(LOG_ERROR, "setting libdospath log file to: %s and log level to: %d", logDir.c_str(), flags.logLevel);
 
     Utils::screenShotVblEnabled(false);                         // screenshot vbl not enabled by default
     preloadGlobalsFromDotEnv();

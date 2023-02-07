@@ -43,6 +43,7 @@ public:
     static bool fileExists(std::string &hostPath);
 
     static void out(int logLevel, const char *format, ...);
+    static void logRotateIfNeeded(void);
 };
 
 #endif

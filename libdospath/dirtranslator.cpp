@@ -60,7 +60,7 @@ void DirTranslator::updateFileName(const std::string& hostPath, const std::strin
     }
 }
 
-void DirTranslator::shortToLongPath(const std::string& shortPath, std::string& longPath, bool refreshOnMiss)
+void DirTranslator::shortToLongPath(const std::string& shortPath, std::string& longPath, bool refreshOnMiss, int recursionLevel)
 {
     std::string inPath = shortPath;
     UtilsLib::toHostSeparators(inPath);                    // from dos/atari separators to host separators only
@@ -98,8 +98,20 @@ void DirTranslator::shortToLongPath(const std::string& shortPath, std::string& l
         }
     }
 
-    UtilsLib::joinStrings(longPathParts, longPath);         // join all output parts to one long path
-    applySymlinkIfPossible(longPath);                       // apply symlink if possible
+    UtilsLib::joinStrings(longPathParts, longPath);                 // join all output parts to one long path
+    bool symlinkWasApplied = applySymlinkIfPossible(longPath);      // apply symlink if possible
+
+    // if we applied symlink, we might need to do the short-to-long translation again, as parts of path after symlink
+    // need additional resolving. But only if recursionLevel is small, otherwise we could be stuck in some endless recursion.
+    if(symlinkWasApplied && recursionLevel < 3) {
+        UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::shortToLongPath - additional short-to-long path after symlink applied is needed for: %s", longPath.c_str());
+
+        std::string longPath2;
+        shortToLongPath(longPath, longPath2, refreshOnMiss, recursionLevel + 1);
+        longPath = longPath2;       // copy the new long path to the expected place
+
+        UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::shortToLongPath - additional short-to-long path after symlink applied resulted in: %s", longPath.c_str());
+    }
 }
 
 bool DirTranslator::longToShortFilename(const std::string &longHostPath, const std::string &longFname, std::string &shortFname)
@@ -292,8 +304,8 @@ int DirTranslator::cleanUpShortenersIfNeeded(void)
     int newSize = currentSize;                      // start with current size
     uint32_t timeBoundary = 0;                      // we will try to find this time boundary
 
-    for(int i=0; i<accessVsSize.size(); i++) {     // go through the vector
-        newSize -= accessVsSize[i].second;         // subtract the size of this file shortener
+    for(size_t i=0; i<accessVsSize.size(); i++) {   // go through the vector
+        newSize -= accessVsSize[i].second;          // subtract the size of this file shortener
 
         if(newSize < MAX_NAMES_IN_TRANSLATOR) {     // if the new size is less allowed maximum, the last access time of this shortener will be our time boundary
             timeBoundary = accessVsSize[i].first;   // use lastAccessTime if this file shortener
@@ -553,7 +565,7 @@ void DirTranslator::symlink(const std::string& longPathSource, const std::string
     }
 }
 
-void DirTranslator::applySymlinkIfPossible(std::string& inLongPath)
+bool DirTranslator::applySymlinkIfPossible(std::string& inLongPath)
 {
     bool foundMatch = false;
     std::string src, dest;
@@ -605,6 +617,8 @@ void DirTranslator::applySymlinkIfPossible(std::string& inLongPath)
         UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::applySymlinkIfPossible - %s -> %s", inLongPath.c_str(), dest.c_str());
         inLongPath = dest;                              // copy new path to inLongPath
     }
+
+    return foundMatch;      // returns true if symlink was applied
 }
 
 // returns true if symlink for the source is present
