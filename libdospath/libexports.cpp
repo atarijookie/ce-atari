@@ -57,13 +57,13 @@ extern "C" void ldp_setParam(int paramNo, uint64_t paramVal)
                           If false, then dict-miss (cache-miss) of short filename will not try to do refresh of dir translator.
                           (use false if filename probably doesn't exist - e.g. on fcreate(), mkdir())
 */
-extern "C" void ldp_shortToLongPath(const std::string &shortPath, std::string &longPath, bool refreshOnMiss)
+extern "C" void ldp_shortToLongPath(const std::string &shortPath, std::string &longPath, bool refreshOnMiss, std::vector<std::string>* pSymlinksApplied)
 {
     if(!dt) {
         dt = new DirTranslator();
     }
 
-    dt->shortToLongPath(shortPath, longPath, refreshOnMiss);
+    dt->shortToLongPath(shortPath, longPath, refreshOnMiss, pSymlinksApplied, 0);
 }
 
 /*

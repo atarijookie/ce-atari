@@ -127,8 +127,8 @@ public:
 
     static void pathSeparatorAtariToHost(std::string &path);
 
-    bool createFullAtariPathAndFullHostPath(const std::string &inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount);
-    void createFullHostPath (const std::string &inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount);
+    bool createFullAtariPathAndFullHostPath(const std::string &inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, bool* isInArchive=NULL);
+    void createFullHostPath(const std::string &inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, bool* isInArchive=NULL);
 
     // for status report
     bool driveIsEnabled(int driveIndex);
@@ -193,8 +193,8 @@ private:
 //  void onFgetdta(uint8_t *cmd);                    // this function needs to be handled on ST only
     void onFsfirst(uint8_t *cmd);
     void onFsnext(uint8_t *cmd);
-    bool buildGemdosFindstorageData(TFindStorage& fs, const std::string& hostSearchString, uint8_t findAttribs, bool isRootDir);    // helper function, not called from ST directly
-    void diskItemToAtariFindStorageItem(DiskItem& di, uint8_t* buf);
+    bool buildGemdosFindstorageData(TFindStorage& fs, const std::string& hostSearchString, uint8_t findAttribs, bool isRootDir, bool isInArchive);    // helper function, not called from ST directly
+    void diskItemToAtariFindStorageItem(DiskItem& di, uint8_t* buf, bool isInArchive);
 
     // file and directory manipulation
     void onDfree(uint8_t *cmd);
@@ -261,7 +261,9 @@ private:
     int  driveLetterToDriveIndex(char pathDriveLetter);
 
     bool createFullAtariPath(std::string inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex);
-
+    void checkPathForArchiveAndRequestMountIfNeeded(const std::string& outFullHostPath, bool &waitingForMount, std::vector<std::string>* pSymlinksApplied, bool* isInArchive);
+    void isArchiveInThisPath(const std::string& outFullHostPath, bool& pathHasArchive, std::string& zipFilePath);
+    void getWaitingForMountAndRequestMountIfNeeded(const std::string& zipFilePath, bool& waitingForMount);
     //-----------------------------------
     // ZIP DIR stuff
     bool useZipdirNotFile;

@@ -727,12 +727,12 @@ void Utils::createPathWithOtherExtension(std::string &inPathWithOriginalExt, con
     outPathWithOtherExtension = outPathWithOtherExtension + std::string(otherExtension);    // append other extension
 }
 
-bool Utils::fileExists(std::string &path)
+bool Utils::fileExists(const std::string& path)
 {
     return Utils::fileExists(path.c_str());
 }
 
-bool Utils::fileExists(const char *path)
+bool Utils::fileExists(const char* path)
 {
     struct stat sb;
 

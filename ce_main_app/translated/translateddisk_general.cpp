@@ -604,7 +604,8 @@ bool TranslatedDisk::hostPathExists_caseInsensitive(std::string hostPath, std::s
     return res;
 }
 
-bool TranslatedDisk::createFullAtariPathAndFullHostPath(const std::string &inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount)
+bool TranslatedDisk::createFullAtariPathAndFullHostPath(const std::string &inPartialAtariPath, std::string &outFullAtariPath,
+    int &outAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, bool* isInArchive)
 {
     bool res;
 
@@ -622,7 +623,7 @@ bool TranslatedDisk::createFullAtariPathAndFullHostPath(const std::string &inPar
     }
 
     // got full atari path, now try to create full host path
-    createFullHostPath(outFullAtariPath, outAtariDriveIndex, outFullHostPath, waitingForMount);
+    createFullHostPath(outFullAtariPath, outAtariDriveIndex, outFullHostPath, waitingForMount, isInArchive);
     return true;
 }
 
@@ -716,7 +717,8 @@ bool TranslatedDisk::hasArchiveExtension(const std::string& longPath)
     return false;               // supported archive not found
 }
 
-void TranslatedDisk::createFullHostPath(const std::string &inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount)
+void TranslatedDisk::createFullHostPath(const std::string &inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath,
+    bool &waitingForMount, bool* isInArchive)
 {
     /*
     This method will take in short (Atari) path, will convert it to host path (where the Atari path is mapped), then will use the
@@ -727,45 +729,128 @@ void TranslatedDisk::createFullHostPath(const std::string &inFullAtariPath, int 
     The mounter component will tell us later when the mount finishes and we will then flip the flag in archiveMounted from false to true.
     */
 
+    // If pointer to isInArchive is provided, set default value to false.
+    // Set to true when checkPathForArchiveAndRequestMountIfNeeded() just found out that this is an archive
+    if(isInArchive) {
+        *isInArchive = false;
+    }
+
     waitingForMount = false;    // start by assuming that we're not waiting for a mount
 
     std::string root = conf[inAtariDriveIndex].hostRootPath;    // get root path
 
+    std::vector<std::string> symlinksApplied;       // this will be non-empty if ldp_shortToLongPath() will apply symlink to path
     std::string shortPath = root;
-    Utils::mergeHostPaths(shortPath, inFullAtariPath);          // short path = root + full atari path
-    ldp_shortToLongPath(shortPath, outFullHostPath, true);      // short path to long path
+    Utils::mergeHostPaths(shortPath, inFullAtariPath);                      // short path = root + full atari path
+    ldp_shortToLongPath(shortPath, outFullHostPath, true, &symlinksApplied); // short path to long path
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - shortPath: %s -> outFullHostPath: %s", shortPath.c_str(), outFullHostPath.c_str());
-
-    if(!useZipdirNotFile) {     // mounting of archives not enabled? quit now
-        return;
+    if(isInArchive) {           // if pointer to isInArchive is provided, store in it if symlink was applied
+        *isInArchive = symlinksApplied.size() > 0;
     }
 
-    bool isArchive = hasArchiveExtension(outFullHostPath);      // is this an archive in this long path?
+    Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - shortPath: %s -> outFullHostPath: %s , applied symlinks count: %d", shortPath.c_str(), outFullHostPath.c_str(), symlinksApplied.size());
 
-    if(!isArchive) {            // not an archive, quit now
-        return;
+    if(useZipdirNotFile) {     // mounting of archives enabled? check if this is in archive and waiting for mount
+        checkPathForArchiveAndRequestMountIfNeeded(outFullHostPath, waitingForMount, &symlinksApplied, isInArchive);
+    } else {                    // mounting of archives not enabled
+        Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - useZipdirNotFile: %d so skipping rest of check", (int) useZipdirNotFile);
     }
+}
+
+void TranslatedDisk::isArchiveInThisPath(const std::string& outFullHostPath, bool& pathHasArchive, std::string& zipFilePath)
+{
+    // This function might be called with a filename directly - /var/run/ce/trans/N/ce_update.zip
+    // or it might be called with a search string appended    - /var/run/ce/trans/N/ce_update.zip/*.*
+
+    pathHasArchive = false;
+
+    std::string justPath, justFilename;
+    Utils::splitFilenameFromPath(outFullHostPath, justPath, justFilename);
+
+    if(Utils::fileExists(outFullHostPath) && hasArchiveExtension(outFullHostPath)) {    // if file with full path exists and has archive extension
+        pathHasArchive = true;
+        zipFilePath = outFullHostPath;
+        Debug::out(LOG_DEBUG, "TranslatedDisk::isArchiveInThisPath - archive was found in FULL path: %s", zipFilePath.c_str());
+    }
+
+    if(Utils::fileExists(justPath) && hasArchiveExtension(justPath)) {  // if file with part of the path exists and has archive extension
+        pathHasArchive = true;
+        zipFilePath = justPath;
+        Debug::out(LOG_DEBUG, "TranslatedDisk::isArchiveInThisPath - archive was found in PART of path: %s", zipFilePath.c_str());
+    }
+
+    Debug::out(LOG_DEBUG, "TranslatedDisk::isArchiveInThisPath - outFullHostPath: %s - pathHasArchive: %d", outFullHostPath.c_str(), (int) pathHasArchive);
+}
+
+void TranslatedDisk::checkPathForArchiveAndRequestMountIfNeeded(const std::string& outFullHostPath, bool &waitingForMount, std::vector<std::string>* pSymlinksApplied, bool* isInArchive)
+{
+    // This function might be called with a filename directly - /var/run/ce/trans/N/ce_update.zip
+    // or it might be called with a search string appended    - /var/run/ce/trans/N/ce_update.zip/*.*
+
+    waitingForMount = false;
+
+    std::string zipFilePath;
+    bool pathHasArchive = false;
+
+    bool symlinksWereApplied = pSymlinksApplied->size() > 0;       // check if some symlinks were applied to path, it's an archive if they were applied to path
+    if(symlinksWereApplied) {       // if symlinks were applied, we have to check all the symlinks for mount
+        Debug::out(LOG_DEBUG, "TranslatedDisk::checkPathForArchiveAndRequestMountIfNeeded - symlinks were applied, checking them individually");
+
+        if(isInArchive) {           // if pointer to isInArchive is provided, set to true - we're in archive
+            *isInArchive = true;
+        }
+
+        // go through all the applied symlinks and check if some of them is still mounting
+        for (auto it = begin(*pSymlinksApplied); it != end(*pSymlinksApplied); ++it) {
+            bool waitingForMountOne;
+            getWaitingForMountAndRequestMountIfNeeded(*it, waitingForMountOne);     // check this symlink
+            waitingForMount = waitingForMount || waitingForMountOne;     // if at least one symlink is waiting for mount, we're all waiting for mount
+        }
+    } else {                        // if no symlinks were applied, just check this path for archive in it
+        Debug::out(LOG_DEBUG, "TranslatedDisk::checkPathForArchiveAndRequestMountIfNeeded - symlinks were not applied, checking just path for archive ext");
+
+        isArchiveInThisPath(outFullHostPath, pathHasArchive, zipFilePath);
+
+        if(pathHasArchive) {        // this path has archive in it
+            if(isInArchive) {       // if pointer to isInArchive is provided, set to true - we're in archive
+                *isInArchive = true;
+            }
+
+            getWaitingForMountAndRequestMountIfNeeded(zipFilePath, waitingForMount);    // check if we're waiting for mount
+        }
+    }
+
+    Debug::out(LOG_DEBUG, "TranslatedDisk::checkPathForArchiveAndRequestMountIfNeeded - outFullHostPath: %s - waitingForMount: %d", outFullHostPath.c_str(), (int) waitingForMount);
+}
+
+void TranslatedDisk::getWaitingForMountAndRequestMountIfNeeded(const std::string& zipFilePath, bool& waitingForMount)
+{
+    waitingForMount = false;
 
     // if archiveMounted contains this path, we're sent a request to mount it already
-    bool requestedMountAlready = archiveMounted.find(outFullHostPath) != archiveMounted.end();
+    bool requestedMountAlready = archiveMounted.find(zipFilePath) != archiveMounted.end();
 
-    if(requestedMountAlready) {
-        waitingForMount = !archiveMounted[outFullHostPath]; // if not mounted yet, then still waiting for mount
-        Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - already have requested mount of %s, waitingForMount: %s", outFullHostPath.c_str(), waitingForMount ? "true" : "false");
+    if(requestedMountAlready) {             // if we already asked for mounting this archive
+        waitingForMount = !archiveMounted[zipFilePath];     // if not mounted yet, then still waiting for mount
+        Debug::out(LOG_DEBUG, "TranslatedDisk::getWaitingForMountAndRequestMountIfNeeded - already have requested mount of %s, waitingForMount: %s", zipFilePath.c_str(), waitingForMount ? "true" : "false");
+        return;
+    }
+
+    if(!Utils::fileExists(zipFilePath)) {   // check if this file really exists
+        Debug::out(LOG_WARNING, "TranslatedDisk::getWaitingForMountAndRequestMountIfNeeded - archive: %s does not exist, not trying to mount!", zipFilePath.c_str());
         return;
     }
 
     // if not requested mount of this archive yet, we need to mount this archive
-    Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - will now request mounting of %s archive", outFullHostPath.c_str());
-    std::string pathToArchiveFile = outFullHostPath;        // make a copy of this path to file, because below we will replace it with symlink path
-    archiveMounted[pathToArchiveFile] = false;              // this archive is not mounted yet
+    Debug::out(LOG_DEBUG, "TranslatedDisk::getWaitingForMountAndRequestMountIfNeeded - will now request mounting of %s archive", zipFilePath.c_str());
+    archiveMounted[zipFilePath] = false;            // this archive is not mounted yet
+    waitingForMount = true;                         // we're definitelly waiting for mount now
 
     // send command to mounter to mount this archive
     std::string jsonString = "{\"cmd_name\": \"mount_zip\", \"path\": \"";
-    jsonString += pathToArchiveFile;                        // add path to archive file we should now mount
+    jsonString += zipFilePath;                      // add path to archive file we should now mount
     jsonString += "\"}";
-    Utils::sendToMounter(jsonString);                       // send to socket
+    Utils::sendToMounter(jsonString);               // send to socket
 }
 
 void TranslatedDisk::handleZipMounted(std::string& zip_path, std::string& mount_path)

@@ -185,7 +185,7 @@ void TranslatedDisk::onDgetpath(uint8_t *cmd)
     dataTrans->setStatus(E_OK);
 }
 
-bool TranslatedDisk::buildGemdosFindstorageData(TFindStorage& fs, const std::string& hostSearchString, uint8_t findAttribs, bool isRootDir)
+bool TranslatedDisk::buildGemdosFindstorageData(TFindStorage& fs, const std::string& hostSearchString, uint8_t findAttribs, bool isRootDir, bool isInArchive)
 {
     fs.clear();                     // clear find storage
 
@@ -202,7 +202,7 @@ bool TranslatedDisk::buildGemdosFindstorageData(TFindStorage& fs, const std::str
     uint8_t* bfr = fs.buffer;
     while(ldp_findFirstAndNext(sp, di)) {   // try to find item
         if(fs.count < fs.maxCount) {        // if still can fit in the buffer
-            diskItemToAtariFindStorageItem(di, bfr);    // disk item to this buffer position
+            diskItemToAtariFindStorageItem(di, bfr, isInArchive);   // disk item to this buffer position
             bfr += 23;                      // pointer in buffer to next item
             fs.count++;                     // count increment
         }
@@ -211,12 +211,12 @@ bool TranslatedDisk::buildGemdosFindstorageData(TFindStorage& fs, const std::str
     return true;    // when should we return false? even empty dir might be a valid result
 }
 
-void TranslatedDisk::diskItemToAtariFindStorageItem(DiskItem& di, uint8_t* buf)
+void TranslatedDisk::diskItemToAtariFindStorageItem(DiskItem& di, uint8_t* buf, bool isInArchive)
 {
     uint16_t atariTime = Utils::fileTimeToAtariTime(&di.datetime);
     uint16_t atariDate = Utils::fileTimeToAtariDate(&di.datetime);
 
-    if(useZipdirNotFile) {          // if ZIP DIRs are enabled
+    if(useZipdirNotFile && !isInArchive) {              // if ZIP DIRs are enabled and we're not already in an archive (== don't allow nested opening on archives)
         bool isArchive = hasArchiveExtension(di.name);  // check if this has archive extension (e.g. .zip)
 
         if(isArchive) {             // if this is a supported archive, turn file into directory by adding FA_DIR
@@ -280,10 +280,10 @@ void TranslatedDisk::onFsfirst(uint8_t *cmd)
         Debug::out(LOG_DEBUG, "find attribs: 0x%02x -> %s", findAttribs, atts.c_str());
     }
 
-    bool        waitingForMount;
-    int         atariDriveIndex;
+    bool waitingForMount, isInArchive;
+    int  atariDriveIndex;
     std::string fullAtariPath;
-    res = createFullAtariPathAndFullHostPath(atariSearchString, fullAtariPath, atariDriveIndex, hostSearchString, waitingForMount);
+    res = createFullAtariPathAndFullHostPath(atariSearchString, fullAtariPath, atariDriveIndex, hostSearchString, waitingForMount, &isInArchive);
 
     if(!res) {                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - atari search string: %s -- failed to create host path", atariSearchString.c_str());
@@ -310,7 +310,7 @@ void TranslatedDisk::onFsfirst(uint8_t *cmd)
     bool rootDir = isRootDir(justPath);
 
     //now use the dir translator to get the dir content
-    res = buildGemdosFindstorageData(tempFindStorage, hostSearchString, findAttribs, rootDir);
+    res = buildGemdosFindstorageData(tempFindStorage, hostSearchString, findAttribs, rootDir, isInArchive);
 
     if(!res) {
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - host search string: %s -- failed to build gemdos find storage data", hostSearchString.c_str());

@@ -60,8 +60,12 @@ void DirTranslator::updateFileName(const std::string& hostPath, const std::strin
     }
 }
 
-void DirTranslator::shortToLongPath(const std::string& shortPath, std::string& longPath, bool refreshOnMiss, int recursionLevel)
+void DirTranslator::shortToLongPath(const std::string& shortPath, std::string& longPath, bool refreshOnMiss, std::vector<std::string>* pSymlinksApplied, int recursionLevel)
 {
+    if(pSymlinksApplied && recursionLevel == 0) {           // clear the vector of applied symlinks on 0th level of recursion
+        pSymlinksApplied->clear();
+    }
+
     std::string inPath = shortPath;
     UtilsLib::toHostSeparators(inPath);                    // from dos/atari separators to host separators only
 
@@ -99,7 +103,7 @@ void DirTranslator::shortToLongPath(const std::string& shortPath, std::string& l
     }
 
     UtilsLib::joinStrings(longPathParts, longPath);                 // join all output parts to one long path
-    bool symlinkWasApplied = applySymlinkIfPossible(longPath);      // apply symlink if possible
+    bool symlinkWasApplied = applySymlinkIfPossible(longPath, pSymlinksApplied);        // apply symlink if possible
 
     // if we applied symlink, we might need to do the short-to-long translation again, as parts of path after symlink
     // need additional resolving. But only if recursionLevel is small, otherwise we could be stuck in some endless recursion.
@@ -107,7 +111,7 @@ void DirTranslator::shortToLongPath(const std::string& shortPath, std::string& l
         UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::shortToLongPath - additional short-to-long path after symlink applied is needed for: %s", longPath.c_str());
 
         std::string longPath2;
-        shortToLongPath(longPath, longPath2, refreshOnMiss, recursionLevel + 1);
+        shortToLongPath(longPath, longPath2, refreshOnMiss, pSymlinksApplied, recursionLevel + 1);
         longPath = longPath2;       // copy the new long path to the expected place
 
         UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::shortToLongPath - additional short-to-long path after symlink applied resulted in: %s", longPath.c_str());
@@ -565,7 +569,7 @@ void DirTranslator::symlink(const std::string& longPathSource, const std::string
     }
 }
 
-bool DirTranslator::applySymlinkIfPossible(std::string& inLongPath)
+bool DirTranslator::applySymlinkIfPossible(std::string& inLongPath, std::vector<std::string>* pSymlinksApplied)
 {
     bool foundMatch = false;
     std::string src, dest;
@@ -612,6 +616,10 @@ bool DirTranslator::applySymlinkIfPossible(std::string& inLongPath)
 
     // if an exact match was found, replace source in inLongPath with destination
     if(foundMatch) {
+        if(pSymlinksApplied) {                  // got pointer to applied symlinks vector?
+            pSymlinksApplied->push_back(src);   // add this symlink source to vector
+        }
+
         std::string rest = inLongPath.substr(src.length());     // remove the source length from inLongPath, keep just rest
         UtilsLib::mergeHostPaths(dest, rest);           // merge destination + rest, result will be stored in dest
         UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::applySymlinkIfPossible - %s -> %s", inLongPath.c_str(), dest.c_str());

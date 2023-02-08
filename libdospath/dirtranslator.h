@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <map>
+#include <vector>
 
 #include <stdint.h>
 #include "libdospath.h"
@@ -28,7 +29,7 @@ public:
     void clear(void);
 
     // convert whole path from short to long - e.g. convert 'long_p~1\\sub_fo~1\\anothe~1' to 'long path/sub folder/another one'
-    void shortToLongPath(const std::string& shortPath, std::string& longPath, bool refreshOnMiss, int recursionLevel=0);
+    void shortToLongPath(const std::string& shortPath, std::string& longPath, bool refreshOnMiss, std::vector<std::string>* pSymlinksApplied=NULL, int recursionLevel=0);
 
     // call this for find first / find next on host file system with filename shortening already in place
     bool findFirstAndNext(SearchParams& sp, DiskItem& di);
@@ -65,7 +66,7 @@ private:
     static void closeDirSetFlags(SearchParams& sp);
     static void toUpperCaseString(std::string &st);
 
-    bool applySymlinkIfPossible(std::string& inLongPath);
+    bool applySymlinkIfPossible(std::string& inLongPath, std::vector<std::string>* pSymlinksApplied);
 };
 
 #endif // DIRTRANSLATOR_H

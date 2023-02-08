@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <string>
+#include <vector>
 #include <inttypes.h>
 #include <dirent.h>
 
@@ -63,7 +64,7 @@ typedef struct {
 
 extern "C" {
     void ldp_setParam(int paramNo, uint64_t paramVal);
-    void ldp_shortToLongPath(const std::string& shortPath, std::string& longPath, bool refreshOnMiss);
+    void ldp_shortToLongPath(const std::string& shortPath, std::string& longPath, bool refreshOnMiss, std::vector<std::string>* pSymlinksApplied=NULL);
     void ldp_updateFileName(const std::string& hostPath, const std::string& oldFileName, const std::string& newFileName);
     bool ldp_findFirstAndNext(SearchParams& sp, DiskItem& di);
     void ldp_symlink(const std::string& longPathSource, const std::string& longPathDest);
