@@ -1108,14 +1108,19 @@ void Utils::createFloppyTestImage(void)
     fclose(f);
 }
 
-bool Utils::endsWith(std::string const& value, const char* ending)
+bool Utils::startsWith(const std::string& value, const char* head)
 {
-    size_t lenEnding = strlen(ending);
+    return (value.find(head) == 0);       // value starts with start when it's found at index 0
+}
 
-    if (lenEnding > value.size()) {     // ending longer than value? surely doesn't end with ending
+bool Utils::endsWith(const std::string& value, const char* tail)
+{
+    size_t lenTail = strlen(tail);
+
+    if (lenTail > value.size()) {     // ending longer than value? surely doesn't end with ending
         return false;
     }
 
     // compare this value at its end with the ending
-    return (value.compare(value.size() - lenEnding, lenEnding, ending) == 0);
+    return (value.compare(value.size() - lenTail, lenTail, tail) == 0);
 }

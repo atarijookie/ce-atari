@@ -170,14 +170,10 @@ private:
     uint16_t getDrivesBitmap(void);
     static void removeDoubleDots(std::string &path);
     static void pathSeparatorHostToAtari(std::string &path);
-    static bool isLetter(char a);
     static char toUpperCase(char a);
     static bool isValidDriveLetter(char a);
     static bool pathContainsWildCards(const char *path);
     static int  deleteDirectoryPlain(const char *path);
-
-    static bool startsWith(std::string what, std::string subStr);
-    static bool endsWith(std::string what, std::string subStr);
 
     void onGetConfig(uint8_t *cmd);
     void getIpAdds(uint8_t *bfr);
@@ -268,7 +264,6 @@ private:
     // ZIP DIR stuff
     bool useZipdirNotFile;
     bool hasArchiveExtension(const std::string& longPath);
-    static bool isOkToMountThisAsZipDir(const char *zipFilePath);
 
     void fillSupportedArchiveExtensionsIfNeeded(void);
     std::vector<std::string> supportedArchiveExtensions;        // vector of strings holding supported archive extensions from MOUNT_ARCHIVES_SUPPORTED
