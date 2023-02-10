@@ -12,6 +12,7 @@ from screen_floppy import floppy_create
 from screen_network import network_create
 from screen_ikbd import ikbd_create
 from screen_update import update_create
+from screen_other import other_create
 import shared
 from utils import delete_update_files, log_config, other_instance_running, load_dotenv_config
 
@@ -40,6 +41,7 @@ def create_main_menu():
                   ('Floppy config', floppy_create),
                   ('Network settings', network_create),
                   ('IKBD', ikbd_create),
+                  ('Other', other_create),
                   ('Update software', update_create)]
 
     if False:       # if should show license menu

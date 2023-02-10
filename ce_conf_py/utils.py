@@ -14,7 +14,10 @@ settings_default = {'DRIVELETTER_FIRST': 'C', 'DRIVELETTER_CONFDRIVE': 'O', 'DRI
                     'FLOPPYCONF_DRIVEID': 0, 'FLOPPYCONF_WRITEPROTECTED': 0, 'FLOPPYCONF_SOUND_ENABLED': 1,
                     'ACSI_DEVTYPE_0': 0, 'ACSI_DEVTYPE_1': 1, 'ACSI_DEVTYPE_2': 0, 'ACSI_DEVTYPE_3': 0,
                     'ACSI_DEVTYPE_4': 0, 'ACSI_DEVTYPE_5': 0, 'ACSI_DEVTYPE_6': 0, 'ACSI_DEVTYPE_7': 0,
-                    'KEYBOARD_KEYS_JOY0': 'A%S%D%W%LSHIFT', 'KEYBOARD_KEYS_JOY1': 'LEFT%DOWN%RIGHT%UP%RSHIFT'}
+                    'KEYBOARD_KEYS_JOY0': 'A%S%D%W%LSHIFT', 'KEYBOARD_KEYS_JOY1': 'LEFT%DOWN%RIGHT%UP%RSHIFT',
+                    'TIME_SET': 1, 'TIME_UTC_OFFSET': 0, 'TIME_NTP_SERVER': '200.20.186.76',
+                    'SCREENCAST_FRAMESKIP': 20, 'SCREEN_RESOLUTION': 1
+                    }
 
 
 def load_dotenv_config():
@@ -44,7 +47,7 @@ def load_dotenv_config():
 def setting_get_str(setting_name):
     value_raw = setting_get_merged(setting_name)        # get value from settings
 
-    if not value_raw:       # if it's None, replace with empty string
+    if value_raw is None:   # if it's None, replace with empty string
         return ''
 
     return value_raw        # not None, return as is

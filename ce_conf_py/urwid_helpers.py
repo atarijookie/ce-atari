@@ -1,5 +1,6 @@
 import urwid
 import shared
+from loguru import logger as app_log
 
 
 class ButtonLabel(urwid.SelectableIcon):
@@ -125,6 +126,11 @@ def create_edit(setting_name, width, on_edit_changed, mask=None):
         text = setting_get_str(setting_name)
     else:                   # no setting name? just empty string
         text = ''
+
+    if not isinstance(text, str):       # convert to text if not a text already
+        text = str(text)
+
+    app_log.debug(f"create_edit - setting_name: {setting_name}, text: {text}")
 
     edit_line = urwid.Edit(caption='', edit_text=text, mask=mask)
     urwid.connect_signal(edit_line, 'change', on_edit_changed, {'id': setting_name})
