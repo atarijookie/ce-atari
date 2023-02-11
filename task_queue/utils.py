@@ -1,10 +1,12 @@
 import os
+import re
 import json
 import socket
 from loguru import logger as app_log
 import logging
 from dotenv import load_dotenv
 import psutil
+import subprocess
 
 
 def load_dotenv_config():
@@ -113,7 +115,7 @@ def send_to_taskq(item):
 def log_config():
     log_dir = os.getenv('LOG_DIR')
     os.makedirs(log_dir, exist_ok=True)
-    log_file = os.path.join(log_dir, 'ce_taskq.log')
+    log_file = os.path.join(log_dir, 'taskq.log')
 
     app_log.add(log_file, rotation="1 MB", retention=1)
 
@@ -189,3 +191,61 @@ def unlink_without_fail(path):
         app.logger.warning(f'failed to unlink {path} - exception: {str(ex)}')
 
     return False
+
+
+def setting_load_one(setting_name, default_value=None):
+    settings_path = os.getenv('SETTINGS_DIR')           # path to settings dir
+    path = os.path.join(settings_path, setting_name)    # create full path
+
+    if not os.path.isfile(path):  # if it's not a file, skip it
+        return default_value
+
+    try:
+        with open(path, "r") as file:  # read the file into value in dictionary
+            value = file.readline()
+            value = re.sub('[\n\r\t]', '', value)
+            return value
+    except Exception as ex:
+        app_log.debug(f"setting_load_one: failed to load {setting_name} - exception: {str(ex)}")
+
+    return default_value
+
+
+def system_custom(command_str, to_log=True, shell=False):
+    """ This is a replacement for os.system() from which it's harder to get the output
+        and also for direct calling of subprocess.run(), where you should pass in list instead of string.
+
+        @param command_str: command with arguments as string
+        @param to_log: if true, log the output of the command
+        @param shell: if true, subprocess.run() runs the command with shell binary (== heavier than shel=False)
+    """
+
+    # subprocess.run() can accept command with arguments as:
+    # string - if shell=True
+    # list - if shell=False
+    # The problem is that when you run it with shell=True, it doesn't lunch the executable directly, but it first
+    # starts the shell binary and then the executable, so whenever we can, we should run it without shell, thus
+    # with list of arguments instead of strings. But writing the command as list of strings instead of single string
+    # is annoying, so instead this function takes in a string and splits it to list of strings.
+    # But this fails in some cases, e.g. when supplying "" as empty ip address to nmcli, so for that case we allow
+    # to run that command with shell=True.
+
+    if '"' in command_str and not shell:    # add this warning for future developers
+        app_log.warning('Hey! Your command string has " character in it, if the command is failing, call system_custom() with shell=True')
+
+    if shell:       # run with shell - heavier, but sometimes necessary to make it work
+        result = subprocess.run(command_str, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    else:           # run without shell - lighter, but fails sometimes
+        command_list = command_str.split(' ')  # split command from string to list
+        result = subprocess.run(command_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE)   # run the command list
+
+    stdout = result.stdout.decode('utf-8')                          # get output as string
+    stderr = result.stderr.decode('utf-8')
+
+    if to_log:
+        app_log.debug(f'command   : {command_str}')
+        app_log.debug(f'returncode: {result.returncode}')
+        app_log.debug(f'cmd stdout: {stdout}')
+        app_log.debug(f'cmd stderr: {stderr}')
+
+    return stdout, result.returncode

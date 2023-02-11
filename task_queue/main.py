@@ -3,13 +3,17 @@ import os
 import json
 import urllib3
 import threading
+from datetime import datetime
 from time import time
 from enum import Enum
-from uuid import uuid1
+from uuid import uuid4
 from setproctitle import setproctitle
 from floppy_image_lists import update_floppy_image_lists, after_floppy_image_list_downloaded  # these imports are needed
 import concurrent.futures
-from utils import load_dotenv_config, log_config, other_instance_running, text_to_file, unlink_without_fail
+from utils import load_dotenv_config, log_config, other_instance_running, text_to_file, unlink_without_fail, \
+    setting_load_one, system_custom
+import ntplib
+from time import ctime
 from loguru import logger as app_log
 
 should_run = True
@@ -142,6 +146,53 @@ def download_list(item):
     download_file(item)
 
 
+def get_tz_offset():
+    tz = setting_load_one('TIME_UTC_OFFSET', 0)
+    tz_in = tz
+
+    try:
+        tz = float(tz)
+    except Exception as ex:
+        app_log.warning(f"failed to convert '{tz}' to float: {str(ex)}")
+        tz = 0
+
+    tz = int(tz * 100)
+    tz_str = f"{'-' if tz < 0 else '+'}{tz:04}"
+    app_log.debug(f"converted '{tz_in}' to '{tz_str}'")
+    return tz_str
+
+
+@app_log.catch
+def update_time_from_ntp(item):
+    # get ntp server IP from settings
+    ntp_server = setting_load_one('TIME_NTP_SERVER', 'europe.pool.ntp.org')
+    app_log.info(f"will fetch time from NTP server {ntp_server}")
+
+    date_str = time_str = None
+    good = False
+    try:
+        c = ntplib.NTPClient()
+        response = c.request(ntp_server, version=3)
+        dt_object = datetime.utcfromtimestamp(response.tx_time)
+        date_str = dt_object.strftime('%Y-%m-%d')
+        time_str = dt_object.strftime('%H:%M:%S')
+        good = True
+    except Exception as ex:
+        app_log.warning(f"failed to get time from NTP server {ntp_server}: {str(ex)}")
+
+    if not good:            # if failed to fetch date from NTP server, quit
+        return
+
+    tz_str = get_tz_offset()
+
+    # log result and set datetime
+    app_log.info(f"time from NTP server: {date_str} {time_str} {tz_str}")
+
+    # set date time
+    cmd_set_datetime = f"date +'%Y-%m-%d %H:%M:%S %z' -s '{date_str} {time_str} {tz_str}'"
+    system_custom(cmd_set_datetime, to_log=True, shell=True)
+
+
 def create_socket():
     taskq_sock_path = os.getenv('TASKQ_SOCK_PATH')
 
@@ -166,6 +217,10 @@ def create_socket():
 
 def add_run_once_tasks(xecutor):
     """ CE and its components need these things to run at least once since power-on of the device. """
+
+    msg = {'action': 'update_time_from_ntp'}
+    submit_task_to_executor(xecutor, msg)
+
     msg = {'action': 'update_floppy_image_lists'}
     submit_task_to_executor(xecutor, msg)
 
@@ -186,7 +241,7 @@ def submit_task_to_executor(xecutor, msg):
         return
 
     if 'id' not in msg:  # if our message doesn't have id, generate on
-        msg['id'] = str(uuid1())
+        msg['id'] = str(uuid4())
 
     app_log.debug(f'submitting message to executor: {msg}')
     update_status_json(msg, StatusOp.ADD)   # add item to status

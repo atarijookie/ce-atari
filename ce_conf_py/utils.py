@@ -15,7 +15,7 @@ settings_default = {'DRIVELETTER_FIRST': 'C', 'DRIVELETTER_CONFDRIVE': 'O', 'DRI
                     'ACSI_DEVTYPE_0': 0, 'ACSI_DEVTYPE_1': 1, 'ACSI_DEVTYPE_2': 0, 'ACSI_DEVTYPE_3': 0,
                     'ACSI_DEVTYPE_4': 0, 'ACSI_DEVTYPE_5': 0, 'ACSI_DEVTYPE_6': 0, 'ACSI_DEVTYPE_7': 0,
                     'KEYBOARD_KEYS_JOY0': 'A%S%D%W%LSHIFT', 'KEYBOARD_KEYS_JOY1': 'LEFT%DOWN%RIGHT%UP%RSHIFT',
-                    'TIME_SET': 1, 'TIME_UTC_OFFSET': 0, 'TIME_NTP_SERVER': '200.20.186.76',
+                    'TIME_SET': 1, 'TIME_UTC_OFFSET': 0, 'TIME_NTP_SERVER': 'pool.ntp.org',
                     'SCREENCAST_FRAMESKIP': 20, 'SCREEN_RESOLUTION': 1
                     }
 

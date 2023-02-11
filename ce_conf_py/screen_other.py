@@ -110,7 +110,7 @@ def other_save(button):
     # validate time settings only if setting time from internet enabled
     if setting_get_bool('TIME_SET'):
         checks.extend([
-            ('TIME_NTP_SERVER', 'IP address', IP, None, None),
+            ('TIME_NTP_SERVER', 'NTP address', str, None, None),
             ('TIME_UTC_OFFSET', 'UTC offset', float, -12.0, 14.0)
         ])
 
