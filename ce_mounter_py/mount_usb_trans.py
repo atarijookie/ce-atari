@@ -181,6 +181,7 @@ def symlink_not_linked(mounted_all):
                                         f'(letters) {len_letters} < {len_not_linked} (not linked)'))
 
     sources_not_linked = list(sources_not_linked)       # set to list, so we can use [i] below
+    sources_not_linked.sort()           # sort the sources, so we will then link sda1 first, then sda2
 
     got_something = False  # each time device is attempted to be symlinked, this will be ORed with result
 

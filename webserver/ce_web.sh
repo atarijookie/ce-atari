@@ -55,10 +55,6 @@ venv_dir="venv_$hname"        # venv dir with hostname so multiple venvs can be 
 if [ ! -d "./$venv_dir/bin" ]; then
   echo "Creating python virtual environment"
   python3 -m venv $venv_dir                       # new way to create venv since python 3.6
-  . ./$venv_dir/bin/activate                      # activate virtualenv
-
-  echo "Installing required packages."
-  python3 -m pip install -r requirements.txt      # install requirements
 fi
 
 if [ ! -f "./$venv_dir/bin/activate" ]; then      # virtualenv still missing?
@@ -66,13 +62,19 @@ if [ ! -f "./$venv_dir/bin/activate" ]; then      # virtualenv still missing?
   exit
 fi
 
-echo "Starting the webserver"
-. ./$venv_dir/bin/activate       # activate virtualenv
+. ./$venv_dir/bin/activate                        # activate virtualenv
 
-# generate random secret key for flask if it doesn't exist
-if [ ! -f "/var/run/ce/flask_secret_key" ]; then
-  python -c 'import secrets; print(secrets.token_hex())' > /var/run/ce/flask_secret_key
+echo "Checking if all required packages are installed"
+python3 -c "import pkg_resources; pkg_resources.require(open('requirements.txt',mode='r'))" > /dev/null 2>&1
+
+if [ $? -ne 0 ]; then                             # the above command failed, so something is missing
+  echo "Some package missing, installing required packages..."
+  python3 -m pip install -r requirements.txt      # install requirements
+else
+  echo "All packages present."
 fi
+
+echo "Starting the webserver"
 
 # start web service
 gunicorn --workers 2 --worker-class=gevent --bind 0.0.0.0:80 \

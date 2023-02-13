@@ -1,6 +1,7 @@
 import os
+import secrets
 from flask import Flask, render_template
-from utils import log_config, generate_routes_for_templates, text_from_file, load_dotenv_config
+from utils import log_config, generate_routes_for_templates, text_from_file, load_dotenv_config, text_to_file
 
 load_dotenv_config()        # load dotenv before our imports which might need it already loaded
 
@@ -15,7 +16,13 @@ from auth import auth, login_required
 log_config()                                                    # configure logs
 app = Flask(__name__,  template_folder='templates', static_folder='static')
 
-SECRET_KEY_PATH = os.path.join(os.getenv('DATA_DIR'), "flask_secret_key")
+# generate secret key if needed, otherwise just load it
+SECRET_KEY_PATH = os.path.join(os.getenv('SETTINGS_DIR'), "flask_secret_key")
+
+if not os.path.exists(SECRET_KEY_PATH):                         # no secret key yet? generate, store to file
+    secret_key = secrets.token_hex()
+    text_to_file(secret_key, SECRET_KEY_PATH)
+
 app.secret_key = text_from_file(SECRET_KEY_PATH)                # set the secret key on start
 
 os.makedirs(os.getenv('FLOPPY_UPLOAD_PATH'), exist_ok=True)     # create upload folder if it doesn't exist
