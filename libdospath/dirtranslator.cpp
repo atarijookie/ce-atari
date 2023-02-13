@@ -32,10 +32,15 @@ int MAX_NAMES_IN_TRANSLATOR = 100000;
 DirTranslator::DirTranslator()
 {
     lastCleanUpCheck = UtilsLib::getCurrentMs();
+
+    UtilsLib::out(LDP_LOG_DEBUG, " ");
+    UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator CONSTRUCTOR");
 }
 
 DirTranslator::~DirTranslator()
 {
+    UtilsLib::out(LDP_LOG_DEBUG, " ");
+    UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator DESTRUCTOR");
     clear();
 }
 
@@ -62,6 +67,8 @@ void DirTranslator::updateFileName(const std::string& hostPath, const std::strin
 
 void DirTranslator::shortToLongPath(const std::string& shortPath, std::string& longPath, bool refreshOnMiss, std::vector<std::string>* pSymlinksApplied, int recursionLevel)
 {
+    UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::shortToLongPath called - shortPath: %s, refreshOnMiss: %d, recursionLevel: %d", shortPath.c_str(), (int) refreshOnMiss, recursionLevel);
+
     if(pSymlinksApplied && recursionLevel == 0) {           // clear the vector of applied symlinks on 0th level of recursion
         pSymlinksApplied->clear();
     }
@@ -69,40 +76,49 @@ void DirTranslator::shortToLongPath(const std::string& shortPath, std::string& l
     std::string inPath = shortPath;
     UtilsLib::toHostSeparators(inPath);                    // from dos/atari separators to host separators only
 
-    std::vector<std::string> shortPathParts;
-    UtilsLib::splitString(inPath, '/', shortPathParts);    // explode string to individual parts
+    // pathParts will contain exploded parts of the input shortPath in the start, and while going deeper in the short-to-long
+    // translation, the individual SHORT parts will be replaced with their long version. After this loop we can then
+    // join them back together into path, which will be the output long path.
+    std::vector<std::string> pathParts;
+    UtilsLib::splitString(inPath, '/', pathParts);    // explode string to individual parts
 
-    unsigned int i, partsCount = shortPathParts.size();
-    std::vector<std::string> longPathParts;
+    unsigned int i, partsCount = pathParts.size();
+    UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::shortToLongPath - inPath: %s was split to %d parts", inPath.c_str(), partsCount);
 
     // now convert all the short names to long names
     for(i=0; i<partsCount; i++) {
         std::string subPath;
-        UtilsLib::joinStrings(shortPathParts, subPath, i);             // create just sub-path from the whole path (e.g. just '/mnt/shared' from '/mnt/shared/images/games')
+        UtilsLib::joinStrings(pathParts, subPath, i);          // create just sub-path from the whole path (e.g. just '/mnt/shared' from '/mnt/shared/images/games')
+        UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::shortToLongPath - [i: %d] pathParts -> joinStrings() -> subPath: %s", i, subPath.c_str());
 
+        // getShortenerForPath() must be called with LONG version of the path, which really exists on disk, because if
+        // no existing shortener will be found, that path will be used to open that dir, go through its content and feed
+        // a new shortener.
         FilenameShortener *fs = getShortenerForPath(subPath);       // find or create shortener for this path
 
         std::string longName;
         bool ok;
 
-        ok = fs->shortToLongFileName(shortPathParts[i], longName);  // try to convert short-to-long filename
+        ok = fs->shortToLongFileName(pathParts[i], longName);  // try to convert short-to-long filename
 
         if(!ok && refreshOnMiss) {          // if conversion from short-to-long failed, and we should do a refresh on dict-miss (cache-miss)
-            UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::shortToLongPath - shortToLongFileName() failed for short name: %s , subPath=%s, but will do a refresh now!", shortPathParts[i].c_str(), subPath.c_str());
+            UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::shortToLongPath - shortToLongFileName() FAIL for short name: %s , subPath=%s, will do a refresh now, then try again", pathParts[i].c_str(), subPath.c_str());
 
             feedShortener(subPath, fs);     // feed shortener with possibly new filenames
-            ok = fs->shortToLongFileName(shortPathParts[i], longName);      // 2nd attempt to convert short-to-long filename (after refresh)
+            ok = fs->shortToLongFileName(pathParts[i], longName);      // 2nd attempt to convert short-to-long filename (after refresh)
+            UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::shortToLongPath - shortToLongFileName() %s on 2nd attempt for short name: %s , subPath=%s",
+                ok ? "OK" : "FAIL", pathParts[i].c_str(), subPath.c_str());
         }
 
         if(ok) {        // filename translation from short-to-long was successful - replace the short part with long part
-            longPathParts.push_back(std::string(longName));
+            UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::shortToLongPath - shortToLongFileName() OK - shortNameParts[i]: %s -> longName: %s", pathParts[i].c_str(), longName.c_str());
+            pathParts[i] = longName;                       // modify short path part to contain long path now
         } else {        // failed to find long path, use the original in this place
-            longPathParts.push_back(shortPathParts[i]);
-            UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::shortToLongPath - shortToLongFileName() failed for short name: %s , subPath=%s", shortPathParts[i].c_str(), subPath.c_str());
+            UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::shortToLongPath - shortToLongFileName() FAIL - shortNameParts[i]: %s , subPath=%s", pathParts[i].c_str(), subPath.c_str());
         }
     }
 
-    UtilsLib::joinStrings(longPathParts, longPath);                 // join all output parts to one long path
+    UtilsLib::joinStrings(pathParts, longPath);            // join all output parts to one long path
     bool symlinkWasApplied = applySymlinkIfPossible(longPath, pSymlinksApplied);        // apply symlink if possible
 
     // if we applied symlink, we might need to do the short-to-long translation again, as parts of path after symlink
@@ -126,6 +142,10 @@ bool DirTranslator::longToShortFilename(const std::string &longHostPath, const s
 
 FilenameShortener *DirTranslator::getShortenerForPath(std::string path, bool createIfNotFound)
 {
+    // getShortenerForPath() must be called with LONG version of the path, which really exists on disk, because if
+    // no existing shortener will be found, that path will be used to open that dir, go through its content and feed
+    // a new shortener.
+
     // remove trailing '/' if it's present and if this is not the root path (just a single '/' here)
     if(path.size() > 1 && path[path.size() - 1] == HOSTPATH_SEPAR_CHAR) {
         path.erase(path.size() - 1, 1);
@@ -136,14 +156,14 @@ FilenameShortener *DirTranslator::getShortenerForPath(std::string path, bool cre
     FilenameShortener *fs;
 
     if(it != mapPathToShortener.end()) {            // already got the shortener
-        //UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::getShortenerForPath - shortener for %s found", path.c_str());
+        UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::getShortenerForPath - shortener for %s found", path.c_str());
         fs = it->second;
     } else {                                        // don't have the shortener yet
         if(createIfNotFound) {  // should create?
             UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::getShortenerForPath - shortener for %s NOT found, creating", path.c_str());
             fs = createShortener(path);
         } else {                // shoul NOT create?
-            //UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::getShortenerForPath - shortener for %s NOT found, returning NULL", path.c_str());
+            UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::getShortenerForPath - shortener for %s NOT found, returning NULL", path.c_str());
             fs = NULL;
         }
     }
@@ -159,10 +179,11 @@ FilenameShortener *DirTranslator::createShortener(const std::string &path)
 {
     // do clean up if going above maximum count, then create shortener for specified path and feed it with dir content
     cleanUpShortenersIfNeeded();
+    UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::createShortener - path: %s", path.c_str());
 
     FilenameShortener *fs = new FilenameShortener(path);
     mapPathToShortener.insert( std::pair<std::string, FilenameShortener *>(path, fs) );
-    
+
     feedShortener(path, fs);    // feed the shortener to initialize it with dir content
 
     return fs;
@@ -173,11 +194,14 @@ int DirTranslator::feedShortener(const std::string &path, FilenameShortener *fs)
     // Feed the shortener with content of the specified dir. 
     // It's used when creating shornerer (initial feeding) and when refreshing shortener with new dir content
 
+    UtilsLib::out(LDP_LOG_DEBUG, "TranslatedDisk::feedShortener() - path: %s", path.c_str());
+
     int createdCount = 0;       // count of items that were created. can be used to see if new items have been added to shortener
 
     DIR *dir = opendir(path.c_str());               // try to open the dir
 
     if(dir == NULL) {                               // not found?
+        UtilsLib::out(LDP_LOG_DEBUG, "TranslatedDisk::feedShortener() - FAIL opendir() path: %s", path.c_str());
         return createdCount;
     }
 
@@ -189,12 +213,13 @@ int DirTranslator::feedShortener(const std::string &path, FilenameShortener *fs)
         }
 
         if(de->d_type != DT_DIR && de->d_type != DT_REG) {          // not  a file, not a directory?
-            UtilsLib::out(LDP_LOG_DEBUG, "TranslatedDisk::feedShortener -- skipped %s because the type %d is not supported!", de->d_name, de->d_type);
+            UtilsLib::out(LDP_LOG_DEBUG, "TranslatedDisk::feedShortener() - skipped %s because the type %d is not supported!", de->d_name, de->d_type);
             continue;
         }
 
-        if(strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
+        if(strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) {
             continue;
+        }
 
         bool ok, created;
         std::string shortName;
@@ -205,6 +230,7 @@ int DirTranslator::feedShortener(const std::string &path, FilenameShortener *fs)
         }
     }
 
+    UtilsLib::out(LDP_LOG_DEBUG, "TranslatedDisk::feedShortener() - path: %s, found %d new items", path.c_str(), createdCount);
     closedir(dir);
     return createdCount;
 }
@@ -610,6 +636,7 @@ bool DirTranslator::applySymlinkIfPossible(std::string& inLongPath, std::vector<
 
         if(res == 0) {          // exact match on path was found, good!
             foundMatch = true;
+            UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::applySymlinkIfPossible - stored symlink source: %s matches inLongSubPath: %s", src.c_str(), inLongSubPath.c_str());
             break;
         }
     }
@@ -618,6 +645,7 @@ bool DirTranslator::applySymlinkIfPossible(std::string& inLongPath, std::vector<
     if(foundMatch) {
         if(pSymlinksApplied) {                  // got pointer to applied symlinks vector?
             pSymlinksApplied->push_back(src);   // add this symlink source to vector
+            UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::applySymlinkIfPossible - push_back this symlink source: %s", src.c_str());
         }
 
         std::string rest = inLongPath.substr(src.length());     // remove the source length from inLongPath, keep just rest

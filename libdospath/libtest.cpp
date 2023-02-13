@@ -42,6 +42,13 @@ void testShortToLongName(void)
     printf("\n\nshortToLongPath -- cache-miss with refresh, then cache-hit\n");
     ldp_shortToLongPath(std::string("/tmp/test\\LONG_F~2.EXT"), lp, true);  // WITH refresh - will hit cache
     assert(lp == "/tmp/test/Long FileName 2.extension");
+
+    printf("\n\nshortToLongPath -- long file in long folder without pre-caching\n");
+    ldp_cleanup();
+    system("mkdir -p /tmp/test/thisLongDirectory/thatLongFolder");
+    system("touch /tmp/test/thisLongDirectory/thatLongFolder/SomeLongFileName.extension");  // long filename
+    ldp_shortToLongPath(std::string("/tmp/test/THISLO~1/THATLO~1/SOMELO~1.EXT"), lp, true);
+    assert(lp == "/tmp/test/thisLongDirectory/thatLongFolder/SomeLongFileName.extension");
 }
 
 void testFindFirstAndNext(void)

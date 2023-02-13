@@ -63,6 +63,8 @@ extern "C" void ldp_shortToLongPath(const std::string &shortPath, std::string &l
         dt = new DirTranslator();
     }
 
+    UtilsLib::out(LDP_LOG_DEBUG, " ");      // this is just a visual divider in logs
+    UtilsLib::out(LDP_LOG_DEBUG, "ldp_shortToLongPath - shortPath: %s", shortPath.c_str());
     dt->shortToLongPath(shortPath, longPath, refreshOnMiss, pSymlinksApplied, 0);
 }
 
