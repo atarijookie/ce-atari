@@ -204,6 +204,12 @@ void ScreencastAcsiCommand::readPalette(void)
         return;
     }
 
+    // special case monochrome palette - always white + black
+    if(iScreenmode == 2) {
+        dataBuffer[0] = dataBuffer[1] = 0xff;
+        dataBuffer[2] = dataBuffer[3] = 0x00;
+    }
+
     if(sharedMemPointer) {                                // got shared memory? copy values there
         sharedMemPointer[0] = iScreenmode;                // 0: resolution
         memcpy(sharedMemPointer + 1, dataBuffer, 32);     // 1-32: palette
