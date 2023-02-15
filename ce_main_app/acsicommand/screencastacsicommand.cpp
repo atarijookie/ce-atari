@@ -193,7 +193,7 @@ void ScreencastAcsiCommand::readPalette(void)
     if(mod != 0) {
         pad = 16 - mod;             // how many we need to add to make count % 16 equal to 0?
     }
-    
+
     uint32_t transferSizeBytes = byteCount + pad;
     
     bool res;

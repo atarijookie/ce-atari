@@ -51,6 +51,9 @@ show_help()
     echo "  r, restart - restart all the required CosmosEx services"
     echo "  s, status  - show what CosmosEx services are running"
     echo "  c, config  - run the CosmosEx configuration tool"
+    echo "     update  - download and apply the latest update from internet"
+    echo "               (this also flashes the chips IF NEEDED)"
+    echo "     upforce - same as update, but FLASHING CHIPS IS FORCED"
     echo "  ?, help    - this help message"
     echo ""
     echo "Options:"
@@ -64,6 +67,7 @@ if [ "$1" != "status" ] && [ "$1" != "s" ] && \
    [ "$1" != "restart" ] && [ "$1" != "r" ] && \
    [ "$1" != "stop" ] && [ "$1" != "d" ] && \
    [ "$1" != "conf" ] && [ "$1" != "config" ] && [ "$1" != "c" ] && \
+   [ "$1" != "update" ] && [ "$1" != "upforce" ] && \
    [ "$1" != "help" ] && [ "$1" != "--help" ] && [ "$1" != "?" ]; then
   show_help
   exit 1
@@ -79,6 +83,19 @@ fi
 if [ "$1" = "conf" ] || [ "$1" = "config" ] || [ "$1" = "c" ]; then
   cd /ce/services/config/
   ./ce_conf.sh
+  exit 0
+fi
+
+# Should run the config tool? Run it!
+if [ "$1" = "update" ] || [ "$1" = "upforce" ]; then
+  if [ "$1" = "upforce" ]; then
+    echo "Starting UPDATE with FORCED CHIPS FLASHING!"
+    touch /tmp/FW_FLASH_ALL     # create this file, so ce_update.sh will do flashing in any case
+  else
+    echo "Starting UPDATE with flashing chips only when needed."
+  fi
+
+  /ce/update/ce_update.sh
   exit 0
 fi
 

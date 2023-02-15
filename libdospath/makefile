@@ -1,15 +1,15 @@
-CXX	    = g++
-CC      = gcc
+CXX	= g++
+CC	= gcc
 
 CFLAGS	= -Wall -g -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE
-CXXFLAGS = $(CFLAGS)
+CXXFLAGS	= $(CFLAGS)
 
-TARGET = libdospath.a
+TARGET	= libdospath.a
 
-all: libtest.exe
+all: libtest.elf
 
-libtest.exe: libdospath.a libtest.o
-	g++ $(CXXFLAGS) libtest.o libdospath.a -o libtest.exe
+libtest.elf: libdospath.a libtest.o
+	g++ $(CXXFLAGS) libtest.o libdospath.a -o libtest.elf
 
 libdospath.a: dirtranslator.o filenameshortener.o libexports.o utilslib.o libcpptests.o
 	ar rcs libdospath.a dirtranslator.o filenameshortener.o libexports.o libcpptests.o utilslib.o
@@ -17,4 +17,4 @@ libdospath.a: dirtranslator.o filenameshortener.o libexports.o utilslib.o libcpp
 lib: libdospath.a
 
 clean:
-	rm -f libtest *.o *.a *.exe
+	rm -f libtest *.o *.a *.elf

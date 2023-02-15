@@ -17,17 +17,15 @@ DEPFLAGS = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
 VPATH = ./lib
 LDFLAGS	= -Llib $(CPU_FLAGS)
 LDLIBS = -ldospath -lrt -lanl -lpthread -ldl -lutil
+OBJDIR = obj
+TARGET = cosmosex.elf
 
 ifeq ($(ONPC),yes)
-    OBJDIR = obj/onpc
     CFLAGS += -DONPC -I./
-    TARGET = cosmosex
     LDLIBS += -ldl
 else
     LDLIBS	+= -lbcm2835
     CFLAGS += -I./
-    OBJDIR = obj/raspbian
-    TARGET =  cosmosex_raspbian
     LDLIBS += -ldl
     # add search path for libbcm2835.a
     # /usr/local/bin on rpi or more exotic path when cross-compiling
@@ -110,7 +108,7 @@ all:	$(TARGET)
 $(TARGET): $(LDLIBS) $(OBJS) $(HDRS)
 	$(CXX_LINK) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $@ $(LDLIBS)
 #	$(STRIP) -s $@
-	@ln -sf $(CURDIR)/$(TARGET) ./core/cosmosex     # create symlink from whatever the output target is to just cosmosex
+	@ln -sf $(CURDIR)/$(TARGET) ./core/cosmosex.elf		# create symlink from whatever the output target is to just cosmosex.elf
 
 print-%:	; @echo $* = $($*)
 

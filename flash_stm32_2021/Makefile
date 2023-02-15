@@ -25,25 +25,25 @@ OBJS =	dev_table.o	\
 
 LIBOBJS = parsers/parsers.a
 
-all: stm32flash
+all: flash_stm32_2021.elf
 
 serial_platform.o: serial_posix.c serial_w32.c
 
 parsers/parsers.a: force
 	cd parsers && $(MAKE) parsers.a
 
-stm32flash: $(OBJS) $(LIBOBJS)
+flash_stm32_2021.elf: $(OBJS) $(LIBOBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LDFLAGS) $(LIBOBJS)
 
 clean:
-	rm -f $(OBJS) stm32flash
+	rm -f $(OBJS) flash_stm32_2021.elf
 	cd parsers && $(MAKE) $@
 
 install: all
 	$(INSTALL) -d $(DESTDIR)$(PREFIX)/bin
-	$(INSTALL) -m 755 stm32flash $(DESTDIR)$(PREFIX)/bin
+	$(INSTALL) -m 755 flash_stm32_2021.elf $(DESTDIR)$(PREFIX)/bin
 	$(INSTALL) -d $(DESTDIR)$(PREFIX)/share/man/man1
-	$(INSTALL) -m 644 stm32flash.1 $(DESTDIR)$(PREFIX)/share/man/man1
+	$(INSTALL) -m 644 flash_stm32_2021.elf.1 $(DESTDIR)$(PREFIX)/share/man/man1
 
 force:
 

@@ -1,4 +1,4 @@
-TARGET	= flash_stm32
+TARGET	= flash_stm32.elf
 
 CC		= gcc
 HDR		= parsers/binary.h parsers/hex.h parser.h serial.h stm32.h utils.c gpio.h

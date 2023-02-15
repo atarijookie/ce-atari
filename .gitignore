@@ -17,15 +17,10 @@ test_sting/test_server
 *.tra
 *.dep
 *.bak
+*.a
+*.elf
 **/.idea/
 **/venv/
 **/venv_*/
 __pycache__/
 **/__pycache__/
-appviasock/appviasock
-appviasock/client
-appviasock/vt100_to_vt52
-ce_main_app/cosmosex_raspbian
-ce_main_app/core/cosmosex
-libdospath/libdospath.a
-libdospath/libtest.exe
