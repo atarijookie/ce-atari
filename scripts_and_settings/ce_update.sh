@@ -18,7 +18,7 @@ UPDATE_URL=$( getdotenv.sh UPDATE_URL "http://joo.kie.sk/cosmosex/update" )
 CE_DIR=$( getdotenv.sh CE_DIR "/ce" )
 SETTINGS_DIR=$( getdotenv.sh SETTINGS_DIR "/ce/settings" )
 
-url_to_zip_update="$UPDATE_URL/$DISTRO.zip"        # URL where to get the ZIP file
+url_to_zip_update="$UPDATE_URL/$DISTRO.zip"       # URL where to get the ZIP file
 path_to_tmp_update="/tmp/$DISTRO.zip"             # path where to store the ZIP file - either downloaded or from USB
 
 # back up current CE settings
