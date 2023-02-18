@@ -1,18 +1,16 @@
 #!/bin/sh
 
 # This script return the distro of linux which it is run on. Instead of guessing it like before
-# it's just reading it from .env file so you can override it if needed, and if that fails,
-# the user is asked for manual input of the distro name (in case it's not in the .env file)
+# it's just reading it from .env file so you can override it if needed.
 
 echoerr() { echo "$@" 1>&2; }
 
 DISTRO=$( getdotenv.sh DISTRO "" )
 
-# no DISTRO from .env file? try getting it manually
+# no DISTRO from .env file? fail
 if [ -z "$DISTRO" ]; then
   echoerr "Failed to get DISTRO from .env"
-  echoerr "Please specify DISTRO manually:"
-  read DISTRO
+  exit 1
 fi
 
 echo "$DISTRO"      # output DISTRO to stdout

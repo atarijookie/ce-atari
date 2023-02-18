@@ -1,36 +1,60 @@
 #!/bin/sh
 
-# find out which HW version we're running
-hw_ver=$( /ce/whichhw.sh )
+echo "update_xilinx        : START"
 
-if [ "$hw_ver" -eq "3" ]; then      # if v3 was detected, we can skip flashing Xilinx as no Xilinx is present
-    printf "\nThis device doesn't contain Xilinx, skipping flashing Xilinx chip.\n"
-    exit 0                          # exit with success
+# initialize variables
+is36=0
+is72=0
+
+# test for XC9536 chip
+/ce/update/flash_xilinx.elf /ce/update/test_xc9536xl.xsvf  > /dev/null 2> /dev/null
+
+if [ "$?" -eq "0" ]; then
+    is36=1
+fi
+
+# test for XC9572 chip
+/ce/update/flash_xilinx.elf /ce/update/test_xc9572xl.xsvf  > /dev/null 2> /dev/null
+
+if [ "$?" -eq "0" ]; then
+    is72=1
+fi
+
+# no chip detected? fail, quit
+if [ "$is36" -eq "0" ] && [ "$is72" -eq "0" ]; then
+    echo "xilinx type          : NONE - this is invalid"
+    exit
+fi
+
+# both chips detected? fail, quit
+if [ "$is36" -eq "1" ] && [ "$is72" -eq "1" ]; then
+    echo "xilinx type          : BOTH - this is invalid"
+    exit
 fi
 
 # for XC9536 - just burn the firmware
-if [ "$hw_ver" -eq "1" ]; then
+if [ "$is36" -eq "1" ]; then
     # write the XC9536 firmware
-    printf "Detected XC9536 chip, will write firmware\n"
-
-    /ce/update/flash_xilinx /ce/update/xilinx.xsvf
+    echo "xilinx type          : XC9536"
+    /ce/update/flash_xilinx.elf /ce/update/xilinx.xsvf
     cp /ce/update/xilinx.version /ce/update/xilinx.current          # copy flashed version into current version file
     ln -fs /ce/update/xilinx.version /ce/update/xilinx_used.version # xilinx_user.version will point to file from which we took the version, so when that file changes, we will know we need to update xilinx 
     exit
 fi
 
 # for XC9572 - first check the HDD IF - if it's SCSI or ACSI
-if [ "$hw_ver" -eq "2" ]; then
-    printf "Detected XC9572 chip, now will detect if it's ACSI or SCSI\n"
-    out=$( /ce/app/cosmosex hwinfo )
+if [ "$is72" -eq "1" ]; then
+    echo "xilinx type          : XC9572"
+    echo "CE interface         : detecting ACSI / SCSI"
+    out=$( /ce/services/core/cosmosex.elf hwinfo )
 
     isAcsi=$( echo "$out" | grep 'ACSI' )
     isScsi=$( echo "$out" | grep 'SCSI' )
 
     # if it's ACSI version
     if [ -n "$isAcsi" ]; then
-        printf "Detected XC9572 chip and ACSI interface, will write firmware\n"
-        /ce/update/flash_xilinx /ce/update/xlnx2a.xsvf
+        echo "CE interface         : ACSI"
+        /ce/update/flash_xilinx.elf /ce/update/xlnx2a.xsvf
         cp /ce/update/xlnx2a.version /ce/update/xilinx.current          # copy flashed version into current version file
         ln -fs /ce/update/xlnx2a.version /ce/update/xilinx_used.version # xilinx_user.version will point to file from which we took the version, so when that file changes, we will know we need to update xilinx 
         exit
@@ -38,12 +62,12 @@ if [ "$hw_ver" -eq "2" ]; then
 
     # if it's SCSI version
     if [ -n "$isScsi" ]; then
-        printf "Detected XC9572 chip and SCSI interface, will write firmware\n"
-        /ce/update/flash_xilinx /ce/update/xlnx2s.xsvf
+        echo "CE interface         : SCSI"
+        /ce/update/flash_xilinx.elf /ce/update/xlnx2s.xsvf
         cp /ce/update/xlnx2s.version /ce/update/xilinx.current          # copy flashed version into current version file
         ln -fs /ce/update/xlnx2s.version /ce/update/xilinx_used.version # xilinx_user.version will point to file from which we took the version, so when that file changes, we will know we need to update xilinx 
         exit
     fi
 
-    printf "Detected XC9572 chip but didn't write any firmware :(\n"
+    echo "CE interface         : couldn't detect, firmware not written"
 fi
