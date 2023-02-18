@@ -54,7 +54,7 @@ settings_restore()
   BACKUP_DIR=/tmp/ce_settings
   echo "restore settings     : $BACKUP_DIR  =>  $SETTINGS_DIR"
 
-  cp -r /tmp/ce_settings* $SETTINGS_DIR/
+  cp -r $BACKUP_DIR/* $SETTINGS_DIR
 }
 
 PATH=$PATH:/ce/update                       # add our update folder to path so we can use relative paths when referencing our scripts
