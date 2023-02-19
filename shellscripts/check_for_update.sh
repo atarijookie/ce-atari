@@ -6,6 +6,12 @@ if [ $(id -u) != 0 ]; then
   exit 0
 fi
 
+# get log path, generate current date and logfile with that date, redirect output to log and console
+LOG_DIR=$( /ce/update/getdotenv.sh LOG_DIR "/var/log/ce" )
+NOW=$( date +"%Y%m%d_%H%M%S" )
+LOG_FILE="$LOG_DIR/update_check_$NOW.log"
+{
+
 rm -f /tmp/UPDATE_PENDING_YES /tmp/UPDATE_PENDING_NO /tmp/UPDATE_STATUS   # delete update pending answer files
 echo "Checking for update..." | tee /tmp/UPDATE_STATUS                    # fill update check status
 
@@ -88,3 +94,5 @@ echo "current version path : $UPDATE_VERSION_CURR_LOCAL"
 echo "current version value: $curr"
 
 [ "$new" != "$curr" ] && update_yes || update_no            # got update if versions don't match, otherwise no update
+
+} 2>&1 | tee $LOG_FILE      # end of redirect to file and console

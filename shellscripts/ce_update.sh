@@ -6,6 +6,12 @@ if [ $(id -u) != 0 ]; then
   exit 0
 fi
 
+# get log path, generate current date and logfile with that date, redirect output to log and console
+LOG_DIR=$( /ce/update/getdotenv.sh LOG_DIR "/var/log/ce" )
+NOW=$( date +"%Y%m%d_%H%M%S" )
+LOG_FILE="$LOG_DIR/update_$NOW.log"
+{
+
 on_exit()
 {
   echo "on exit              : starting CE services"
@@ -125,3 +131,5 @@ sync
 echo " "
 echo "Update done, the software should start up in few seconds.";
 echo " "
+
+} 2>&1 | tee $LOG_FILE    # end of redirect to file and console
