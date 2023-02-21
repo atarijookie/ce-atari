@@ -6,14 +6,21 @@ if [ $(id -u) != 0 ]; then
   exit 0
 fi
 
+PATH=$PATH:/ce/update     # add our update folder to path so we can use relative paths when referencing our scripts
+
 # get log path, generate current date and logfile with that date, redirect output to log and console
-LOG_DIR=$( /ce/update/getdotenv.sh LOG_DIR "/var/log/ce" )
+LOG_DIR=$( getdotenv.sh LOG_DIR "/var/log/ce" )
 NOW=$( date +"%Y%m%d_%H%M%S" )
 LOG_FILE="$LOG_DIR/update_check_$NOW.log"
 {
 
-rm -f /tmp/UPDATE_PENDING_YES /tmp/UPDATE_PENDING_NO /tmp/UPDATE_STATUS   # delete update pending answer files
-echo "Checking for update..." | tee /tmp/UPDATE_STATUS                    # fill update check status
+# read these .env variables for usage further below
+FILE_UPDATE_STATUS=$( getdotenv.sh FILE_UPDATE_STATUS "" )
+FILE_UPDATE_PENDING_YES=$( getdotenv.sh FILE_UPDATE_PENDING_YES "" )
+FILE_UPDATE_PENDING_NO=$( getdotenv.sh FILE_UPDATE_PENDING_NO "" )
+
+rm -f "$FILE_UPDATE_STATUS" "$FILE_UPDATE_PENDING_YES" "$FILE_UPDATE_PENDING_NO"   # delete update pending answer files
+echo "Checking for update..." | tee "$FILE_UPDATE_STATUS"                 # fill update check status
 
 read_from_file()
 {
@@ -40,23 +47,23 @@ online_file_exists()
 
 update_yes()
 {
-  echo "got update for you!" > /tmp/UPDATE_STATUS
-  touch /tmp/UPDATE_PENDING_YES
+  echo "got update for you!" > "$FILE_UPDATE_STATUS"
+  touch "$FILE_UPDATE_PENDING_YES"
   echo "update pending       : YES"
-  echo -n "update status        : " ; cat /tmp/UPDATE_STATUS     # show the final status
+  echo "created file         : $FILE_UPDATE_PENDING_YES"
+  echo -n "update status        : " ; cat "$FILE_UPDATE_STATUS"     # show the final status
 }
 
 update_no()
 {
   # $1 - reason for no update. If not provided, will use default
   [ -z "$1" ] && STATUS="update not needed" || STATUS=$1
-  echo $STATUS > /tmp/UPDATE_STATUS
-  touch /tmp/UPDATE_PENDING_NO
+  echo $STATUS > "$FILE_UPDATE_STATUS"
+  touch "$FILE_UPDATE_PENDING_NO"
   echo "update pending       : NO"
-  echo -n "update status        : " ; cat /tmp/UPDATE_STATUS     # show the final status
+  echo "created file         : $FILE_UPDATE_PENDING_NO"
+  echo -n "update status        : " ; cat "$FILE_UPDATE_STATUS"     # show the final status
 }
-
-PATH=$PATH:/ce/update     # add our update folder to path so we can use relative paths when referencing our scripts
 
 DISTRO=$( distro.sh )     # fetch distro name
 [ -z "$DISTRO" ] && echo "Cannot continue the update without DISTRO. Terminating." && exit 1    # no DISTRO still? quit
@@ -65,7 +72,7 @@ echo "running on distro    : $DISTRO"
 #----------------------------------------------
 # look for update on mounted disks
 
-UPDATE_PATH_USB=$( ./check_for_update_usb.sh )
+UPDATE_PATH_USB=$( check_for_update_usb.sh )
 [ -f "$UPDATE_PATH_USB" ] && update_yes && exit 0         # if file was found on some USB drive
 
 #----------------------------------------------

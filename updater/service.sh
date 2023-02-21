@@ -5,13 +5,15 @@ LOG_DIR=$( /ce/update/getdotenv.sh LOG_DIR "/var/log/ce" )
 NOW=$( date +"%Y%m%d_%H%M%S" )
 LOG_FILE="$LOG_DIR/updater_service_$NOW.log"
 {
-CE_UPDATE_TRIGGER=$( /ce/update/getdotenv.sh CE_UPDATE_TRIGGER "" )
+CE_UPDATE_TRIGGER=$( /ce/update/getdotenv.sh CE_UPDATE_TRIGGER "" )   # if this file appears, we should do the update
+CE_UPDATE_RUNNING=$( /ce/update/getdotenv.sh CE_UPDATE_RUNNING "" )   # if this file is present, we are doing update
 
 while :
 do
   if [ -f "$CE_UPDATE_TRIGGER" ]; then        # if trigger file exists
     echo " "
     rm -f "$CE_UPDATE_TRIGGER"                # delete that file so we won't be doing update in endless loop
+    touch "$CE_UPDATE_RUNNING"                # doing update now
 
     echo "CosmosEx update - stopping CE services"
     for srvc in /ce/systemd/*.service         # find all the services
@@ -49,7 +51,9 @@ do
     done
 
     rm -f "$CE_UPDATE_TRIGGER"                # delete update trigger file if it appeared during the install
+    rm -f "$CE_UPDATE_RUNNING"                # not doing update now
   else                                        # no trigger file? just wait some more
+    rm -f "$CE_UPDATE_RUNNING"                # not doing update now
     sleep 3
     echo -n "."
   fi

@@ -2,7 +2,7 @@ import os
 import urwid
 from loguru import logger as app_log
 from urwid_helpers import create_my_button, create_header_footer, dialog_yes_no, dialog
-from utils import on_cancel, back_to_main_menu
+from utils import on_cancel, back_to_main_menu, system_custom, text_to_file
 import shared
 from screen_network import create_setting_row
 
@@ -64,8 +64,16 @@ def update_create(button):
 
 
 def get_status():
+    status, should_update = get_status_internal()
+    app_log.debug(f"get_status - status: {status}, should_update: {should_update}")
+    return status, should_update
+
+
+def get_status_internal():
     # if no update files present - 'before_check' state
-    if not os.path.exists(os.getenv('FILE_UPDATE_STATUS')):
+    file_update_status = os.getenv('FILE_UPDATE_STATUS')
+    app_log.debug(f"get_status - file_update_status: {file_update_status}")
+    if not os.path.exists(file_update_status):
         return 'before_check', False
 
     # STATUS file exists, but no UPDATE_PENDING_* files present, but there's UPDATE_STATUS file, 'checking' state
@@ -118,6 +126,7 @@ def on_refresh_update_screen(loop=None, data=None):
     global screen_shown
 
     if not screen_shown:                        # if this screen is already not shown, just quit
+        app_log.debug("on_refresh_update_screen - ignoring, screen not shown")
         return
 
     shared.main_loop.set_alarm_in(1, on_refresh_update_screen)  # trigger alarm in 1 second
@@ -139,7 +148,7 @@ def on_action(button):
     status, should_update = get_status()        # get current update check status
 
     if status == 'before_check':                # didn't check yet? run the check
-        os.system('/ce/update/check_for_update.sh > /dev/null 2>&1 &')
+        system_custom('/ce/update/check_for_update.sh &', shell=True)
 
     elif status == 'after_check':               # we're after the check
         if should_update:                       # should update device? run the update
@@ -158,10 +167,11 @@ def on_update_force(should_force):
         return
 
     # check if update is not already running
-    running = os.system('/ce/update/update_running.sh > /dev/null 2>&1 &')
+    update_running_file = os.getenv('CE_UPDATE_RUNNING')
+    running = os.path.exists(update_running_file)
     app_log.debug("update_running: {}".format(running))
 
-    if running > 0:     # if the update is already running
+    if running:             # if the update is already running
         dialog(shared.main_loop, shared.current_body,
                "Update is already running. Do not turn off your device!")
         return
@@ -172,6 +182,9 @@ def on_update_force(should_force):
 
     # user selected force update? run it
     app_log.debug("starting update now")
-    os.system('/ce/ce_update.sh > /dev/null 2>&1 &')
+
+    update_trigger_file = os.getenv('CE_UPDATE_TRIGGER')        # get from .env where the trigger file should be
+    text_to_file("void", update_trigger_file)                   # create update trigger file
+    app_log.debug(f"created update trigger file: {update_trigger_file}")
 
     on_cancel(None)         # back to main menu
