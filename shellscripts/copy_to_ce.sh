@@ -1,5 +1,7 @@
 #!/bin/sh
 
+rm -rf /ce/services/*
+mkdir -p /ce/services
 REPO_PATH='/shared/ce-atari'
 
 cd $REPO_PATH
@@ -16,5 +18,17 @@ cp -f flash_stm32/flash_stm32.elf flash_stm32_2021/flash_stm32_2021.elf flash_xi
   /ce/update
 
 cd $REPO_PATH
-cp -R ce_conf_py ce_main_app/core ce_fdd_py ce_mounter_py task_queue webserver \
+cp -R ce_conf_py ce_main_app/core ce_fdd_py ce_mounter_py task_queue webserver terminal updater \
   /ce/services
+
+cd /ce/services
+mv ce_conf_py config
+mv ce_fdd_py floppy
+mv ce_mounter_py mounter
+mv task_queue taskq
+
+cd $REPO_PATH
+cp -R systemd /ce
+
+cd /ce
+chown -R jookie:jookie *

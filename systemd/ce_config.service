@@ -1,0 +1,15 @@
+[Unit]
+Description=CosmosEx config tool
+After=local-fs.target
+
+[Service]
+User=root
+Group=root
+Type=simple
+Restart=always
+ExecStart=/ce/services/config/service.sh
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=local-fs.target

@@ -1,0 +1,15 @@
+[Unit]
+Description=CosmosEx mounter
+After=local-fs.target
+
+[Service]
+User=root
+Group=root
+Type=simple
+Restart=always
+ExecStart=/ce/services/mounter/ce_mounter.sh
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=local-fs.target
