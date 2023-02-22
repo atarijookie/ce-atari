@@ -11,8 +11,8 @@ echo "Post install script..."
 # do the following section only when the boot config file is present (e.g. we're on Raspberry Pi)
 if [ -f /boot/config.txt ]; then
   # add / change the core_freq param in the boot config to avoid SPI clock issues
-  coreFreqCountAny=$( cat /boot/config.txt | grep core_freq | wc -l )
-  coreFreqCountCorrect=$( cat /boot/config.txt | grep 'core_freq=250' | wc -l )
+  coreFreqCountAny=$( cat /boot/config.txt | grep -c core_freq )
+  coreFreqCountCorrect=$( cat /boot/config.txt | grep -c 'core_freq=250' )
 
   addCoreFreq=0           # don't add it yet
 

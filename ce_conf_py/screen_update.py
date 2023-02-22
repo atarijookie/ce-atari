@@ -2,7 +2,7 @@ import os
 import urwid
 from loguru import logger as app_log
 from urwid_helpers import create_my_button, create_header_footer, dialog_yes_no, dialog
-from utils import on_cancel, back_to_main_menu, system_custom, text_to_file
+from utils import on_cancel, back_to_main_menu, system_custom, text_to_file, delete_update_files
 import shared
 from screen_network import create_setting_row
 
@@ -14,7 +14,7 @@ from screen_network import create_setting_row
 
 screen_shown = False
 button_text_current = ' Check '
-status_text = 'unknown'
+status_text = 'waiting for Check button press'
 widget_status = None
 widget_button = None
 
@@ -57,6 +57,8 @@ def update_create(button):
     global screen_shown
     screen_shown = True
 
+    delete_update_files()                       # delete files which tell us if we should update or not
+    on_action(None)
     on_refresh_update_screen(None, None)        # refresh update screen now
 
     shared.main_loop.set_alarm_in(1, on_refresh_update_screen)      # trigger alarm in 1 second

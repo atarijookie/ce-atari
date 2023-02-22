@@ -24,6 +24,10 @@ if [ "$python_version_ok" -eq "0" ]; then
   exit
 fi
 
+PROJECTDIR=$( dirname $0 )                        # get project dir
+cd $PROJECTDIR                                    # change into project dir
+echo "Current working directory is: " $( pwd )    # show that dir in output so we can tell if we're in the correct place
+
 hname=$( hostname )           # get hostname into variable, as $HOSTNAME seems to be missing in some cases
 venv_dir="venv_$hname"        # venv dir with hostname so multiple venvs can be present when this folder is shared
 

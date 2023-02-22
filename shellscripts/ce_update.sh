@@ -7,7 +7,8 @@ if [ $(id -u) != 0 ]; then
 fi
 
 # get log path, generate current date and logfile with that date, redirect output to log and console
-LOG_DIR=$( /ce/update/getdotenv.sh LOG_DIR "/var/log/ce" )
+PATH=$PATH:/ce/update       # add our update folder to path so we can use relative paths when referencing our scripts
+LOG_DIR=$( getdotenv.sh LOG_DIR "/var/log/ce" )
 NOW=$( date +"%Y%m%d_%H%M%S" )
 LOG_FILE="$LOG_DIR/update_$NOW.log"
 {
@@ -55,13 +56,12 @@ settings_restore()
   cp -r $BACKUP_DIR/* $SETTINGS_DIR
 }
 
-PATH=$PATH:/ce/update                       # add our update folder to path so we can use relative paths when referencing our scripts
 DISTRO=$( distro.sh )                       # fetch distro name
 [ -z "$DISTRO" ] && echo "Cannot continue the update without DISTRO. Terminating." && exit 1    # no DISTRO still? quit
 echo "running on distro    : $DISTRO"
 UPDATE_LOCAL="/tmp/$DISTRO.zip"             # path where to store the ZIP file - either downloaded or from USB
 
-UPDATE_PATH_USB=$( ./check_for_update_usb.sh )    # look for update on mounted disks
+UPDATE_PATH_USB=$( check_for_update_usb.sh )    # look for update on mounted disks
 if [ -f "$UPDATE_PATH_USB" ]; then                # if file was found on some USB drive
   echo "update source        : locally mounted disk"
   echo "moving update        : $UPDATE_PATH_USB  =>  $UPDATE_LOCAL"
