@@ -30,69 +30,57 @@ mkdir -p $DATA_DIR
 mkdir -p $LOG_DIR
 mkdir -p $SETTINGS_DIR
 
+# function to show help
 show_help()
 {
-    echo ""
-    echo "CosmosEx helper script."
-    echo "Usage: ce command [options]"
-    echo ""
-    echo "Commands:"
-    echo "  u, start   - start all the required CosmosEx services"
-    echo "  d, stop    - stop all the running CosmosEx services "
-    echo "  r, restart - restart all the required CosmosEx services"
-    echo "  s, status  - show what CosmosEx services are running"
-    echo "  c, config  - run the CosmosEx configuration tool"
-    echo "     update  - download and apply the latest update from internet"
-    echo "               (this also flashes the chips IF NEEDED)"
-    echo "     upforce - same as update, but FLASHING CHIPS IS FORCED"
-    echo "  ?, help    - this help message"
-    echo ""
-    echo "Options:"
-    echo "   [name of service] - start / stop / restart only service with this name"
-    echo ""
+cat << EOF
+
+CosmosEx helper script.
+Usage: ce command [options]
+
+Commands:
+  u, start   - start all the required CosmosEx services
+  d, stop    - stop all the running CosmosEx services
+  r, restart - restart all the required CosmosEx services
+  s, status  - show what CosmosEx services are running
+  c, config  - run the CosmosEx configuration tool
+     update  - download and apply the latest update from internet
+               (this also flashes the chips IF NEEDED)
+     upforce - same as update, but FLASHING CHIPS IS FORCED
+  ?, help    - this help message
+
+Options:
+   [name of service] - start / stop / restart only service with this name
+
+EOF
 }
 
-# no supported command was used? Show help.
-if [ "$1" != "status" ] && [ "$1" != "s" ] && \
-   [ "$1" != "start" ] && [ "$1" != "u" ] && \
-   [ "$1" != "restart" ] && [ "$1" != "r" ] && \
-   [ "$1" != "stop" ] && [ "$1" != "d" ] && \
-   [ "$1" != "conf" ] && [ "$1" != "config" ] && [ "$1" != "c" ] && \
-   [ "$1" != "update" ] && [ "$1" != "upforce" ] && \
-   [ "$1" != "help" ] && [ "$1" != "--help" ] && [ "$1" != "?" ]; then
-  show_help
-  exit 1
-fi
-
-# help was requested? Show help.
-if [ "$1" = "help" ] || [ "$1" = "--help" ] || [ "$1" = "?" ]; then
-  show_help
-  exit 0
-fi
-
-# Should run the config tool? Run it!
-if [ "$1" = "conf" ] || [ "$1" = "config" ] || [ "$1" = "c" ]; then
-  cd /ce/services/config/
-  ./ce_conf.sh
-  exit 0
-fi
-
-# Should run the config tool? Run it!
-if [ "$1" = "update" ] || [ "$1" = "upforce" ]; then
+# function to start the update of CE software
+start_update()
+{
   if [ "$1" = "upforce" ]; then
     echo "Starting UPDATE with FORCED CHIPS FLASHING!"
-    touch /tmp/FW_FLASH_ALL     # create this file, so ce_update.sh will do flashing in any case
+    CE_FLASH_ALL=$( getdotenv.sh CE_FLASH_ALL "" )
+    touch "$CE_FLASH_ALL"     # create this file, so ce_update.sh will do flashing in any case
+    echo "Created CE_FLASH_ALL file: $CE_FLASH_ALL"
   else
     echo "Starting UPDATE with flashing chips only when needed."
   fi
 
   CE_UPDATE_TRIGGER=$( getdotenv.sh CE_UPDATE_TRIGGER "" )
+  touch "$CE_UPDATE_TRIGGER"
   echo "Created CE_UPDATE_TRIGGER file: $CE_UPDATE_TRIGGER"
   echo "This should trigger CE update within few seconds."
-  touch "$CE_UPDATE_TRIGGER"
+}
 
-  exit 0
-fi
+# handle some of the commands here, let other supported commands pass and unhandled commands show just help
+case $1 in
+  status|s|start|u|restart|r|stop|d) ;;                                     # supported command - do nothing
+  conf|config|c)      /ce/services/config//ce_conf.sh ;         exit 0;;    # conf tool
+  update|upforce)     start_update $1 ;                         exit 0;;    # start the update
+  ""|help|?|--help)                                show_help ;  exit 0;;    # no command or help command
+  *)                  echo "unknown command: $1" ; show_help ;  exit 1;;    # unknown command
+esac
 
 handle_service()
 {
@@ -101,71 +89,55 @@ handle_service()
     # $2 - service name with extension == systemd unit service file (e.g. 'ce_core.service')
     # $3 - service name without 3 characters prefix and without extension (e.g. 'core')
 
-    app_running=$( systemctl status $2 | grep -c 'Active: active' )
+    status=$( systemctl status $2 2>&1 )                        # get service status
+
+    needs_reload=$( echo $status | grep -c 'daemon-reload' )    # if this was found in the systemctl output, we need to do daemon-reload
+    [ "$needs_reload" != "0" ] && systemctl daemon-reload       # if systemctl needs reload, do it
+
+    app_running=$( echo $status | grep -c 'Active: active' )    # check if app is running
 
     # should just report status?
     if [ "$1" = "status" ]; then
-        if [ "$app_running" != "0" ]; then
-            printf "    %-20s [ UP ]\n" "$3"
-        else
-            printf "    %-20s [    ]\n" "$3"
-        fi
+      [ "$app_running" != "0" ] && stat='UP' || stat='  '
+      printf "    %-20s [ $stat ]\n" "$3"
+      return      # exit function here, nothing more to do
     fi
 
-    # should start?
-    if [ "$1" = "start" ]; then
-        if [ "$app_running" = "0" ]; then          # not running? start
-            printf "    %-20s starting\n" "$3"
-            systemctl start $2
-        else
-            printf "    %-20s running\n" "$3"
-        fi
-    fi
+    case $1 in
+      start)    [ "$app_running"  = "0" ] && act='starting' || act='running'      ;;
+      stop)     [ "$app_running" != "0" ] && act='stopping' || act='not running'  ;;
+      restart)                               act='restarting'                     ;;
+      *)        return ;;               # other commands not supported
+    esac
 
-    # should stop?
-    if [ "$1" = "stop" ]; then
-        if [ "$app_running" != "0" ]; then       # is running? stop
-            printf "    %-20s stopping\n" "$3"
-            systemctl stop $2
-        else
-            printf "    %-20s not running\n" "$3"
-        fi
-    fi
-
-    # should restart?
-    if [ "$1" = "restart" ]; then
-        printf "    %-20s restarting\n" "$3"
-        systemctl restart $2
-    fi
+    printf "    %-20s $act\n" "$3"      # show action to user
+    systemctl $1 $2                     # do the action
 }
 
-# go through all the service files and start / stop / status those services
 echo ""
 
-if [ "$1" = "start" ] || [ "$1" = "u" ]; then
-    echo "Starting CosmosEx services:"
-    action="start"
-elif [ "$1" = "restart" ] || [ "$1" = "r" ]; then
-    echo "Restarting CosmosEx services:"
-    action="restart"
-elif [ "$1" = "stop" ] || [ "$1" = "d" ]; then
-    echo "Stopping CosmosEx services:"
-    action="stop"
-elif [ "$1" = "status" ] || [ "$1" = "s" ]; then
-    echo "CosmosEx services statuses:"
-    action="status"
-fi
+# show appropriate action message, convert short action to long action string (e.g. 's' -> 'status')
+case $1 in
+  status|s)   echo "CosmosEx services statuses:"    ; action="status"   ;;
+  start|u)    echo "Starting CosmosEx services:"    ; action="start"    ;;
+  restart|r)  echo "Restarting CosmosEx services:"  ; action="restart"  ;;
+  stop|d)     echo "Stopping CosmosEx services:"    ; action="stop"     ;;
+  *)          echo "unknown command: $1"            ; exit 1            ;;
+esac
 
+# go through all the service files and start / stop / status those services
 for srvc in /ce/systemd/*.service             # find all the services
 do
-  srvc=$( basename $srvc )                          # get filename with extension
-  srvc_no_ext=$( basename $srvc .service )          # get filename without extension
-  srvc_no_pref=$( echo $srvc_no_ext | cut -c 4- )   # get filename without extension and without first 3 chars
+  srvc=$( basename $srvc )                          # get filename with extension           e.g. /ce/systemd/ce_core.service -> ce_core.service
+  srvc_no_ext=$( basename $srvc .service )          # get filename without extension                    e.g. ce_core.service -> ce_core
+  srvc_no_pref=$( echo $srvc_no_ext | cut -c 4- )   # get filename without extension and without first 3 chars, e.g. ce_core -> core
 
-  if [ ! -z $2 ]; then                      # if service name was provided
-    if [ "$srvc_no_ext" != "$2" ] && [ "$srvc_no_pref" != "$2" ]; then    # if this service is not service filename without extension or without first 3 chars ('ce_'), skip it
-      continue
-    fi
+  # if service name was provided and this service is not that wanted service, skip it
+  # We are comparing wanted service name to:
+  # - service filename without extension - e.g. with 'ce_core'
+  # - service filename without extension and without first 3 chars - e.g. with 'core'
+  if [ ! -z $2 ] && [ "$srvc_no_ext" != "$2" ] && [ "$srvc_no_pref" != "$2" ]; then
+    continue
   fi
 
   handle_service $action $srvc $srvc_no_pref

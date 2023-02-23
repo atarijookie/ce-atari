@@ -8,29 +8,17 @@ is72=0
 
 # test for XC9536 chip
 /ce/update/flash_xilinx.elf /ce/update/test_xc9536xl.xsvf  > /dev/null 2> /dev/null
-
-if [ "$?" -eq "0" ]; then
-    is36=1
-fi
+[ "$?" -eq "0" ] && is36=1
 
 # test for XC9572 chip
 /ce/update/flash_xilinx.elf /ce/update/test_xc9572xl.xsvf  > /dev/null 2> /dev/null
-
-if [ "$?" -eq "0" ]; then
-    is72=1
-fi
+[ "$?" -eq "0" ] && is72=1
 
 # no chip detected? fail, quit
-if [ "$is36" -eq "0" ] && [ "$is72" -eq "0" ]; then
-    echo "xilinx type          : NONE - this is invalid"
-    exit
-fi
+[ "$is36" -eq "0" ] && [ "$is72" -eq "0" ] && echo "xilinx type          : NONE - this is invalid" && exit
 
 # both chips detected? fail, quit
-if [ "$is36" -eq "1" ] && [ "$is72" -eq "1" ]; then
-    echo "xilinx type          : BOTH - this is invalid"
-    exit
-fi
+[ "$is36" -eq "1" ] && [ "$is72" -eq "1" ] && echo "xilinx type          : BOTH - this is invalid" && exit
 
 # for XC9536 - just burn the firmware
 if [ "$is36" -eq "1" ]; then

@@ -17,22 +17,13 @@ if [ -f /boot/config.txt ]; then
   addCoreFreq=0           # don't add it yet
 
   # A) no core_freq? Add it
-  if [ "$coreFreqCountAny" -eq "0" ]; then
-      echo "No core_freq in /boot/config.txt, adding it"
-      addCoreFreq=1
-  fi
+  [ "$coreFreqCountAny" -eq "0" ] && echo "No core_freq in /boot/config.txt, adding it" && addCoreFreq=1
 
   # B) more than one core_freq? Remove them, then add one
-  if [ "$coreFreqCountAny" -gt "1" ]; then
-      echo "Too many core_freq in /boot/config.txt, fixing it"
-      addCoreFreq=1
-  fi
+  [ "$coreFreqCountAny" -gt "1" ] && echo "Too many core_freq in /boot/config.txt, fixing it" && addCoreFreq=1
 
   # C) There is some core_freq, but it's not correct? Remove it, then add correct one
-  if [ "$coreFreqCountAny" -gt "0" ] && [ "$coreFreqCountCorrect" -eq "0" ]; then
-      echo "core_freq in /boot/config.txt is incorrect, fixing it"
-      addCoreFreq=1
-  fi
+  [ "$coreFreqCountAny" -gt "0" ] && [ "$coreFreqCountCorrect" -eq "0" ] && echo "core_freq in /boot/config.txt is incorrect, fixing it" && addCoreFreq=1
 
   # if we need to add the core_freq
   if [ "$addCoreFreq" -gt "0" ]; then
