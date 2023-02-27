@@ -100,6 +100,12 @@ unzip -o $UPDATE_LOCAL -d $CE_DIR       # unzip update into /ce directory, overw
 echo "delete after unzip   : $UPDATE_LOCAL"
 rm -f $UPDATE_LOCAL
 
+# copy new to current version
+CE_UPDATE_VERSION_NEW=$( getdotenv.sh CE_UPDATE_VERSION_NEW "/tmp/software.version" )                 # path to file containing new version for this distro
+CE_UPDATE_VERSION_CURRENT=$( getdotenv.sh CE_UPDATE_VERSION_CURRENT "/ce/update/software.current" )   # path to file containing current version for this distro
+[ -f "$CE_UPDATE_VERSION_NEW" ] && echo "copy sw version      : $CE_UPDATE_VERSION_NEW  =>  $CE_UPDATE_VERSION_CURRENT" && \
+    cp -f "$CE_UPDATE_VERSION_NEW" "$CE_UPDATE_VERSION_CURRENT" && rm -f "$CE_UPDATE_VERSION_NEW"     # if file with new version exist, copy new to current version
+
 # add permissions
 echo "adding X permissions : *.sh, *.elf"
 find /ce/ -type f \( -name "*.sh" -o -name "*.elf" \) -exec chmod +x {} \;

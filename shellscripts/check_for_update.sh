@@ -81,9 +81,11 @@ UPDATE_URL=$( getdotenv.sh UPDATE_URL "http://joo.kie.sk/cosmosex/update" )
 CE_DIR=$( getdotenv.sh CE_DIR "/ce" )
 CE_UPDATE_DIR=$( getdotenv.sh CE_UPDATE_DIR "/ce/update" )
 
+# get paths for new version and currrent version files
+UPDATE_VERSION_NEW_LOCAL=$( getdotenv.sh CE_UPDATE_VERSION_NEW "/tmp/software.version" )                 # path to file containing new version for this distro
+UPDATE_VERSION_CURR_LOCAL=$( getdotenv.sh CE_UPDATE_VERSION_CURRENT "/ce/update/software.current" )   # path to file containing current version for this distro
+
 UPDATE_VERSION_NEW_URL="$UPDATE_URL/$DISTRO.version"        # url to file containing new version for this distro
-UPDATE_VERSION_NEW_LOCAL="/tmp/$DISTRO.version"             # path to file containing new version for this distro
-UPDATE_VERSION_CURR_LOCAL="$CE_UPDATE_DIR/$DISTRO.current"   # path to file containing current version for this distro
 
 echo "online version url   : $UPDATE_VERSION_NEW_URL"
 echo "online version path  : $UPDATE_VERSION_NEW_LOCAL"

@@ -99,7 +99,7 @@ handle_service()
     # should just report status?
     if [ "$1" = "status" ]; then
       [ "$app_running" != "0" ] && stat='UP' || stat='  '
-      printf "    %-20s [ $stat ]\n" "$3"
+      printf "%-24s [ $stat ]\n" "$3"
       return      # exit function here, nothing more to do
     fi
 
@@ -110,7 +110,7 @@ handle_service()
       *)        return ;;               # other commands not supported
     esac
 
-    printf "    %-20s $act\n" "$3"      # show action to user
+    printf "%-24s $act\n" "$3"      # show action to user
     systemctl $1 $2                     # do the action
 }
 
