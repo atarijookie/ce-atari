@@ -58,6 +58,12 @@ public:
     uint8_t* fdd_sectorWritten(int &side, int &track, int &sector, int &byteCount);
 
     //----------------
+    // button, beeper and display handling
+    void handleButton(int& btnDownTime, uint32_t& nextScreenTime);
+    void handleBeeperCommand(int beeperCommand, FloppyConfig *fc);
+    bool handlesDisplay(void);                              // returns true if should handle i2c display from RPi
+    void displayBuffer(uint8_t *bfr, uint16_t size);        // send this display buffer data to remote display
+    //----------------
 private:
     CConSpi *conSpi;
 
@@ -68,6 +74,7 @@ private:
     uint8_t *bufIn;
 
     void serialSetup(void);                             // open IKDB serial port
+    void initButtonAndBeeperPins(void);
 };
 
 #endif // CHIPINTERFACE12_H

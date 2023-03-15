@@ -16,17 +16,23 @@ BSD license, check license.txt for more information
 #include "ssd1306.h"
 #include "i2c2.h"
 #include "../utils.h"
+#include "../chipinterface.h"
+
+extern ChipInterface* chipInterface;
 
 SSD1306::SSD1306()
 {
     buffer = new uint8_t[SSD1306_BUFFER_SIZE];
-    i2c = new i2c2();
+
+    i2c = (chipInterface && chipInterface->handlesDisplay()) ? new i2c2() : NULL;
 }
 
 SSD1306::~SSD1306()
 {
-    delete i2c;
-    i2c = NULL;
+    if(i2c) {
+        delete i2c;
+        i2c = NULL;
+    }
 
     delete []buffer;
     buffer = NULL;
@@ -107,8 +113,12 @@ void SSD1306::invertDisplay(uint8_t i) {
 }
 
 int SSD1306::command(uint8_t c) {
-    int res;
-    res = i2c->i2c_smbus_write_byte_data(SSD1306_I2C_ADDRESS, 0, c);
+    int res = 0;
+
+    if(i2c) {
+        res = i2c->i2c_smbus_write_byte_data(SSD1306_I2C_ADDRESS, 0, c);
+    }
+
     return (res == 0);      // if ACK bit on beginTransmission was 0, this command went OK
 }
 
@@ -209,10 +219,15 @@ void SSD1306::display(void)
     // page end: 7 for 64px height, 3 for 32px height, 1 for 16px height
     command(3); // Page end address
 
+    chipInterface->displayBuffer(buffer, SSD1306_BUFFER_SIZE);  // tell any remote display that this should be displayed
+
     int y;
     for (y=0; y<SSD1306_LCDHEIGHT; y++) {
         uint8_t *data = buffer + (y * SSD1306_BYTES_PER_LINE);
-        i2c->i2c_smbus_write_i2c_block_data(SSD1306_I2C_ADDRESS, 0x40, SSD1306_BYTES_PER_LINE, data);
+
+        if(i2c) {
+            i2c->i2c_smbus_write_i2c_block_data(SSD1306_I2C_ADDRESS, 0x40, SSD1306_BYTES_PER_LINE, data);
+        }
     }
 }
 

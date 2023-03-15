@@ -17,6 +17,7 @@
 #include "../global.h"
 #include "../update.h"
 #include "../ikbd/ikbd.h"
+#include "../display/displaythread.h"
 
 #ifndef ONPC
     #include <bcm2835.h>
@@ -406,3 +407,153 @@ uint8_t* ChipInterface12::fdd_sectorWritten(int &side, int &track, int &sector, 
     return bufIn;                                           // return pointer to received written sector
 }
 
+void ChipInterface12::initButtonAndBeeperPins(void)
+{
+    static bool pinsInitialized = false;
+
+    if(!pinsInitialized) {      // initialize only once
+#ifndef ONPC
+        bcm2835_gpio_fsel(PIN_BEEPER, BCM2835_GPIO_FSEL_OUTP);      // config these extra GPIO pins here (not in the gpio_open())
+        bcm2835_gpio_fsel(PIN_BUTTON, BCM2835_GPIO_FSEL_INPT);
+#endif
+
+        pinsInitialized = true;
+    }
+}
+
+void ChipInterface12::handleButton(int& btnDownTime, uint32_t& nextScreenTime)
+{
+    static bool btnDownPrev = false;
+    static uint32_t btnDownStart = 0;
+    static int btnDownTimePrev = 0;
+    static bool powerOffIs = false;
+    static bool powerOffWas = false;
+
+    initButtonAndBeeperPins();
+
+    #ifdef ONPC
+        bool btnDown = false;
+    #else
+        bool btnDown = bcm2835_gpio_lev(PIN_BUTTON) == LOW;
+    #endif
+
+    uint32_t now = Utils::getCurrentMs();
+
+    if(btnDown) {                                   // if button is pressed
+        if(!btnDownPrev) {                          // it was just pressed down (falling edge)
+            btnDownStart = now;                     // store button down time
+        }
+
+        uint32_t btnDownTimeMs = (now - btnDownStart); // calculate how long the button is down in ms
+
+        //-------------
+        // it's the power off interval, if button down time is between this MIN and MAX time
+        powerOffIs = (btnDownTimeMs >= PWR_OFF_PRESS_TIME_MIN) && (btnDownTimeMs < PWR_OFF_PRESS_TIME_MAX);
+
+        if(!powerOffWas && powerOffIs) {            // if we just entered power off interval (not was, but now is)
+            display_showNow(DISP_SCREEN_POWEROFF);      // show power off question
+            nextScreenTime = Utils::getEndTime(1000);   // redraw display in 1 second
+        }
+
+        powerOffWas = powerOffIs;                   // store previous value of are-we-in-the-power-off-interval flag
+
+        //-------------
+        btnDownTime = btnDownTimeMs / 1000;         // ms to seconds
+        if(btnDownTime != btnDownTimePrev) {        // if button down time (in seconds) changed since the last time we've checked, update strings, show on screen
+            btnDownTimePrev = btnDownTime;          // store this as previous time
+
+            if(btnDownTime >= PWR_OFF_PRESS_TIME_MAX_SECONDS) { // if we're after the power-off interval
+                fillLine_recovery(btnDownTime);         // fill recovery screen lines
+                display_showNow(DISP_SCREEN_RECOVERY);  // show the recovery screen
+            }
+        }
+    } else if(!btnDown && btnDownPrev) {    // if button was just released (rising edge)
+        // if user was holding button down, we should redraw the recovery screen to something normal
+        if(btnDownTime > 0) {
+            int refreshInterval = (btnDownTime < 5) ? 1000 : NEXT_SCREEN_INTERVAL;  // if not doing recovery, redraw in 1 second, otherwise in normal interval
+            nextScreenTime = Utils::getEndTime(refreshInterval);
+        }
+
+        btnDownTime = 0;                    // not holding down button anymore, no button down time
+        btnDownTimePrev = 0;
+        beeper_beep(BEEP_SHORT);            // do a short beep as feedback
+    }
+
+    btnDownPrev = btnDown;                  // store current button down state as previous state
+}
+
+void ChipInterface12::handleBeeperCommand(int beeperCommand, FloppyConfig *fc)
+{
+    initButtonAndBeeperPins();
+
+#ifndef ONPC
+    // should be short-mid-long beep?
+    if(beeperCommand >= BEEP_SHORT && beeperCommand <= BEEP_LONG) {
+        int beepLengthMs[3] = {50, 150, 500};       // beep length: short, mid, long
+        int lengthMs = beepLengthMs[beeperCommand]; // get beep length in ms
+
+        bcm2835_gpio_write(PIN_BEEPER, HIGH);
+        Utils::sleepMs(lengthMs);
+        bcm2835_gpio_write(PIN_BEEPER, LOW);
+        return;
+    }
+
+    // should do the button-press-is-in-the-power-off-interval sound
+    if(beeperCommand == BEEP_POWER_OFF_INTERVAL) {
+        for(int i=0; i<100; i++) {
+            bcm2835_gpio_write(PIN_BEEPER, HIGH);
+            Utils::sleepMs(1);
+            bcm2835_gpio_write(PIN_BEEPER, LOW);
+            Utils::sleepMs(5);
+        }
+
+        return;
+    }
+
+    // should be floppy seek noise?
+    if((beeperCommand & BEEP_FLOPPY_SEEK) == BEEP_FLOPPY_SEEK) {
+        int trackCount = beeperCommand - BEEP_FLOPPY_SEEK;
+        if(trackCount < 0) {        // too little?
+            trackCount = 0;
+        }
+
+        if(trackCount > 100) {      // too much?
+            trackCount = 80;
+        }
+
+        if(!fc->soundEnabled) {     // if shouldn't make noises on floppy seek, just quit
+            return;
+        }
+
+        // for each track seek do a short bzzzz, so in the end it's not a long beep, but a buzzing sound
+        int i;
+        for(i=0; i<trackCount; i++) {
+            bcm2835_gpio_write(PIN_BEEPER, HIGH);
+            Utils::sleepMs(1);
+            bcm2835_gpio_write(PIN_BEEPER, LOW);
+            Utils::sleepMs(5);
+        }
+
+        return;
+    }
+
+    // should just reload config?
+    if(beeperCommand == BEEP_RELOAD_SETTINGS) {
+        Settings s;
+        s.loadFloppyConfig(fc);
+        return;
+    }
+#endif
+}
+
+// returns true if should handle i2c display from RPi
+bool ChipInterface12::handlesDisplay(void)
+{
+    return true;        // v1/v2 does handle display locally
+}
+
+// send this display buffer data to remote display
+void ChipInterface12::displayBuffer(uint8_t *bfr, uint16_t size)
+{
+    // nothing to do in v1/v2 here, as display is handled locally
+}

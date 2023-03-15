@@ -100,8 +100,8 @@ int main(int argc, char *argv[])
 
     bool good = false;
 
-    if(flags.chipInterface == CHIPIF_UNKNOWN) {                 // unknown chip interface? do the auto detection
-        Debug::out(LOG_INFO, "ChipInterface auto-detect: trying v1/v2");
+    if(flags.chipInterface == CHIPIF_UNKNOWN || flags.chipInterface == CHIPIF_V1_V2) {  // chip interface unknown or v1/v2
+        Debug::out(LOG_INFO, "ChipInterface: v1/v2");
 
         chipInterface = new ChipInterface12();                  // create chip interface v1/v2
         hwConfig.version = 2;
@@ -109,9 +109,9 @@ int main(int argc, char *argv[])
         good = chipInterface->ciOpen();                         // try to open chip interface v1/v2
 
         if(!good) {
-            Debug::out(LOG_INFO, "ChipInterface auto-detect: v1/v2 failed, terminating");
+            Debug::out(LOG_INFO, "ChipInterface: v1/v2 failed, terminating");
         } else {
-            Debug::out(LOG_INFO, "ChipInterface auto-detect: v1/v2 opened, continuing.");
+            Debug::out(LOG_INFO, "ChipInterface: v1/v2 opened, continuing.");
             printf("\nChipInterface auto-detect: v1/v2 opened\n");
         }
     } else if(flags.chipInterface == CHIPIF_DUMMY) {
@@ -488,7 +488,7 @@ void printfPossibleCmdLineArgs(void)
     printf("\nPossible command line args:\n");
     printf("reset    - reset Hans and Franz, release lines, quit\n");
     printf("noreset  - when starting, don't reset Hans and Franz\n");
-    printf("llx      - set log level to x (default is 1, max is 3)\n");
+    printf("llx      - set log level to x (default is 1, max is 4)\n");
     printf("cix      - set chip interface type to x (1 & 2 for SPI, 9 for network server, 0 for dummy)\n");
     printf("test     - some default config for device testing\n");
     printf("ce_conf  - use this app as ce_conf on RPi (the app must be running normally, too)\n");

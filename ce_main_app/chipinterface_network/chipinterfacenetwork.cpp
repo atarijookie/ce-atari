@@ -666,3 +666,25 @@ void ChipInterfaceNetwork::byteSwapBfr(uint8_t* buf, int len)
         buf[i+1] = tmp;
     }
 }
+
+void ChipInterfaceNetwork::handleButton(int& btnDownTime, uint32_t& nextScreenTime)
+{
+
+}
+
+void ChipInterfaceNetwork::handleBeeperCommand(int beeperCommand, FloppyConfig *fc)
+{
+
+}
+
+// returns true if should handle i2c display from RPi
+bool ChipInterfaceNetwork::handlesDisplay(void)
+{
+    return false;        // network interface doesn't handle display locally
+}
+
+// send this display buffer data to remote display
+void ChipInterfaceNetwork::displayBuffer(uint8_t *bfr, uint16_t size)
+{
+    // TODO: send this buffer to client, so he can show it
+}

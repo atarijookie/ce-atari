@@ -142,7 +142,7 @@ void *ikbdThreadCode(void *ptr)
         bool clientConnected = false;
 
         if(fdUart >= 0 && FD_ISSET(fdUart, &readfds)) {
-            // process the incomming data from original keyboard and from ST
+            // process the incoming data from original keyboard and from ST
             ikbd.processReceivedCommands(clientConnected);
         }
 

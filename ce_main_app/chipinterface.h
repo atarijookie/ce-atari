@@ -2,6 +2,7 @@
 #define CHIPINTERFACE_H
 
 #include <stdint.h>
+#include "settings.h"
 
 // types of chip interface, as returned by 
 #define CHIP_IF_DUMMY   -1
@@ -118,6 +119,13 @@ public:
     // FDD: all you need for handling the floppy interface
     virtual void fdd_sendTrackToChip(int byteCount, uint8_t *encodedTrack) = 0;    // send encodedTrack to chip for MFM streaming
     virtual uint8_t* fdd_sectorWritten(int &side, int &track, int &sector, int &byteCount) = 0;
+
+    //----------------
+    // button, beeper and display handling
+    virtual void handleButton(int& btnDownTime, uint32_t& nextScreenTime) = 0;
+    virtual void handleBeeperCommand(int beeperCommand, FloppyConfig *fc) = 0;
+    virtual bool handlesDisplay(void) = 0;                          // returns true if should handle i2c display from RPi
+    virtual void displayBuffer(uint8_t *bfr, uint16_t size) = 0;    // send this display buffer data to remote display
 
 protected:
     uint8_t fwResponseBfr[FW_RESPONSE_LEN_BIGGER];

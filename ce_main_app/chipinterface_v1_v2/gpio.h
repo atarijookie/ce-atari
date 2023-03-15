@@ -34,11 +34,14 @@
 #define PIN_MISO                RPI_V2_GPIO_P1_21
 #define PIN_SCK                 RPI_V2_GPIO_P1_23
 
-#define SPI_CS_HANS     BCM2835_SPI_CS0
-#define SPI_CS_FRANZ    BCM2835_SPI_CS1
+#define SPI_CS_HANS             BCM2835_SPI_CS0
+#define SPI_CS_FRANZ            BCM2835_SPI_CS1
 
-#define SPI_ATN_HANS    PIN_ATN_HANS
-#define SPI_ATN_FRANZ   PIN_ATN_FRANZ
+#define SPI_ATN_HANS            PIN_ATN_HANS
+#define SPI_ATN_FRANZ           PIN_ATN_FRANZ
+
+#define PIN_BEEPER              RPI_V2_GPIO_P1_32
+#define PIN_BUTTON              RPI_V2_GPIO_P1_33
 
 bool gpio_open(void);
 void gpio_close(void);

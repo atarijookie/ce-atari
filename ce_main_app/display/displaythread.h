@@ -38,8 +38,13 @@ void display_print_center(char *str);
 
 void display_setLine(int displayLineId, const char *newLineString);
 void display_showNow(int screenIndex);
+void fillLine_recovery(int buttonDownTime);
 
 void *displayThreadCode(void *ptr);
+
+//----------------------------
+// how often we should show next screen, when no other command comes?
+#define NEXT_SCREEN_INTERVAL    5000
 
 //----------------------------
 // interval for power-off button release

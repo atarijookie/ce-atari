@@ -151,3 +151,25 @@ uint8_t* ChipInterfaceDummy::fdd_sectorWritten(int &side, int &track, int &secto
 {
     return NULL;
 }
+
+void ChipInterfaceDummy::handleButton(int& btnDownTime, uint32_t& nextScreenTime)
+{
+
+}
+
+void ChipInterfaceDummy::handleBeeperCommand(int beeperCommand, FloppyConfig *fc)
+{
+
+}
+
+// returns true if should handle i2c display from RPi
+bool ChipInterfaceDummy::handlesDisplay(void)
+{
+    return false;        // dummy interface doesn't handle display locally
+}
+
+// send this display buffer data to remote display
+void ChipInterfaceDummy::displayBuffer(uint8_t *bfr, uint16_t size)
+{
+    // nothing to do here, this is a dummy
+}
