@@ -23,6 +23,7 @@
 #include "display/displaythread.h"
 #include "floppy/floppyencoder.h"
 #include "chipinterface_v1_v2/chipinterface12.h"
+#include "chipinterface_v3/chipinterface3.h"
 #include "chipinterface_network/chipinterfacenetwork.h"
 #include "chipinterface_dummy/chipinterfacedummy.h"
 #include "../libdospath/libdospath.h"
@@ -99,27 +100,21 @@ int main(int argc, char *argv[])
     // Opening of chip interface.
 
     bool good = false;
+    chipInterface = NULL;
 
     if(flags.chipInterface == CHIPIF_UNKNOWN || flags.chipInterface == CHIPIF_V1_V2) {  // chip interface unknown or v1/v2
         Debug::out(LOG_INFO, "ChipInterface: v1/v2");
-
         chipInterface = new ChipInterface12();                  // create chip interface v1/v2
         hwConfig.version = 2;
-
-        good = chipInterface->ciOpen();                         // try to open chip interface v1/v2
-
-        if(!good) {
-            Debug::out(LOG_INFO, "ChipInterface: v1/v2 failed, terminating");
-        } else {
-            Debug::out(LOG_INFO, "ChipInterface: v1/v2 opened, continuing.");
-            printf("\nChipInterface auto-detect: v1/v2 opened\n");
-        }
+    } else if(flags.chipInterface == CHIPIF_V3) {
+        Debug::out(LOG_INFO, "ChipInterface: v3");
+        chipInterface = new ChipInterface3();                   // create chip interface v3
+        hwConfig.version = 2;
     } else if(flags.chipInterface == CHIPIF_DUMMY) {
         Debug::out(LOG_INFO, "ChipInterface: opening DUMMY chip interface");
         chipInterface = new ChipInterfaceDummy();
         hwConfig.version = 2;
         flags.noReset = true;
-        good = chipInterface->ciOpen();
     } else if(flags.chipInterface == CHIPIF_NETWORK) {
         Debug::out(LOG_INFO, "ChipInterface: starting NETWORK server");
         networkServerMain();
@@ -127,8 +122,10 @@ int main(int argc, char *argv[])
     } else {
         Debug::out(LOG_INFO, "ChipInterface - unknown option, terminating.");
         printf("\nChipInterface - unknown option, terminating.\n");
-        good = false;
+        return 0;
     }
+
+    good = chipInterface->ciOpen();                         // try to open chip interface v1/v2
 
     // after the previous lines the good flag should contain if we were able to open the chip interface
     if(!good) {
@@ -301,7 +298,7 @@ void initializeFlags(void)
 {
     flags.justShowHelp = false;
     Debug::setLogLevel(LOG_ERROR);      // init current log level to LOG_ERROR
-    flags.chipInterface = CHIPIF_UNKNOWN; // start with unknown chip interface, this will do the auto-detect atttempt
+    flags.chipInterface = CHIPIF_UNKNOWN; // start with unknown chip interface
     flags.justDoReset  = false;         // if shouldn't run the app, but just reset Hans and Franz (used with STM32 ST-Link JTAG)
     flags.noReset      = false;         // don't reset Hans and Franz on start - used with STM32 ST-Link JTAG
     flags.test         = false;         // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
@@ -404,7 +401,8 @@ void parseCmdLineArguments(int argc, char *argv[])
 
                 switch(ci) {
                     case 1:
-                    case 2: flags.chipInterface = CHIPIF_V1_V2;     break;  // 1 or 2 means SPI interface
+                    case 2: flags.chipInterface = CHIPIF_V1_V2;     break;  // 1 or 2 means old SPI interface
+                    case 3: flags.chipInterface = CHIPIF_V3;        break;  // 3 means new SPI interface
 
                     case 0: flags.chipInterface = CHIPIF_DUMMY;     break;  // 0 for dummy interface
                     case 9: flags.chipInterface = CHIPIF_NETWORK;   break;  // 9 for network server

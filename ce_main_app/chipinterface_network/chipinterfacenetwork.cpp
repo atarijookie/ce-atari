@@ -672,7 +672,7 @@ void ChipInterfaceNetwork::handleButton(int& btnDownTime, uint32_t& nextScreenTi
 
 }
 
-void ChipInterfaceNetwork::handleBeeperCommand(int beeperCommand, FloppyConfig *fc)
+void ChipInterfaceNetwork::handleBeeperCommand(int beeperCommand, bool floppySoundEnabled)
 {
 
 }

@@ -57,10 +57,11 @@
 
 //////////////////////////////////////////////////////
 // chip interface types
-#define CHIPIF_UNKNOWN  0
+#define CHIPIF_UNKNOWN  -1
+#define CHIPIF_DUMMY    0
 #define CHIPIF_V1_V2    1       // Hans + CPLD, Franz, via SPI
-#define CHIPIF_NETWORK  2
-#define CHIPIF_DUMMY    3
+#define CHIPIF_V3       3       // Hosts via SPI
+#define CHIPIF_NETWORK  9
 
 //////////////////////////////////////////////////////
 

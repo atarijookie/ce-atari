@@ -157,7 +157,7 @@ void ChipInterfaceDummy::handleButton(int& btnDownTime, uint32_t& nextScreenTime
 
 }
 
-void ChipInterfaceDummy::handleBeeperCommand(int beeperCommand, FloppyConfig *fc)
+void ChipInterfaceDummy::handleBeeperCommand(int beeperCommand, bool floppySoundEnabled)
 {
 
 }

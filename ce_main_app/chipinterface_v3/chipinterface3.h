@@ -1,23 +1,19 @@
-#ifndef __CHIPINTERFACENETWORK_H__
-#define __CHIPINTERFACENETWORK_H__
+#ifndef CHIPINTERFACE3_H
+#define CHIPINTERFACE3_H
 
 #include <stdint.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
+#include "../chipinterface_v1_v2/gpio.h"
 #include "../chipinterface.h"
-#include "bufferedreader.h"
+#include "conspi2.h"
 
-// tags that are being sent from RPi to chip to mark start of data
-#define NET_TAG_HANS_STR    "TGHA"
-#define NET_TAG_FRANZ_STR   "TGFR"
-#define NET_TAG_IKBD_STR    "TGIK"
-#define NET_TAG_ZEROS_STR   "TGZE"
+// SPI interface for connection to Horst chip.
+// Used in CosmosEx v3.
 
-class ChipInterfaceNetwork: public ChipInterface
+class ChipInterface3: public ChipInterface
 {
 public:
-    ChipInterfaceNetwork();
-    virtual ~ChipInterfaceNetwork();
+    ChipInterface3();
+    virtual ~ChipInterface3();
 
     // this return CHIP_IF_V1_V2 or some other
     int chipInterfaceType(void);
@@ -68,52 +64,17 @@ public:
     void handleBeeperCommand(int beeperCommand, bool floppySoundEnabled);
     bool handlesDisplay(void);                              // returns true if should handle i2c display from RPi
     void displayBuffer(uint8_t *bfr, uint16_t size);        // send this display buffer data to remote display
-
+    //----------------
 private:
-    uint32_t lastTimeRecv;
-    int serverIndex;    // on which server index we're running
-
-    int fdListen;       // socket for listen()
-    int fdClient;       // socket received on accept()
-    int fdReport;       // socket for reporting status to main server thread
-
-    struct sockaddr_in addressListen;
-    struct sockaddr_in addressReport;
+    CConSpi2 *conSpi2;
 
     int ikbdReadFd;     // fd used for IKBD read
     int ikbdWriteFd;    // fd used for IKDB write
 
-    // got 2 pipes, with 2 ends...
-    // pipefd[0] refers to the read end of the pipe.
-    // pipefd[1] refers to the write end of the pipe.
-    int pipeFromAtariToRPi[2];
-    int pipeFromRPiToAtari[2];
-
-    uint32_t nextReportTime;    // when should we send next report to main server socket
-
     uint8_t *bufOut;
     uint8_t *bufIn;
 
-    uint8_t  gotAtnId;      // which chip wants to talk? Franz, Hans?
-    uint8_t  gotAtnCode;    // which command code chips sends? 
-    BufferedReader bufReader;
-
-    void createListeningSocket(void);
-    void acceptSocketIfNeededAndPossible(void);
-    void closeClientSocket(void);
-    int  recvFromClient(uint8_t* buf, int len, bool byteSwap=true);
-    void closeFdIfOpen(int& sock);
-    void createServerReportSocket(void);
-    void sendReportToMainServerSocket(void);
-
-    bool waitForAtn(int atnIdWant, uint8_t atnCode, uint32_t timeoutMs, uint8_t *inBuf);
-    void handleZerosAndIkbd(int atnId);
-
     void serialSetup(void);                             // open IKDB serial port
-    void sendIkbdDataToAtari(void);
-
-    void sendDataToChip(const char* tag, uint8_t* data, uint16_t len);    // send data to chip with specified tag
-    void byteSwapBfr(uint8_t* buf, int len);
 };
 
-#endif // __CHIPINTERFACENETWORK_H__
+#endif // CHIPINTERFACE3_H

@@ -60,7 +60,7 @@ public:
     //----------------
     // button, beeper and display handling
     void handleButton(int& btnDownTime, uint32_t& nextScreenTime);
-    void handleBeeperCommand(int beeperCommand, FloppyConfig *fc);
+    void handleBeeperCommand(int beeperCommand, bool floppySoundEnabled);
     bool handlesDisplay(void);                              // returns true if should handle i2c display from RPi
     void displayBuffer(uint8_t *bfr, uint16_t size);        // send this display buffer data to remote display
     //----------------

@@ -7,6 +7,7 @@
 // types of chip interface, as returned by 
 #define CHIP_IF_DUMMY   -1
 #define CHIP_IF_V1_V2   1
+#define CHIP_IF_V3      3
 #define CHIP_IF_NETWORK 9
 
 // The following commands are sent from device to host on chip interface v1 and v2, 
@@ -123,7 +124,7 @@ public:
     //----------------
     // button, beeper and display handling
     virtual void handleButton(int& btnDownTime, uint32_t& nextScreenTime) = 0;
-    virtual void handleBeeperCommand(int beeperCommand, FloppyConfig *fc) = 0;
+    virtual void handleBeeperCommand(int beeperCommand, bool floppySoundEnabled) = 0;
     virtual bool handlesDisplay(void) = 0;                          // returns true if should handle i2c display from RPi
     virtual void displayBuffer(uint8_t *bfr, uint16_t size) = 0;    // send this display buffer data to remote display
 

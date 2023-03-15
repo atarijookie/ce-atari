@@ -81,10 +81,8 @@ void *displayThreadCode(void *ptr)
     display_setLine(DISP_LINE_POWEROFF1, "     Power off?      ");
 
     FloppyConfig floppyConfig;                                  // this contains floppy sound settings
-
-    if(chipInterface) {
-        chipInterface->handleBeeperCommand(BEEP_RELOAD_SETTINGS, &floppyConfig);   // load settings
-    }
+    Settings s;
+    s.loadFloppyConfig(&floppyConfig);
 
     // create pipes as needed
     pipe2(displayPipeFd, O_NONBLOCK);
@@ -163,8 +161,12 @@ void *displayThreadCode(void *ptr)
                 res = read(beeperPipeFd[0], &beeperCommand, 1);     // try to read beeper command
 
                 if(res != -1) { // read good? do beep
-                    if(chipInterface) {
-                        chipInterface->handleBeeperCommand(beeperCommand, &floppyConfig);
+                    if(beeperCommand == BEEP_RELOAD_SETTINGS) {     // if should just reload settings?
+                        s.loadFloppyConfig(&floppyConfig);
+                    } else {                        // some other beeper command?
+                        if(chipInterface) {         // and got the chip interface?
+                            chipInterface->handleBeeperCommand(beeperCommand, floppyConfig.soundEnabled);
+                        }
                     }
                 }
             }
