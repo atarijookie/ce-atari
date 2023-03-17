@@ -131,7 +131,7 @@ void ChipInterfaceNetwork::acceptSocketIfNeededAndPossible(void)
 
 void ChipInterfaceNetwork::closeClientSocket(void)
 {
-    closeFdIfOpen(fdClient);            // close socket
+    Utils::closeFdIfOpen(fdClient);            // close socket
     sendReportToMainServerSocket();     // let main server process know that we're free now
 
     Debug::out(LOG_DEBUG, "closeClientSocket() - client disconnected");
@@ -186,26 +186,18 @@ bool ChipInterfaceNetwork::ciOpen(void)
     return true;
 }
 
-void ChipInterfaceNetwork::closeFdIfOpen(int& sock)
-{
-    if(sock != -1) {    // got the sock?
-        close(sock);    // close it
-        sock = -1;      // set it to invalid value
-    }
-}
-
 void ChipInterfaceNetwork::ciClose(void)
 {
     // close sockets
-    closeFdIfOpen(fdListen);
-    closeFdIfOpen(fdClient);
-    closeFdIfOpen(fdReport);
+    Utils::closeFdIfOpen(fdListen);
+    Utils::closeFdIfOpen(fdClient);
+    Utils::closeFdIfOpen(fdReport);
 
     // close IKDB pipes
-    closeFdIfOpen(pipeFromAtariToRPi[0]);
-    closeFdIfOpen(pipeFromAtariToRPi[1]);
-    closeFdIfOpen(pipeFromRPiToAtari[0]);
-    closeFdIfOpen(pipeFromRPiToAtari[1]);
+    Utils::closeFdIfOpen(pipeFromAtariToRPi[0]);
+    Utils::closeFdIfOpen(pipeFromAtariToRPi[1]);
+    Utils::closeFdIfOpen(pipeFromRPiToAtari[0]);
+    Utils::closeFdIfOpen(pipeFromRPiToAtari[1]);
 }
 
 void ChipInterfaceNetwork::ikbdUartEnable(bool enable)

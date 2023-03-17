@@ -1124,3 +1124,11 @@ bool Utils::endsWith(const std::string& value, const char* tail)
     // compare this value at its end with the ending
     return (value.compare(value.size() - lenTail, lenTail, tail) == 0);
 }
+
+void Utils::closeFdIfOpen(int& fd)
+{
+    if(fd != -1) {    // got the fd?
+        close(fd);    // close it
+        fd = -1;      // set it to invalid value
+    }
+}

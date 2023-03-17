@@ -65,15 +65,8 @@ bool ChipInterface12::ciOpen(void)
 void ChipInterface12::ciClose(void)
 {
 #ifndef ONPC
-    if(ikbdReadFd != -1) {  // if got fd, close it
-        close(ikbdReadFd);
-        ikbdReadFd = -1;
-    }
-
-    if(ikbdWriteFd != -1) { // if got fd, close it
-        close(ikbdWriteFd);
-        ikbdWriteFd = -1;
-    }
+    Utils::closeFdIfOpen(ikbdReadFd);
+    Utils::closeFdIfOpen(ikbdWriteFd);
 
     gpio_close();           // close GPIO and SPI
 #endif

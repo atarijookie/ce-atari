@@ -100,6 +100,8 @@ public:
 
     static void sendToMounter(const std::string& jsonString);
 
+    static void closeFdIfOpen(int& fd);
+
 private:
     static bool copyFileByHandles(FILE *from, FILE *to);
     static void getDefaultValueFromVarName(std::string& varName, std::string& defValue, const std::string& delim);

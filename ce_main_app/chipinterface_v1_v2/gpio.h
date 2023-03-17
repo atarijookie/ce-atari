@@ -43,10 +43,11 @@
 #define PIN_BEEPER              RPI_V2_GPIO_P1_32
 #define PIN_BUTTON              RPI_V2_GPIO_P1_33
 
+#endif      // end of ONPC
+
 bool gpio_open(void);
 void gpio_close(void);
 bool spi_atn(int whichSpiAtn);
 void spi_tx_rx(int whichSpiCS, int count, uint8_t *txBuf, uint8_t *rxBuf);
 
-#endif      // end of ONPC
 #endif      // end of _GPIO_H_

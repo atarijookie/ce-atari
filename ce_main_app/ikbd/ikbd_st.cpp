@@ -45,7 +45,7 @@ void Ikbd::processReceivedCommands(bool skipKeyboardTranslation)
         uint8_t tag = cbReceivedData.peek();                   // peek current value, don't move just yet
         uint8_t val;
 
-        if(tag != UARTMARK_STCMD && tag != UARTMARK_KEYBDATA && tag != UARTMARK_DEBUG_STR) {    // not a valid tag?
+        if(tag != UARTMARK_STCMD && tag != UARTMARK_KEYBDATA) {    // not a valid tag?
             tag = cbReceivedData.get();                     // remove byte from buffer and try again
             continue;
         }
@@ -61,33 +61,6 @@ void Ikbd::processReceivedCommands(bool skipKeyboardTranslation)
             }
 
             continue;
-        }
-
-        if(tag == UARTMARK_DEBUG_STR) {                     // if this is a debug string from chip
-            if(cbReceivedData.count < 4) {                  // the received data buffer doesn't have enough data to get count and a valid string, quit here
-                break;
-            }
-
-            // get length of debug string
-            uint16_t hi, lo, len;
-            hi = cbReceivedData.peekWithOffset(1);
-            lo = cbReceivedData.peekWithOffset(2);
-            len = (hi << 8) | lo;
-
-            if((len + 3) <= cbReceivedData.size) {          // if the expected size will fit in the buffer, do other checks before trying to write to log
-                if(cbReceivedData.count < (3 + len)) {      // if we don't have enough of received data, quit for now, try later
-                    break;
-                }
-            } else {    // the expected length will not fit in our cbReceivedData buffer - due to trying to send too long string, or it's some garbage data
-                len = cbReceivedData.count - 3;             // the length we now want to dump in file is all the data from buffer
-            }
-
-            // if got here, got enough data to show whole debug string
-            for(int i=0; i<3; i++) {                        // remove tag, len-hi, len-lo bytes, we know them already
-                cbReceivedData.get();
-            }
-
-            chipLog(len, &cbReceivedData);                  // dump len of bytes from cbReceivedData into chip log file
         }
     }
 

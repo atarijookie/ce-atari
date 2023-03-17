@@ -29,8 +29,8 @@ ChipInterface3::ChipInterface3()
 {
     conSpi2 = new CConSpi2();
 
-    ikbdReadFd = -1;
-    ikbdWriteFd = -1;
+    pipeFromAtariToRPi[0] = pipeFromAtariToRPi[1] = -1;
+    pipeFromRPiToAtari[0] = pipeFromRPiToAtari[1] = -1;
 
     bufOut = new uint8_t[MFM_STREAM_SIZE];
     bufIn = new uint8_t[MFM_STREAM_SIZE];
@@ -63,113 +63,53 @@ bool ChipInterface3::ciOpen(void)
 
 void ChipInterface3::ciClose(void)
 {
+    Utils::closeFdIfOpen(pipeFromAtariToRPi[0]);
+    Utils::closeFdIfOpen(pipeFromAtariToRPi[1]);
+
+    Utils::closeFdIfOpen(pipeFromRPiToAtari[0]);
+    Utils::closeFdIfOpen(pipeFromRPiToAtari[1]);
+
 #ifndef ONPC
-    if(ikbdReadFd != -1) {  // if got fd, close it
-        close(ikbdReadFd);
-        ikbdReadFd = -1;
-    }
-
-    if(ikbdWriteFd != -1) { // if got fd, close it
-        close(ikbdWriteFd);
-        ikbdWriteFd = -1;
-    }
-
     gpio_close();           // close GPIO and SPI
 #endif
 }
 
 void ChipInterface3::ikbdUartEnable(bool enable)
 {
-#ifndef ONPC
-    if(enable) {
-        bcm2835_gpio_write(PIN_TX_SEL1N2, HIGH);            // TX_SEL1N2, switch the RX line to receive from Franz, which does the 9600 to 7812 baud translation
-    }
-#endif
+    // no special enabling needed on v3
 }
 
 int ChipInterface3::ikbdUartReadFd(void)
 {
-    return ikbdReadFd;
+    return pipeFromAtariToRPi[0];           // IKBD thread reads from Atari, pipe 0
 }
 
 int ChipInterface3::ikbdUartWriteFd(void)
 {
-    return ikbdWriteFd;
+    return pipeFromRPiToAtari[1];           // IKBD thread writes to Atari, pipe 1
 }
 
 void ChipInterface3::serialSetup(void)
 {
-    struct termios termiosStruct;
-    termios *ts = &termiosStruct;
+    // create pipes for communication with ikbd thread
+    int res;
 
-    int fd;
+    res = pipe2(pipeFromAtariToRPi, O_NONBLOCK);
 
-    ikbdReadFd = -1;
-    ikbdWriteFd = -1;
-
-    fd = open(UARTFILE, O_RDWR | O_NOCTTY | O_NDELAY | O_NONBLOCK);
-    if(fd == -1) {
-        logDebugAndIkbd(LOG_ERROR, "Failed to open %s", UARTFILE);
-        return;
+    if(res  < 0) {
+        Debug::out(LOG_ERROR, "failed to create pipeFromAtariToRPi");
     }
 
-    fcntl(fd, F_SETFL, 0);
-    tcgetattr(fd, ts);
+    res = pipe2(pipeFromRPiToAtari, O_NONBLOCK);
 
-    /* reset the settings */
-    cfmakeraw(ts);
-    ts->c_cflag &= ~(CSIZE | CRTSCTS);
-    ts->c_iflag &= ~(IXON | IXOFF | IXANY | IGNPAR);
-    ts->c_lflag &= ~(ECHOK | ECHOCTL | ECHOKE);
-    ts->c_oflag &= ~(OPOST | ONLCR);
-
-    /* setup the new settings */
-    cfsetispeed(ts, B19200);
-    cfsetospeed(ts, B19200);
-    ts->c_cflag |=  CS8 | CLOCAL | CREAD;            // uart: 8N1
-
-    ts->c_cc[VMIN ] = 0;
-    ts->c_cc[VTIME] = 0;
-
-    /* set the settings */
-    tcflush(fd, TCIFLUSH);
-
-    if (tcsetattr(fd, TCSANOW, ts) != 0) {
-        close(fd);
-        return;
+    if(res  < 0) {
+        Debug::out(LOG_ERROR, "failed to create pipeFromRPiToAtari");
     }
-
-    /* confirm they were set */
-    struct termios settings;
-    tcgetattr(fd, &settings);
-    if (settings.c_iflag != ts->c_iflag ||
-        settings.c_oflag != ts->c_oflag ||
-        settings.c_cflag != ts->c_cflag ||
-        settings.c_lflag != ts->c_lflag) {
-        close(fd);
-        return;
-    }
-
-    fcntl(fd, F_SETFL, FNDELAY);                    // make reading non-blocking
-
-    // on real UART same fd is used for read and write
-    ikbdReadFd = fd;
-    ikbdWriteFd = fd;
 }
 
 void ChipInterface3::resetHDDandFDD(void)
 {
-#ifndef ONPC
-    bcm2835_gpio_write(PIN_RESET_HANS,          LOW);       // reset lines to RESET state
-    bcm2835_gpio_write(PIN_RESET_FRANZ,         LOW);
-
-    Utils::sleepMs(10);                                     // wait a while to let the reset work
-
-    bcm2835_gpio_write(PIN_RESET_HANS,          HIGH);      // reset lines to RUN (not reset) state
-    bcm2835_gpio_write(PIN_RESET_FRANZ,         HIGH);
-
-    Utils::sleepMs(50);                                     // wait a while to let the devices boot
-#endif
+    resetHDD();     // just use reset HDD as reset FDD in v3 does nothing
 }
 
 void ChipInterface3::resetHDD(void)
@@ -184,54 +124,28 @@ void ChipInterface3::resetHDD(void)
 
 void ChipInterface3::resetFDD(void)
 {
-#ifndef ONPC
-    bcm2835_gpio_write(PIN_RESET_FRANZ,         LOW);
-    Utils::sleepMs(10);                                     // wait a while to let the reset work
-    bcm2835_gpio_write(PIN_RESET_FRANZ,         HIGH);
-    Utils::sleepMs(50);                                     // wait a while to let the devices boot
-#endif
+    // nothing to do on v3
 }
 
 bool ChipInterface3::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
 {
-#ifndef ONPC
-    // if waitForATN() succeeds, it fills 8 bytes of data in buffer
-    // ...but then we might need some little more, so let's determine what it was
-    // and keep reading as much as needed
-    int moreData = 0;
+    uint16_t marker;
 
-    // check for any ATN code waiting from Hans
-    bool res = conSpi2->waitForATN(SPI_CS_HANS, (uint8_t) ATN_ANY, 0, inBuf);
+    // check for any ATN code waiting from HDD
+    marker = conSpi2->waitForATN(true, (uint8_t) ATN_ANY, 0, inBuf);
 
-    if(res) {    // HANS is signaling attention?
-        if(inBuf[3] == ATN_ACSI_COMMAND) {
-            moreData = 14;                              // all ACSI command bytes
-        }
-
-        if(moreData) {
-            conSpi2->txRx(SPI_CS_HANS, moreData, bufOut, inBuf + 8);   // get more data, offset in input buffer by header size
-        }
-
+    if(marker == MARKER_HDD) {
         hardNotFloppy = true;
         return true;
     }
 
-    // check for any ATN code waiting from Franz
-    res = conSpi2->waitForATN(SPI_CS_FRANZ, (uint8_t) ATN_ANY, 0, inBuf);
+    // check for any ATN code waiting from FDD
+    marker = conSpi2->waitForATN(false, (uint8_t) ATN_ANY, 0, inBuf);
 
-    if(res) {    // FRANZ is signaling attention?
-        if(inBuf[3] == ATN_SEND_TRACK) {
-            moreData = 2;                               // side + track
-        }
-
-        if(moreData) {
-            conSpi2->txRx(SPI_CS_FRANZ, moreData, bufOut, inBuf + 8);   // get more data, offset in input buffer by header size
-        }
-
+    if(marker == MARKER_FDD) {
         hardNotFloppy = false;
         return true;
     }
-#endif
 
     // no action needed
     return false;
@@ -294,7 +208,7 @@ bool ChipInterface3::hdd_sendData_transferBlock(uint8_t *pData, uint32_t dataCou
     }
 
     while(dataCount > 0) {                                          // while there's something to send
-        bool res = conSpi2->waitForATN(SPI_CS_HANS, ATN_READ_MORE_DATA, 1000, bufIn);   // wait for ATN_READ_MORE_DATA
+        uint16_t marker = conSpi2->waitForATN(true, ATN_READ_MORE_DATA, 1000, bufIn);   // wait for ATN_READ_MORE_DATA
 
         if(!res) {                                                  // this didn't come? fuck!
             return false;
@@ -345,7 +259,7 @@ bool ChipInterface3::hdd_recvData_transferBlock(uint8_t *pData, uint32_t dataCou
         // request maximum 512 bytes from host
         uint32_t subCount = (dataCount > 512) ? 512 : dataCount;
 
-        bool res = conSpi2->waitForATN(SPI_CS_HANS, ATN_WRITE_MORE_DATA, 1000, inBuf); // wait for ATN_WRITE_MORE_DATA
+        uint16_t marker = conSpi2->waitForATN(true, ATN_WRITE_MORE_DATA, 1000, inBuf); // wait for ATN_WRITE_MORE_DATA
 
         if(!res) {                                          // this didn't come? fuck!
             return false;
@@ -365,7 +279,7 @@ bool ChipInterface3::hdd_recvData_transferBlock(uint8_t *pData, uint32_t dataCou
 bool ChipInterface3::hdd_sendStatusToHans(uint8_t statusByte)
 {
 #ifndef ONPC
-    bool res = conSpi2->waitForATN(SPI_CS_HANS, ATN_GET_STATUS, 1000, bufIn);   // wait for ATN_GET_STATUS
+    uint16_t marker = conSpi2->waitForATN(true, ATN_GET_STATUS, 1000, bufIn);   // wait for ATN_GET_STATUS
 
     if(!res) {
         return false;

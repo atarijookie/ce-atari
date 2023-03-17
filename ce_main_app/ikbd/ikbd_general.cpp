@@ -361,9 +361,9 @@ void ikbdLog(const char *format, ...)
 
 std::string chipLogFilePath;
 
-// chipLog() will receive incomplete lines stored in cb, terminated by '\n'.
+// chipLog() will receive incomplete lines stored in bfr, terminated by '\n'.
 // It should write only complete lines to file, so it will try to gather chars until '\n' char and do write to file then.
-void chipLog(uint16_t cnt, CyclicBuff *cb)
+void chipLog(uint16_t cnt, uint8_t *bfr)
 {
     static std::string oneLine;
     static uint32_t prevLogOutChips = 0;
@@ -372,18 +372,18 @@ void chipLog(uint16_t cnt, CyclicBuff *cb)
     uint32_t diff = now - prevLogOutChips;
     prevLogOutChips = now;
 
+    if(chipLogFilePath.empty()) {
+        chipLogFilePath = Utils::dotEnvValue("LOG_DIR", "/var/log/ce");     // path to logs dir
+        Utils::mergeHostPaths(chipLogFilePath, "chip.log");             // full path = dir + filename
+    }
+
     char val = 0;
 
     for(int i=0; i<cnt; i++) {  // for cnt of characters
-        val = cb->get();        // get from cyclic buffer
+        val = bfr[i];           // get from buffer
         oneLine += val;         // append to string
 
         if(val == '\n') {       // if last char was new line, dump it to file
-            if(chipLogFilePath.empty()) {
-                chipLogFilePath = Utils::dotEnvValue("LOG_DIR", "/var/log/ce");     // path to logs dir
-                Utils::mergeHostPaths(chipLogFilePath, "chip.log");             // full path = dir + filename
-            }
-
             FILE *f = fopen(chipLogFilePath.c_str(), "a+t");
 
             if(f != NULL) {     // if file open good, write data

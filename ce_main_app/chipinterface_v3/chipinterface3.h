@@ -68,8 +68,11 @@ public:
 private:
     CConSpi2 *conSpi2;
 
-    int ikbdReadFd;     // fd used for IKBD read
-    int ikbdWriteFd;    // fd used for IKDB write
+    // got 2 pipes, with 2 ends...
+    // pipefd[0] refers to the read end of the pipe.
+    // pipefd[1] refers to the write end of the pipe.
+    int pipeFromAtariToRPi[2];
+    int pipeFromRPiToAtari[2];
 
     uint8_t *bufOut;
     uint8_t *bufIn;

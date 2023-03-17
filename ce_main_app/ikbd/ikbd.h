@@ -34,7 +34,6 @@ typedef struct {
 
 #define UARTMARK_STCMD      0xAA
 #define UARTMARK_KEYBDATA   0xBB
-#define UARTMARK_DEBUG_STR  0xDD
 
 typedef struct {
     int axis[JOYAXIS];
@@ -55,7 +54,7 @@ void ikbdLog(const char *format, ...);
                                                 ikbdLog(FORMAT);                \
                                               }
 
-void chipLog(uint16_t cnt, CyclicBuff *cb);
+void chipLog(uint16_t cnt, uint8_t *bfr);
 
 extern TInputDevice ikbdDevs[INTYPE_MAX+1];
 
