@@ -105,6 +105,8 @@ void ChipInterface3::serialSetup(void)
     if(res  < 0) {
         Debug::out(LOG_ERROR, "failed to create pipeFromRPiToAtari");
     }
+
+    conSpi2->setIkbdWriteFd(pipeFromAtariToRPi[1]);     // ConSPI2 get Atari data, writes them to pipe 1, IKBD thread gets them
 }
 
 void ChipInterface3::resetHDDandFDD(void)
@@ -115,10 +117,10 @@ void ChipInterface3::resetHDDandFDD(void)
 void ChipInterface3::resetHDD(void)
 {
 #ifndef ONPC
-    bcm2835_gpio_write(PIN_RESET_HANS,          LOW);       // reset lines to RESET state
-    Utils::sleepMs(10);                                     // wait a while to let the reset work
-    bcm2835_gpio_write(PIN_RESET_HANS,          HIGH);      // reset lines to RUN (not reset) state
-    Utils::sleepMs(50);                                     // wait a while to let the devices boot
+    bcm2835_gpio_write(PIN_RESET_HANS, LOW);        // reset lines to RESET state
+    Utils::sleepMs(10);                             // wait a while to let the reset work
+    bcm2835_gpio_write(PIN_RESET_HANS, HIGH);       // reset lines to RUN (not reset) state
+    Utils::sleepMs(50);                             // wait a while to let the devices boot
 #endif
 }
 

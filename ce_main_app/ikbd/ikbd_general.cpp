@@ -377,22 +377,22 @@ void chipLog(uint16_t cnt, uint8_t *bfr)
         Utils::mergeHostPaths(chipLogFilePath, "chip.log");             // full path = dir + filename
     }
 
-    char val = 0;
+    FILE *f = fopen(chipLogFilePath.c_str(), "a+t");
+
+    if(!f) {                    // no file? quit
+        return;
+    }
 
     for(int i=0; i<cnt; i++) {  // for cnt of characters
-        val = bfr[i];           // get from buffer
+        char val = bfr[i];      // get from buffer
         oneLine += val;         // append to string
 
         if(val == '\n') {       // if last char was new line, dump it to file
-            FILE *f = fopen(chipLogFilePath.c_str(), "a+t");
-
-            if(f != NULL) {     // if file open good, write data
-                fprintf(f, "%08d\t%08d\t ", now, diff);
-                fputs(oneLine.c_str(), f);
-                fclose(f);
-            }
-
+            fprintf(f, "%08d\t%08d\t ", now, diff);
+            fputs(oneLine.c_str(), f);
             oneLine.clear();    // clear gathered line
         }
     }
+
+    fclose(f);      // close file at the end
 }

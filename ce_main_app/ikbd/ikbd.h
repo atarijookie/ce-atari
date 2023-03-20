@@ -140,12 +140,11 @@ private:
     TJoystickState  joystick[2];
     JoystickState   joystickState;
 
-    CyclicBuff      cbReceivedData;
-    CyclicBuff      cbStCommands;
-    CyclicBuff      cbKeyboardData;
+    CyclicBuff cbReceivedData;
+    CyclicBuff cbStCommands;
+    CyclicBuff cbKeyboardData;
 
     uint8_t            specialCodeLen[10];
-
     uint8_t            stCommandLen[256];
 
     std::bitset<KBD_KEY_COUNT> pressedKeys;
