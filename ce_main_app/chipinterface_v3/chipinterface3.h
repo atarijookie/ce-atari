@@ -74,8 +74,7 @@ private:
     int pipeFromAtariToRPi[2];
     int pipeFromRPiToAtari[2];
 
-    uint8_t *bufOut;
-    uint8_t *bufIn;
+    uint8_t *rxDataWOhead;
 
     void serialSetup(void);                             // open IKDB serial port
 };

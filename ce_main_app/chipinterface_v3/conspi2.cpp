@@ -23,6 +23,8 @@ CConSpi2::CConSpi2()
 
     // construct dummy packet, which we will TX, when there's nothing to TX, but we want to RX
     txDummyPacket = new SpiTxPacket(MARKER_HDD, CMD_DUMMY, 0, NULL);
+
+    pthread_mutex_init(&mutex, NULL);
 }
 
 CConSpi2::~CConSpi2()
@@ -37,28 +39,33 @@ void CConSpi2::setCsForTransfer(bool startNotEnd)
 #endif
 }
 
-void CConSpi2::addToTxQueue(uint8_t* data, uint16_t len)
+void CConSpi2::addToTxQueue(uint16_t marker, uint16_t cmd, uint16_t dataSize, uint8_t* inData)
 {
-    // TODO: add copy of this to TX queue
+    pthread_mutex_lock(&mutex);
 
-    // lock mutex
+    // add copy of this data TX queue
+    SpiTxPacket *txPacket = new SpiTxPacket(marker, cmd, dataSize, inData);
+    txQueue.push(txPacket);
 
-    // add
-
-   // unlock mutex
+    pthread_mutex_unlock(&mutex);
 }
 
-uint16_t CConSpi2::waitForATN(bool hddNotFdd, uint8_t atnCode, uint32_t timeoutMs, uint8_t *inBuf)
+SpiRxPacket* CConSpi2::waitForATN(uint8_t expectMarker, uint8_t atnCode, uint32_t timeoutMs)
 {
     // start the timeout count
     uint32_t timeOut = Utils::getEndTime(timeoutMs);
     SpiRxPacket rxPacket;
 
     while(true) {
-        // rx_queue not empty? go through the messages, if any of them is is matching interface + ATN, return it
-        // for message in received_queue
-        //      if CConSpi2::messageAsRequested(item)
-        //          return marker;
+        // rxQueue not empty? go through the messages, if any of them is is matching interface + ATN, return it
+        std::list<SpiRxPacket *>::iterator it;
+        for (it = rxQueue.begin(); it != rxQueue.end(); ++it) {     // go through the queue
+            SpiRxPacket* rxPack = (*it);                            // dereference iterator to packet pointer
+            if(rxPack->asRequested(expectMarker, atnCode)) {        // is this packet from queue what we are looking for?
+                rxQueue.remove(rxPack);     // remove this packet from queue, this messes up iterators, but we will quit here, so it shouldn't matter
+                return rxPack;              // return pointer to this packet
+            }
+        }
 
         uint16_t marker = transferPacket();
 
@@ -82,41 +89,46 @@ uint16_t CConSpi2::waitForATN(bool hddNotFdd, uint8_t atnCode, uint32_t timeoutM
         }
 
         if(marker) {        // this is a valid marker and it's not IKBD and LOGS, so it's HDD or FDD
-            if(rxPacket.asRequested(hddNotFdd, atnCode)) {
-            // TODO:
-            //      return marker;
+            SpiRxPacket *rxPacket2 = new SpiRxPacket();     // create new RX packet object
+            rxPacket2->useRawData(rxBuffer, true);          // copy data from rxBuffer
 
-            } else {        // hdd / fdd + ATN code different to what was requested? add to rx_queue
-                SpiRxPacket *rxPacket2 = new SpiRxPacket();     // create new RX packet object
-                rxPacket2->useRawData(rxBuffer, true);          // copy data from rxBuffer
-                rxQueue.push(rxPacket2);                        // add to RX queue for later processing
+            if(rxPacket.asRequested(expectMarker, atnCode)) {  // is this the packet we've requested? return it
+                return rxPacket2;
+            } else {                                // now what we've requested? add to queue
+                rxQueue.push_front(rxPacket2);
             }
         }
 
+        pthread_mutex_lock(&mutex);
+        bool txQueueEmpty = txQueue.empty();
+        pthread_mutex_unlock(&mutex);
+
         // nothing more to TX and we're out of time? quit
-        // TODO: lock mutex
-        if(txQueue.empty() && Utils::getCurrentMs() >= timeOut) {
-            return 0;
+        if(txQueueEmpty && Utils::getCurrentMs() >= timeOut) {
+            return NULL;
         }
-        // TODO: unlock mutex
     }
 }
 
 uint16_t CConSpi2::transferPacket(void)
 {
+    pthread_mutex_lock(&mutex);
+    bool txQueueEmpty = txQueue.empty();
+    pthread_mutex_unlock(&mutex);
+
+    bool atnIsH = spi_atn(SPI_ATN_HANS);
+
     // ATN is L (CE doesn't need to TX) and our TX queue is empty (we don't need to TX)
-    // TODO: lock mutex
-    if(!spi_atn(SPI_ATN_HANS) && txQueue.size() == 0) {
+    if(!atnIsH && txQueueEmpty) {
         return 0;
     }
-    // TODO: unlock mutex
 
     memset(txBuffer, 0, 8);
     memset(rxBuffer, 0, 8);
 
     // HOST INITIALIZED TRANSFER - we can start HOST initialized transfer if ATN is L.
     // We want to start HOST initialized transfer, if we got something to TX (tx queue not empty).
-    if(!spi_atn(SPI_ATN_HANS) && !txQueue.empty()) {    // ATN is L, but something to TX to CE
+    if(!atnIsH && !txQueueEmpty) {                      // ATN is L, but something to TX to CE
         setCsForTransfer(true);                         // put CS to L
 
         // wait for ATN going H
@@ -148,19 +160,18 @@ uint16_t CConSpi2::transferPacket(void)
     // fetch item to TX to CE
     SpiTxPacket *txPacket = txDummyPacket;
 
-    // TODO: lock mutex
-    if(txQueue.size() > 0) {                // got something in TX queue?
-
+    if(!txQueueEmpty) {                     // got something in TX queue?
+        pthread_mutex_lock(&mutex);
         txPacket = txQueue.front();         // get pointer
         txQueue.pop();                      // remove pointer from queue
+        pthread_mutex_unlock(&mutex);
     }
-    // TODO: unlock mutex
 
     // get whole transfer size = max(incoming_from_ce, size_of_outgoing_message)
     SpiRxPacket rxPacket;
-    rxPacket.useRawData(rxBuffer, false);
+    rxPacket.useRawData(rxBuffer, false);   // use SpiRxPacket to read data size as the header is already present (data is still to be transferred)
 
-    uint16_t txRxLen = MAX(rxPacket.getDataSize() + 2, txPacket->size + 2); // max(incoming_from_ce, size_of_outgoing_message)
+    uint16_t txRxLen = MAX(rxPacket.getDataSize() + 2, txPacket->size); // max(incoming_from_ce, size_of_outgoing_message)
 
     // TX and RX message
     spi_tx_rx(SPI_CS_HANS, txRxLen, txPacket->data, rxBuffer + 8);    // rx buffer contains received data including header
