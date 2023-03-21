@@ -26,7 +26,6 @@ private:
     uint8_t *paddingBuffer;
 
     bool readHeader(int whichSpiCs, uint8_t *outBuf, uint8_t *inBuf);
-    uint16_t swapWord(uint16_t val);
 
     void applyTxRxLimits(int whichSpiCs, uint8_t *inBuff);
     void applyNoTxRxLimis(int whichSpiCs);

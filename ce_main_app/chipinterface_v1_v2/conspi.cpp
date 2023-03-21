@@ -140,8 +140,8 @@ void CConSpi::applyTxRxLimits(int whichSpiCs, uint8_t *inBuff)
     uint16_t *pwIn = (uint16_t *) inBuff;
 
     // words 0 and 1 are 0 and ATN code, words 2 and 3 are txLen, rxLen);
-    uint16_t txLen = swapWord(pwIn[2]);
-    uint16_t rxLen = swapWord(pwIn[3]);
+    uint16_t txLen = Utils::SWAPWORD2(pwIn[2]);
+    uint16_t rxLen = Utils::SWAPWORD2(pwIn[3]);
 
 #ifdef DEBUG_SPI_COMMUNICATION
     Debug::out(LOG_DEBUG, "TX/RX limits: TX %d WORDs, RX %d WORDs", txLen, rxLen);
@@ -162,16 +162,6 @@ void CConSpi::applyTxRxLimits(int whichSpiCs, uint8_t *inBuff)
 
     setRemainingTxRxLen(whichSpiCs, txLen, rxLen);
 #endif
-}
-
-uint16_t CConSpi::swapWord(uint16_t val)
-{
-    uint16_t tmp = 0;
-
-    tmp  = val << 8;
-    tmp |= val >> 8;
-
-    return tmp;
 }
 
 void CConSpi::setRemainingTxRxLen(int whichSpiCs, uint16_t txLen, uint16_t rxLen)

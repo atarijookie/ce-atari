@@ -487,7 +487,7 @@ void printfPossibleCmdLineArgs(void)
     printf("reset    - reset Hans and Franz, release lines, quit\n");
     printf("noreset  - when starting, don't reset Hans and Franz\n");
     printf("llx      - set log level to x (default is 1, max is 4)\n");
-    printf("cix      - set chip interface type to x (1 & 2 for SPI, 9 for network server, 0 for dummy)\n");
+    printf("cix      - set chip interface type to x (1 & 2 for old SPI, 3 for new SPI, 9 for network server, 0 for dummy)\n");
     printf("test     - some default config for device testing\n");
     printf("ce_conf  - use this app as ce_conf on RPi (the app must be running normally, too)\n");
     printf("hwinfo   - get HW version and HDD interface type\n");

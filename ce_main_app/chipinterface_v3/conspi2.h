@@ -128,11 +128,6 @@ public:
         return MIN(inSize, SPI_TX_RX_BFR_SIZE);             // limit to maximum buffer size
     }
 
-    uint16_t rxLen(void)    {
-        uint16_t inSize = Utils::getWord(pData + 6) * 2;    // multiply by 2 because size is in WORDs
-        return MIN(inSize, SPI_TX_RX_BFR_SIZE);             // limit to maximum buffer size
-    }
-
     bool isHdd(void)        { return marker() == MARKER_HDD; }
     bool isFdd(void)        { return marker() == MARKER_FDD; }
 
@@ -178,8 +173,9 @@ private:
     uint16_t swapWord(uint16_t val);
 
     void setCsForTransfer(bool startNotEnd);
-    void getTxSize(uint8_t* inBuff, uint16_t& txLen);
     uint16_t transferPacket(void);
+
+    void testEndian(void);
 };
 
 #endif // CONSPI2_H

@@ -25,11 +25,32 @@ CConSpi2::CConSpi2()
     txDummyPacket = new SpiTxPacket(MARKER_HDD, CMD_DUMMY, 0, NULL);
 
     pthread_mutex_init(&mutex, NULL);
+
+    testEndian();
 }
 
 CConSpi2::~CConSpi2()
 {
     delete txDummyPacket;
+}
+
+void CConSpi2::testEndian(void)
+{
+    uint8_t bfrBytes[8];
+    Utils::storeWord(bfrBytes, 0x1122);         // store WORD to buffer - 0x11 first, 0x22 next
+    uint16_t *inWord = (uint16_t *) bfrBytes;   // cast BYTE pointer to WORD
+
+    // get value like chip interface v1/v2 - by casting BYTE* to WORD* and reading, expecting the order to be reversed to be good
+    uint16_t marker = *inWord;
+    Debug::out(LOG_INFO, "CConSpi2::testEndian 1 - order %s", (marker == 0x2211) ? "OK" : "BAD");
+
+    // get value and use swapWord like chip interface v1/v2 and expect the correct order
+    uint16_t swapped = Utils::SWAPWORD2(inWord[0]);
+    Debug::out(LOG_INFO, "CConSpi2::testEndian 2 - order %s", (swapped == 0x1122) ? "OK" : "BAD");
+
+    // get value using Utils::getWord() and expect correct order
+    uint16_t getted = Utils::getWord(bfrBytes);
+    Debug::out(LOG_INFO, "CConSpi2::testEndian 3 - order %s", (getted == 0x1122) ? "OK" : "BAD");
 }
 
 void CConSpi2::setCsForTransfer(bool startNotEnd)
@@ -214,32 +235,4 @@ uint16_t CConSpi2::readHeader(void)
 
     spi_tx_rx(SPI_CS_HANS, 6, txBuffer + 2, rxBuffer + 2);        // receive: ATN code, txLen, rxLen
     return marker;
-}
-
-void CConSpi2::getTxSize(uint8_t* inBuff, uint16_t& txLen)
-{
-    uint16_t *pwIn = (uint16_t *) inBuff;
-
-    // words 0 and 1 are 0 and ATN code, words 2 and 3 are txLen, rxLen);
-    txLen = swapWord(pwIn[2]);
-    txLen *= 2;                     // word count to byte count
-
-#ifdef DEBUG_SPI_COMMUNICATION
-    Debug::out(LOG_DEBUG, "getTxSize: TX %d WORDs", txLen);
-#endif
-
-    if(txLen > SPI_TX_RX_BFR_SIZE) {
-        Debug::out(LOG_ERROR, "getTxSize: TX limits for Horst are probably wrong! Fix this!");
-        txLen = MIN(txLen, SPI_TX_RX_BFR_SIZE);
-    }
-}
-
-uint16_t CConSpi2::swapWord(uint16_t val)
-{
-    uint16_t tmp = 0;
-
-    tmp  = val << 8;
-    tmp |= val >> 8;
-
-    return tmp;
 }
