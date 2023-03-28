@@ -58,6 +58,7 @@ public:
 
     static void storeWord(uint8_t *bfr, uint16_t val);
     static void storeDword(uint8_t *bfr, uint32_t val);
+    static void store24bits(uint8_t *bfr, uint32_t val);
 
     static void createTimezoneString(char *str);
     static void setTimezoneVariable_inProfileScript(void);

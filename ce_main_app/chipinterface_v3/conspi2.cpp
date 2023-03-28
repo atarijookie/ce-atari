@@ -60,12 +60,12 @@ void CConSpi2::setCsForTransfer(bool startNotEnd)
 #endif
 }
 
-void CConSpi2::addToTxQueue(uint16_t marker, uint16_t cmd, uint16_t dataSize, uint8_t* inData)
+void CConSpi2::addToTxQueue(uint16_t marker, uint16_t cmd, uint16_t dataSizeInBytes, uint8_t* inData)
 {
     pthread_mutex_lock(&mutex);
 
     // add copy of this data TX queue
-    SpiTxPacket *txPacket = new SpiTxPacket(marker, cmd, dataSize, inData);
+    SpiTxPacket *txPacket = new SpiTxPacket(marker, cmd, dataSizeInBytes, inData);
     txQueue.push(txPacket);
 
     pthread_mutex_unlock(&mutex);
@@ -235,4 +235,10 @@ uint16_t CConSpi2::readHeader(void)
 
     spi_tx_rx(SPI_CS_HANS, 6, txBuffer + 2, rxBuffer + 2);        // receive: ATN code, txLen, rxLen
     return marker;
+}
+
+// not waiting for anything, any received packet should be put in rxQueue
+void CConSpi2::transferNow(void)
+{
+    waitForATN(WAIT_FOR_NOTHING, ATN_ANY, 0);
 }

@@ -125,6 +125,11 @@ bool ChipInterface3::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
 {
     SpiRxPacket* rxPacket;
 
+    // TODO: every X ms read from pipeFromRPiToAtari and send to CE
+    // uint16_t size = count of data from pipe
+    // uint8_t bfr[] = read(pipeFromRPiToAtari, ...)
+    // conSpi2->addToTxQueue(MARKER_IKBD, CMD_IKBD_DATA, size, bfr);
+
     // check for any ATN code waiting from HDD or FDD
     rxPacket = conSpi2->waitForATN(WAIT_FOR_HDD_OR_FDD, ATN_ANY, 0);
 
@@ -180,16 +185,13 @@ bool ChipInterface3::hdd_sendData_start(uint32_t totalDataCount, uint8_t scsiSta
         return false;
     }
 
-    uint8_t bfr[4];
-    bfr[0] = totalDataCount >> 16;       // store data size
-    bfr[1] = totalDataCount >>  8;
-    bfr[2] = totalDataCount  & 0xff;
-    bfr[3] = scsiStatus;                 // store status
+    uint8_t bfr[6];
+    bfr[0] = withStatus ? CMD_DATA_READ_WITH_STATUS : CMD_DATA_READ_WITHOUT_STATUS;
+    Utils::store24bits(bfr + 1, totalDataCount);    // store data size at 1,2,3
+    bfr[4] = scsiStatus;                 // store status
 
-    uint8_t cmd = withStatus ? CMD_DATA_READ_WITH_STATUS : CMD_DATA_READ_WITHOUT_STATUS;  // command - with or without status
-
-    conSpi2->addToTxQueue(MARKER_HDD, cmd, 4, bfr);
-    conSpi2->waitForATN(WAIT_FOR_NOTHING, ATN_ANY, 0);      // transfer the last TX queue item added above
+    conSpi2->addToTxQueue(MARKER_HDD, ATN_ACSI_COMMAND, 5, bfr);
+    conSpi2->transferNow();             // transfer the last TX queue item added above
 
     return true;
 }
@@ -206,12 +208,12 @@ bool ChipInterface3::hdd_sendData_transferBlock(uint8_t *pData, uint32_t dataCou
         delete rxPacket;                    // free the RX packet from memory
 
         uint32_t cntNow = MIN(dataCount, 512);      // max 512 bytes per transfer
-        conSpi2->addToTxQueue(MARKER_HDD, CMD_DATA_MARKER, cntNow, pData);
+        conSpi2->addToTxQueue(MARKER_HDD, ATN_READ_MORE_DATA, cntNow, pData);
         pData       += cntNow;                      // move the data pointer further
         dataCount   -= cntNow;                      // subtract the amount we've sent
     }
 
-    conSpi2->waitForATN(WAIT_FOR_NOTHING, ATN_ANY, 0);        // transfer the last TX queue item added above
+    conSpi2->transferNow();                         // transfer the last TX queue item added above
     return true;
 }
 
@@ -223,14 +225,13 @@ bool ChipInterface3::hdd_recvData_start(uint8_t *recvBuffer, uint32_t totalDataC
     }
 
     // first send the command and tell Hans that we need WRITE data
-    uint8_t bfr[4];
-    bfr[0] = totalDataCount >> 16;       // store data size
-    bfr[1] = totalDataCount >>  8;
-    bfr[2] = totalDataCount  & 0xff;
-    bfr[3] = 0xff;                       // store INVALID status, because the real status will be sent on CMD_SEND_STATUS
+    uint8_t bfr[6];
+    bfr[0] = CMD_DATA_WRITE;
+    Utils::store24bits(bfr + 1, totalDataCount);    // store data size at 1,2,3
+    bfr[4] = 0xff;                                  // store INVALID status, because the real status will be sent on CMD_SEND_STATUS
 
-    conSpi2->addToTxQueue(MARKER_HDD, CMD_DATA_WRITE, 4, bfr);
-    conSpi2->waitForATN(WAIT_FOR_NOTHING, ATN_ANY, 0);      // transfer the last TX queue item added above
+    conSpi2->addToTxQueue(MARKER_HDD, ATN_ACSI_COMMAND, 5, bfr);
+    conSpi2->transferNow();                         // transfer the last TX queue item added above
 
     return true;
 }
@@ -248,7 +249,7 @@ bool ChipInterface3::hdd_recvData_transferBlock(uint8_t *pData, uint32_t dataCou
         memcpy(pData, rxPacket->getDataPointer(), subCount);    // copy just the data, skip sequence number
         delete rxPacket;                                        // free the RX packet from memory
 
-        dataCount -= subCount;      // decreate the data counter
+        dataCount -= subCount;      // decrement the data counter
         pData += subCount;          // move in the buffer further
     }
 
@@ -265,12 +266,12 @@ bool ChipInterface3::hdd_sendStatusToHans(uint8_t statusByte)
 
     delete rxPacket;                 // free the RX packet from memory
 
-    uint8_t bfr[4];
-    memset(bfr, 0, 4);               // clear the tx buffer
+    uint8_t bfr[2];
     bfr[0] = statusByte;             // single data byte to send
+    bfr[1] = 0;
 
-    conSpi2->addToTxQueue(MARKER_HDD, CMD_SEND_STATUS, 1, bfr);
-    conSpi2->waitForATN(WAIT_FOR_NOTHING, ATN_ANY, 0);      // transfer the last TX queue item added above
+    conSpi2->addToTxQueue(MARKER_HDD, ATN_GET_STATUS, 1, bfr);
+    conSpi2->transferNow();         // transfer the last TX queue item added above
     return true;
 }
 
@@ -278,7 +279,7 @@ void ChipInterface3::fdd_sendTrackToChip(int byteCount, uint8_t *encodedTrack)
 {
     // send encoded track out, use ATN value as CMD
     conSpi2->addToTxQueue(MARKER_FDD, ATN_SEND_TRACK, byteCount, encodedTrack);
-    conSpi2->waitForATN(WAIT_FOR_NOTHING, ATN_ANY, 0);      // transfer the last TX queue item added above
+    conSpi2->transferNow();      // transfer the last TX queue item added above
 }
 
 uint8_t* ChipInterface3::fdd_sectorWritten(int &side, int &track, int &sector, int &byteCount)

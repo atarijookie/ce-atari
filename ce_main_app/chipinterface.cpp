@@ -3,6 +3,7 @@
 #include "chipinterface.h"
 #include "global.h"
 #include "debug.h"
+#include "utils.h"
 
 extern THwConfig  hwConfig;
 extern TFlags     flags;
@@ -85,8 +86,7 @@ void ChipInterface::responseAddWord(uint8_t *bfr, uint16_t value)        // add 
         return;
     }
 
-    bfr[response.currentLength + 0] = (uint8_t) (value >> 8);
-    bfr[response.currentLength + 1] = (uint8_t) (value & 0xff);
+    Utils::storeWord(&bfr[response.currentLength], value);
     response.currentLength += 2;
 }
 
