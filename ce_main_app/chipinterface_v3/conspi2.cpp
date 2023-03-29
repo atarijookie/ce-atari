@@ -15,8 +15,6 @@
     #define SPI_CS_HANS     0
 #endif
 
-void chipLog(uint16_t cnt, uint8_t *bfr);
-
 CConSpi2::CConSpi2()
 {
     ikbdWriteFd = -1;
@@ -77,7 +75,7 @@ SpiRxPacket* CConSpi2::waitForATN(uint8_t expectMarker, uint8_t atnCode, uint32_
     uint32_t timeOut = Utils::getEndTime(timeoutMs);
     SpiRxPacket rxPacket;
 
-    while(true) {
+    while(sigintReceived == 0) {
         // rxQueue not empty? go through the messages, if any of them is is matching interface + ATN, return it
         std::list<SpiRxPacket *>::iterator it;
         for (it = rxQueue.begin(); it != rxQueue.end(); ++it) {     // go through the queue
@@ -94,16 +92,12 @@ SpiRxPacket* CConSpi2::waitForATN(uint8_t expectMarker, uint8_t atnCode, uint32_
             rxPacket.useRawData(rxBuffer, false);
         }
 
-        if(marker == MARKER_IKBD || marker == MARKER_LOGS) {    // IKBD data or logs?
+        if(marker == MARKER_IKBD) {     // IKBD data?
             uint8_t* buffer = rxPacket.getDataPointer();
             uint32_t length = rxPacket.getDataSize();
 
-            if(marker == MARKER_IKBD && ikbdWriteFd > 0) {      // it's for IKBD and got IKBD pipe?
+            if(ikbdWriteFd > 0) {       // got IKBD pipe?
                 write(ikbdWriteFd, buffer, length);
-            }
-
-            if(marker == MARKER_LOGS) {                         // it's logs? write them to file
-                chipLog(length, buffer);
             }
 
             continue;
@@ -129,6 +123,8 @@ SpiRxPacket* CConSpi2::waitForATN(uint8_t expectMarker, uint8_t atnCode, uint32_
             return NULL;
         }
     }
+
+    return NULL;
 }
 
 uint16_t CConSpi2::transferPacket(void)
@@ -155,7 +151,7 @@ uint16_t CConSpi2::transferPacket(void)
         // wait for ATN going H
         uint32_t timeOut = Utils::getEndTime(100);      // wait some time for ATN to go high
 
-        while(1) {
+        while(sigintReceived == 0) {
             if(Utils::getCurrentMs() >= timeOut) {      // if it takes more than allowed timeout, fail
                 setCsForTransfer(false);                // put CS back to H
                 Debug::out(LOG_ERROR, "waitForATN - timeout on HOST INITIALIZED TRANSFER");
@@ -217,7 +213,7 @@ uint16_t CConSpi2::readHeader(void)
         marker = *inWord;
 
         // if found one of the supported markers
-        if(marker == MARKER_HDD || marker == MARKER_FDD || marker == MARKER_IKBD ||  marker == MARKER_LOGS) {
+        if(marker == MARKER_HDD || marker == MARKER_FDD || marker == MARKER_IKBD) {
             break;
         }
 

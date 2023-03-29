@@ -29,9 +29,6 @@ typedef struct {
 // count of key to check for key combination
 #define KBD_KEY_COUNT   256
 
-// use this serial port on Raspbian
-#define UARTFILE            "/dev/serial0"
-
 #define UARTMARK_STCMD      0xAA
 #define UARTMARK_KEYBDATA   0xBB
 
@@ -53,8 +50,6 @@ void ikbdLog(const char *format, ...);
                                                 Debug::out(LOGLEVEL, FORMAT);   \
                                                 ikbdLog(FORMAT);                \
                                               }
-
-void chipLog(uint16_t cnt, uint8_t *bfr);
 
 extern TInputDevice ikbdDevs[INTYPE_MAX+1];
 

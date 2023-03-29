@@ -18,7 +18,6 @@
 #define MARKER_HDD      0xfdca      // cafd - hdD
 #define MARKER_FDD      0xffca      // caff - Fdd
 #define MARKER_IKBD     0xfbca      // cafb - ikBd
-#define MARKER_LOGS     0xf0ca      // caf0 - l0gs
 #define MARKER_DISP     0xf5ca      // caf5 - di5play
 
 // commands for display stream

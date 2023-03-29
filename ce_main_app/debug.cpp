@@ -194,3 +194,45 @@ void Debug::logRotateIfNeeded(const char *logFilePath)
         rename(logFilePath, logFilePathOld.c_str());            // rename current to old
     }
 }
+
+void Debug::chipLog(const char* bfr)
+{
+    Debug::chipLog(strlen(bfr), (char*) bfr);
+}
+
+// chipLog() will receive incomplete lines stored in bfr, terminated by '\n'.
+// It should write only complete lines to file, so it will try to gather chars until '\n' char and do write to file then.
+void Debug::chipLog(uint16_t cnt, char* bfr)
+{
+    static std::string oneLine;
+    static uint32_t prevLogOutChips = 0;
+    static std::string chipLogFilePath;
+
+    uint32_t now = Utils::getCurrentMs();
+    uint32_t diff = now - prevLogOutChips;
+    prevLogOutChips = now;
+
+    if(chipLogFilePath.empty()) {
+        chipLogFilePath = Utils::dotEnvValue("LOG_DIR", "/var/log/ce");     // path to logs dir
+        Utils::mergeHostPaths(chipLogFilePath, "chip.log");             // full path = dir + filename
+    }
+
+    FILE *f = fopen(chipLogFilePath.c_str(), "a+t");
+
+    if(!f) {                    // no file? quit
+        return;
+    }
+
+    for(int i=0; i<cnt; i++) {  // for cnt of characters
+        char val = bfr[i];      // get from buffer
+        oneLine += val;         // append to string
+
+        if(val == '\n') {       // if last char was new line, dump it to file
+            fprintf(f, "%08d\t%08d\t ", now, diff);
+            fputs(oneLine.c_str(), f);
+            oneLine.clear();    // clear gathered line
+        }
+    }
+
+    fclose(f);      // close file at the end
+}

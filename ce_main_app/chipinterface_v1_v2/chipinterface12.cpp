@@ -101,9 +101,11 @@ void ChipInterface12::serialSetup(void)
     ikbdReadFd = -1;
     ikbdWriteFd = -1;
 
-    fd = open(UARTFILE, O_RDWR | O_NOCTTY | O_NDELAY | O_NONBLOCK);
+    std::string uartPath = Utils::dotEnvValue("IKBD_SERIAL_PORT");
+    fd = open(uartPath.c_str(), O_RDWR | O_NOCTTY | O_NDELAY | O_NONBLOCK);
+
     if(fd == -1) {
-        logDebugAndIkbd(LOG_ERROR, "Failed to open %s", UARTFILE);
+        logDebugAndIkbd(LOG_ERROR, "Failed to open '%s'", uartPath.c_str());
         return;
     }
 

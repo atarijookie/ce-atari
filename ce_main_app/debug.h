@@ -30,7 +30,10 @@ public:
     static void setLogFile(const char *path);
 
     static void logRotateIfNeeded(const char *logFilePath);
-    
+
+    static void chipLog(const char* bfr);
+    static void chipLog(uint16_t cnt, char* bfr);
+
 private:    
     static char logFilePath[128];
 };
