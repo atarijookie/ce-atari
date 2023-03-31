@@ -25,6 +25,100 @@
 extern THwConfig hwConfig;
 extern TFlags    flags;                 // global flags from command line
 
+bool chipLogRun = false;
+
+int chipDebugStringsFd = -1;
+void chipDebugStringsSetup(void);       // open UART for debug strings from HW
+void chipDebugStringsHandle(void);      // read from UART, write to chiplog
+void handlePthreadCreate(const char* threadName, pthread_t* pThreadInfo, void* threadCode);
+void pthread_kill_join(const char* threadName, pthread_t& threadInfo);
+
+void chipDebugStringsSetup(void)
+{
+    char msg[128];
+    Debug::chipLog("\n\nchipDebugStringsSetup starting\n");
+
+    struct termios termiosStruct;
+    termios *ts = &termiosStruct;
+
+    std::string uartPath = Utils::dotEnvValue("IKBD_SERIAL_PORT");
+    int fd = open(uartPath.c_str(), O_RDWR | O_NOCTTY | O_NDELAY | O_NONBLOCK);
+
+    if(fd == -1) {
+        sprintf(msg, "Failed to open UART: '%s' for chiplog!\n", uartPath.c_str());
+        Debug::chipLog(msg);
+        return;
+    }
+
+    fcntl(fd, F_SETFL, 0);
+    tcgetattr(fd, ts);
+
+    /* reset the settings */
+    cfmakeraw(ts);
+    ts->c_cflag &= ~(CSIZE | CRTSCTS);
+    ts->c_iflag &= ~(IXON | IXOFF | IXANY | IGNPAR);
+    ts->c_lflag &= ~(ECHOK | ECHOCTL | ECHOKE);
+    ts->c_oflag &= ~(OPOST | ONLCR);
+
+    /* setup the new settings */
+    cfsetispeed(ts, B19200);
+    cfsetospeed(ts, B19200);
+    ts->c_cflag |=  CS8 | CLOCAL | CREAD;            // uart: 8N1
+
+    ts->c_cc[VMIN ] = 0;
+    ts->c_cc[VTIME] = 0;
+
+    /* set the settings */
+    tcflush(fd, TCIFLUSH);
+
+    if (tcsetattr(fd, TCSANOW, ts) != 0) {
+        Debug::chipLog("Failed to set serial port attributes.\n");
+    }
+
+    fcntl(fd, F_SETFL, FNDELAY);                    // make reading non-blocking
+    chipDebugStringsFd = fd;
+
+    sprintf(msg, "opened UART '%s' for chiplog\n", uartPath.c_str());
+    Debug::chipLog(msg);
+}
+
+void chipDebugStringsHandle(void)
+{
+    if(chipDebugStringsFd <= 0) {       // no fd? quit
+        return;
+    }
+
+    // how many bytes we can read immediately?
+    int res, bytesAvailable;
+    res = ioctl(chipDebugStringsFd, FIONREAD, &bytesAvailable);
+
+    if(res < 0) {       // ioctl() failed? no bytes available
+        return;
+    }
+
+    // prepare buffer, determine max read size
+    char bfr[1024];
+    memset(bfr, 0, sizeof(bfr));
+    int readCount = MIN(bytesAvailable, sizeof(bfr));
+
+    // read from fd, write to log
+    ssize_t rCount = read(chipDebugStringsFd, bfr, readCount);
+    Debug::chipLog(rCount, bfr);
+}
+
+void *chiplogThreadCode(void *ptr)
+{
+    chipDebugStringsSetup();
+
+    while(chipLogRun && sigintReceived == 0) {
+        chipDebugStringsHandle();
+        Utils::sleepMs(330);            // TODO: remake into SELECT instead of sleep
+    }
+
+    Utils::closeFdIfOpen(chipDebugStringsFd);
+    return NULL;
+}
+
 ChipInterface3::ChipInterface3()
 {
     conSpi2 = new CConSpi2();
@@ -35,7 +129,6 @@ ChipInterface3::ChipInterface3()
     rxDataWOhead = new uint8_t[MFM_STREAM_SIZE];
 
     memset(&hansConfigWords, 0, sizeof(hansConfigWords));
-    chipDebugStringsFd = -1;
 }
 
 ChipInterface3::~ChipInterface3()
@@ -52,20 +145,25 @@ int ChipInterface3::chipInterfaceType(void)
 
 bool ChipInterface3::ciOpen(void)
 {
-    chipDebugStringsSetup();
+    chipLogRun = true;
+    handlePthreadCreate("chiplog", &chiplogThreadInfo, (void*) chiplogThreadCode);
+
     serialSetup();          // open and configure pipes for IKBD
     return gpio_open();     // open GPIO and SPI
 }
 
 void ChipInterface3::ciClose(void)
 {
+    if(chipLogRun) {
+        chipLogRun = false;
+        pthread_kill_join("chiplog", chiplogThreadInfo);
+    }
+
     Utils::closeFdIfOpen(pipeFromAtariToRPi[0]);
     Utils::closeFdIfOpen(pipeFromAtariToRPi[1]);
 
     Utils::closeFdIfOpen(pipeFromRPiToAtari[0]);
     Utils::closeFdIfOpen(pipeFromRPiToAtari[1]);
-
-    Utils::closeFdIfOpen(chipDebugStringsFd);
 
     gpio_close();           // close GPIO and SPI
 }
@@ -105,78 +203,6 @@ void ChipInterface3::serialSetup(void)
     conSpi2->setIkbdWriteFd(pipeFromAtariToRPi[1]);     // ConSPI2 get Atari data, writes them to pipe 1, IKBD thread gets them
 }
 
-void ChipInterface3::chipDebugStringsSetup(void)
-{
-    Debug::chipLog("\n\nchipDebugStringsSetup starting\n");
-
-    struct termios termiosStruct;
-    termios *ts = &termiosStruct;
-
-    std::string uartPath = Utils::dotEnvValue("IKBD_SERIAL_PORT");
-    int fd = open(uartPath.c_str(), O_RDWR | O_NOCTTY | O_NDELAY | O_NONBLOCK);
-
-    if(fd == -1) {
-        char msg[128];
-        sprintf(msg, "Failed to open UART: '%s' for chiplog!\n", uartPath.c_str());
-        Debug::chipLog(msg);
-        return;
-    }
-
-    fcntl(fd, F_SETFL, 0);
-    tcgetattr(fd, ts);
-
-    /* reset the settings */
-    cfmakeraw(ts);
-    ts->c_cflag &= ~(CSIZE | CRTSCTS);
-    ts->c_iflag &= ~(IXON | IXOFF | IXANY | IGNPAR);
-    ts->c_lflag &= ~(ECHOK | ECHOCTL | ECHOKE);
-    ts->c_oflag &= ~(OPOST | ONLCR);
-
-    /* setup the new settings */
-    cfsetispeed(ts, B19200);
-    cfsetospeed(ts, B19200);
-    ts->c_cflag |=  CS8 | CLOCAL | CREAD;            // uart: 8N1
-
-    ts->c_cc[VMIN ] = 0;
-    ts->c_cc[VTIME] = 0;
-
-    /* set the settings */
-    tcflush(fd, TCIFLUSH);
-
-    if (tcsetattr(fd, TCSANOW, ts) != 0) {
-        Debug::chipLog("Failed to set serial port attributes.\n");
-    }
-
-    fcntl(fd, F_SETFL, FNDELAY);                    // make reading non-blocking
-    chipDebugStringsFd = fd;
-
-    Debug::chipLog("opened UART for chiplog\n");
-}
-
-void ChipInterface3::chipDebugStringsHandle(void)
-{
-    if(chipDebugStringsFd <= 0) {       // no fd? quit
-        return;
-    }
-
-    // how many bytes we can read immediately?
-    int res, bytesAvailable;
-    res = ioctl(chipDebugStringsFd, FIONREAD, &bytesAvailable);
-
-    if(res < 0) {       // ioctl() failed? no bytes available
-        return;
-    }
-
-    // prepare buffer, determine max read size
-    char bfr[1024];
-    memset(bfr, 0, sizeof(bfr));
-    int readCount = MIN(bytesAvailable, sizeof(bfr));
-
-    // read from fd, write to log
-    ssize_t rCount = read(chipDebugStringsFd, bfr, readCount);
-    Debug::chipLog(rCount, bfr);
-}
-
 void ChipInterface3::resetHDDandFDD(void)
 {
     resetHDD();     // just use reset HDD as reset FDD in v3 does nothing
@@ -200,8 +226,6 @@ void ChipInterface3::resetFDD(void)
 bool ChipInterface3::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
 {
     SpiRxPacket* rxPacket;
-
-    chipDebugStringsHandle();       // read any debug strings from uart, write to chip log
 
     // TODO: every X ms read from pipeFromRPiToAtari and send to CE
     // uint16_t size = count of data from pipe

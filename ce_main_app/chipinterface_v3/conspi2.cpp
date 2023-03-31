@@ -74,8 +74,11 @@ SpiRxPacket* CConSpi2::waitForATN(uint8_t expectMarker, uint8_t atnCode, uint32_
     // start the timeout count
     uint32_t timeOut = Utils::getEndTime(timeoutMs);
     SpiRxPacket rxPacket;
+    int maxLoops = 10;      // limit this wait loop to some count of attempts
 
-    while(sigintReceived == 0) {
+    while(sigintReceived == 0 && maxLoops > 0) {
+        maxLoops--;
+
         // rxQueue not empty? go through the messages, if any of them is is matching interface + ATN, return it
         std::list<SpiRxPacket *>::iterator it;
         for (it = rxQueue.begin(); it != rxQueue.end(); ++it) {     // go through the queue
@@ -149,7 +152,8 @@ uint16_t CConSpi2::transferPacket(void)
         setCsForTransfer(true);                         // put CS to L
 
         // wait for ATN going H
-        uint32_t timeOut = Utils::getEndTime(100);      // wait some time for ATN to go high
+        // TODO: change to 100 ms after fixed
+        uint32_t timeOut = Utils::getEndTime(5000);     // wait some time for ATN to go high
 
         while(sigintReceived == 0) {
             if(Utils::getCurrentMs() >= timeOut) {      // if it takes more than allowed timeout, fail

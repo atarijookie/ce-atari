@@ -77,10 +77,7 @@ private:
     uint8_t *rxDataWOhead;
 
     void serialSetup(void);                         // open pipes for fake IKDB serial port
-
-    int chipDebugStringsFd;
-    void chipDebugStringsSetup(void);               // open UART for debug strings from HW
-    void chipDebugStringsHandle(void);              // read from UART, write to chiplog
+    pthread_t chiplogThreadInfo;
 };
 
 #endif // CHIPINTERFACE3_H
