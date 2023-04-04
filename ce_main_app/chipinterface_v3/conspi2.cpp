@@ -171,6 +171,11 @@ uint16_t CConSpi2::transferPacket(void)
     // ATN is H in this now - either we've just requested transfer, or CE was requesting transfer before us
     setCsForTransfer(true);                 // put CS to L
 
+    atnIsH = spi_atn(SPI_ATN_HANS);
+    if(!atnIsH) {
+        Debug::out(LOG_ERROR, "waitForATN - ATN not H before transfer, this is wrong!");
+    }
+
     // read header
     uint16_t marker = readHeader();         // receive: 0xcaf*, ATN code, txLen, rxLen (8 bytes)
     if(!marker) {                           // no recognized header was found? quit
@@ -193,6 +198,7 @@ uint16_t CConSpi2::transferPacket(void)
     rxPacket.useRawData(rxBuffer, false);   // use SpiRxPacket to read data size as the header is already present (data is still to be transferred)
 
     uint16_t txRxLen = MAX(rxPacket.getDataSize() + 2, txPacket->size); // max(incoming_from_ce, size_of_outgoing_message)
+    Debug::out(LOG_DEBUG, "rxPacket size: %d, txPacket size: %d, so txRxLen is: %d", rxPacket.getDataSize(), txPacket->size, txRxLen);
 
     // TX and RX message
     spi_tx_rx(SPI_CS_HANS, txRxLen, txPacket->data, rxBuffer + 8);    // rx buffer contains received data including header
@@ -208,13 +214,16 @@ uint16_t CConSpi2::transferPacket(void)
 uint16_t CConSpi2::readHeader(void)
 {
     uint16_t marker = 0;
-    uint16_t *inWord = (uint16_t *) rxBuffer;
     uint32_t loops = 0;
+    uint32_t cntZero = 0, cntNonZero = 0;
+
+    memset(txBuffer, 0, 8);
 
     // read the first uint16_t, if it's not 0xcafe, then read again to synchronize
     while(sigintReceived == 0) {
-        spi_tx_rx(SPI_CS_HANS, 2, txBuffer, rxBuffer);            // receive just marker
-        marker = *inWord;
+        spi_tx_rx(SPI_CS_HANS, 2, txBuffer, rxBuffer);          // receive just marker, send zeros
+        marker = Utils::getWord(rxBuffer);
+        (marker == 0) ? (cntZero++) : (cntNonZero++);           // update counts
 
         // if found one of the supported markers
         if(marker == MARKER_HDD || marker == MARKER_FDD || marker == MARKER_IKBD) {
@@ -224,7 +233,7 @@ uint16_t CConSpi2::readHeader(void)
         loops++;
 
         if(loops >= 10000) {                    // if this doesn't synchronize in 10k loops, something is very wrong
-            Debug::out(LOG_ERROR, "readHeader couldn't synchronize!");
+            Debug::out(LOG_ERROR, "readHeader couldn't synchronize! Found zeros: %d, found other: %d", cntZero, cntNonZero);
             return 0;                           // return value of 0 means no marker found
         }
     }
@@ -233,7 +242,18 @@ uint16_t CConSpi2::readHeader(void)
         Debug::out(LOG_DEBUG, "readHeader took %d loops to synchronize!", loops);
     }
 
-    spi_tx_rx(SPI_CS_HANS, 6, txBuffer + 2, rxBuffer + 2);        // receive: ATN code, txLen, rxLen
+    Debug::out(LOG_DEBUG, "readHeader found marker %04X", marker);
+
+    spi_tx_rx(SPI_CS_HANS, 6, txBuffer, rxBuffer + 2);        // receive: ATN code, txLen, invertedMarker, send zeros
+
+    uint16_t invMarkerGot = Utils::getWord(rxBuffer + 6);
+    uint16_t invMarkerExpect = ~marker;
+
+    if(invMarkerGot != invMarkerExpect) {       // check the inverted marker to be the inversion of marker
+        Debug::out(LOG_WARNING, "readHeader - invMarker was expected to be %04X, but it's %04X instead!", invMarkerExpect, invMarkerGot);
+        marker = 0;         // clear the found marker - this is a false positive
+    }
+
     return marker;
 }
 

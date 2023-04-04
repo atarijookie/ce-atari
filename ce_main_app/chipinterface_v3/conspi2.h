@@ -15,10 +15,10 @@
 
 // v3 uses single physical stream, thus markers for each logical stream are different.
 // They are all different from v1/v2 marker, so the v1/v2 chip interface code will fail with v3 protocol.
-#define MARKER_HDD      0xfdca      // cafd - hdD
-#define MARKER_FDD      0xffca      // caff - Fdd
-#define MARKER_IKBD     0xfbca      // cafb - ikBd
-#define MARKER_DISP     0xf5ca      // caf5 - di5play
+#define MARKER_HDD      0xcafd      // cafd - hdD
+#define MARKER_FDD      0xcaff      // caff - Fdd
+#define MARKER_IKBD     0xcafb      // cafb - ikBd
+#define MARKER_DISP     0xcaf5      // caf5 - di5play
 
 // commands for display stream
 #define CMD_DISPLAY     0x10        // display this buffer
@@ -133,10 +133,13 @@ public:
     bool isHdd(void)        { return marker() == MARKER_HDD; }
     bool isFdd(void)        { return marker() == MARKER_FDD; }
 
-    uint8_t* getDataPointer(void)   { return (pData + 8); }                 // data starts after 8 bytes of header
-    uint16_t getDataSize(void)      { return (txLen() - 8 - 2); }     // size of data = TX size - header size - trailing zero size
+    uint8_t* getDataPointer(void)   { return (pData + 8); }         // data starts after 8 bytes of header
+    uint16_t getDataSize(void) {                        // size of data = TX size - header size
+        int txLength = txLen();
+        return (txLength >= 8) ? (txLength - 8) : 0;    // if it seems that there is data after header, subtract size, otherwise no data
+    }
 
-    uint8_t* getBaseDataPointer(void)   { return pData; }                   // returns pointer tho base of whole packet
+    uint8_t* getBaseDataPointer(void)   { return pData; }           // returns pointer tho base of whole packet
 
 private:
     uint8_t* pData;                     // store pointer to data
