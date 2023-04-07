@@ -641,29 +641,27 @@ void CCoreThread::handleFwVersion_hans(void)
 
     //----------------------------------
     // do the following only for chip interface v1 v2
-    if(chipIfType == CHIP_IF_V1_V2 || chipIfType == CHIP_IF_NETWORK) {
-        int currentLed = fwVer[4];
+    int currentLed = fwVer[4];
 
-        char recoveryLevel = fwVer[9];
-        if(recoveryLevel != 0) {                                                        // if the recovery level is not empty
-            if(recoveryLevel == 'R' || recoveryLevel == 'S' || recoveryLevel == 'T') {  // and it's a valid recovery level
-                handleRecoveryCommands(recoveryLevel - 'Q');                            // handle recovery action
-            }
+    char recoveryLevel = fwVer[9];
+    if(recoveryLevel != 0) {                                                        // if the recovery level is not empty
+        if(recoveryLevel == 'R' || recoveryLevel == 'S' || recoveryLevel == 'T') {  // and it's a valid recovery level
+            handleRecoveryCommands(recoveryLevel - 'Q');                            // handle recovery action
         }
-
-        if(lastFloppyImageLed != currentLed) {              // did the floppy image LED change since last time?
-            lastFloppyImageLed = currentLed;
-
-            Debug::out(LOG_DEBUG, "Floppy image changed to %d, forcing disk change", currentLed);
-
-            shared.imageSilo->setCurrentSlot(currentLed);     // switch the floppy image
-
-            diskChanged     = true;                         // also tell Franz that floppy changed
-            setDiskChanged  = true;
-        }
-
-        Debug::out(LOG_DEBUG, "FW: Hans,  %d-%02d-%02d, LED is: %d", Update::versions.hans.getYear(), Update::versions.hans.getMonth(), Update::versions.hans.getDay(), currentLed);
     }
+
+    if(lastFloppyImageLed != currentLed) {              // did the floppy image LED change since last time?
+        lastFloppyImageLed = currentLed;
+
+        Debug::out(LOG_DEBUG, "Floppy image changed to %d, forcing disk change", currentLed);
+
+        shared.imageSilo->setCurrentSlot(currentLed);     // switch the floppy image
+
+        diskChanged     = true;                         // also tell Franz that floppy changed
+        setDiskChanged  = true;
+    }
+
+    Debug::out(LOG_DEBUG, "FW: Hans,  %d-%02d-%02d, LED is: %d", Update::versions.hans.getYear(), Update::versions.hans.getMonth(), Update::versions.hans.getDay(), currentLed);
 
     //----------------------------------
 
@@ -722,11 +720,7 @@ void CCoreThread::handleFwVersion_franz(void)
     franzHandledOnce = true;
     flags.gotFranzFwVersion = true;
 
-    int chipIfType = chipInterface->chipInterfaceType();
-
-    if(chipIfType == CHIP_IF_V1_V2 || chipIfType == CHIP_IF_NETWORK) {  // only on IF v1 v2 show info about Franz
-        Debug::out(LOG_DEBUG, "FW: Franz, %d-%02d-%02d", Update::versions.franz.getYear(), Update::versions.franz.getMonth(), Update::versions.franz.getDay());
-    }
+    Debug::out(LOG_DEBUG, "FW: Franz, %d-%02d-%02d", Update::versions.franz.getYear(), Update::versions.franz.getMonth(), Update::versions.franz.getDay());
 }
 
 void CCoreThread::getIdBits(uint8_t &enabledIDbits, uint8_t &sdCardAcsiId)

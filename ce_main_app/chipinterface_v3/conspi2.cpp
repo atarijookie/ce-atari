@@ -207,6 +207,17 @@ uint16_t CConSpi2::transferPacket(void)
         delete txPacket;
     }
 
+    if(rxPacket.atnCode() == CMD_DUMMY) {   // if this is just dummy packet, ignore it (return 'no marker found')
+#ifdef DEBUG_SPI_COMMUNICATION
+        Debug::out(LOG_DEBUG, "rxPacket with CMD_DUMMY ignored.");
+#endif
+        marker = 0;
+    } else {
+#ifdef DEBUG_SPI_COMMUNICATION
+        Debug::out(LOG_DEBUG, "rxPacket - marker: %04X, ATN: %04X", rxPacket.marker(), rxPacket.atnCode());
+#endif
+    }
+
     setCsForTransfer(false);            // put CS back to H
     return marker;                      // now we return what marker was found
 }

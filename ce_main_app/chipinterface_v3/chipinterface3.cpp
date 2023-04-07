@@ -242,6 +242,8 @@ bool ChipInterface3::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
     hardNotFloppy = rxPacket->isHdd();  // store is-hdd flag
     memcpy(inBuf, rxPacket->getBaseDataPointer(), rxPacket->txLen());   // copy the whole received packet to inBuf
 
+    // Debug::outBfr(rxPacket->getBaseDataPointer(), rxPacket->txLen());
+
     // for these cases we also need a copy of just data (without header) into our local receive buffer
     if((rxPacket->isFdd() && rxPacket->atnCode() == ATN_SECTOR_WRITTEN) ||  // for FDD     + ATN_SECTOR_WRITTEN
        (                     rxPacket->atnCode() == ATN_FW_VERSION)) {      // for FDD/HDD + ATN_FW_VERSION
