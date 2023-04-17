@@ -345,6 +345,25 @@ uint16_t Utils::SWAPWORD2(uint16_t w)
     return w;
 }
 
+void Utils::swapWordsBuffer(uint8_t *bfr, uint16_t size)
+{
+    uint8_t tmp;
+
+    for(uint16_t i=0; i<size; i += 2) {
+        tmp = bfr[i];
+        bfr[i] = bfr[i+1];
+        bfr[i+1] = tmp;
+    }
+}
+
+void Utils::swapWordsBufferWithCopy(uint8_t *bfrDest, uint8_t *bfrSrc, uint16_t size)
+{
+    for(uint16_t i=0; i<size; i += 2) {
+        bfrDest[i + 1] = bfrSrc[i];
+        bfrDest[i    ] = bfrSrc[i + 1];
+    }
+}
+
 void Utils::getIpAdds(uint8_t *bfrIPs, uint8_t *bfrMasks)
 {
     struct ifaddrs *ifaddr, *ifa;

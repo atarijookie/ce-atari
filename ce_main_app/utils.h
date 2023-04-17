@@ -47,6 +47,8 @@ public:
 
     static void SWAPWORD(uint16_t &w);
     static uint16_t SWAPWORD2(uint16_t w);
+    static void swapWordsBuffer(uint8_t *bfr, uint16_t size);
+    static void swapWordsBufferWithCopy(uint8_t *bfrDest, uint8_t *bfrSrc, uint16_t size);
 
     static void getIpAdds(uint8_t *bfrIPs, uint8_t *bfrMasks=NULL);
 

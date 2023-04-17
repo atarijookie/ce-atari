@@ -17,6 +17,7 @@
 #include "../update.h"
 #include "../ikbd/ikbd.h"
 #include "../display/displaythread.h"
+#include "../display/ssd1306.h"
 
 #ifndef ONPC
     #include <bcm2835.h>
@@ -227,10 +228,27 @@ bool ChipInterface3::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
 {
     SpiRxPacket* rxPacket;
 
-    // TODO: every X ms read from pipeFromRPiToAtari and send to CE
-    // uint16_t size = count of data from pipe
-    // uint8_t bfr[] = read(pipeFromRPiToAtari, ...)
-    // conSpi2->addToTxQueue(MARKER_IKBD, CMD_IKBD_DATA, size, bfr);
+    // periodically read IKBD data from pipeFromRPiToAtari[0] and send to CE
+    static uint32_t lastIkbdSend = 0;
+    uint32_t now = Utils::getCurrentMs();
+    uint32_t diff = now - lastIkbdSend;
+
+    if(diff > 50 && pipeFromRPiToAtari[0] > -1) {   // if last ikbd send was at least this interval ago, send now
+        lastIkbdSend = now;                     // we're sending the data now, next after interval period
+
+        int bytesAvailable;
+        int rv = ioctl(pipeFromRPiToAtari[0], FIONREAD, &bytesAvailable);    // how many bytes we can read?
+
+        if(rv == 0 && bytesAvailable > 0) {     // ioctl was OK and we got something to read
+            uint8_t bfr[64];
+            int readSize = MIN(64, bytesAvailable);             // limit read to buffer size
+            rv = read(pipeFromRPiToAtari[0], bfr, readSize);    // do the read
+
+            if(rv > 0) {                        // something was read? send it
+                conSpi2->addToTxQueue(MARKER_IKBD, CMD_IKBD_DATA, bytesAvailable, bfr);
+            }
+        }
+    }
 
     // check for any ATN code waiting from HDD or FDD
     rxPacket = conSpi2->waitForATN(WAIT_FOR_HDD_OR_FDD, ATN_ANY, 0);
@@ -416,5 +434,7 @@ bool ChipInterface3::handlesDisplay(void)
 // send this display buffer data to remote display
 void ChipInterface3::displayBuffer(uint8_t *bfr, uint16_t size)
 {
-    conSpi2->addToTxQueue(MARKER_DISP, CMD_DISPLAY, size, bfr);
+    uint8_t bfrSwapped[SSD1306_BUFFER_SIZE];                    // buffer of display buffer size
+    Utils::swapWordsBufferWithCopy(bfrSwapped, bfr, size);
+    conSpi2->addToTxQueue(MARKER_DISP, CMD_DISPLAY, size, bfrSwapped);
 }
