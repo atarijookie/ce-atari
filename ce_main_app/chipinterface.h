@@ -14,12 +14,12 @@
 // but as they are used for command identification in core thread and are reused
 // in chip interface v3 (even though that one doesn't really use them), it's moved here.
 
-#define ATN_FW_VERSION                  0x01                                // followed by string with FW version (length: 4 WORDs - cmd, v[0], v[1], 0)
+#define ATN_FW_VERSION                  0x01        // followed by string with FW version (length: 4 WORDs - cmd, v[0], v[1], 0)
 #define ATN_ACSI_COMMAND                0x02
 #define ATN_READ_MORE_DATA              0x03
 #define ATN_WRITE_MORE_DATA             0x04
 #define ATN_GET_STATUS                  0x05
-#define ATN_ANY                         0xff                                // this is used only on host to wait for any ATN
+#define ATN_ANY                         0xff        // this is used only on host to wait for any ATN
 
 // defines for Floppy part
 // commands sent from device to host
@@ -62,6 +62,8 @@
 #define FDD_FW_RESPONSE_LEN     8
 
 #define FW_RESPONSE_LEN_BIGGER  ((HDD_FW_RESPONSE_LEN > FDD_FW_RESPONSE_LEN) ? HDD_FW_RESPONSE_LEN : FDD_FW_RESPONSE_LEN)
+
+#define INBUF_SIZE  (WRITTENMFMSECTOR_SIZE + 8)
 
 // This class is interface definition for communication with low-level chips.
 // The derived object will handle all the low-level chip communication (e.g. via SPI or paralel data port)

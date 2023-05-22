@@ -138,8 +138,6 @@ void CCoreThread::sharedObjects_destroy(void)
     shared.imageStorage = NULL;
 }
 
-#define INBUF_SIZE  (WRITTENMFMSECTOR_SIZE + 8)
-
 void CCoreThread::run(void)
 {
     // inBuff might contain whole written floppy sector + header size
@@ -268,8 +266,8 @@ void CCoreThread::run(void)
 
         load.busy.markEnd();                        // mark the end of the busy part of the code
 
-        if(!gotAtn) {                                // no ATN was processed?
-            Utils::sleepMs(1);                        // wait 1 ms...
+        if(!gotAtn) {                               // no ATN was processed?
+            Utils::sleepMs(1);                      // wait 1 ms...
         }
     }
 }
@@ -406,6 +404,7 @@ void CCoreThread::handleAcsiCommand(uint8_t *bufIn)
 
     uint8_t acsiId = bufIn[0] >> 5;                            // get just ACSI ID
     if(acsiIdInfo.acsiIDdevType[acsiId] == DEVTYPE_OFF) {    // if this ACSI ID is off, reply with error and quit
+        Debug::out(LOG_WARNING, "CCoreThread::handleAcsiCommand - acsiId %d is OFF, sending CHECK CONDITION", acsiId);
         dataTrans->setStatus(SCSI_ST_CHECK_CONDITION);
         dataTrans->sendDataAndStatus();
         return;

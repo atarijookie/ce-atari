@@ -258,14 +258,30 @@ bool ChipInterface3::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
     }
 
     hardNotFloppy = rxPacket->isHdd();  // store is-hdd flag
-    memcpy(inBuf, rxPacket->getBaseDataPointer(), rxPacket->txLen());   // copy the whole received packet to inBuf
 
+    if(rxPacket->txLen() > INBUF_SIZE) {
+        Debug::out(LOG_ERROR, "ChipInterface3::actionNeeded -- rxPacket->txLen(): %d > INBUF_SIZE: %d", rxPacket->txLen(), INBUF_SIZE);
+    }
+    int copyCount = MIN(rxPacket->txLen(), INBUF_SIZE);
+    memcpy(inBuf, rxPacket->getBaseDataPointer(), copyCount);   // copy the whole received packet to inBuf
+
+#ifdef DEBUG_SPI_COMMUNICATION
+    Debug::out(LOG_DEBUG, "ChipInterface3::actionNeeded -- hardNotFloppy: %d, packet length: %d", (int) hardNotFloppy, rxPacket->txLen());
+#endif
     // Debug::outBfr(rxPacket->getBaseDataPointer(), rxPacket->txLen());
 
     // for these cases we also need a copy of just data (without header) into our local receive buffer
     if((rxPacket->isFdd() && rxPacket->atnCode() == ATN_SECTOR_WRITTEN) ||  // for FDD     + ATN_SECTOR_WRITTEN
        (                     rxPacket->atnCode() == ATN_FW_VERSION)) {      // for FDD/HDD + ATN_FW_VERSION
-        memcpy(rxDataWOhead, rxPacket->getDataPointer(), rxPacket->getDataSize());
+        if(rxPacket->txLen() > INBUF_SIZE) {
+            Debug::out(LOG_ERROR, "ChipInterface3::actionNeeded -- rxPacket->getDataSize(): %d > MFM_STREAM_SIZE: %d", rxPacket->getDataSize(), MFM_STREAM_SIZE);
+        }
+        copyCount = MIN(rxPacket->getDataSize(), MFM_STREAM_SIZE);
+        memcpy(rxDataWOhead, rxPacket->getDataPointer(), copyCount);
+#ifdef DEBUG_SPI_COMMUNICATION
+        Debug::out(LOG_DEBUG, "ChipInterface3::actionNeeded -- additionally copied to rxDataWOhead: %d", rxPacket->getDataSize());
+        Debug::outBfr(rxDataWOhead, rxPacket->getDataSize());
+#endif
     }
 
     delete rxPacket;                    // free the RX packet from memory
@@ -275,7 +291,7 @@ bool ChipInterface3::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
 void ChipInterface3::getFWversion(bool hardNotFloppy, uint8_t *inFwVer)
 {
     if(hardNotFloppy) {     // for HDD
-        // fwResponseBfr should be filled with Hans config - by calling setHDDconfig() (and not calling anything else inbetween)
+        // fwResponseBfr should be filled with Hans config - by calling setHDDconfig() (and not calling anything else in between)
 
         // send response to HDD + ATN_FW_VERSION later
         conSpi2->addToTxQueue(MARKER_HDD, ATN_FW_VERSION, HDD_FW_RESPONSE_LEN, fwResponseBfr);
@@ -289,7 +305,7 @@ void ChipInterface3::getFWversion(bool hardNotFloppy, uint8_t *inFwVer)
         int year = Utils::bcdToInt(rxDataWOhead[1]) + 2000;
         Update::versions.hans.fromInts(year, Utils::bcdToInt(rxDataWOhead[2]), Utils::bcdToInt(rxDataWOhead[3]));     // store found FW version of Hans
     } else {                // for FDD
-        // fwResponseBfr should be filled with Franz config - by calling setFDDconfig() (and not calling anything else inbetween)
+        // fwResponseBfr should be filled with Franz config - by calling setFDDconfig() (and not calling anything else in between)
 
         // send response to FDD + ATN_FW_VERSION later
         conSpi2->addToTxQueue(MARKER_FDD, ATN_FW_VERSION, FDD_FW_RESPONSE_LEN, fwResponseBfr);
@@ -312,6 +328,11 @@ bool ChipInterface3::hdd_sendData_start(uint32_t totalDataCount, uint8_t scsiSta
     Utils::store24bits(bfr + 1, totalDataCount);    // store data size at 1,2,3
     bfr[4] = scsiStatus;                 // store status
 
+#ifdef DEBUG_SPI_COMMUNICATION
+    Debug::out(LOG_DEBUG, "ChipInterface3::hdd_sendData_start - next state: %02x, dataCnt: %d, status: %02x", bfr[0], totalDataCount, scsiStatus);
+    Debug::outBfr(bfr, 5);
+#endif
+
     conSpi2->addToTxQueue(MARKER_HDD, ATN_ACSI_COMMAND, 5, bfr);
     conSpi2->transferNow();             // transfer the last TX queue item added above
 
@@ -324,6 +345,7 @@ bool ChipInterface3::hdd_sendData_transferBlock(uint8_t *pData, uint32_t dataCou
         SpiRxPacket* rxPacket = conSpi2->waitForATN(WAIT_FOR_HDD, ATN_READ_MORE_DATA, 1000);    // wait for ATN_READ_MORE_DATA
 
         if(!rxPacket) {                     // this didn't come? fail
+            Debug::out(LOG_ERROR, "ChipInterface3::hdd_sendData_transferBlock - failed to wait for WAIT_FOR_HDD + ATN_READ_MORE_DATA");
             return false;
         }
 
@@ -333,6 +355,10 @@ bool ChipInterface3::hdd_sendData_transferBlock(uint8_t *pData, uint32_t dataCou
         conSpi2->addToTxQueue(MARKER_HDD, ATN_READ_MORE_DATA, cntNow, pData);
         pData       += cntNow;                      // move the data pointer further
         dataCount   -= cntNow;                      // subtract the amount we've sent
+
+#ifdef DEBUG_SPI_COMMUNICATION
+    Debug::out(LOG_DEBUG, "ChipInterface3::hdd_sendData_transferBlock - dataCnt: %d", cntNow);
+#endif
     }
 
     conSpi2->transferNow();                         // transfer the last TX queue item added above
@@ -352,6 +378,11 @@ bool ChipInterface3::hdd_recvData_start(uint8_t *recvBuffer, uint32_t totalDataC
     Utils::store24bits(bfr + 1, totalDataCount);    // store data size at 1,2,3
     bfr[4] = 0xff;                                  // store INVALID status, because the real status will be sent on CMD_SEND_STATUS
 
+#ifdef DEBUG_SPI_COMMUNICATION
+    Debug::out(LOG_DEBUG, "ChipInterface3::hdd_recvData_start - next state: %02x, dataCnt: %d", bfr[0], totalDataCount);
+    Debug::outBfr(bfr, 5);
+#endif
+
     conSpi2->addToTxQueue(MARKER_HDD, ATN_ACSI_COMMAND, 5, bfr);
     conSpi2->transferNow();                         // transfer the last TX queue item added above
 
@@ -364,12 +395,22 @@ bool ChipInterface3::hdd_recvData_transferBlock(uint8_t *pData, uint32_t dataCou
         SpiRxPacket* rxPacket = conSpi2->waitForATN(WAIT_FOR_HDD, ATN_WRITE_MORE_DATA, 1000);   // wait for ATN_WRITE_MORE_DATA
 
         if(!rxPacket) {                                     // this didn't come? fail
+            Debug::out(LOG_ERROR, "ChipInterface3::hdd_recvData_transferBlock - failed to wait for WAIT_FOR_HDD + ATN_WRITE_MORE_DATA");
             return false;
         }
 
         uint32_t subCount = rxPacket->getDataSize();            // use all the data we have received
+        if(subCount > dataCount) {
+            Debug::out(LOG_ERROR, "ChipInterface3::hdd_recvData_transferBlock -- subCount: %d > dataCount: %d", subCount, dataCount);
+        }
+        subCount = MIN(subCount, dataCount);
+
         memcpy(pData, rxPacket->getDataPointer(), subCount);    // copy just the data, skip sequence number
         delete rxPacket;                                        // free the RX packet from memory
+
+#ifdef DEBUG_SPI_COMMUNICATION
+    Debug::out(LOG_DEBUG, "ChipInterface3::hdd_recvData_transferBlock - dataCnt: %d", subCount);
+#endif
 
         dataCount -= subCount;      // decrement the data counter
         pData += subCount;          // move in the buffer further
@@ -383,6 +424,7 @@ bool ChipInterface3::hdd_sendStatusToHans(uint8_t statusByte)
     SpiRxPacket* rxPacket = conSpi2->waitForATN(WAIT_FOR_HDD, ATN_GET_STATUS, 1000);    // wait for ATN_GET_STATUS
 
     if(!rxPacket) {
+        Debug::out(LOG_ERROR, "ChipInterface3::hdd_sendStatusToHans - failed to wait for WAIT_FOR_HDD + ATN_GET_STATUS");
         return false;
     }
 
@@ -391,6 +433,11 @@ bool ChipInterface3::hdd_sendStatusToHans(uint8_t statusByte)
     uint8_t bfr[2];
     bfr[0] = statusByte;             // single data byte to send
     bfr[1] = 0;
+
+#ifdef DEBUG_SPI_COMMUNICATION
+    Debug::out(LOG_DEBUG, "ChipInterface3::hdd_sendStatusToHans - statusByte: %02x", statusByte);
+    Debug::outBfr(bfr, 2);
+#endif
 
     conSpi2->addToTxQueue(MARKER_HDD, ATN_GET_STATUS, 1, bfr);
     conSpi2->transferNow();         // transfer the last TX queue item added above
@@ -434,7 +481,5 @@ bool ChipInterface3::handlesDisplay(void)
 // send this display buffer data to remote display
 void ChipInterface3::displayBuffer(uint8_t *bfr, uint16_t size)
 {
-    uint8_t bfrSwapped[SSD1306_BUFFER_SIZE];                    // buffer of display buffer size
-    Utils::swapWordsBufferWithCopy(bfrSwapped, bfr, size);
-    conSpi2->addToTxQueue(MARKER_DISP, CMD_DISPLAY, size, bfrSwapped);
+    conSpi2->addToTxQueue(MARKER_DISP, CMD_DISPLAY, size, bfr);
 }

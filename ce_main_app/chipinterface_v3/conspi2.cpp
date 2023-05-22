@@ -8,8 +8,6 @@
 #include "acsidatatrans.h"
 #include "utils.h"
 
-//#define DEBUG_SPI_COMMUNICATION
-
 #ifdef ONPC
     #define SPI_ATN_HANS    0
     #define SPI_CS_HANS     0
@@ -62,6 +60,11 @@ void CConSpi2::addToTxQueue(uint16_t marker, uint16_t cmd, uint16_t dataSizeInBy
 {
     pthread_mutex_lock(&mutex);
 
+#ifdef DEBUG_SPI_COMMUNICATION
+    Debug::out(LOG_DEBUG, "addToTxQueue - marker: %04X, cmd: %04X, dataSizeInBytes: %d", marker, cmd, dataSizeInBytes);
+    Debug::outBfr(inData, dataSizeInBytes);
+#endif
+
     // add copy of this data TX queue
     SpiTxPacket *txPacket = new SpiTxPacket(marker, cmd, dataSizeInBytes, inData);
     txQueue.push(txPacket);
@@ -77,7 +80,12 @@ SpiRxPacket* CConSpi2::waitForATN(uint8_t expectMarker, uint8_t atnCode, uint32_
     int maxLoops = 10;      // limit this wait loop to some count of attempts
 
     while(sigintReceived == 0 && maxLoops > 0) {
-        maxLoops--;
+        // To make sure this loop still quits after some time, then if the timeoutMs is:
+        // A) 0 ms - limit to maxLoops counts to enable sending and receiving some packets which are waiting for transfer
+        // B) >0 ms - limit this loop by the specified timeout (thus don't decrement maxLoops count here)
+        if(timeoutMs == 0) {
+            maxLoops--;
+        }
 
         // rxQueue not empty? go through the messages, if any of them is is matching interface + ATN, return it
         std::list<SpiRxPacket *>::iterator it;
@@ -92,6 +100,9 @@ SpiRxPacket* CConSpi2::waitForATN(uint8_t expectMarker, uint8_t atnCode, uint32_
         uint16_t marker = transferPacket();
 
         if(marker) {        // some valid marker was found? use current rx buffer as rx packet
+#ifdef DEBUG_SPI_COMMUNICATION
+            Debug::out(LOG_DEBUG, "waitForATN - marker: %04X", marker);
+#endif
             rxPacket.useRawData(rxBuffer, false);
         }
 
@@ -99,20 +110,32 @@ SpiRxPacket* CConSpi2::waitForATN(uint8_t expectMarker, uint8_t atnCode, uint32_
             uint8_t* buffer = rxPacket.getDataPointer();
             uint32_t length = rxPacket.getDataSize();
 
+            rxPacket.logPacket();
+
             if(ikbdWriteFd > 0) {       // got IKBD pipe?
                 write(ikbdWriteFd, buffer, length);
             }
 
+#ifdef DEBUG_SPI_COMMUNICATION
+            Debug::out(LOG_DEBUG, "waitForATN - MARKER_IKBD was processed, continue");
+#endif
             continue;
         }
 
         if(marker) {        // this is a valid marker and it's not IKBD and LOGS, so it's HDD or FDD
             SpiRxPacket *rxPacket2 = new SpiRxPacket();     // create new RX packet object
             rxPacket2->useRawData(rxBuffer, true);          // copy data from rxBuffer
+            rxPacket2->logPacket();
 
             if(rxPacket.asRequested(expectMarker, atnCode)) {  // is this the packet we've requested? return it
+#ifdef DEBUG_SPI_COMMUNICATION
+                Debug::out(LOG_DEBUG, "waitForATN - asRequested() - YES, return");
+#endif
                 return rxPacket2;
             } else {                                // now what we've requested? add to queue
+#ifdef DEBUG_SPI_COMMUNICATION
+                Debug::out(LOG_DEBUG, "waitForATN - asRequested() - NO, push");
+#endif
                 rxQueue.push_front(rxPacket2);
             }
         }
@@ -144,7 +167,7 @@ uint16_t CConSpi2::transferPacket(void)
     }
 
     memset(txBuffer, 0, 8);
-    memset(rxBuffer, 0, 8);
+    memset(rxBuffer, 0, 32);
 
     // HOST INITIALIZED TRANSFER - we can start HOST initialized transfer if ATN is L.
     // We want to start HOST initialized transfer, if we got something to TX (tx queue not empty).
@@ -158,7 +181,7 @@ uint16_t CConSpi2::transferPacket(void)
         while(sigintReceived == 0) {
             if(Utils::getCurrentMs() >= timeOut) {      // if it takes more than allowed timeout, fail
                 setCsForTransfer(false);                // put CS back to H
-                Debug::out(LOG_ERROR, "waitForATN - timeout on HOST INITIALIZED TRANSFER");
+                Debug::out(LOG_ERROR, "transferPacket - timeout on HOST INITIALIZED TRANSFER");
                 return 0;
             }
 
@@ -173,13 +196,16 @@ uint16_t CConSpi2::transferPacket(void)
 
     atnIsH = spi_atn(SPI_ATN_HANS);
     if(!atnIsH) {
-        Debug::out(LOG_ERROR, "waitForATN - ATN not H before transfer, this is wrong!");
+        Debug::out(LOG_ERROR, "transferPacket - ATN not H before transfer, this is wrong!");
     }
 
     // read header
     uint16_t marker = readHeader();         // receive: 0xcaf*, ATN code, txLen, rxLen (8 bytes)
     if(!marker) {                           // no recognized header was found? quit
         setCsForTransfer(false);            // put CS back to H
+#ifdef DEBUG_SPI_COMMUNICATION
+        Debug::out(LOG_DEBUG, "transferPacket - no marker");
+#endif
         return 0;
     }
 
@@ -198,7 +224,9 @@ uint16_t CConSpi2::transferPacket(void)
     rxPacket.useRawData(rxBuffer, false);   // use SpiRxPacket to read data size as the header is already present (data is still to be transferred)
 
     uint16_t txRxLen = MAX(rxPacket.getDataSize() + 2, txPacket->size); // max(incoming_from_ce, size_of_outgoing_message)
-    Debug::out(LOG_DEBUG, "rxPacket size: %d, txPacket size: %d, so txRxLen is: %d", rxPacket.getDataSize(), txPacket->size, txRxLen);
+#ifdef DEBUG_SPI_COMMUNICATION
+    Debug::out(LOG_DEBUG, "transferPacket - rxPacket size: %d, txPacket size: %d, so txRxLen is: %d", rxPacket.getDataSize(), txPacket->size, txRxLen);
+#endif
 
     // TX and RX message
     spi_tx_rx(SPI_CS_HANS, txRxLen, txPacket->data, rxBuffer + 8);    // rx buffer contains received data including header
@@ -209,16 +237,20 @@ uint16_t CConSpi2::transferPacket(void)
 
     if(rxPacket.atnCode() == CMD_DUMMY) {   // if this is just dummy packet, ignore it (return 'no marker found')
 #ifdef DEBUG_SPI_COMMUNICATION
-        Debug::out(LOG_DEBUG, "rxPacket with CMD_DUMMY ignored.");
+        Debug::out(LOG_DEBUG, "transferPacket - rxPacket with CMD_DUMMY ignored.");
 #endif
         marker = 0;
     } else {
 #ifdef DEBUG_SPI_COMMUNICATION
-        Debug::out(LOG_DEBUG, "rxPacket - marker: %04X, ATN: %04X", rxPacket.marker(), rxPacket.atnCode());
+        Debug::out(LOG_DEBUG, "transferPacket - rxPacket - marker: %04X, ATN: %04X", rxPacket.marker(), rxPacket.atnCode());
 #endif
     }
 
     setCsForTransfer(false);            // put CS back to H
+#ifdef DEBUG_SPI_COMMUNICATION
+    Debug::out(LOG_DEBUG, "END OF PACKET RECEIVING ^^^");
+    // after this point the packet is fully received into this device
+#endif
     return marker;                      // now we return what marker was found
 }
 
@@ -253,7 +285,10 @@ uint16_t CConSpi2::readHeader(void)
         Debug::out(LOG_DEBUG, "readHeader took %d loops to synchronize!", loops);
     }
 
+#ifdef DEBUG_SPI_COMMUNICATION
+    Debug::out(LOG_DEBUG, "START OF PACKET RECEIVING vvv");
     Debug::out(LOG_DEBUG, "readHeader found marker %04X", marker);
+#endif
 
     spi_tx_rx(SPI_CS_HANS, 6, txBuffer, rxBuffer + 2);        // receive: ATN code, txLen, invertedMarker, send zeros
 
@@ -263,6 +298,11 @@ uint16_t CConSpi2::readHeader(void)
     if(invMarkerGot != invMarkerExpect) {       // check the inverted marker to be the inversion of marker
         Debug::out(LOG_WARNING, "readHeader - invMarker was expected to be %04X, but it's %04X instead!", invMarkerExpect, invMarkerGot);
         marker = 0;         // clear the found marker - this is a false positive
+    } else {
+#ifdef DEBUG_SPI_COMMUNICATION
+        Debug::out(LOG_DEBUG, "readHeader - 1st 8 bytes: ");
+        Debug::outBfr(rxBuffer, 8);
+#endif
     }
 
     return marker;

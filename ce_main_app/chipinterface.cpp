@@ -103,13 +103,12 @@ void ChipInterface::responseAddByte(uint8_t *bfr, uint8_t value)        // add a
 void ChipInterface::setHDDconfig(uint8_t hddEnabledIDs, uint8_t sdCardId, uint8_t fddEnabledSlots, bool setNewFloppyImageLed, uint8_t newFloppyImageLed)
 {
     memset(fwResponseBfr, 0, HDD_FW_RESPONSE_LEN);
-
-    // uint16_t sent (bytes shown): 01 23 45 67
-
     responseStart(HDD_FW_RESPONSE_LEN);                         // init the response struct
 
-    hansConfigWords.next.acsi   = MAKEWORD(hddEnabledIDs, sdCardId);
-    hansConfigWords.next.fdd    = MAKEWORD(fddEnabledSlots, 0);
+    hansConfigWords.next.acsi = MAKEWORD(hddEnabledIDs, sdCardId);
+    hansConfigWords.next.fdd  = MAKEWORD(fddEnabledSlots, 0);
+
+    Debug::out(LOG_DEBUG, "setHDDconfig - next.acsi: %04x <=> current.acsi: %04x, next.fdd: %04x <=> current.fdd: %04x", hansConfigWords.next.acsi, hansConfigWords.current.acsi, hansConfigWords.next.fdd, hansConfigWords.current.fdd);
 
     if( (hansConfigWords.next.acsi  != hansConfigWords.current.acsi) ||
         (hansConfigWords.next.fdd   != hansConfigWords.current.fdd )) {
@@ -117,6 +116,8 @@ void ChipInterface::setHDDconfig(uint8_t hddEnabledIDs, uint8_t sdCardId, uint8_
         // hansConfigWords.skipNextSet - it's a flag used for skipping one config sending, because we send the new config now, but receive it processed in the next (not this) fw version packet
 
         if(!hansConfigWords.skipNextSet) {
+            Debug::out(LOG_DEBUG, "setHDDconfig - will send next.acsi: %04x, next.fdd: %04x", hansConfigWords.next.acsi, hansConfigWords.next.fdd);
+
             responseAddWord(fwResponseBfr, CMD_ACSI_CONFIG);             // CMD: send acsi config
             responseAddWord(fwResponseBfr, hansConfigWords.next.acsi);   // store ACSI enabled IDs and which ACSI ID is used for SD card
             responseAddWord(fwResponseBfr, hansConfigWords.next.fdd);    // store which floppy images are enabled

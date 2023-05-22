@@ -8,6 +8,8 @@
 #include "../debug.h"
 #include "../chipinterface.h"
 
+#define DEBUG_SPI_COMMUNICATION
+
 #define WAIT_FOR_NOTHING        0       // not waiting for anything, any received packet should be put in rxQueue
 #define WAIT_FOR_HDD            1       // waiting for HDD marker only
 #define WAIT_FOR_FDD            2       // waiting for FDD marker only
@@ -39,15 +41,24 @@
 class SpiTxPacket
 {
 public:
-    SpiTxPacket(uint16_t marker, uint16_t cmd, uint16_t dataSizeInBytes, uint8_t* inData)
+    SpiTxPacket(uint16_t marker, uint16_t cmd, uint16_t dataSizeInBytes, uint8_t* inData, bool dataSwap=true)
     {
         Utils::storeWord(data + 0, 0);                  // pre-pad with zero
         Utils::storeWord(data + 2, marker);
         Utils::storeWord(data + 4, cmd);
         Utils::storeWord(data + 6, dataSizeInBytes);   // packet will hold the EXACT number of bytes we're sending
 
-        if(dataSizeInBytes > 0 && inData != NULL) {    // if packet has some data
-            memcpy(data + 8, inData, dataSizeInBytes); // copy in data
+        if(dataSizeInBytes > SPI_TX_RX_BFR_SIZE) {
+            Debug::out(LOG_ERROR, "SpiTxPacket - dataSizeInBytes is %d bytes, but buffer is only %d bytes!", dataSizeInBytes, SPI_TX_RX_BFR_SIZE);
+            return;
+        }
+
+        if(dataSizeInBytes > 0 && inData != NULL) {         // if packet has some data
+            if(dataSwap) {                                  // copy with swap if data swap is required
+                Utils::swapWordsBufferWithCopy(data + 8, inData, dataSizeInBytes);
+            } else {                                        // just copy data if data swap is not required
+                memcpy(data + 8, inData, dataSizeInBytes);
+            }
         }
 
         // the transfer size might be bigger by +1 if input data size is odd (but packet will hold exact number of real data)
@@ -97,9 +108,52 @@ public:
         }
     }
 
+    void logPacket(void)
+    {
+#ifdef DEBUG_SPI_COMMUNICATION
+        Debug::out(LOG_DEBUG, "SpiRxPacket - txLen: %d", txLen());
+        Debug::outBfr(pData, txLen());
+
+        Debug::out(LOG_DEBUG, "  stream marker : %02x %02x", pData[0], pData[1]);
+        Debug::out(LOG_DEBUG, "  ATN code      : %02x %02x", pData[2], pData[3]);
+        Debug::out(LOG_DEBUG, "  TX len (WORDS): %02x %02x", pData[4], pData[5]);
+        Debug::out(LOG_DEBUG, "  marker inv.   : %02x %02x", pData[6], pData[7]);
+
+        int dataInPacket = MAX(txLen() - 8, 0);
+        Debug::out(LOG_DEBUG, "  data in packet: %d bytes", dataInPacket);
+        Debug::outBfr(pData + 8, dataInPacket);
+#endif
+    }
+
+    const char* expectMarkerStr(uint8_t expectMarker)
+    {
+        switch(expectMarker) {
+            case WAIT_FOR_NOTHING:      return "nothing";
+            case WAIT_FOR_HDD:          return "HDD";
+            case WAIT_FOR_FDD:          return "FDD";
+            case WAIT_FOR_HDD_OR_FDD:   return "HDD or FDD";
+            default:                    return "???";
+        }
+    }
+
+    const char* expectedAtnCode(uint8_t atnCode)
+    {
+        if(atnCode == ATN_ANY) {
+            return "any";
+        }
+
+        static char tmp[32];
+        sprintf(tmp, "%08x", atnCode);
+        return tmp;
+    }
+
     // returns true if this packet is for HDD / FDD as requested, and the ATN code matches
     bool asRequested(uint8_t expectMarker, uint8_t atnCodeIn)
     {
+#ifdef DEBUG_SPI_COMMUNICATION
+//      Debug::out(LOG_DEBUG, "SpiRxPacket::asRequested() - expectMarker: %s, atnCodeIn: %s", expectMarkerStr(expectMarker), expectedAtnCode(atnCodeIn));
+#endif
+
         // from the expectMarker create flags which tell us is HDD and FDD are accepted here
         bool acceptsHdd = (expectMarker == WAIT_FOR_HDD_OR_FDD || expectMarker == WAIT_FOR_HDD);
         bool acceptsFdd = (expectMarker == WAIT_FOR_HDD_OR_FDD || expectMarker == WAIT_FOR_FDD);
@@ -107,18 +161,28 @@ public:
         // if it's HDD when expecting HDD or and it's FDD when expecting FDD, the accepted markers match
         bool acceptedMarkersMatch = (acceptsHdd && isHdd()) || (acceptsFdd && isFdd());
 
-        // not founc match between wanting HDD/FDD and getting HDD/FDD, then this packet is not as requested
+        // not found match between wanting HDD/FDD and getting HDD/FDD, then this packet is not as requested
         if(!acceptedMarkersMatch) {
+#ifdef DEBUG_SPI_COMMUNICATION
+//          Debug::out(LOG_DEBUG, "SpiRxPacket::asRequested() - NO, markers not matching");
+#endif
             return false;
         }
 
         // HDD / FDD as requested and ANY ATN is acceptable, good
         if(atnCodeIn == ATN_ANY) {
+#ifdef DEBUG_SPI_COMMUNICATION
+            Debug::out(LOG_DEBUG, "SpiRxPacket::asRequested() - YES, markers matching, ATN code can be ANY");
+#endif
             return true;
         }
 
         // HDD / FDD as requested, but ATN code is specific, so as requested if wanted ATN code equals this ATN code
-        return atnCode() == atnCodeIn;
+        bool matching = atnCode() == atnCodeIn;
+#ifdef DEBUG_SPI_COMMUNICATION
+//        Debug::out(LOG_DEBUG, "SpiRxPacket::asRequested() - %s, markers matching, atnCode: %02x <==> atnCodeIn: %02x", matching ? "YES" : "NO", atnCode(), atnCodeIn);
+#endif
+        return matching;
     }
 
     // data format: marker, ATN code, txLen, rxLen
@@ -126,8 +190,9 @@ public:
     uint16_t atnCode(void)  { return Utils::getWord(pData + 2); }
 
     uint16_t txLen(void)    {
-        uint16_t inSize = Utils::getWord(pData + 4) * 2;    // multiply by 2 because size is in WORDs
-        return MIN(inSize, SPI_TX_RX_BFR_SIZE);             // limit to maximum buffer size
+        uint16_t inSize = Utils::getWord(pData + 4) * 2;        // multiply by 2 because size is in WORDs
+        uint16_t txLenFinal = MIN(inSize, SPI_TX_RX_BFR_SIZE);  // limit to maximum buffer size
+        return txLenFinal;
     }
 
     bool isHdd(void)        { return marker() == MARKER_HDD; }

@@ -503,9 +503,9 @@ void Utils::storeDword(uint8_t *bfr, uint32_t val)
 
 void Utils::store24bits(uint8_t *bfr, uint32_t val)
 {
-    bfr[1] = val >> 16;
-    bfr[2] = val >>  8;
-    bfr[3] = val & 0xff;
+    bfr[0] = val >> 16;
+    bfr[1] = val >>  8;
+    bfr[2] = val;
 }
 
 void Utils::createTimezoneString(char *str)
