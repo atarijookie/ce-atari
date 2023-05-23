@@ -349,7 +349,7 @@ bool ChipInterface3::hdd_sendData_transferBlock(uint8_t *pData, uint32_t dataCou
             return false;
         }
 
-        delete rxPacket;                    // free the RX packet from memory
+        delete rxPacket;                            // free the RX packet from memory
 
         uint32_t cntNow = MIN(dataCount, 512);      // max 512 bytes per transfer
         conSpi2->addToTxQueue(MARKER_HDD, ATN_READ_MORE_DATA, cntNow, pData);
@@ -391,6 +391,7 @@ bool ChipInterface3::hdd_recvData_start(uint8_t *recvBuffer, uint32_t totalDataC
 
 bool ChipInterface3::hdd_recvData_transferBlock(uint8_t *pData, uint32_t dataCount)
 {
+    // Transfer all the data of size dataCount via multiple packets.
     while(dataCount > 0) {
         SpiRxPacket* rxPacket = conSpi2->waitForATN(WAIT_FOR_HDD, ATN_WRITE_MORE_DATA, 1000);   // wait for ATN_WRITE_MORE_DATA
 
@@ -399,21 +400,23 @@ bool ChipInterface3::hdd_recvData_transferBlock(uint8_t *pData, uint32_t dataCou
             return false;
         }
 
-        uint32_t subCount = rxPacket->getDataSize();            // use all the data we have received
-        if(subCount > dataCount) {
-            Debug::out(LOG_ERROR, "ChipInterface3::hdd_recvData_transferBlock -- subCount: %d > dataCount: %d", subCount, dataCount);
-        }
-        subCount = MIN(subCount, dataCount);
+        uint32_t dataInPacket = rxPacket->getDataSize();        // use all the data we have received
+        dataInPacket = MIN(dataInPacket, 512);                  // limit usable data in ATN_WRITE_MORE_DATA to 512 bytes, as there might be slightly more (e.g. padding), but only 512 bytes are actual data
+        uint32_t storeCount = MIN(dataCount, dataInPacket);     // limit how much can we store in this loop - either just all data from this packet, or only much much more space is left in pData (dataCount)
 
-        memcpy(pData, rxPacket->getDataPointer(), subCount);    // copy just the data, skip sequence number
+        if(storeCount < dataInPacket) {
+            Debug::out(LOG_WARNING, "ChipInterface3::hdd_recvData_transferBlock - the received packet has %d bytes, but we can only store %d bytes", dataInPacket, storeCount);
+        }
+
+        memcpy(pData, rxPacket->getDataPointer(), storeCount);  // copy just the data
         delete rxPacket;                                        // free the RX packet from memory
 
 #ifdef DEBUG_SPI_COMMUNICATION
-    Debug::out(LOG_DEBUG, "ChipInterface3::hdd_recvData_transferBlock - dataCnt: %d", subCount);
+    Debug::out(LOG_DEBUG, "ChipInterface3::hdd_recvData_transferBlock - storeCount: %d", storeCount);
 #endif
 
-        dataCount -= subCount;      // decrement the data counter
-        pData += subCount;          // move in the buffer further
+        dataCount -= storeCount;      // decrement the data counter
+        pData += storeCount;          // move in the buffer further
     }
 
     return true;

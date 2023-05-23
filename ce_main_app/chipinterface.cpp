@@ -108,7 +108,7 @@ void ChipInterface::setHDDconfig(uint8_t hddEnabledIDs, uint8_t sdCardId, uint8_
     hansConfigWords.next.acsi = MAKEWORD(hddEnabledIDs, sdCardId);
     hansConfigWords.next.fdd  = MAKEWORD(fddEnabledSlots, 0);
 
-    Debug::out(LOG_DEBUG, "setHDDconfig - next.acsi: %04x <=> current.acsi: %04x, next.fdd: %04x <=> current.fdd: %04x", hansConfigWords.next.acsi, hansConfigWords.current.acsi, hansConfigWords.next.fdd, hansConfigWords.current.fdd);
+    //Debug::out(LOG_DEBUG, "setHDDconfig - next.acsi: %04x <=> current.acsi: %04x, next.fdd: %04x <=> current.fdd: %04x", hansConfigWords.next.acsi, hansConfigWords.current.acsi, hansConfigWords.next.fdd, hansConfigWords.current.fdd);
 
     if( (hansConfigWords.next.acsi  != hansConfigWords.current.acsi) ||
         (hansConfigWords.next.fdd   != hansConfigWords.current.fdd )) {

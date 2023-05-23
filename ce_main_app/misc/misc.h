@@ -7,8 +7,7 @@
 
 #define MISC_CMD_IDENTIFY       0
 #define MISC_CMD_SEND_SERIAL    1
-#define MISC_CMD_GET_LICENSE    2
-#define MISC_CMD_GET_SETTINGS   3
+#define MISC_CMD_GET_SETTINGS   2
 
 #define MISC_CMD_GET_UPDATE     10
 
@@ -31,14 +30,11 @@ private:
     AcsiDataTrans *dataTrans;
     const char *functionCodeToName(int code);
 
-    void recvHwSerialAndDeleteLicense(uint8_t *cmd);
+    void recvHwSerial(uint8_t *cmd);
     void getLicense(uint8_t *cmd);
     void getSettings(uint8_t *cmd);
     void getUpdate(uint8_t *cmd);
     void hostShutdown(uint8_t *cmd);
-
-    bool getLicenseForSerialFromSettings(uint8_t *bfrLicense);
-    void retrieveLicenseForSerial(void);
 };
 
 #endif

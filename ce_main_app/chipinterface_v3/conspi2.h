@@ -8,7 +8,7 @@
 #include "../debug.h"
 #include "../chipinterface.h"
 
-#define DEBUG_SPI_COMMUNICATION
+//#define DEBUG_SPI_COMMUNICATION
 
 #define WAIT_FOR_NOTHING        0       // not waiting for anything, any received packet should be put in rxQueue
 #define WAIT_FOR_HDD            1       // waiting for HDD marker only
