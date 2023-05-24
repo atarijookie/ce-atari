@@ -28,6 +28,7 @@
 #include "lcdfont.h"
 #include "displaythread.h"
 #include "../chipinterface.h"
+#include "../translated/translateddisk.h"
 
 extern THwConfig hwConfig;
 extern TFlags    flags;
@@ -54,6 +55,8 @@ int beeperPipeFd[2];
  2017-03-20 10:25
  */
 
+//#define DEBUG_DISPLAY
+
 // the following array of strings holds every line that can be shown as a raw string, they are filled by rest of the app, and accessed by specified line type number
 #define DISP_LINE_MAXLEN    21
 #define DISPLAY_LINES_SIZE  (DISP_LINE_COUNT * (DISP_LINE_MAXLEN + 1))
@@ -72,6 +75,72 @@ static void display_drawScreen(int screenIndex);
 static char *get_displayLinePtr(int displayLineId);
 
 extern ChipInterface* chipInterface;
+
+const char* dispScreenToText(int index)
+{
+    switch(index) {
+        case DISP_SCREEN_HDD1_IDX:  return "DISP_SCREEN_HDD1_IDX";
+        case DISP_SCREEN_HDD2_IDX:  return "DISP_SCREEN_HDD2_IDX";
+        case DISP_SCREEN_TRANS_IDX: return "DISP_SCREEN_TRANS_IDX";
+        case DISP_SCREEN_RECOVERY:  return "DISP_SCREEN_RECOVERY";
+        case DISP_SCREEN_POWEROFF:  return "DISP_SCREEN_POWEROFF";
+        default: return "???";
+    }
+}
+
+const char* dispLineToText(int index)
+{
+    switch(index) {
+        case DISP_LINE_EMPTY:       return "DISP_LINE_EMPTY";
+        case DISP_LINE_HDD_IDS:     return "DISP_LINE_HDD_IDS";
+        case DISP_LINE_HDD_TYPES:   return "DISP_LINE_HDD_TYPES";
+        case DISP_LINE_FLOPPY:      return "DISP_LINE_FLOPPY";
+        case DISP_LINE_IKDB:        return "DISP_LINE_IKDB";
+        case DISP_LINE_LAN :        return "DISP_LINE_LAN";
+        case DISP_LINE_WLAN:        return "DISP_LINE_WLAN";
+        case DISP_LINE_TRAN_SETT:   return "DISP_LINE_TRAN_SETT";
+        case DISP_LINE_CONF_SHAR:   return "DISP_LINE_CONF_SHAR";
+        case DISP_LINE_TRAN_DRIV:   return "DISP_LINE_TRAN_DRIV";
+        case DISP_LINE_DATETIME:    return "DISP_LINE_DATETIME";
+        case DISP_LINE_RECOVERY1:   return "DISP_LINE_RECOVERY1";
+        case DISP_LINE_RECOVERY2:   return "DISP_LINE_RECOVERY2";
+        case DISP_LINE_POWEROFF1:   return "DISP_LINE_POWEROFF1";
+        default: return "???";
+    }
+}
+
+static void fillNetworkDisplayLines(void)
+{
+    uint8_t bfr[10];
+    Utils::getIpAdds(bfr);
+
+    char tmp[64];
+
+    if(bfr[0] == 1) {                               // eth0 enabled? add its IP
+        sprintf(tmp, "LAN : %d.%d.%d.%d", (int) bfr[1], (int) bfr[2], (int) bfr[3], (int) bfr[4]);
+        display_setLine(DISP_LINE_LAN, tmp);
+    } else {
+        display_setLine(DISP_LINE_LAN, "LAN : disabled");
+    }
+
+    if(bfr[5] == 1) {                               // wlan0 enabled? add its IP
+        sprintf(tmp, "WLAN: %d.%d.%d.%d", (int) bfr[6], (int) bfr[7], (int) bfr[8], (int) bfr[9]);
+        display_setLine(DISP_LINE_WLAN, tmp);
+    } else {
+        display_setLine(DISP_LINE_WLAN, "WLAN: disabled");
+    }
+}
+
+static void fillTranslatedDisplayLines(void)
+{
+    TranslatedDisk* translated = TranslatedDisk::getInstance();
+
+    if(translated) {
+        translated->mutexLock();
+        translated->fillTranslatedDisplayLines();
+        translated->mutexUnlock();
+    }
+}
 
 void *displayThreadCode(void *ptr)
 {
@@ -423,7 +492,21 @@ void fillLine_recovery(int buttonDownTime)
 
 static void display_drawScreen(int screenIndex)
 {
+    static uint32_t nextFillTime = 0;
+    uint32_t now = Utils::getCurrentMs();
+
+    if(now > nextFillTime) {
+        nextFillTime = Utils::getEndTime(15000);        // refresh these every 15 seconds
+        fillLine_datetime();
+        fillNetworkDisplayLines();
+        fillTranslatedDisplayLines();
+    }
+
     display->clearDisplay();
+
+#ifdef DEBUG_DISPLAY
+    Debug::out(LOG_DEBUG, "display_drawScreen - screenIndex: %02d -> %s", screenIndex, dispScreenToText(screenIndex));
+#endif
 
     // get lines numbers from the specified screen number - this will be 4 indexes of lines in screenLines[]
     int *screenLines = (int *) &display_screens[screenIndex];
@@ -431,16 +514,18 @@ static void display_drawScreen(int screenIndex)
     int i, y;
     for(i=0; i<4; i++) {
         int screenLine = screenLines[i];        // which line we should show?
-
-        if(screenLine == DISP_LINE_DATETIME) {  // is it datetime? update it now
-            fillLine_datetime();
-        }
-
         char *line = get_displayLinePtr(screenLine);
 
         if(line == NULL) {
+#ifdef DEBUG_DISPLAY
+        Debug::out(LOG_DEBUG, "display_drawScreen - screenLine: %02d -> %-19s <= this line is EMPTY", screenLine, dispLineToText(screenLine));
+#endif
             continue;
         }
+
+#ifdef DEBUG_DISPLAY
+        Debug::out(LOG_DEBUG, "display_drawScreen - screenLine: %02d -> %-19s => %s", screenLine, dispLineToText(screenLine), line);
+#endif
 
         y = i * CHAR_H;
         gfx->drawString(0, y, line);            // show it on display

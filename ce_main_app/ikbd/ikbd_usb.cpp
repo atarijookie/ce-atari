@@ -92,22 +92,32 @@ void Ikbd::closeDevs(void)
 void Ikbd::fillDisplayLine(void)
 {
     char tmp[64];
+    bool has = false;
+
     strcpy(tmp, "IKBD: ");
 
     if(gotUsbKeyboard()) {
         strcat(tmp, "Keyb ");
+        has = true;
     }
 
     if(gotUsbMouse()) {
         strcat(tmp, "Mou ");
+        has = true;
     }
 
     if(gotUsbJoy1()) {
         strcat(tmp, "J1 ");
+        has = true;
     }
 
     if(gotUsbJoy2()) {
         strcat(tmp, "J2 ");
+        has = true;
+    }
+
+    if(!has) {      // no IKBD stuff present?
+        strcat(tmp, "-");
     }
 
     display_setLine(DISP_LINE_IKDB, tmp);

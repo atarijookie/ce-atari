@@ -138,8 +138,8 @@ public:
 		return conf[driveIndex].hostRootPath.c_str();
 	}
 
-    void fillDisplayLines(void);
     void handleZipMounted(std::string& zip_path, std::string& mount_path);  // Call this method when some (ZIP) archive with zip_path got mounted to mount_path.
+    void fillTranslatedDisplayLines(void);
 
 private:
     AcsiDataTrans       *dataTrans;

@@ -1188,13 +1188,14 @@ void TranslatedDisk::driveGetReport(int driveIndex, std::string &reportString)
     reportString = "drive";     // TODO: get drive type (config / usb / shared) from mounter
 }
 
-void TranslatedDisk::fillDisplayLines(void)
+void TranslatedDisk::fillTranslatedDisplayLines(void)
 {
     char tmp[64];
 
     // mount USB drives as raw/translated + ZIP files are dirs/files
     Settings s;
     bool mountRawNotTrans = s.getBool("MOUNT_RAW_NOT_TRANS", 0);
+    bool useZipdirNotFile = s.getBool("USE_ZIP_DIR", 1);
     strcpy(tmp, mountRawNotTrans ? "USB raw    " : "USB trans  ");
     strcat(tmp, useZipdirNotFile ? "ZIP dir"     : "ZIP file");
     display_setLine(DISP_LINE_TRAN_SETT, tmp);
@@ -1204,6 +1205,7 @@ void TranslatedDisk::fillDisplayLines(void)
     display_setLine(DISP_LINE_CONF_SHAR, tmp);
 
     // other drives
+    bool hasDrive = false;
     strcpy(tmp, "drvs: ");
     for(int i=2; i<MAX_DRIVES; i++) {   // if drive is normal and enabled
         if(conf[i].enabled) {
@@ -1211,7 +1213,13 @@ void TranslatedDisk::fillDisplayLines(void)
             tmp2[0] = 'A' + i;  // drive letter
             tmp2[1] = 0;        // string terminator
             strcat(tmp, tmp2);  // append
+            hasDrive = true;
         }
     }
+
+    if(!hasDrive) {             // no drives present?
+        strcat(tmp, "-");
+    }
+
     display_setLine(DISP_LINE_TRAN_DRIV, tmp);
 }
