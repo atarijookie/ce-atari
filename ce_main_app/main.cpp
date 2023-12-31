@@ -24,6 +24,7 @@
 #include "floppy/floppyencoder.h"
 #include "chipinterface_v1_v2/chipinterface12.h"
 #include "chipinterface_v3/chipinterface3.h"
+#include "chipinterface_v4/chipinterface4.h"
 #include "chipinterface_network/chipinterfacenetwork.h"
 #include "chipinterface_dummy/chipinterfacedummy.h"
 #include "../libdospath/libdospath.h"
@@ -109,6 +110,10 @@ int main(int argc, char *argv[])
     } else if(flags.chipInterface == CHIPIF_V3) {
         Debug::out(LOG_INFO, "ChipInterface: v3");
         chipInterface = new ChipInterface3();                   // create chip interface v3
+        hwConfig.version = 2;
+    } else if(flags.chipInterface == CHIPIF_V4) {
+        Debug::out(LOG_INFO, "ChipInterface: v4");
+        chipInterface = new ChipInterface4();                   // create chip interface v4
         hwConfig.version = 2;
     } else if(flags.chipInterface == CHIPIF_DUMMY) {
         Debug::out(LOG_INFO, "ChipInterface: opening DUMMY chip interface");
@@ -403,6 +408,7 @@ void parseCmdLineArguments(int argc, char *argv[])
                     case 1:
                     case 2: flags.chipInterface = CHIPIF_V1_V2;     break;  // 1 or 2 means old SPI interface
                     case 3: flags.chipInterface = CHIPIF_V3;        break;  // 3 means new SPI interface
+                    case 4: flags.chipInterface = CHIPIF_V4;        break;  // 4 stands for Franz via SPI and ACSI via GPIO
 
                     case 0: flags.chipInterface = CHIPIF_DUMMY;     break;  // 0 for dummy interface
                     case 9: flags.chipInterface = CHIPIF_NETWORK;   break;  // 9 for network server

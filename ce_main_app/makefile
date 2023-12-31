@@ -1,7 +1,7 @@
 # control verbosity. use make V=1
 V = 0
 
-ONPC   = no
+ONPC   = yes
 
 CXX	    = g++
 CC	    = gcc
@@ -66,9 +66,10 @@ SUBDIR11 = ikbd
 SUBDIR12 = display
 SUBDIR13 = chipinterface_v1_v2
 SUBDIR14 = chipinterface_v3
-SUBDIR15 = chipinterface_dummy
-SUBDIR16 = chipinterface_network
-SUBDIR17 = misc
+SUBDIR15 = chipinterface_v4
+SUBDIR16 = chipinterface_dummy
+SUBDIR17 = chipinterface_network
+SUBDIR18 = misc
 
 SRCS  = $(wildcard *.cpp) 
 SRCS += $(wildcard $(SUBDIR1)/*.cpp) 
@@ -85,6 +86,7 @@ SRCS += $(wildcard $(SUBDIR14)/*.cpp)
 SRCS += $(wildcard $(SUBDIR15)/*.cpp)
 SRCS += $(wildcard $(SUBDIR16)/*.cpp)
 SRCS += $(wildcard $(SUBDIR17)/*.cpp)
+SRCS += $(wildcard $(SUBDIR18)/*.cpp)
 
 HDRS  = $(wildcard *.h)
 HDRS += $(wildcard $(SUBDIR1)/*.h)
@@ -101,6 +103,7 @@ HDRS += $(wildcard $(SUBDIR14)/*.h)
 HDRS += $(wildcard $(SUBDIR15)/*.h)
 HDRS += $(wildcard $(SUBDIR16)/*.h)
 HDRS += $(wildcard $(SUBDIR17)/*.h)
+HDRS += $(wildcard $(SUBDIR18)/*.h)
 HDRS += ../libdospath/libdospath.h
 
 OBJS = $(addprefix $(OBJDIR)/, $(patsubst %.cpp,%.o,$(SRCS:.c=.o)))

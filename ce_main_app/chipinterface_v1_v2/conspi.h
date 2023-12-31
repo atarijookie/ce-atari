@@ -13,7 +13,7 @@
 class CConSpi
 {
 public:
-    CConSpi();
+    CConSpi(int atnHans, int atnFranz, int csHans, int csFranz);
     ~CConSpi();
 
     bool waitForATN(int whichSpiCs, uint8_t atnCode, uint32_t timeoutMs, uint8_t *inBuf);
@@ -22,6 +22,11 @@ public:
     uint16_t getRemainingLength(void);
 
 private:
+    int atnHans;
+    int atnFranz;
+    int csHans;
+    int csFranz;
+
     uint16_t remainingPacketLength;
     uint8_t *paddingBuffer;
 

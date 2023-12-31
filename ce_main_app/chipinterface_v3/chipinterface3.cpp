@@ -100,7 +100,7 @@ void chipDebugStringsHandle(void)
     // prepare buffer, determine max read size
     char bfr[1024];
     memset(bfr, 0, sizeof(bfr));
-    int readCount = MIN(bytesAvailable, sizeof(bfr));
+    int readCount = MIN(bytesAvailable, (int) sizeof(bfr));
 
     // read from fd, write to log
     ssize_t rCount = read(chipDebugStringsFd, bfr, readCount);

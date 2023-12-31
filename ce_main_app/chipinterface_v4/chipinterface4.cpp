@@ -10,8 +10,8 @@
 #include <sys/inotify.h>
 #include <limits.h>
 
-#include "chipinterface12.h"
-#include "gpio.h"
+#include "chipinterface4.h"
+#include "gpio4.h"
 #include "../utils.h"
 #include "../debug.h"
 #include "../global.h"
@@ -26,13 +26,13 @@
 extern THwConfig hwConfig;
 extern TFlags    flags;                 // global flags from command line
 
-ChipInterface12::ChipInterface12()
+ChipInterface4::ChipInterface4()
 {
-    #ifndef ONPC
-        conSpi = new CConSpi(SPI_ATN_HANS, SPI_ATN_FRANZ, SPI_CS_HANS, SPI_CS_FRANZ);
-    #else
-        conSpi = new CConSpi(0, 0, 0, 0);
-    #endif
+#ifndef ONPC
+    conSpi = new CConSpi(0, PIN_ATN_FRANZ, 0, SPI_CS_FRANZ);
+#else
+    conSpi = new CConSpi(0, 0, 0, 0);
+#endif
 
     ikbdReadFd = -1;
     ikbdWriteFd = -1;
@@ -43,7 +43,7 @@ ChipInterface12::ChipInterface12()
     memset(&hansConfigWords, 0, sizeof(hansConfigWords));
 }
 
-ChipInterface12::~ChipInterface12()
+ChipInterface4::~ChipInterface4()
 {
     delete conSpi;
 
@@ -51,12 +51,12 @@ ChipInterface12::~ChipInterface12()
     delete []bufIn;
 }
 
-int ChipInterface12::chipInterfaceType(void)
+int ChipInterface4::chipInterfaceType(void)
 {
-    return CHIP_IF_V1_V2;
+    return CHIP_IF_V4;
 }
 
-bool ChipInterface12::ciOpen(void)
+bool ChipInterface4::ciOpen(void)
 {
 #ifndef ONPC
     serialSetup();          // open and configure UART for IKBD
@@ -66,7 +66,7 @@ bool ChipInterface12::ciOpen(void)
 #endif
 }
 
-void ChipInterface12::ciClose(void)
+void ChipInterface4::ciClose(void)
 {
 #ifndef ONPC
     Utils::closeFdIfOpen(ikbdReadFd);
@@ -76,26 +76,22 @@ void ChipInterface12::ciClose(void)
 #endif
 }
 
-void ChipInterface12::ikbdUartEnable(bool enable)
+void ChipInterface4::ikbdUartEnable(bool enable)
 {
-#ifndef ONPC
-    if(enable) {
-        bcm2835_gpio_write(PIN_TX_SEL1N2, HIGH);            // TX_SEL1N2, switch the RX line to receive from Franz, which does the 9600 to 7812 baud translation
-    }
-#endif
+    // don't do anything, it's always enabled
 }
 
-int ChipInterface12::ikbdUartReadFd(void)
+int ChipInterface4::ikbdUartReadFd(void)
 {
     return ikbdReadFd;
 }
 
-int ChipInterface12::ikbdUartWriteFd(void)
+int ChipInterface4::ikbdUartWriteFd(void)
 {
     return ikbdWriteFd;
 }
 
-void ChipInterface12::serialSetup(void)
+void ChipInterface4::serialSetup(void)
 {
     struct termios termiosStruct;
     termios *ts = &termiosStruct;
@@ -157,32 +153,7 @@ void ChipInterface12::serialSetup(void)
     ikbdWriteFd = fd;
 }
 
-void ChipInterface12::resetHDDandFDD(void)
-{
-#ifndef ONPC
-    bcm2835_gpio_write(PIN_RESET_HANS,          LOW);       // reset lines to RESET state
-    bcm2835_gpio_write(PIN_RESET_FRANZ,         LOW);
-
-    Utils::sleepMs(10);                                     // wait a while to let the reset work
-
-    bcm2835_gpio_write(PIN_RESET_HANS,          HIGH);      // reset lines to RUN (not reset) state
-    bcm2835_gpio_write(PIN_RESET_FRANZ,         HIGH);
-
-    Utils::sleepMs(50);                                     // wait a while to let the devices boot
-#endif
-}
-
-void ChipInterface12::resetHDD(void)
-{
-#ifndef ONPC
-    bcm2835_gpio_write(PIN_RESET_HANS,          LOW);       // reset lines to RESET state
-    Utils::sleepMs(10);                                     // wait a while to let the reset work
-    bcm2835_gpio_write(PIN_RESET_HANS,          HIGH);      // reset lines to RUN (not reset) state
-    Utils::sleepMs(50);                                     // wait a while to let the devices boot
-#endif
-}
-
-void ChipInterface12::resetFDD(void)
+void ChipInterface4::resetHDDandFDD(void)
 {
 #ifndef ONPC
     bcm2835_gpio_write(PIN_RESET_FRANZ,         LOW);
@@ -192,7 +163,31 @@ void ChipInterface12::resetFDD(void)
 #endif
 }
 
-bool ChipInterface12::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
+void ChipInterface4::resetHDD(void)
+{
+#ifndef ONPC
+    bcm2835_gpio_write(FF12D,    HIGH);     // we want the signals to go H
+    Utils::sleepMs(1);
+    bcm2835_gpio_write(INT_TRIG, HIGH);     // do CLK pulse
+    bcm2835_gpio_write(DRQ_TRIG, HIGH);
+    Utils::sleepMs(1);
+    bcm2835_gpio_write(FF12D,    LOW);      // we can put this back to L
+    bcm2835_gpio_write(INT_TRIG, LOW);      // CLK back to L
+    bcm2835_gpio_write(DRQ_TRIG, LOW);
+#endif
+}
+
+void ChipInterface4::resetFDD(void)
+{
+#ifndef ONPC
+    bcm2835_gpio_write(PIN_RESET_FRANZ,         LOW);
+    Utils::sleepMs(10);                                     // wait a while to let the reset work
+    bcm2835_gpio_write(PIN_RESET_FRANZ,         HIGH);
+    Utils::sleepMs(50);                                     // wait a while to let the devices boot
+#endif
+}
+
+bool ChipInterface4::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
 {
 #ifndef ONPC
     // if waitForATN() succeeds, it fills 8 bytes of data in buffer
@@ -237,7 +232,7 @@ bool ChipInterface12::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
     return false;
 }
 
-void ChipInterface12::getFWversion(bool hardNotFloppy, uint8_t *inFwVer)
+void ChipInterface4::getFWversion(bool hardNotFloppy, uint8_t *inFwVer)
 {
 #ifndef ONPC
     if(hardNotFloppy) {     // for HDD
@@ -261,11 +256,11 @@ void ChipInterface12::getFWversion(bool hardNotFloppy, uint8_t *inFwVer)
 #endif
 }
 
-bool ChipInterface12::hdd_sendData_start(uint32_t totalDataCount, uint8_t scsiStatus, bool withStatus)
+bool ChipInterface4::hdd_sendData_start(uint32_t totalDataCount, uint8_t scsiStatus, bool withStatus)
 {
 #ifndef ONPC
     if(totalDataCount > 0xffffff) {
-        Debug::out(LOG_ERROR, "ChipInterface12::hdd_sendData_start -- trying to send more than 16 MB, fail");
+        Debug::out(LOG_ERROR, "ChipInterface4::hdd_sendData_start -- trying to send more than 16 MB, fail");
         return false;
     }
 
@@ -283,7 +278,7 @@ bool ChipInterface12::hdd_sendData_start(uint32_t totalDataCount, uint8_t scsiSt
     return true;
 }
 
-bool ChipInterface12::hdd_sendData_transferBlock(uint8_t *pData, uint32_t dataCount)
+bool ChipInterface4::hdd_sendData_transferBlock(uint8_t *pData, uint32_t dataCount)
 {
 #ifndef ONPC
     bufOut[0] = 0;
@@ -313,11 +308,11 @@ bool ChipInterface12::hdd_sendData_transferBlock(uint8_t *pData, uint32_t dataCo
     return true;
 }
 
-bool ChipInterface12::hdd_recvData_start(uint8_t *recvBuffer, uint32_t totalDataCount)
+bool ChipInterface4::hdd_recvData_start(uint8_t *recvBuffer, uint32_t totalDataCount)
 {
 #ifndef ONPC
     if(totalDataCount > 0xffffff) {
-        Debug::out(LOG_ERROR, "ChipInterface12::hdd_recvData_start() -- trying to send more than 16 MB, fail");
+        Debug::out(LOG_ERROR, "ChipInterface4::hdd_recvData_start() -- trying to send more than 16 MB, fail");
         return false;
     }
 
@@ -335,7 +330,7 @@ bool ChipInterface12::hdd_recvData_start(uint8_t *recvBuffer, uint32_t totalData
     return true;
 }
 
-bool ChipInterface12::hdd_recvData_transferBlock(uint8_t *pData, uint32_t dataCount)
+bool ChipInterface4::hdd_recvData_transferBlock(uint8_t *pData, uint32_t dataCount)
 {
 #ifndef ONPC
     memset(bufOut, 0, TX_RX_BUFF_SIZE);                   // nothing to transmit, really...
@@ -362,7 +357,7 @@ bool ChipInterface12::hdd_recvData_transferBlock(uint8_t *pData, uint32_t dataCo
     return true;
 }
 
-bool ChipInterface12::hdd_sendStatusToHans(uint8_t statusByte)
+bool ChipInterface4::hdd_sendStatusToHans(uint8_t statusByte)
 {
 #ifndef ONPC
     bool res = conSpi->waitForATN(SPI_CS_HANS, ATN_GET_STATUS, 1000, bufIn);   // wait for ATN_GET_STATUS
@@ -381,7 +376,7 @@ bool ChipInterface12::hdd_sendStatusToHans(uint8_t statusByte)
     return true;
 }
 
-void ChipInterface12::fdd_sendTrackToChip(int byteCount, uint8_t *encodedTrack)
+void ChipInterface4::fdd_sendTrackToChip(int byteCount, uint8_t *encodedTrack)
 {
 #ifndef ONPC
     // send encoded track out, read garbage into bufIn and don't care about it
@@ -389,7 +384,7 @@ void ChipInterface12::fdd_sendTrackToChip(int byteCount, uint8_t *encodedTrack)
 #endif
 }
 
-uint8_t* ChipInterface12::fdd_sectorWritten(int &side, int &track, int &sector, int &byteCount)
+uint8_t* ChipInterface4::fdd_sectorWritten(int &side, int &track, int &sector, int &byteCount)
 {
 #ifndef ONPC
     byteCount = conSpi->getRemainingLength();               // get how many data we still have
@@ -406,146 +401,29 @@ uint8_t* ChipInterface12::fdd_sectorWritten(int &side, int &track, int &sector, 
     return bufIn;                                           // return pointer to received written sector
 }
 
-void ChipInterface12::initButtonAndBeeperPins(void)
+void ChipInterface4::initButtonAndBeeperPins(void)
 {
-    static bool pinsInitialized = false;
-
-    if(!pinsInitialized) {      // initialize only once
-#ifndef ONPC
-        bcm2835_gpio_fsel(PIN_BEEPER, BCM2835_GPIO_FSEL_OUTP);      // config these extra GPIO pins here (not in the gpio_open())
-        bcm2835_gpio_fsel(PIN_BUTTON, BCM2835_GPIO_FSEL_INPT);
-#endif
-
-        pinsInitialized = true;
-    }
+    // button and beeper are not directly attached to GPIO, nothing to do here
 }
 
-void ChipInterface12::handleButton(int& btnDownTime, uint32_t& nextScreenTime)
+void ChipInterface4::handleButton(int& btnDownTime, uint32_t& nextScreenTime)
 {
-    static bool btnDownPrev = false;
-    static uint32_t btnDownStart = 0;
-    static int btnDownTimePrev = 0;
-    static bool powerOffIs = false;
-    static bool powerOffWas = false;
-
-    initButtonAndBeeperPins();
-
-    #ifdef ONPC
-        bool btnDown = false;
-    #else
-        bool btnDown = bcm2835_gpio_lev(PIN_BUTTON) == LOW;
-    #endif
-
-    uint32_t now = Utils::getCurrentMs();
-
-    if(btnDown) {                                   // if button is pressed
-        if(!btnDownPrev) {                          // it was just pressed down (falling edge)
-            btnDownStart = now;                     // store button down time
-        }
-
-        uint32_t btnDownTimeMs = (now - btnDownStart); // calculate how long the button is down in ms
-
-        //-------------
-        // it's the power off interval, if button down time is between this MIN and MAX time
-        powerOffIs = (btnDownTimeMs >= PWR_OFF_PRESS_TIME_MIN) && (btnDownTimeMs < PWR_OFF_PRESS_TIME_MAX);
-
-        if(!powerOffWas && powerOffIs) {            // if we just entered power off interval (not was, but now is)
-            display_showNow(DISP_SCREEN_POWEROFF);      // show power off question
-            nextScreenTime = Utils::getEndTime(1000);   // redraw display in 1 second
-        }
-
-        powerOffWas = powerOffIs;                   // store previous value of are-we-in-the-power-off-interval flag
-
-        //-------------
-        btnDownTime = btnDownTimeMs / 1000;         // ms to seconds
-        if(btnDownTime != btnDownTimePrev) {        // if button down time (in seconds) changed since the last time we've checked, update strings, show on screen
-            btnDownTimePrev = btnDownTime;          // store this as previous time
-
-            if(btnDownTime >= PWR_OFF_PRESS_TIME_MAX_SECONDS) { // if we're after the power-off interval
-                fillLine_recovery(btnDownTime);         // fill recovery screen lines
-                display_showNow(DISP_SCREEN_RECOVERY);  // show the recovery screen
-            }
-        }
-    } else if(!btnDown && btnDownPrev) {    // if button was just released (rising edge)
-        // if user was holding button down, we should redraw the recovery screen to something normal
-        if(btnDownTime > 0) {
-            int refreshInterval = (btnDownTime < 5) ? 1000 : NEXT_SCREEN_INTERVAL;  // if not doing recovery, redraw in 1 second, otherwise in normal interval
-            nextScreenTime = Utils::getEndTime(refreshInterval);
-        }
-
-        btnDownTime = 0;                    // not holding down button anymore, no button down time
-        btnDownTimePrev = 0;
-        beeper_beep(BEEP_SHORT);            // do a short beep as feedback
-    }
-
-    btnDownPrev = btnDown;                  // store current button down state as previous state
+    // nothing to do
 }
 
-void ChipInterface12::handleBeeperCommand(int beeperCommand, bool floppySoundEnabled)
+void ChipInterface4::handleBeeperCommand(int beeperCommand, bool floppySoundEnabled)
 {
-    initButtonAndBeeperPins();
-
-#ifndef ONPC
-    // should be short-mid-long beep?
-    if(beeperCommand >= BEEP_SHORT && beeperCommand <= BEEP_LONG) {
-        int beepLengthMs[3] = {50, 150, 500};       // beep length: short, mid, long
-        int lengthMs = beepLengthMs[beeperCommand]; // get beep length in ms
-
-        bcm2835_gpio_write(PIN_BEEPER, HIGH);
-        Utils::sleepMs(lengthMs);
-        bcm2835_gpio_write(PIN_BEEPER, LOW);
-        return;
-    }
-
-    // should do the button-press-is-in-the-power-off-interval sound
-    if(beeperCommand == BEEP_POWER_OFF_INTERVAL) {
-        for(int i=0; i<100; i++) {
-            bcm2835_gpio_write(PIN_BEEPER, HIGH);
-            Utils::sleepMs(1);
-            bcm2835_gpio_write(PIN_BEEPER, LOW);
-            Utils::sleepMs(5);
-        }
-
-        return;
-    }
-
-    // should be floppy seek noise?
-    if((beeperCommand & BEEP_FLOPPY_SEEK) == BEEP_FLOPPY_SEEK) {
-        int trackCount = beeperCommand - BEEP_FLOPPY_SEEK;
-        if(trackCount < 0) {        // too little?
-            trackCount = 0;
-        }
-
-        if(trackCount > 100) {      // too much?
-            trackCount = 80;
-        }
-
-        if(floppySoundEnabled) {          // if shouldn't make noises on floppy seek, just quit
-            return;
-        }
-
-        // for each track seek do a short bzzzz, so in the end it's not a long beep, but a buzzing sound
-        int i;
-        for(i=0; i<trackCount; i++) {
-            bcm2835_gpio_write(PIN_BEEPER, HIGH);
-            Utils::sleepMs(1);
-            bcm2835_gpio_write(PIN_BEEPER, LOW);
-            Utils::sleepMs(5);
-        }
-
-        return;
-    }
-#endif
+    // nothing to do
 }
 
 // returns true if should handle i2c display from RPi
-bool ChipInterface12::handlesDisplay(void)
+bool ChipInterface4::handlesDisplay(void)
 {
-    return true;        // v1/v2 does handle display locally
+    return false;        // v4 does NOT handle display localy
 }
 
 // send this display buffer data to remote display
-void ChipInterface12::displayBuffer(uint8_t *bfr, uint16_t size)
+void ChipInterface4::displayBuffer(uint8_t *bfr, uint16_t size)
 {
-    // nothing to do in v1/v2 here, as display is handled locally
+    // TODO: send data to display
 }

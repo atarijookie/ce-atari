@@ -10,11 +10,16 @@
 #define SWAP_ENDIAN false
 //#define DEBUG_SPI_COMMUNICATION
 
-CConSpi::CConSpi()
+CConSpi::CConSpi(int atnHans, int atnFranz, int csHans, int csFranz)
 {
     remainingPacketLength = -1;
     paddingBuffer = new uint8_t[PADDINGBUFFER_SIZE];
     memset(paddingBuffer, 0, PADDINGBUFFER_SIZE);
+
+    this->atnHans = atnHans;
+    this->atnFranz = atnFranz;
+    this->csHans = csHans;
+    this->csFranz = csFranz;
 }
 
 CConSpi::~CConSpi()
@@ -39,10 +44,10 @@ bool CConSpi::waitForATN(int whichSpiCs, uint8_t atnCode, uint32_t timeoutMs, ui
 
     // first translate CS signal to ATN signal
     int whichAtnSignal;
-    if(whichSpiCs == SPI_CS_HANS) {                         // for CS Hans
-        whichAtnSignal = SPI_ATN_HANS;                      // look for ATN Hans
-    } else {                                                // for CS Franz
-        whichAtnSignal = SPI_ATN_FRANZ;                     // look for ANT Franz
+    if(whichSpiCs == csHans) {                         // for CS Hans
+        whichAtnSignal = atnHans;                      // look for ATN Hans
+    } else {                                           // for CS Franz
+        whichAtnSignal = atnFranz;                     // look for ANT Franz
     }
 
     applyNoTxRxLimis(whichSpiCs);                           // set that we're not limiting the TX/RX count for now
@@ -148,13 +153,13 @@ void CConSpi::applyTxRxLimits(int whichSpiCs, uint8_t *inBuff)
 #endif
 
     // manually limit the TX and RX len
-    if( whichSpiCs == SPI_CS_HANS  && (txLen > ONE_KB || rxLen > ONE_KB) ) {
+    if( whichSpiCs == csHans && (txLen > ONE_KB || rxLen > ONE_KB) ) {
         Debug::out(LOG_ERROR, "applyTxRxLimits - TX/RX limits for HANS are probably wrong! Fix this!");
         txLen = MIN(txLen, ONE_KB);
         rxLen = MIN(rxLen, ONE_KB);
     }
 
-    if( whichSpiCs == SPI_CS_FRANZ  && (txLen > TWENTY_KB || rxLen > TWENTY_KB) ) {
+    if( whichSpiCs == csFranz && (txLen > TWENTY_KB || rxLen > TWENTY_KB) ) {
         Debug::out(LOG_ERROR, "applyTxRxLimits - TX/RX limits for FRANZ are probably wrong! Fix this!");
         txLen = MIN(txLen, TWENTY_KB);
         rxLen = MIN(rxLen, TWENTY_KB);
