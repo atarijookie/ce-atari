@@ -5,8 +5,10 @@
 #include "../chipinterface_v1_v2/chipinterface12.h"
 #include "../chipinterface_v1_v2/conspi.h"
 
-// SPI interface for connection to Hans (hard drive chip) and Franz (floppy chip).
-// Used in CosmosEx v1 and v2.
+// SPI interface for connection to Franz (floppy chip) and ACSI via GPIO.
+// Used in CosmosEx v4.
+
+class GpioAcsi;
 
 class ChipInterface4: public ChipInterface12
 {
@@ -65,6 +67,7 @@ public:
     void displayBuffer(uint8_t *bfr, uint16_t size);        // send this display buffer data to remote display
     //----------------
 private:
+    GpioAcsi* gpioAcsi;
     CConSpi *conSpi;
 
     int ikbdReadFd;     // fd used for IKBD read
