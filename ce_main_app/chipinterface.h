@@ -57,6 +57,11 @@
 #define CMD_DRIVE_ENABLED           0xa0
 #define CMD_DRIVE_DISABLED          0xb0
 
+// Franz v4: new commands sent from host to device, they will be ignored in older Franz
+#define CMD_FRANZ_MODE_1            0xc0        // Franz in v1/v2 mode
+#define CMD_FRANZ_MODE_4_SOUND_ON   0xc1        // Franz in v4 mode + do floppy seek sound
+#define CMD_FRANZ_MODE_4_SOUND_OFF  0xc2        // Franz in v4 mode + don't make the floppy seek sound
+
 #define MAKEWORD(A, B)  ( (((uint16_t)A)<<8) | ((uint16_t)B) )
 
 #define HDD_FW_RESPONSE_LEN     12
@@ -106,7 +111,7 @@ public:
     // to handle FW version, first call setHDDconfig() / setFDDconfig() to fill config into bufOut, then call getFWversion to get the FW version from chip
     virtual void getFWversion(bool hardNotFloppy, uint8_t *inFwVer) = 0;
     virtual void setHDDconfig(uint8_t hddEnabledIDs, uint8_t sdCardId, uint8_t fddEnabledSlots, bool setNewFloppyImageLed, uint8_t newFloppyImageLed);
-    virtual void setFDDconfig(bool setFloppyConfig, bool fddEnabled, int id, int writeProtected, bool setDiskChanged, bool diskChanged);
+    virtual void setFDDconfig(bool setFloppyConfig, FloppyConfig* fddConfig, bool setDiskChanged, bool diskChanged);
 
     //----------------
     // HDD: READ/WRITE functions for large (>1 MB) block transfers (Scsi::readSectors(), Scsi::writeSectors()) and also by the convenient functions above
@@ -153,9 +158,11 @@ protected:
         int currentLength;
     } response;
 
+    bool floppySoundEnabled;
+
     virtual void responseStart(int bufferLengthInBytes);        // use this to start creating response (commands) to Hans or Franz
     virtual void responseAddWord(uint8_t *bfr, uint16_t value);        // add a uint16_t to the response (command) to Hans or Franz
-    virtual void responseAddByte(uint8_t *bfr, uint8_t value);        // add a uint8_t to the response (command) to Hans or Franz
+    virtual bool responseAddByte(uint8_t *bfr, uint8_t value);        // add a uint8_t to the response (command) to Hans or Franz
 
     static void convertXilinxInfo(uint8_t xilinxInfo);
 

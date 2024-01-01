@@ -10,6 +10,7 @@ extern TFlags     flags;
 
 ChipInterface::ChipInterface()
 {
+    floppySoundEnabled = true;
     instanceIndex = -1;
 }
 
@@ -102,14 +103,15 @@ void ChipInterface::responseAddWord(uint8_t *bfr, uint16_t value)        // add 
     response.currentLength += 2;
 }
 
-void ChipInterface::responseAddByte(uint8_t *bfr, uint8_t value)        // add a uint8_t to the response (command) to Hans or Franz
+bool ChipInterface::responseAddByte(uint8_t *bfr, uint8_t value)        // add a uint8_t to the response (command) to Hans or Franz
 {
     if(response.currentLength >= response.bfrLengthInBytes) {
-        return;
+        return false;
     }
 
     bfr[response.currentLength] = value;
     response.currentLength++;
+    return true;
 }
 
 void ChipInterface::setHDDconfig(uint8_t hddEnabledIDs, uint8_t sdCardId, uint8_t fddEnabledSlots, bool setNewFloppyImageLed, uint8_t newFloppyImageLed)
@@ -158,16 +160,17 @@ void ChipInterface::setHDDconfig(uint8_t hddEnabledIDs, uint8_t sdCardId, uint8_
     }
 }
 
-void ChipInterface::setFDDconfig(bool setFloppyConfig, bool fddEnabled, int id, int writeProtected, bool setDiskChanged, bool diskChanged)
+void ChipInterface::setFDDconfig(bool setFloppyConfig, FloppyConfig* fddConfig, bool setDiskChanged, bool diskChanged)
 {
     memset(fwResponseBfr, 0, FDD_FW_RESPONSE_LEN);
 
     responseStart(FDD_FW_RESPONSE_LEN);                             // init the response struct
+    floppySoundEnabled = fddConfig->soundEnabled;               // store this in instance var for later use
 
-    if(setFloppyConfig) {                                   // should set floppy config?
-        responseAddByte(fwResponseBfr, ( fddEnabled     ? CMD_DRIVE_ENABLED     : CMD_DRIVE_DISABLED) );
-        responseAddByte(fwResponseBfr, ((id == 0)       ? CMD_SET_DRIVE_ID_0    : CMD_SET_DRIVE_ID_1) );
-        responseAddByte(fwResponseBfr, ( writeProtected ? CMD_WRITE_PROTECT_ON  : CMD_WRITE_PROTECT_OFF) );
+    if(setFloppyConfig) {                                       // should set floppy config?
+        responseAddByte(fwResponseBfr, ( fddConfig->enabled         ? CMD_DRIVE_ENABLED     : CMD_DRIVE_DISABLED) );
+        responseAddByte(fwResponseBfr, ((fddConfig->id == 0)        ? CMD_SET_DRIVE_ID_0    : CMD_SET_DRIVE_ID_1) );
+        responseAddByte(fwResponseBfr, ( fddConfig->writeProtected  ? CMD_WRITE_PROTECT_ON  : CMD_WRITE_PROTECT_OFF) );
     }
 
     if(setDiskChanged) {

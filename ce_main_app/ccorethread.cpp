@@ -697,7 +697,7 @@ void CCoreThread::handleFwVersion_franz(void)
     uint8_t fwVer[14];
     memset(fwVer,   0, 14);
 
-    chipInterface->setFDDconfig(setFloppyConfig, floppyConfig.enabled, floppyConfig.id, floppyConfig.writeProtected, setDiskChanged, diskChanged);
+    chipInterface->setFDDconfig(setFloppyConfig, &floppyConfig, setDiskChanged, diskChanged);
     chipInterface->getFWversion(false, fwVer);
 
     if(setFloppyConfig) {                                       // did set floppy config? don't set again

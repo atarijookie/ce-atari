@@ -251,6 +251,7 @@ void ChipInterface4::getFWversion(bool hardNotFloppy, uint8_t *inFwVer)
         Update::versions.hans.fromInts(2024, 1, 1);                     // store fake FW version of non-present Hans
     } else {                // for FDD
         // fwResponseBfr should be filled with Franz config - by calling setFDDconfig() (and not calling anything else inbetween)
+        responseAddByte(fwResponseBfr, floppySoundEnabled ? CMD_FRANZ_MODE_4_SOUND_ON : CMD_FRANZ_MODE_4_SOUND_OFF);
         conSpi->txRx(SPI_CS_FRANZ, FDD_FW_RESPONSE_LEN, fwResponseBfr, inFwVer);
 
         int year = Utils::bcdToInt(inFwVer[1]) + 2000;

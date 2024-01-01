@@ -43,6 +43,7 @@ private:
     void timeoutStart(uint32_t durationMs);
     bool isTimeout(void);
     bool waitForEOT(void);
+    void waitForEOTlevel(int level);
 };
 
 #endif

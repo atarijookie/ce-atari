@@ -46,13 +46,17 @@ void GpioAcsi::reset(void)
     bcm2835_gpio_write(OUT_OE,   HIGH);     // don't drive output data
     bcm2835_gpio_write(IN_OE,    HIGH);     // don't drive input data
 
-    // reset INT and DRQ (in case they got stuck L)
-    bcm2835_gpio_write(FF12D,    HIGH);     // we want the signals to go H
-    Utils::sleepMs(1);
-    bcm2835_gpio_write(INT_TRIG, HIGH);     // do CLK pulse
-    bcm2835_gpio_write(DRQ_TRIG, HIGH);
-    Utils::sleepMs(1);
-    bcm2835_gpio_write(FF12D,    LOW);      // we can put this back to L
+    // reset INT and DRQ if needed
+    if(bcm2835_gpio_lev(EOT) == LOW) {          // if DRQ or INT is L
+        bcm2835_gpio_write(FF12D,    HIGH);     // we want the signals to go H
+        Utils::sleepMs(1);
+        bcm2835_gpio_write(INT_TRIG, HIGH);     // do CLK pulse
+        bcm2835_gpio_write(DRQ_TRIG, HIGH);
+
+        waitForEOTlevel(HIGH);                  // wait a while until INT and DRQ come back to H again
+    }
+
+    bcm2835_gpio_write(FF12D,    LOW);      // FF12D must be L for normal usage
     bcm2835_gpio_write(INT_TRIG, LOW);      // CLK back to L
     bcm2835_gpio_write(DRQ_TRIG, LOW);
 #endif
@@ -128,6 +132,7 @@ bool GpioAcsi::sendBlock(uint8_t *pData, uint32_t dataCount)
 
 #ifndef ONPC
         bcm2835_gpio_write(DRQ_TRIG, HIGH);     // do CLK pulse
+        waitForEOTlevel(LOW);                   // wait until DRQ is L
         bcm2835_gpio_write(DRQ_TRIG, LOW);      // CLK back to L
 #endif
 
@@ -150,6 +155,7 @@ bool GpioAcsi::recvBlock(uint8_t *pData, uint32_t dataCount)
     for(uint32_t i=0; i<dataCount; i++) {
 #ifndef ONPC
         bcm2835_gpio_write(DRQ_TRIG, HIGH);     // do CLK pulse
+        waitForEOTlevel(LOW);                   // wait until DRQ is L
         bcm2835_gpio_write(DRQ_TRIG, LOW);      // CLK back to L
 #endif
 
@@ -171,6 +177,7 @@ uint8_t GpioAcsi::getCmdByte(void)
 {
 #ifndef ONPC
     bcm2835_gpio_write(INT_TRIG, HIGH);     // do CLK pulse
+    waitForEOTlevel(LOW);                   // wait until INT is L
     bcm2835_gpio_write(INT_TRIG, LOW);      // CLK back to L
 #endif
 
@@ -188,12 +195,18 @@ bool GpioAcsi::sendStatus(uint8_t scsiStatus)
 
 #ifndef ONPC
     bcm2835_gpio_write(INT_TRIG, HIGH);     // do CLK pulse
+    waitForEOTlevel(LOW);                   // wait until INT is L
     bcm2835_gpio_write(INT_TRIG, LOW);      // CLK back to L
 #endif
 
     return waitForEOT();    // try to wait for EOT and return success / failure
 }
 
+/*
+    This method waits for EOT (end-of-transfer) to become H, after it's been set to L by RPi and
+    will be reset back to H by Atari after each transfered byte. It's waiting up to the timeout time
+    and can fail if Atari doesn't transfer the current byte.
+*/
 bool GpioAcsi::waitForEOT(void)
 {
     while(true) {
@@ -207,6 +220,23 @@ bool GpioAcsi::waitForEOT(void)
             return false;
         }
     }
+}
+
+/* 
+    This method waits for the EOT (which is INT & DRQ) to reach specified level, but only for a short while.
+    It's used after doing rising CLK on TRIG_INT or TRIG_DRQ, and it's just waiting for the CLK to propagate
+    the FF12D value through D flip-flow to Q output (either INT or DRQ), so we don't return TRIG to L too quickly.
+    This doesn't wait for Atari response, but just for flip-flop response and should always succeed. 
+*/
+void GpioAcsi::waitForEOTlevel(int level)
+{
+#ifndef ONPC
+    for(int i=0; i<1000; i++) {
+        if(bcm2835_gpio_lev(EOT) == level) {
+            break;
+        }
+    }
+#endif
 }
 
 void GpioAcsi::setDataDirection(uint8_t sendNotRecv)

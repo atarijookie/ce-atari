@@ -253,6 +253,7 @@ void ChipInterface12::getFWversion(bool hardNotFloppy, uint8_t *inFwVer)
         Update::versions.hans.fromInts(year, Utils::bcdToInt(inFwVer[2]), Utils::bcdToInt(inFwVer[3]));       // store found FW version of Hans
     } else {                // for FDD
         // fwResponseBfr should be filled with Franz config - by calling setFDDconfig() (and not calling anything else inbetween)
+        responseAddByte(fwResponseBfr, CMD_FRANZ_MODE_1);
         conSpi->txRx(SPI_CS_FRANZ, FDD_FW_RESPONSE_LEN, fwResponseBfr, inFwVer);
 
         int year = Utils::bcdToInt(inFwVer[1]) + 2000;
