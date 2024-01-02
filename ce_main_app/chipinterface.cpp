@@ -10,6 +10,7 @@ extern TFlags     flags;
 
 ChipInterface::ChipInterface()
 {
+    currentFloppyImageLed = 0xff;
     floppySoundEnabled = true;
     instanceIndex = -1;
 }
@@ -157,6 +158,7 @@ void ChipInterface::setHDDconfig(uint8_t hddEnabledIDs, uint8_t sdCardId, uint8_
     if(setNewFloppyImageLed) {
         responseAddWord(fwResponseBfr, CMD_FLOPPY_SWITCH);               // CMD: set new image LED (bytes 8 & 9)
         responseAddWord(fwResponseBfr, MAKEWORD(fddEnabledSlots, newFloppyImageLed));  // store which floppy images LED should be on
+        currentFloppyImageLed = newFloppyImageLed;
     }
 }
 

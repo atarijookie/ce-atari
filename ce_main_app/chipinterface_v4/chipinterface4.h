@@ -67,6 +67,11 @@ public:
     void displayBuffer(uint8_t *bfr, uint16_t size);        // send this display buffer data to remote display
     //----------------
 private:
+    uint8_t* displayData;           // holds display data which should be sent to Franz
+    uint16_t displayDataSize;
+
+    bool btnDown;       // current button state, button is pressed (down) if true
+
     GpioAcsi* gpioAcsi;
     CConSpi *conSpi;
 
@@ -78,6 +83,7 @@ private:
 
     void serialSetup(void);                             // open IKDB serial port
     void initButtonAndBeeperPins(void);
+    void handleFloppySlotSwitch(void);
 };
 
 #endif // __CHIPINTERFACE4_H__

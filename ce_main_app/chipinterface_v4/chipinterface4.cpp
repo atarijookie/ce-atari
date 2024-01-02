@@ -27,6 +27,8 @@
 extern THwConfig hwConfig;
 extern TFlags    flags;                 // global flags from command line
 
+#define DISPLAY_DATA_SIZE   516
+
 ChipInterface4::ChipInterface4()
 {
 #ifndef ONPC
@@ -43,6 +45,11 @@ ChipInterface4::ChipInterface4()
     bufOut = new uint8_t[MFM_STREAM_SIZE];
     bufIn = new uint8_t[MFM_STREAM_SIZE];
 
+    displayData = new uint8_t[DISPLAY_DATA_SIZE];
+    displayDataSize = 0;
+
+    btnDown = false;        // button not pressed
+
     memset(&hansConfigWords, 0, sizeof(hansConfigWords));
 }
 
@@ -53,6 +60,8 @@ ChipInterface4::~ChipInterface4()
 
     delete []bufOut;
     delete []bufIn;
+
+    delete []displayData;
 }
 
 int ChipInterface4::chipInterfaceType(void)
@@ -225,6 +234,11 @@ bool ChipInterface4::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
     res = conSpi->waitForATN(SPI_CS_FRANZ, (uint8_t) ATN_ANY, 0, inBuf);
 
     if(res) {    // FRANZ is signaling attention?
+        if(inBuf[3] == ATN_GET_DISPLAY_DATA) {      // Franz wants display data? send it here and don't let anyone else know
+            conSpi->txRx(SPI_CS_FRANZ, displayDataSize, displayData, bufIn);
+            return false;
+        }
+
         if(inBuf[3] == ATN_SEND_TRACK) {
             moreData = 2;                               // side + track
         }
@@ -247,8 +261,14 @@ void ChipInterface4::getFWversion(bool hardNotFloppy, uint8_t *inFwVer)
 #ifndef ONPC
     if(hardNotFloppy) {     // for HDD
         ChipInterface::convertXilinxInfo(gpioAcsi->getXilinxByte());    // convert xilinx info into hwInfo struct
-        int year = Utils::bcdToInt(inFwVer[1]) + 2000;
-        Update::versions.hans.fromInts(2024, 1, 1);                     // store fake FW version of non-present Hans
+
+        hansConfigWords.current.acsi = hansConfigWords.next.acsi;   // store next values to current
+        hansConfigWords.current.fdd  = hansConfigWords.next.fdd;
+
+        inFwVer[4] = currentFloppyImageLed;             // pretend that new floppy LED/slot came from Hans
+        inFwVer[9] = 0;                                 // TODO: set recovery level here
+
+        Update::versions.hans.fromInts(2024, 1, 1);     // store fake FW version of non-present Hans
     } else {                // for FDD
         // fwResponseBfr should be filled with Franz config - by calling setFDDconfig() (and not calling anything else inbetween)
         responseAddByte(fwResponseBfr, floppySoundEnabled ? CMD_FRANZ_MODE_4_SOUND_ON : CMD_FRANZ_MODE_4_SOUND_OFF);
@@ -329,7 +349,86 @@ void ChipInterface4::initButtonAndBeeperPins(void)
 
 void ChipInterface4::handleButton(int& btnDownTime, uint32_t& nextScreenTime)
 {
-    // nothing to do
+    static bool btnDownPrev = false;
+    static uint32_t btnDownStart = 0;
+    static int btnDownTimePrev = 0;
+    static bool powerOffIs = false;
+    static bool powerOffWas = false;
+
+    // btnDown state is sent from Franz, but handled here
+
+    uint32_t now = Utils::getCurrentMs();
+
+    if(btnDown) {                                   // if button is pressed
+        if(!btnDownPrev) {                          // it was just pressed down (falling edge)
+            btnDownStart = now;                     // store button down time
+        }
+
+        uint32_t btnDownTimeMs = (now - btnDownStart); // calculate how long the button is down in ms
+
+        //-------------
+        // it's the power off interval, if button down time is between this MIN and MAX time
+        powerOffIs = (btnDownTimeMs >= PWR_OFF_PRESS_TIME_MIN) && (btnDownTimeMs < PWR_OFF_PRESS_TIME_MAX);
+
+        if(!powerOffWas && powerOffIs) {            // if we just entered power off interval (not was, but now is)
+            display_showNow(DISP_SCREEN_POWEROFF);      // show power off question
+            nextScreenTime = Utils::getEndTime(1000);   // redraw display in 1 second
+        }
+
+        powerOffWas = powerOffIs;                   // store previous value of are-we-in-the-power-off-interval flag
+
+        //-------------
+        btnDownTime = btnDownTimeMs / 1000;         // ms to seconds
+        if(btnDownTime != btnDownTimePrev) {        // if button down time (in seconds) changed since the last time we've checked, update strings, show on screen
+            btnDownTimePrev = btnDownTime;          // store this as previous time
+
+            if(btnDownTime >= PWR_OFF_PRESS_TIME_MAX_SECONDS) { // if we're after the power-off interval
+                fillLine_recovery(btnDownTime);         // fill recovery screen lines
+                display_showNow(DISP_SCREEN_RECOVERY);  // show the recovery screen
+            }
+        }
+    } else if(!btnDown && btnDownPrev) {    // if button was just released (rising edge)
+        // if user was holding button down, we should redraw the recovery screen to something normal
+        if(btnDownTime > 0) {
+            int refreshInterval = (btnDownTime < 5) ? 1000 : NEXT_SCREEN_INTERVAL;  // if not doing recovery, redraw in 1 second, otherwise in normal interval
+            nextScreenTime = Utils::getEndTime(refreshInterval);
+        }
+
+        btnDownTime = 0;                    // not holding down button anymore, no button down time
+        btnDownTimePrev = 0;
+
+        uint32_t btnDownTimeMs = (now - btnDownStart); // calculate how long the button was down in ms
+        if(btnDownTimeMs < 100) {           // short button press? do floppy slot switch
+            handleFloppySlotSwitch();
+        }
+    }
+
+    btnDownPrev = btnDown;                  // store current button down state as previous state
+}
+
+void ChipInterface4::handleFloppySlotSwitch(void)
+{
+    uint8_t fddEnabledSlots = hansConfigWords.next.fdd >> 8;
+
+    if(fddEnabledSlots == 0) {              // no slots enabled?
+        currentFloppyImageLed = 0xff;       // no LED on
+    } else {
+        if(currentFloppyImageLed == 0xff) { // no LED set before?
+            currentFloppyImageLed = 2;      // start with last LED, it will be switched immediatelly to 0th
+        }
+
+        for(int i=0; i<3; i++) {            // we will find next LED in 3 attempts or less
+            currentFloppyImageLed++;        // move one LED up
+            if(currentFloppyImageLed > 2) { // we're at the end? roll back to 0
+                currentFloppyImageLed = 0;
+            }
+
+            if(fddEnabledSlots & (1 << currentFloppyImageLed)) {    // this slot enabled? use it
+
+                return;
+            }
+        }
+    }
 }
 
 void ChipInterface4::handleBeeperCommand(int beeperCommand, bool floppySoundEnabled)
@@ -343,8 +442,15 @@ bool ChipInterface4::handlesDisplay(void)
     return false;        // v4 does NOT handle display localy
 }
 
-// send this display buffer data to remote display
+// Send this display buffer data to remote display... once it asks for it.
+// Just copy the data at the time of call.
 void ChipInterface4::displayBuffer(uint8_t *bfr, uint16_t size)
 {
-    // TODO: send data to display
+    uint16_t copySize = MIN(DISPLAY_DATA_SIZE - 4, size);       // pick smaller and don't overflow
+
+    Utils::storeWord(displayData, 0xd1da);          // starting tag - DIsplay DAta
+    Utils::storeWord(displayData + 2, copySize);    // how much data is there
+
+    displayDataSize = copySize + 4;                 // how much data should be transfered
+    memcpy(displayData + 4, bfr, copySize);         // copy in the data
 }

@@ -29,6 +29,9 @@
 #define ATN_SECTOR_WRITTEN          0x03            // sent: 3, side (highest bit) + track #, current sector #
 #define ATN_SEND_TRACK              0x04            // send the whole track
 
+// commands sent from Franz v4 to host
+#define ATN_GET_DISPLAY_DATA        0x05            // get current display content
+
 #define COMMAND_SIZE            10
 #define ACSI_CMD_SIZE           14
 #define WRITTENMFMSECTOR_SIZE   2048
@@ -159,6 +162,7 @@ protected:
     } response;
 
     bool floppySoundEnabled;
+    uint8_t currentFloppyImageLed;
 
     virtual void responseStart(int bufferLengthInBytes);        // use this to start creating response (commands) to Hans or Franz
     virtual void responseAddWord(uint8_t *bfr, uint16_t value);        // add a uint16_t to the response (command) to Hans or Franz
