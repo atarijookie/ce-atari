@@ -70,7 +70,8 @@ private:
     uint8_t* displayData;           // holds display data which should be sent to Franz
     uint16_t displayDataSize;
 
-    bool btnDown;       // current button state, button is pressed (down) if true
+    bool btnDown;           // current button state, button is pressed (down) if true
+    uint8_t recoveryLevel;
 
     GpioAcsi* gpioAcsi;
     CConSpi *conSpi;
@@ -84,6 +85,7 @@ private:
     void serialSetup(void);                             // open IKDB serial port
     void initButtonAndBeeperPins(void);
     void handleFloppySlotSwitch(void);
+    void handleRecoveryButtonPress(int btnDownTime);
 };
 
 #endif // __CHIPINTERFACE4_H__

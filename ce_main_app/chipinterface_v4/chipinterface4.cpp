@@ -49,6 +49,7 @@ ChipInterface4::ChipInterface4()
     displayDataSize = 0;
 
     btnDown = false;        // button not pressed
+    recoveryLevel = 0;
 
     memset(&hansConfigWords, 0, sizeof(hansConfigWords));
 }
@@ -266,7 +267,9 @@ void ChipInterface4::getFWversion(bool hardNotFloppy, uint8_t *inFwVer)
         hansConfigWords.current.fdd  = hansConfigWords.next.fdd;
 
         inFwVer[4] = currentFloppyImageLed;             // pretend that new floppy LED/slot came from Hans
-        inFwVer[9] = 0;                                 // TODO: set recovery level here
+        inFwVer[9] = recoveryLevel;                     // set recovery level
+
+        recoveryLevel = 0;
 
         Update::versions.hans.fromInts(2024, 1, 1);     // store fake FW version of non-present Hans
     } else {                // for FDD
@@ -276,6 +279,8 @@ void ChipInterface4::getFWversion(bool hardNotFloppy, uint8_t *inFwVer)
 
         int year = Utils::bcdToInt(inFwVer[1]) + 2000;
         Update::versions.franz.fromInts(year, Utils::bcdToInt(inFwVer[2]), Utils::bcdToInt(inFwVer[3]));              // store found FW version of Franz
+
+        btnDown = (inFwVer[4] == 1);                    // Franz v4 sends 1 here if button is pressed
     }
 #endif
 }
@@ -394,6 +399,8 @@ void ChipInterface4::handleButton(int& btnDownTime, uint32_t& nextScreenTime)
             nextScreenTime = Utils::getEndTime(refreshInterval);
         }
 
+        handleRecoveryButtonPress(btnDownTime); // if this is a recovery request, handle it
+
         btnDownTime = 0;                    // not holding down button anymore, no button down time
         btnDownTimePrev = 0;
 
@@ -424,10 +431,20 @@ void ChipInterface4::handleFloppySlotSwitch(void)
             }
 
             if(fddEnabledSlots & (1 << currentFloppyImageLed)) {    // this slot enabled? use it
-
                 return;
             }
         }
+    }
+}
+
+void ChipInterface4::handleRecoveryButtonPress(int btnDownTime)
+{
+    if(btnDownTime >= 15) {
+        recoveryLevel = (uint8_t) 'T';
+    } else if(btnDownTime >= 10) {
+        recoveryLevel = (uint8_t) 'S';
+    } else if(btnDownTime >= 5) {
+        recoveryLevel = (uint8_t) 'R';
     }
 }
 
