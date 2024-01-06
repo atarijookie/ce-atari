@@ -260,6 +260,9 @@ bool ChipInterface4::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
 void ChipInterface4::getFWversion(bool hardNotFloppy, uint8_t *inFwVer)
 {
 #ifndef ONPC
+    static uint32_t btnDownStart = 0;
+    static bool btnDownPrev = false;
+
     if(hardNotFloppy) {     // for HDD
         ChipInterface::convertXilinxInfo(gpioAcsi->getXilinxByte());    // convert xilinx info into hwInfo struct
 
@@ -280,7 +283,25 @@ void ChipInterface4::getFWversion(bool hardNotFloppy, uint8_t *inFwVer)
         int year = Utils::bcdToInt(inFwVer[1]) + 2000;
         Update::versions.franz.fromInts(year, Utils::bcdToInt(inFwVer[2]), Utils::bcdToInt(inFwVer[3]));              // store found FW version of Franz
 
-        btnDown = (inFwVer[4] == 1);                    // Franz v4 sends 1 here if button is pressed
+        if(inFwVer[5] == BTN_SHUTDOWN) {
+            // TODO: handle shutdown
+        } else {
+            btnDown = (inFwVer[5] == BTN_PRESSED);      // Franz v4 sends button pressed status
+
+            if(btnDownPrev != btnDown) {                // button state changed, so it's not pressed or released
+                btnDownPrev = btnDown;
+
+                uint32_t now = Utils::getCurrentMs();
+                if(btnDown) {                           // button now pressed?
+                    btnDownStart = now;
+                } else {                                // button now released?
+                    uint32_t btnDownTimeMs = (now - btnDownStart); // calculate how long the button was down in ms
+                    if(btnDownTimeMs < 250) {           // short button press? do floppy slot switch
+                        handleFloppySlotSwitch();
+                    }
+                }
+            }
+        }
     }
 #endif
 }
@@ -403,11 +424,6 @@ void ChipInterface4::handleButton(int& btnDownTime, uint32_t& nextScreenTime)
 
         btnDownTime = 0;                    // not holding down button anymore, no button down time
         btnDownTimePrev = 0;
-
-        uint32_t btnDownTimeMs = (now - btnDownStart); // calculate how long the button was down in ms
-        if(btnDownTimeMs < 100) {           // short button press? do floppy slot switch
-            handleFloppySlotSwitch();
-        }
     }
 
     btnDownPrev = btnDown;                  // store current button down state as previous state

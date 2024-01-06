@@ -1,11 +1,13 @@
 #include "floppyhelpers.h"
 #include "stm32f10x.h"                       // STM32F103 definitions
+#include "defs.h"
 
 // set GPIOB as --- CNF1:0 -- 00 (push-pull output), MODE1:0 -- 11 (output 50 Mhz)
 void FloppyOut_Enable(void )
 {
     GPIOB->CRH &= ~(0x00000fff); 
     GPIOB->CRH |=  (0x00000777);            // (0x00000333)
+    GPIOA->BRR = FLLC_OE;                   // Franz v4 - FLLC_OE to L to enable output
     FloppyIndex_Enable();
     FloppyMFMread_Enable();     
 }
@@ -15,6 +17,7 @@ void FloppyOut_Disable(void)
 {
     GPIOB->CRH &= ~(0x00000fff); 
     GPIOB->CRH |=  (0x00000444); 
+    GPIOA->BSRR = FLLC_OE;                  // Franz v4 - FLLC_OE to H to disable output
     FloppyIndex_Disable();  
     FloppyMFMread_Disable();    
 }

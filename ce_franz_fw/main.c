@@ -47,6 +47,16 @@ void updateStreamPositionByFloppyPosition(void);
 
 void handleFloppyWrite(void);
 
+BYTE franzMode = FRANZ_MODE_V1_V2;      // starting in the v1/v2 mode
+BYTE soundOn   = FALSE;                 // not using sound by default
+
+BYTE buttonPressed = FALSE;
+BYTE buttonPressedPrev = FALSE;
+WORD buttonTimeDown = 0;
+
+BYTE sendShutdownRequest = FALSE;
+WORD shutdownStart = 0;
+
 void trackRequest(BYTE forceRequest) 
 {
     next.track = now.track;
@@ -72,6 +82,101 @@ void trackRequest(BYTE forceRequest)
 
     fillReadStreamBufferWithDummyData();        // fill MFM stream with dummy data so we won't stream any junk
     outFlags.weAreReceivingTrack = TRUE;        // mark that we are receiving TRACK data, and thus shouldn't stream
+}
+
+void beeperOff(void)
+{
+    if(franzMode == FRANZ_MODE_V4) {            // touch pin only in Franz mode v4
+        GPIOB->BRR = BEEPER;
+    }
+}
+
+void beeperToggle(BYTE isFloppySound)
+{
+    WORD beeperNow;
+
+    if(franzMode != FRANZ_MODE_V4) {            // touch pin only in Franz mode v4
+        return;
+    }
+
+    beeperNow = GPIOB->ODR & BEEPER;
+
+    if(beeperNow) {     // beeper ON? always allow turning OFF
+        GPIOB->BRR = BEEPER;
+    } else {            // beeper OFF? turn on only if it's not from floppy or if it's from floppy but floppy seek sound enabled
+        if(!isFloppySound || (isFloppySound && soundOn)) {
+            GPIOB->BSRR = BEEPER;
+        }
+    }
+}
+
+void beeperOn(BYTE isFloppySound)
+{
+    if(franzMode != FRANZ_MODE_V4) {            // touch pin only in Franz mode v4
+        return;
+    }
+
+    //  turn on only if it's not from floppy or if it's from floppy but floppy seek sound enabled
+    if(!isFloppySound || (isFloppySound && soundOn)) {
+        GPIOB->BSRR = BEEPER;
+    }
+}
+
+void handleButton(void)
+{
+    static WORD lastHandleTime = 0;
+    WORD timeSinceShutdownRequest;
+    BYTE isInShutdownTimeInterval = 0;
+    WORD timeNow = TIM4->CNT;
+    WORD diff;
+    WORD pressDuration;
+
+    // handle button only every 100 ms (don't handle too often)
+    diff = timeNow - lastHandleTime;
+    if(diff < 200) {            // less than 100 ms passed? just quit
+        return;
+    }
+    lastHandleTime = timeNow;   // we're handling it now
+
+    pressDuration = timeNow - buttonTimeDown;  // how long the button is pressed
+    pressDuration = pressDuration >> 1;             // 1 tick is 0.5 ms, convert them to ms by dividing by 2
+    isInShutdownTimeInterval = (pressDuration >= PWR_OFF_PRESS_TIME_MIN) && (pressDuration < PWR_OFF_PRESS_TIME_MAX);  // if press length is in the 'power off' interval
+
+    buttonPressed = (GPIOA->IDR & BTN) == BTN;      // get button bit, pressed if H
+
+    // button press changed == press event or release event
+    if(buttonPressedPrev != buttonPressed) {
+        buttonPressedPrev = buttonPressed;
+
+        if(buttonPressed) {                     // on press - store time and send report
+            buttonTimeDown = timeNow;
+            sendFwVersion = TRUE;
+        } else {                                // on button released
+            if(isInShutdownTimeInterval) {      // if in shutdown time interval, should send shutdown request
+                sendShutdownRequest = TRUE;
+                shutdownStart = timeNow;
+            }
+            sendFwVersion = TRUE;
+            beeperOff();
+        }
+    }
+
+    // button pressed - handle long press
+    if(buttonPressed && isInShutdownTimeInterval) { // pressed and in shutdown interval?
+        beeperToggle(0);
+    }
+
+    // we've requested the shutdown, now if the host doesn't shut this down, then we will after some time
+    if(sendShutdownRequest) {
+        timeSinceShutdownRequest = timeNow - shutdownStart;         // ticks since shutdown start
+        timeSinceShutdownRequest = timeSinceShutdownRequest / 2000; // seconds since shutdown start
+
+        if(timeSinceShutdownRequest >= PWR_OFF_AFTER_REQUEST) {     // enough time passed since shutdown request?
+            GPIOB->CRL &= ~(0x0000000f);                            // remove bits from GPIOB for GPIOB0 (DEVICE_OFF_H)
+            GPIOB->CRL |=   0x00000003;                             // set DEVICE_OFF_H (GPIO0) in push-pull output
+            GPIOB->BSRR = DEVICE_OFF_H;                             // set DEVICE_OFF_H to H - to turn off device now
+        }
+    }
 }
 
 int main(void)
@@ -108,6 +213,10 @@ int main(void)
 
     while(1) {
         WORD inputs;
+
+        if(franzMode == FRANZ_MODE_V4) {                // if we're in Franz mode v4, handle the button
+            handleButton();
+        }
 
         if(outFlags.updatePosition) {
             outFlags.updatePosition = FALSE;
@@ -161,13 +270,21 @@ int main(void)
 
                 spiDma_txRx(ATN_SENDFWVERSION_LEN_TX, atnSendFwVersion, ATN_SENDFWVERSION_LEN_RX, cmdBuffer);
 
-                sendFwVersion   = FALSE;
+                if(sendShutdownRequest) {       // if shutdown should be requested, send it
+                    atnSendFwVersion[6] = BTN_SHUTDOWN;
+                } else {                        // not shutdown? send button state
+                    atnSendFwVersion[6] = buttonPressed ? BTN_PRESSED : BTN_RELEASED;
+                }
+
+                sendFwVersion = FALSE;
             } else if(sendTrackRequest) {                                                       // if should send track request
                 // check how much time passed since the request was created
                 WORD timeNow    = TIM4->CNT;
                 WORD diff       = timeNow - lastRequestTime;
 
                 if(diff >= 30) {                                                                // and at least 15 ms passed since the request (30 / 2000 s)
+                    beeperOff();
+
                     sendTrackRequest = FALSE;
 
                     // first check if this isn't what we've requested last time
@@ -420,6 +537,8 @@ void EXTI3_IRQHandler(void)
             }
         }
 
+        beeperToggle(1);
+
         if(now.track == 0) {                            // if track is 0
             GPIOB->BRR = TRACK0;                        // TRACK 0 signal to L
         } else {                                                    // if track is not 0
@@ -521,6 +640,17 @@ void updateStreamPositionByFloppyPosition(void)
     inIndexGet = (streamSize * mediaPosition) / 400;
 }
 
+void setMode(BYTE newFranzMode, BYTE newSoundOn)
+{
+    if(newFranzMode == franzMode && newSoundOn == soundOn) {    // no change in mode and sound - just quit
+        return;
+    }
+
+    // update mode, sound and dir bit
+    franzMode = newFranzMode;
+    soundOn = newSoundOn;
+}
+
 void processHostCommand(BYTE val)
 {
     switch(val) {
@@ -533,6 +663,10 @@ void processHostCommand(BYTE val)
         case CMD_SET_DRIVE_ID_1:    driveId             = 1;        setupDriveSelect();             break;  // ...or that!
         case CMD_DRIVE_ENABLED:     driveEnabled        = TRUE;     setupDriveSelect();             break;  // drive is now enabled
         case CMD_DRIVE_DISABLED:    driveEnabled        = FALSE;    setupDriveSelect();             break;  // drive is now disabled
+
+        case CMD_FRANZ_MODE_1:              setMode(FRANZ_MODE_V1_V2, FALSE);   break;  // set Franz in v1/v2 mode
+        case CMD_FRANZ_MODE_4_SOUND_ON:     setMode(FRANZ_MODE_V4, TRUE);       break;  // set Franz in v4 mode with sound
+        case CMD_FRANZ_MODE_4_SOUND_OFF:    setMode(FRANZ_MODE_V4, FALSE);      break;  // set Franz in v4 mode without sound
     }
 }
 

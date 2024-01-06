@@ -46,6 +46,11 @@ BYTE timeout(void);
 #define CMD_TRACK_STREAM_END        0xF000                          // this is the mark in the track stream that we shouldn't go any further in the stream
 #define CMD_TRACK_STREAM_END_BYTE   0xF0                            // this is the mark in the track stream that we shouldn't go any further in the stream
 
+// Franz v4: new commands sent from host to device, they will be ignored in older Franz
+#define CMD_FRANZ_MODE_1            0xc0        // Franz in v1/v2 mode
+#define CMD_FRANZ_MODE_4_SOUND_ON   0xc1        // Franz in v4 mode + do floppy seek sound
+#define CMD_FRANZ_MODE_4_SOUND_OFF  0xc2        // Franz in v4 mode + don't make the floppy seek sound
+
 #define MFM_4US     1
 #define MFM_6US     2
 #define MFM_8US     3
@@ -69,5 +74,8 @@ BYTE timeout(void);
 
 #define STREAM_TABLE_OFFSET (10/2)              // 10 bytes / 5 words - the stream table starts at this offset, because first 5 words are empty (ATN + sizes + other)
 #define STREAM_START_OFFSET (STREAM_TABLE_OFFSET + STREAM_TABLE_SIZE)
+
+#define FRANZ_MODE_V1_V2    1
+#define FRANZ_MODE_V4       4
 
 #endif

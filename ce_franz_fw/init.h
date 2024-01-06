@@ -9,5 +9,6 @@ void dma_spi_init(void);
 void init_hw_sw(void);
 void initUsarts(void);
 void Exti3InterruptOn(BYTE onNotOff);
+void reconfigV1V2V4pins(BYTE mode);
 
 #endif

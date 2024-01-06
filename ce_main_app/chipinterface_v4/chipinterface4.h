@@ -8,6 +8,10 @@
 // SPI interface for connection to Franz (floppy chip) and ACSI via GPIO.
 // Used in CosmosEx v4.
 
+#define BTN_RELEASED    0
+#define BTN_PRESSED     1
+#define BTN_SHUTDOWN    2
+
 class GpioAcsi;
 
 class ChipInterface4: public ChipInterface12

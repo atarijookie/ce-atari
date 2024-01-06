@@ -1,6 +1,14 @@
 #ifndef DEFS_H_
 #define DEFS_H_
 
+#define PWR_OFF_PRESS_TIME_MIN          1000
+#define PWR_OFF_PRESS_TIME_MAX          2000
+#define PWR_OFF_AFTER_REQUEST           10
+
+#define BTN_RELEASED    0
+#define BTN_PRESSED     1
+#define BTN_SHUTDOWN    2
+
 #define BYTE    unsigned char
 #define WORD    unsigned short
 #define DWORD   unsigned int
@@ -74,6 +82,8 @@ GPIOA_14 - SWD -- for debugging
 
 inputs:
 -------
+GPIOA_0  - BTN
+
 GPIOB_2  - DIRECTION
 GPIOB_3  - STEP                         (using EXTI3)
 GPIOB_4  - WDATA                        (using TIM3_CH1 after remap)
@@ -87,37 +97,47 @@ GPIOB_14 - DRIVE_SELECT1
 outputs:
 ---------
 GPIOA_1  - INDEX                        (using TIM2_CH2)
-
 GPIOA_8  - RDATA                        (using TIM1_CH1)
+
+GPIOB_0  - DEVICE_OFF_H
+GPIOB_1  - BEEPER - on Franz v4
+GPIOB_5  - SDA 
 
 GPIOB_8  - WRITE_PROTECT
 GPIOB_9  - DISK_CHANGE
 GPIOB_10 - TRACK0
 GPIOB_11 - USART3_RX -- for original ST keyboard TX
 GPIOB_15 - ATTENTION (need more data / data available to retrieve)
+
+GPIOA_11 - DENSITY
+GPIOA_12 - FLLC_OE
+GPIOA_15 - SCL
 */
 
-
 // on GPIOA
-//#define   RDATA       (1 <<   8)
-
+#define BTN                 (1 <<   0)
+#define DENSITY             (1 <<  11)
+#define FLLC_OE             (1 <<  12)
+#define SCL                 (1 <<  15)
 
 // on GPIOB
-#define DIR             (1 <<   2)
-#define STEP            (1 <<   3)
-#define WDATA           (1 <<   4)
-#define SIDE1           (1 <<   6)
-#define WGATE           (1 <<   7)
+#define DEVICE_OFF_H        (1 <<   0)
+#define BEEPER              (1 <<   1)
+#define DIR                 (1 <<   2)
+#define STEP                (1 <<   3)
+#define WDATA               (1 <<   4)
+#define SDA                 (1 <<   5)
+#define SIDE1               (1 <<   6)
+#define WGATE               (1 <<   7)
 
-#define WR_PROTECT      (1 <<   8)
-#define DISK_CHANGE     (1 <<   9)
-#define TRACK0          (1 <<  10)
+#define WR_PROTECT          (1 <<   8)
+#define DISK_CHANGE         (1 <<   9)
+#define TRACK0              (1 <<  10)
 
-#define MOTOR_ENABLE    (1 <<  12)
-#define DRIVE_SELECT0   (1 <<  13)
-#define DRIVE_SELECT1   (1 <<  14)
+#define MOTOR_ENABLE        (1 <<  12)
+#define DRIVE_SELECT0       (1 <<  13)
+#define DRIVE_SELECT1       (1 <<  14)
 
-#define ATN             (1 <<  15)
-
+#define ATN                 (1 <<  15)
 
 #endif /* DEFS_H_ */

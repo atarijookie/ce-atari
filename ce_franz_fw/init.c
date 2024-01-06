@@ -207,11 +207,7 @@ void init_hw_sw(void)
     RCC->APB2ENR    |= (1 << 14) | (1 << 12) | (1 << 11) | (1 << 3) | (1 << 2);     // Enable USART1, SPI1, TIM1, GPIOA and GPIOB clock
     
     // set FLOATING INPUTs for GPIOB_0 ... 6
-    GPIOB->CRL &= ~(0x0fffffff);                                    // remove bits from GPIOB
-    GPIOB->CRL |=   0x04444444;                                     // set GPIOB as --- CNF1:0 -- 01 (floating input), MODE1:0 -- 00 (input), PxODR -- don't care
-
-    GPIOB->CRL &= ~(0xf0000f00);                                    // remove bits from GPIOB for GPIOB2 and GPIOB7
-    GPIOB->CRL |=   0x80000800;                                     // set GPIOB as --- CNF1:0 -- 10 (pull up/down input), MODE1:0 -- 00 (input)
+    GPIOB->CRL = 0x84344834;                                        // 8 means input with pull-up, 4 means floating input, 3 means output push-pull
     GPIOB->BSRR = DIR | WGATE;                                      // set DIR, WGATE to 1 in ODR == pull up
 
     driveId         = 0;
@@ -224,12 +220,12 @@ void init_hw_sw(void)
     
     // SPI -- enable atlernate function for PA4, PA5, PA6, PA7, 
     // UART2 (to IKBD) -- alternate function for PA2, floating input for PA3
-    GPIOA->CRL &= ~(0xffffff00);                                    // remove bits from GPIOA
-    GPIOA->CRL |=   0xbbbb4b00;                                     
+    GPIOA->CRL &= ~(0xffffff0f);                                    // remove bits from GPIOA
+    GPIOA->CRL |=   0xbbbb4b04;
 
     // UART1 (to RPi) - alternate function for PA9, floating input for PA10
-    GPIOA->CRH &= ~(0x00000ff0);                                    // remove bits from GPIOA
-    GPIOA->CRH |=   0x000004b0;                                     
+    GPIOA->CRH &= ~(0xf00f0ff0);                                    // remove bits from GPIOA
+    GPIOA->CRH |=   0x300304b0;
 
     // ATTENTION -- set GPIOB_15 (ATTENTION) as --- CNF1:0 -- 00 (push-pull output), MODE1:0 -- 11 (output 50 Mhz)
     // UART3 (to original keyboard) -- floating input for PB11
