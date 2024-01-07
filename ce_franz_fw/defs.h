@@ -9,9 +9,14 @@
 #define BTN_PRESSED     1
 #define BTN_SHUTDOWN    2
 
+#define IFACE_ACSI      0
+#define IFACE_SCSI      1
+
 #define BYTE    unsigned char
 #define WORD    unsigned short
 #define DWORD   unsigned int
+
+#define MAKEWORD(UP, DOWN)  ( (((WORD) UP) << 8) | ((WORD)DOWN) )
 
 #define TRUE    1
 #define FALSE   0
@@ -87,6 +92,7 @@ GPIOA_0  - BTN
 GPIOB_2  - DIRECTION
 GPIOB_3  - STEP                         (using EXTI3)
 GPIOB_4  - WDATA                        (using TIM3_CH1 after remap)
+GPIOB_5  - IFACE_DETECT 
 GPIOB_6  - SIDE1
 GPIOB_7  - WGATE
 GPIOB_12 - MOTOR_ENABLE
@@ -118,7 +124,6 @@ GPIOA_15 - SCL
 #define BTN                 (1 <<   0)
 #define DENSITY             (1 <<  11)
 #define FLLC_OE             (1 <<  12)
-#define SCL                 (1 <<  15)
 
 // on GPIOB
 #define DEVICE_OFF_H        (1 <<   0)
@@ -126,7 +131,7 @@ GPIOA_15 - SCL
 #define DIR                 (1 <<   2)
 #define STEP                (1 <<   3)
 #define WDATA               (1 <<   4)
-#define SDA                 (1 <<   5)
+#define IFACE_DETECT        (1 <<   5)
 #define SIDE1               (1 <<   6)
 #define WGATE               (1 <<   7)
 

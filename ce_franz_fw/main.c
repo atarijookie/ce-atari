@@ -263,19 +263,24 @@ int main(void)
         // sending and receiving data over SPI using DMA
         if(spiDmaIsIdle) {                                                                      // SPI DMA: nothing to Tx and nothing to Rx?
             if(sendFwVersion) {                                                                 // should send FW version? this is a window for receiving commands
+                WORD ifaceReport;
+                WORD buttonReport;
+
                 if(isDiskChanged) {                                                             // if it was held for a while, take it down
                     isDiskChanged = FALSE;
                     setupDiskChangeWriteProtect();
                 }
 
-                spiDma_txRx(ATN_SENDFWVERSION_LEN_TX, atnSendFwVersion, ATN_SENDFWVERSION_LEN_RX, cmdBuffer);
+                ifaceReport = ((GPIOB->IDR & IFACE_DETECT) == IFACE_DETECT) ? IFACE_SCSI : IFACE_ACSI;  // bit H means SCSI, bit L means ACSI
 
                 if(sendShutdownRequest) {       // if shutdown should be requested, send it
-                    atnSendFwVersion[6] = BTN_SHUTDOWN;
+                    buttonReport = BTN_SHUTDOWN;
                 } else {                        // not shutdown? send button state
-                    atnSendFwVersion[6] = buttonPressed ? BTN_PRESSED : BTN_RELEASED;
+                    buttonReport = buttonPressed ? BTN_PRESSED : BTN_RELEASED;
                 }
+                atnSendFwVersion[6] = MAKEWORD(ifaceReport, buttonReport);
 
+                spiDma_txRx(ATN_SENDFWVERSION_LEN_TX, atnSendFwVersion, ATN_SENDFWVERSION_LEN_RX, cmdBuffer);
                 sendFwVersion = FALSE;
             } else if(sendTrackRequest) {                                                       // if should send track request
                 // check how much time passed since the request was created
@@ -291,7 +296,7 @@ int main(void)
                     lastRequested.track = next.track;                                       // mark what we've requested last time
                     lastRequested.side  = next.side;
 
-                    atnSendTrackRequest[4] = (((WORD)next.side) << 8) | (next.track);
+                    atnSendTrackRequest[4] = MAKEWORD(next.side, next.track);
                     spiDma_txRx(ATN_SENDTRACK_REQ_LEN_TX, atnSendTrackRequest, ATN_SENDTRACK_REQ_LEN_RX, readTrackDataBfr);
 
                     outFlags.weAreReceivingTrack = TRUE;                                    // mark that we started to receive TRACK data

@@ -12,6 +12,9 @@
 #define BTN_PRESSED     1
 #define BTN_SHUTDOWN    2
 
+#define IFACE_ACSI      0
+#define IFACE_SCSI      1
+
 class GpioAcsi;
 
 class ChipInterface4: public ChipInterface12
@@ -90,6 +93,7 @@ private:
     void initButtonAndBeeperPins(void);
     void handleFloppySlotSwitch(void);
     void handleRecoveryButtonPress(int btnDownTime);
+    void handleIfaceReport(uint8_t ifaceReport);
 };
 
 #endif // __CHIPINTERFACE4_H__

@@ -37,7 +37,7 @@ ChipInterface4::ChipInterface4()
     conSpi = new CConSpi(0, 0, 0, 0);
 #endif
 
-    gpioAcsi = new GpioAcsi();
+    gpioAcsi = NULL;        // no iface yet
 
     ikbdReadFd = -1;
     ikbdWriteFd = -1;
@@ -57,7 +57,11 @@ ChipInterface4::ChipInterface4()
 ChipInterface4::~ChipInterface4()
 {
     delete conSpi;
-    delete gpioAcsi;
+
+    if(gpioAcsi) {          // got some interface? delete it
+        delete gpioAcsi;
+        gpioAcsi = NULL;
+    }
 
     delete []bufOut;
     delete []bufIn;
@@ -73,9 +77,14 @@ int ChipInterface4::chipInterfaceType(void)
 bool ChipInterface4::ciOpen(void)
 {
 #ifndef ONPC
-    gpioAcsi->init();
     serialSetup();          // open and configure UART for IKBD
-    return gpio_open();     // open GPIO and SPI
+    bool ok = gpio_open();  // open GPIO and SPI
+
+    if(ok) {                // if succeeded opening GPIO, we can init iface
+        handleIfaceReport(IFACE_ACSI);
+    }
+
+    return ok;
 #else
     return false;
 #endif
@@ -283,6 +292,8 @@ void ChipInterface4::getFWversion(bool hardNotFloppy, uint8_t *inFwVer)
         int year = Utils::bcdToInt(inFwVer[1]) + 2000;
         Update::versions.franz.fromInts(year, Utils::bcdToInt(inFwVer[2]), Utils::bcdToInt(inFwVer[3]));              // store found FW version of Franz
 
+        handleIfaceReport(inFwVer[4]);                  // handle interface report - can witch between ACSI and SCSI
+
         if(inFwVer[5] == BTN_SHUTDOWN) {
             // TODO: handle shutdown
         } else {
@@ -304,6 +315,33 @@ void ChipInterface4::getFWversion(bool hardNotFloppy, uint8_t *inFwVer)
         }
     }
 #endif
+}
+
+void ChipInterface4::handleIfaceReport(uint8_t ifaceReport)
+{
+    static uint8_t ifaceReportPrev = 0xff;
+
+    if(ifaceReport != IFACE_ACSI && ifaceReport != IFACE_SCSI) {    // invalid value supplied? ignore it and quit
+        return;
+    }
+
+    if(ifaceReportPrev == ifaceReport) {    // interface not changed to what we've handled last time? just quit
+        return;
+    }
+
+    ifaceReportPrev = ifaceReport;          // store current iface report
+
+    if(gpioAcsi) {                          // got some interface? delete it
+        delete gpioAcsi;
+        gpioAcsi = NULL;
+    }
+
+    if(ifaceReport == IFACE_ACSI) {         // it's ACSI
+        gpioAcsi = new GpioAcsi();
+        gpioAcsi->init();
+    } else {                                // it's SCSI
+        // TODO: implement SCSI
+    }
 }
 
 bool ChipInterface4::hdd_sendData_start(uint32_t totalDataCount, uint8_t scsiStatus, bool withStatus)

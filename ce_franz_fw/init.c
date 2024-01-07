@@ -206,8 +206,8 @@ void init_hw_sw(void)
     RCC->APB1ENR    |= (1 << 18) | (1 << 17) | (1 << 2) | (1 <<  1) | (1 <<  0);    // enable USART3, USART2, TIM4, TIM3, TIM2
     RCC->APB2ENR    |= (1 << 14) | (1 << 12) | (1 << 11) | (1 << 3) | (1 << 2);     // Enable USART1, SPI1, TIM1, GPIOA and GPIOB clock
     
-    // set FLOATING INPUTs for GPIOB_0 ... 6
-    GPIOB->CRL = 0x84344834;                                        // 8 means input with pull-up, 4 means floating input, 3 means output push-pull
+    // set input / output for GPIOB0-7
+    GPIOB->CRL = 0x84444834;                                        // 8 means input with pull-up, 4 means floating input, 3 means output push-pull
     GPIOB->BSRR = DIR | WGATE;                                      // set DIR, WGATE to 1 in ODR == pull up
 
     driveId         = 0;
