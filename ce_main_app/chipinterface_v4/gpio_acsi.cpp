@@ -1,4 +1,5 @@
 #include "../utils.h"
+#include "../debug.h"
 #include "gpio_acsi.h"
 
 GpioAcsi::GpioAcsi()
@@ -86,8 +87,11 @@ bool GpioAcsi::getCmd(uint8_t* cmd)
     cmd[0] = dataIn();
     uint8_t id = (cmd[0] >> 5) & 0x07;      // get only device ID
 
+    Debug::out(LOG_DEBUG, "GpioAcsi::getCmd - got 0th cmd byte: %02x -> id: %d", cmd[0], id);
+
     //----------------------
     if(!(hddEnabledIDs & (1 << id))) {      // if this ID is not enabled, quit
+        Debug::out(LOG_DEBUG, "GpioAcsi::getCmd - hddEnabledIDs: %02x -> id: %d not enabled, ignoring", hddEnabledIDs, id);
         reset();
         return false;
     }
@@ -98,13 +102,23 @@ bool GpioAcsi::getCmd(uint8_t* cmd)
         cmd[i] = getCmdByte();
 
         if(isTimeout()) {                   // if something was wrong, quit, failed
+            Debug::out(LOG_DEBUG, "GpioAcsi::getCmd - timeout on cmd byte %d", i);
             reset();
             return false;
         }
         
         if(i == 1) {                        // if we got also the 2nd byte, get actual cmd length
             cmdLen = getCmdLengthFromCmdBytesAcsi(cmd);
+            Debug::out(LOG_DEBUG, "GpioAcsi::getCmd - for cmd: %02x %02x -> cmdLen: %d", cmd[0], cmd[1], cmdLen);
         }             
+    }
+
+    if(cmdLen > 6) {
+        Debug::out(LOG_DEBUG, "GpioAcsi::getCmd - got cmd: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x", 
+                                cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7], cmd[8], cmd[9]);
+    } else {
+        Debug::out(LOG_DEBUG, "GpioAcsi::getCmd - got cmd: %02x %02x %02x %02x %02x %02x", 
+                                cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5]);
     }
 
     return true;
@@ -267,17 +281,30 @@ void GpioAcsi::setDataDirection(uint8_t sendNotRecv)
 uint8_t GpioAcsi::dataIn(void)
 {
 #ifndef ONPC
+    // single GPIO read
     volatile uint32_t* paddr = bcm2835_gpio + BCM2835_GPLEV0/4;
     uint32_t value = bcm2835_peri_read(paddr);
-#else
-    uint32_t value = 0;
-#endif
-
     value = value & 0x1BF0000;          // leave only data bits
 
     uint32_t bits5to0 = value >> 16;
     uint32_t bits76 = value >> 17;
     uint32_t data = bits76 | bits5to0;  // merge bits
+
+/*
+    // GPIO read by bits
+    uint8_t data = 0;
+    int dataPins[8] = {DATA0, DATA1, DATA2, DATA3, DATA4, DATA5, DATA6, DATA7};
+    for(int i=0; i<8; i++) {
+        if(bcm2835_gpio_lev(dataPins[i]) == HIGH) {
+            data = data | (1 << i);
+        }
+    }
+*/
+
+#else
+    uint8_t data = 0;
+#endif
+
     return data;
 }
 

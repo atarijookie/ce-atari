@@ -78,7 +78,9 @@ bool ChipInterface4::ciOpen(void)
 {
 #ifndef ONPC
     serialSetup();          // open and configure UART for IKBD
-    bool ok = gpio_open();  // open GPIO and SPI
+    bool ok = gpio4_open();  // open GPIO and SPI
+
+    Debug::out(LOG_DEBUG, "ChipInterface4::ciOpen - ok=%d", (int) ok);
 
     if(ok) {                // if succeeded opening GPIO, we can init iface
         handleIfaceReport(IFACE_ACSI);
@@ -96,7 +98,7 @@ void ChipInterface4::ciClose(void)
     Utils::closeFdIfOpen(ikbdReadFd);
     Utils::closeFdIfOpen(ikbdWriteFd);
 
-    gpio_close();           // close GPIO and SPI
+    gpio4_close();           // close GPIO and SPI
 #endif
 }
 
@@ -326,17 +328,22 @@ void ChipInterface4::handleIfaceReport(uint8_t ifaceReport)
     }
 
     if(ifaceReportPrev == ifaceReport) {    // interface not changed to what we've handled last time? just quit
+        //Debug::out(LOG_DEBUG, "ChipInterface4::handleIfaceReport - ifaceReport=%02x not changed, skipping", ifaceReport);
         return;
     }
 
     ifaceReportPrev = ifaceReport;          // store current iface report
 
     if(gpioAcsi) {                          // got some interface? delete it
+        Debug::out(LOG_DEBUG, "ChipInterface4::handleIfaceReport - ifaceReport=%02x - deleting ACSI iface", ifaceReport);
         delete gpioAcsi;
         gpioAcsi = NULL;
     }
 
+    ifaceReport = IFACE_ACSI;               // TODO: remove this once the PCB is fixed
+
     if(ifaceReport == IFACE_ACSI) {         // it's ACSI
+        Debug::out(LOG_DEBUG, "ChipInterface4::handleIfaceReport - ifaceReport=%02x - creating ACSI iface", ifaceReport);
         gpioAcsi = new GpioAcsi();
         gpioAcsi->init();
     } else {                                // it's SCSI

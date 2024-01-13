@@ -145,7 +145,7 @@
         <SetRegEntry>
           <Number>0</Number>
           <Key>DLGTARM</Key>
-          <Name>(1010=708,196,1074,739,0)(1007=105,133,282,398,0)(1008=90,117,456,339,0)(1009=120,149,354,687,0)(100=281,95,917,754,0)(110=60,84,270,530,0)(111=782,333,992,779,0)(1011=674,364,1198,711,0)(180=120,149,405,432,0)(120=769,322,1180,713,0)(121=354,328,765,719,0)(122=-1,-1,-1,-1,0)(123=-1,-1,-1,-1,0)(140=75,100,753,426,0)(240=105,133,494,464,0)(190=-1,-1,-1,-1,0)(200=-1,-1,-1,-1,0)(170=120,149,395,431,0)(130=731,170,1315,850,0)(131=567,98,1151,778,0)(132=150,182,734,862,0)(133=150,182,734,862,0)(160=449,207,887,607,0)(161=757,200,1195,600,0)(162=946,191,1384,591,0)(210=885,197,1202,544,0)(211=-1,-1,-1,-1,0)(220=-1,-1,-1,-1,0)(221=-1,-1,-1,-1,0)(230=-1,-1,-1,-1,0)(231=-1,-1,-1,-1,0)(232=-1,-1,-1,-1,0)(233=-1,-1,-1,-1,0)(150=240,248,833,868,0)(151=240,248,833,868,0)</Name>
+          <Name>(1010=708,196,1074,739,0)(1007=105,133,282,398,0)(1008=90,117,456,339,0)(1009=120,149,354,687,0)(100=281,95,917,754,0)(110=60,84,270,534,0)(111=782,333,992,779,0)(1011=674,364,1198,711,0)(180=120,149,405,432,0)(120=769,322,1180,713,0)(121=1296,219,1707,614,0)(122=-1,-1,-1,-1,0)(123=-1,-1,-1,-1,0)(140=75,100,753,426,0)(240=105,133,494,464,0)(190=-1,-1,-1,-1,0)(200=-1,-1,-1,-1,0)(170=120,149,395,431,0)(130=731,170,1315,850,0)(131=567,98,1151,778,0)(132=150,182,734,862,0)(133=150,182,734,862,0)(160=449,207,887,607,0)(161=757,200,1195,600,0)(162=946,191,1384,591,0)(210=885,197,1202,544,0)(211=-1,-1,-1,-1,0)(220=-1,-1,-1,-1,0)(221=-1,-1,-1,-1,0)(230=-1,-1,-1,-1,0)(231=-1,-1,-1,-1,0)(232=-1,-1,-1,-1,0)(233=-1,-1,-1,-1,0)(150=240,248,833,868,0)(151=240,248,833,868,0)</Name>
         </SetRegEntry>
         <SetRegEntry>
           <Number>0</Number>
@@ -229,10 +229,10 @@
       <FileType>1</FileType>
       <tvExp>0</tvExp>
       <Focus>0</Focus>
-      <ColumnNumber>1</ColumnNumber>
+      <ColumnNumber>0</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
-      <TopLine>244</TopLine>
-      <CurrentLine>262</CurrentLine>
+      <TopLine>560</TopLine>
+      <CurrentLine>571</CurrentLine>
       <bDave2>0</bDave2>
       <PathWithFileName>.\main.c</PathWithFileName>
       <FilenameWithoutPath>main.c</FilenameWithoutPath>
@@ -293,10 +293,10 @@
       <FileType>1</FileType>
       <tvExp>0</tvExp>
       <Focus>0</Focus>
-      <ColumnNumber>0</ColumnNumber>
+      <ColumnNumber>26</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
-      <TopLine>1</TopLine>
-      <CurrentLine>1</CurrentLine>
+      <TopLine>106</TopLine>
+      <CurrentLine>142</CurrentLine>
       <bDave2>0</bDave2>
       <PathWithFileName>.\timers.c</PathWithFileName>
       <FilenameWithoutPath>timers.c</FilenameWithoutPath>
@@ -488,7 +488,7 @@
       <ColumnNumber>0</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
       <TopLine>1</TopLine>
-      <CurrentLine>1</CurrentLine>
+      <CurrentLine>32</CurrentLine>
       <bDave2>0</bDave2>
       <PathWithFileName>.\floppyhelpers.c</PathWithFileName>
       <FilenameWithoutPath>floppyhelpers.c</FilenameWithoutPath>
@@ -519,8 +519,8 @@
       <Focus>0</Focus>
       <ColumnNumber>0</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
-      <TopLine>268</TopLine>
-      <CurrentLine>1</CurrentLine>
+      <TopLine>219</TopLine>
+      <CurrentLine>237</CurrentLine>
       <bDave2>0</bDave2>
       <PathWithFileName>.\init.c</PathWithFileName>
       <FilenameWithoutPath>init.c</FilenameWithoutPath>
@@ -615,7 +615,7 @@
       <Focus>0</Focus>
       <ColumnNumber>0</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
-      <TopLine>120</TopLine>
+      <TopLine>122</TopLine>
       <CurrentLine>133</CurrentLine>
       <bDave2>0</bDave2>
       <PathWithFileName>.\startup_stm32f10x_md.s</PathWithFileName>
@@ -645,10 +645,10 @@
       <FileType>1</FileType>
       <tvExp>0</tvExp>
       <Focus>0</Focus>
-      <ColumnNumber>21</ColumnNumber>
+      <ColumnNumber>1</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
-      <TopLine>1</TopLine>
-      <CurrentLine>14</CurrentLine>
+      <TopLine>220</TopLine>
+      <CurrentLine>235</CurrentLine>
       <bDave2>0</bDave2>
       <PathWithFileName>.\floppy_write.c</PathWithFileName>
       <FilenameWithoutPath>floppy_write.c</FilenameWithoutPath>
@@ -661,10 +661,10 @@
       <FileType>1</FileType>
       <tvExp>0</tvExp>
       <Focus>0</Focus>
-      <ColumnNumber>7</ColumnNumber>
+      <ColumnNumber>0</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
       <TopLine>1</TopLine>
-      <CurrentLine>4</CurrentLine>
+      <CurrentLine>16</CurrentLine>
       <bDave2>0</bDave2>
       <PathWithFileName>.\global_vars.c</PathWithFileName>
       <FilenameWithoutPath>global_vars.c</FilenameWithoutPath>

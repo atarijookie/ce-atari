@@ -11,7 +11,7 @@ WORD mfmReadStreamBuffer[16];                           // 16 words - 16 mfm tim
 
 WORD mfmWriteStreamBuffer[MFM_WRITE_STREAM_SIZE];
 
-WORD version[2] = {0xf019, 0x0709};             // this means: Franz, 2019-07-09
+WORD version[2] = {0xf024, 0x0101};             // this means: Franz, 2024-01-01
 WORD drive_select;
 
 volatile BYTE sendFwVersion, sendTrackRequest;

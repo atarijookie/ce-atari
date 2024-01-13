@@ -1,7 +1,7 @@
 # control verbosity. use make V=1
 V = 0
 
-ONPC   = yes
+#ONPC   = yes
 
 CXX	    = g++
 CC	    = gcc

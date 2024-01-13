@@ -68,7 +68,7 @@ void handleFloppyWrite(void)
     pWriteNow = &wrNow->buffer[wrNow->count];           // where we want to store current written data (using pointer instead of index for speed reasons)
     pWriteEnd = &wrNow->buffer[WRITEBUFFER_SIZE - 4];   // end of write buffer - terminate write loop if we get here (minus some space at the end for additional data)
 
-    wval = (streamed.track << 8) | streamed.sector; // next word (buffer[4]) is side, track, sector
+    wval = MAKEWORD(streamed.track, streamed.sector);   // next word (buffer[4]) is side, track, sector
 
     if(streamed.side != 0) {        // if side is not 0, set the highest bit
         wval |= 0x8000;
@@ -252,7 +252,7 @@ void handleFloppyWrite(void)
     pWriteNow = &wrNow->buffer[wrNow->count];           // where we want to store current written data (using pointer instead of index for speed reasons)
     pWriteEnd = &wrNow->buffer[WRITEBUFFER_SIZE - 4];   // end of write buffer - terminate write loop if we get here (minus some space at the end for additional data)
 
-    wval = (streamed.track << 8) | streamed.sector; // next word (buffer[4]) is side, track, sector
+    wval = MAKEWORD(streamed.track, streamed.sector); // next word (buffer[4]) is side, track, sector
 
     if(streamed.side != 0) {        // if side is not 0, set the highest bit
         wval |= 0x8000;
