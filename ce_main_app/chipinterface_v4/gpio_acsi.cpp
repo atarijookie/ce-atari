@@ -4,9 +4,8 @@
 
 GpioAcsi::GpioAcsi()
 {
-    hddEnabledIDs = 1;      // ID 0 enabled
+    hddEnabledIDs = 0;      // nothing enabled yet
     sdCardId = 0xff;        // SD card not enabled
-    sendNotRecvNow = 0xff;  // no data direction set yet
 }
 
 GpioAcsi::~GpioAcsi()
@@ -14,11 +13,13 @@ GpioAcsi::~GpioAcsi()
 
 }
 
-void GpioAcsi::init(void)
+void GpioAcsi::init(uint8_t hddEnabledIDs, uint8_t sdCardId)
 {
+    setConfig(hddEnabledIDs, sdCardId);     // set enabled IDs
+
 #ifndef ONPC
     // set RECV direction (reading data into RPi)
-    setDataDirection(0);
+    setDataDirection(DIR_RECV);
 
     // set these as inputs
     int inputs[3] = {CMD1ST, EOT, PIN_ATN_FRANZ};
@@ -28,7 +29,7 @@ void GpioAcsi::init(void)
 
     // configure those as outputs
     int outputs[5] = {INT_TRIG, DRQ_TRIG, FF12D, IN_OE, OUT_OE};
-    int outVals[5] = {LOW,      LOW,      LOW,   HIGH,  HIGH  };
+    int outVals[5] = {LOW,      LOW,      HIGH,  HIGH,  HIGH  };
     for(int i=0; i<5; i++) {
         bcm2835_gpio_fsel(outputs[i],  BCM2835_GPIO_FSEL_OUTP);
         bcm2835_gpio_write(outputs[i], outVals[i]);
@@ -43,21 +44,22 @@ void GpioAcsi::reset(void)
 {
 #ifndef ONPC
     // disable all data driving (in and out), also reset CMD1ST
-    bcm2835_gpio_write(IN_OE,    LOW);      // IN_OE to L - resets CMD1ST
-    bcm2835_gpio_write(OUT_OE,   HIGH);     // don't drive output data
-    bcm2835_gpio_write(IN_OE,    HIGH);     // don't drive input data
+    bcm2835_gpio_write(FF12D, HIGH);        // FF12D must be H to allow capturing of CMD1ST
+    setDataDirection(DIR_RECV);             // set recv direction
 
     // reset INT and DRQ if needed
-    if(bcm2835_gpio_lev(EOT) == LOW) {          // if DRQ or INT is L
-        bcm2835_gpio_write(FF12D,    HIGH);     // we want the signals to go H
-        Utils::sleepMs(1);
-        bcm2835_gpio_write(INT_TRIG, HIGH);     // do CLK pulse
+    if(bcm2835_gpio_lev(EOT) == LOW) {      // if DRQ or INT is L
+        bcm2835_gpio_write(INT_TRIG, HIGH); // do CLK pulse
         bcm2835_gpio_write(DRQ_TRIG, HIGH);
 
-        waitForEOTlevel(HIGH);                  // wait a while until INT and DRQ come back to H again
+        waitForEOTlevel(HIGH);              // wait a while until INT and DRQ come back to H again
+
+        const char* eotLevel = (bcm2835_gpio_lev(EOT) == LOW) ? "LOW" : "HIGH";
+        Debug::out(LOG_DEBUG, "GpioAcsi::reset - did RESET INT/DRQ, now it's %s", eotLevel);
+    } else {
+        Debug::out(LOG_DEBUG, "GpioAcsi::reset - skipped the RESET of INT/DRQ as it was HIGH");
     }
 
-    bcm2835_gpio_write(FF12D,    LOW);      // FF12D must be L for normal usage
     bcm2835_gpio_write(INT_TRIG, LOW);      // CLK back to L
     bcm2835_gpio_write(DRQ_TRIG, LOW);
 #endif
@@ -65,6 +67,7 @@ void GpioAcsi::reset(void)
 
 void GpioAcsi::setConfig(uint8_t hddEnabledIDs, uint8_t sdCardId)
 {
+    Debug::out(LOG_DEBUG, "GpioAcsi::setConfig - setting hddEnabledIDs: %02x, sdCardId: %d", hddEnabledIDs, sdCardId);
     this->hddEnabledIDs = hddEnabledIDs;
     this->sdCardId = sdCardId;
 }
@@ -76,18 +79,20 @@ uint8_t GpioAcsi::getXilinxByte(void)
 
 bool GpioAcsi::getCmd(uint8_t* cmd)
 {
-    setDataDirection(0);                    // start with recv cmd
+    setDataDirection(DIR_RECV);             // start with recv direction
 
 #ifndef ONPC
     if(bcm2835_gpio_lev(CMD1ST) == LOW) {   // CMD1ST not H? no cmd waiting
         return false;
     }
 
+    resetCmd1st();                          // reset CMD1ST back to L
+
     // if CMD1ST is H, then 1st cmd byte is waiting
     cmd[0] = dataIn();
     uint8_t id = (cmd[0] >> 5) & 0x07;      // get only device ID
 
-    Debug::out(LOG_DEBUG, "GpioAcsi::getCmd - got 0th cmd byte: %02x -> id: %d", cmd[0], id);
+    Debug::out(LOG_DEBUG, "GpioAcsi::getCmd - got 0th cmd byte: %02x -> id: %d, hddEnabledIDs: %02x", cmd[0], id, hddEnabledIDs);
 
     //----------------------
     if(!(hddEnabledIDs & (1 << id))) {      // if this ID is not enabled, quit
@@ -96,6 +101,7 @@ bool GpioAcsi::getCmd(uint8_t* cmd)
         return false;
     }
     
+    bcm2835_gpio_write(FF12D, LOW);         // FF12D must be L for generating INT / DRQ signals
     uint8_t cmdLen = 6;                     // maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
             
     for(uint8_t i=1; i<cmdLen; i++) {       // receive the next command bytes
@@ -139,7 +145,7 @@ void GpioAcsi::startTransfer(uint8_t sendNotRecv, uint32_t totalDataCount, uint8
 
 bool GpioAcsi::sendBlock(uint8_t *pData, uint32_t dataCount)
 {
-    setDataDirection(1);    // send data
+    setDataDirection(DIR_SEND);    // send data
 
     for(uint32_t i=0; i<dataCount; i++) {
         dataOut(pData[i]);  // output data to RPi GPIO pins
@@ -151,6 +157,7 @@ bool GpioAcsi::sendBlock(uint8_t *pData, uint32_t dataCount)
 #endif
 
         if(!waitForEOT()) { // failed to get EOT?
+            reset();
             return false;
         }
     }
@@ -164,7 +171,7 @@ bool GpioAcsi::sendBlock(uint8_t *pData, uint32_t dataCount)
 
 bool GpioAcsi::recvBlock(uint8_t *pData, uint32_t dataCount)
 {
-    setDataDirection(0);    // recv data
+    setDataDirection(DIR_RECV);    // recv data
 
     for(uint32_t i=0; i<dataCount; i++) {
 #ifndef ONPC
@@ -174,6 +181,7 @@ bool GpioAcsi::recvBlock(uint8_t *pData, uint32_t dataCount)
 #endif
 
         if(!waitForEOT()) { // failed to get EOT?
+            reset();
             return false;
         }
 
@@ -204,8 +212,8 @@ uint8_t GpioAcsi::getCmdByte(void)
 
 bool GpioAcsi::sendStatus(uint8_t scsiStatus)
 {
-    setDataDirection(1);    // finish with send status
-    dataOut(scsiStatus);    // output data to RPi GPIO pins
+    setDataDirection(DIR_SEND); // finish with send status
+    dataOut(scsiStatus);        // output data to RPi GPIO pins
 
 #ifndef ONPC
     bcm2835_gpio_write(INT_TRIG, HIGH);     // do CLK pulse
@@ -213,7 +221,9 @@ bool GpioAcsi::sendStatus(uint8_t scsiStatus)
     bcm2835_gpio_write(INT_TRIG, LOW);      // CLK back to L
 #endif
 
-    return waitForEOT();    // try to wait for EOT and return success / failure
+    bool ok = waitForEOT();     // try to wait for EOT and return success / failure
+    reset();
+    return ok;
 }
 
 /*
@@ -255,6 +265,8 @@ void GpioAcsi::waitForEOTlevel(int level)
 
 void GpioAcsi::setDataDirection(uint8_t sendNotRecv)
 {
+    static uint8_t sendNotRecvNow = 0xff;   // init with no data direction set yet
+
     if(sendNotRecvNow == sendNotRecv) {     // direction not changed since last time? quit
         return;
     }
@@ -267,14 +279,14 @@ void GpioAcsi::setDataDirection(uint8_t sendNotRecv)
     bcm2835_gpio_write(OUT_OE, HIGH);
 
     // set RPi GPIO pins as outputs / inputs
-    uint32_t dir = sendNotRecv ? BCM2835_GPIO_FSEL_OUTP : BCM2835_GPIO_FSEL_INPT;
+    uint32_t dir = (sendNotRecv == DIR_SEND) ? BCM2835_GPIO_FSEL_OUTP : BCM2835_GPIO_FSEL_INPT;
     int dataPins[8] = {DATA0, DATA1, DATA2, DATA3, DATA4, DATA5, DATA6, DATA7};
     for(int i=0; i<8; i++) {
         bcm2835_gpio_fsel(dataPins[i],  dir);
     }
 
     // enable only 1 transciever
-    bcm2835_gpio_write(sendNotRecv ? OUT_OE : IN_OE, LOW);
+    bcm2835_gpio_write((sendNotRecv == DIR_SEND) ? OUT_OE : IN_OE, LOW);
 #endif
 }
 
@@ -351,4 +363,23 @@ void GpioAcsi::timeoutStart(uint32_t durationMs)
 bool GpioAcsi::isTimeout(void)
 {
     return (Utils::getCurrentMs() >= timeoutTime);
+}
+
+void GpioAcsi::resetCmd1st(void)
+{
+#ifndef ONPC
+    if(bcm2835_gpio_lev(CMD1ST) == LOW) {       // CMD1ST is L, we don't need to do anything
+        return;
+    }
+
+    bcm2835_gpio_write(FF12D, LOW);             // FF12D to L, this is !MR (!CLR) on 74LVC1G32
+
+    for(int i=0; i<1000; i++) {                 // wait for CMD1ST to be L
+        if(bcm2835_gpio_lev(CMD1ST) == LOW) {
+            break;
+        }
+    }
+
+    bcm2835_gpio_write(FF12D, HIGH);            // FF12D to H, so we can capture next CMD1ST
+#endif
 }

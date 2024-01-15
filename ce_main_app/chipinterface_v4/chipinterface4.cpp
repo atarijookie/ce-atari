@@ -277,6 +277,10 @@ void ChipInterface4::getFWversion(bool hardNotFloppy, uint8_t *inFwVer)
     if(hardNotFloppy) {     // for HDD
         ChipInterface::convertXilinxInfo(gpioAcsi->getXilinxByte());    // convert xilinx info into hwInfo struct
 
+        if(hansConfigWords.next.acsi != hansConfigWords.current.acsi) { // config changed?
+            gpioAcsi->setConfig(hansConfigWords.next.acsi >> 8, hansConfigWords.next.acsi);
+        }
+
         hansConfigWords.current.acsi = hansConfigWords.next.acsi;   // store next values to current
         hansConfigWords.current.fdd  = hansConfigWords.next.fdd;
 
@@ -345,7 +349,7 @@ void ChipInterface4::handleIfaceReport(uint8_t ifaceReport)
     if(ifaceReport == IFACE_ACSI) {         // it's ACSI
         Debug::out(LOG_DEBUG, "ChipInterface4::handleIfaceReport - ifaceReport=%02x - creating ACSI iface", ifaceReport);
         gpioAcsi = new GpioAcsi();
-        gpioAcsi->init();
+        gpioAcsi->init(hansConfigWords.current.acsi >> 8, hansConfigWords.current.acsi);
     } else {                                // it's SCSI
         // TODO: implement SCSI
     }
