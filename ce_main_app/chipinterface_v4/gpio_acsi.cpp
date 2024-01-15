@@ -100,10 +100,11 @@ bool GpioAcsi::getCmd(uint8_t* cmd)
         reset();
         return false;
     }
-    
+
+    timeoutStart(1000);                     // start timeout
     bcm2835_gpio_write(FF12D, LOW);         // FF12D must be L for generating INT / DRQ signals
     uint8_t cmdLen = 6;                     // maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
-            
+
     for(uint8_t i=1; i<cmdLen; i++) {       // receive the next command bytes
         cmd[i] = getCmdByte();
 
