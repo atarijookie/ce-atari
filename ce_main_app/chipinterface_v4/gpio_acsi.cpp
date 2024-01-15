@@ -18,9 +18,6 @@ void GpioAcsi::init(uint8_t hddEnabledIDs, uint8_t sdCardId)
     setConfig(hddEnabledIDs, sdCardId);     // set enabled IDs
 
 #ifndef ONPC
-    // set RECV direction (reading data into RPi)
-    setDataDirection(DIR_RECV);
-
     // set these as inputs
     int inputs[3] = {CMD1ST, EOT, PIN_ATN_FRANZ};
     for(int i=0; i<3; i++) {
@@ -29,11 +26,14 @@ void GpioAcsi::init(uint8_t hddEnabledIDs, uint8_t sdCardId)
 
     // configure those as outputs
     int outputs[5] = {INT_TRIG, DRQ_TRIG, FF12D, IN_OE, OUT_OE};
-    int outVals[5] = {LOW,      LOW,      HIGH,  HIGH,  HIGH  };
+    int outVals[5] = {LOW,      LOW,      HIGH,  LOW,   HIGH  };
     for(int i=0; i<5; i++) {
         bcm2835_gpio_fsel(outputs[i],  BCM2835_GPIO_FSEL_OUTP);
         bcm2835_gpio_write(outputs[i], outVals[i]);
     }
+
+    // set RECV direction (reading data into RPi)
+    setDataDirection(DIR_RECV);
 
     // reset INT and DRQ so they won't block ACSI bus
     reset();
@@ -293,6 +293,7 @@ void GpioAcsi::setDataDirection(uint8_t sendNotRecv)
 uint8_t GpioAcsi::dataIn(void)
 {
 #ifndef ONPC
+/*
     // single GPIO read
     volatile uint32_t* paddr = bcm2835_gpio + BCM2835_GPLEV0/4;
     uint32_t value = bcm2835_peri_read(paddr);
@@ -301,8 +302,8 @@ uint8_t GpioAcsi::dataIn(void)
     uint32_t bits5to0 = value >> 16;
     uint32_t bits76 = value >> 17;
     uint32_t data = bits76 | bits5to0;  // merge bits
+*/
 
-/*
     // GPIO read by bits
     uint8_t data = 0;
     int dataPins[8] = {DATA0, DATA1, DATA2, DATA3, DATA4, DATA5, DATA6, DATA7};
@@ -311,8 +312,6 @@ uint8_t GpioAcsi::dataIn(void)
             data = data | (1 << i);
         }
     }
-*/
-
 #else
     uint8_t data = 0;
 #endif
@@ -327,12 +326,22 @@ void GpioAcsi::dataOut(uint8_t data)
     // D7 D6     D5 D4 D3 D2 D1 D0
     // 24 23     21 20 19 18 17 16
 
+/*
     uint32_t data32 = (uint32_t) data;
     data32 = ((data32 & 0xc0) << 17) | ((data32 & 0x3f) << 16);     // data bits now moved to expected positions 24-23 + 21-16
     uint32_t invData = (~data32) & 0x1BF0000;    // inverted data bits
 
     bcm2835_gpio_set_multi(data32);     // set bits which should be 1
     bcm2835_gpio_clr_multi(invData);    // clear bits which should be 0
+*/
+
+    // GPIO write by bits
+    int dataPins[8] = {DATA0, DATA1, DATA2, DATA3, DATA4, DATA5, DATA6, DATA7};
+    for(int i=0; i<8; i++) {
+        bool bitSet = data & (1 << i);
+        bcm2835_gpio_write(dataPins[i], bitSet ? HIGH : LOW);
+    }
+
 #endif
 }
 
