@@ -172,8 +172,6 @@ void handleButton(void)
         timeSinceShutdownRequest = timeSinceShutdownRequest / 2000; // seconds since shutdown start
 
         if(timeSinceShutdownRequest >= PWR_OFF_AFTER_REQUEST) {     // enough time passed since shutdown request?
-            GPIOB->CRL &= ~(0x0000000f);                            // remove bits from GPIOB for GPIOB0 (DEVICE_OFF_H)
-            GPIOB->CRL |=   0x00000003;                             // set DEVICE_OFF_H (GPIO0) in push-pull output
             GPIOB->BSRR = DEVICE_OFF_H;                             // set DEVICE_OFF_H to H - to turn off device now
         }
     }
@@ -672,6 +670,7 @@ void processHostCommand(BYTE val)
         case CMD_FRANZ_MODE_1:              setMode(FRANZ_MODE_V1_V2, FALSE);   break;  // set Franz in v1/v2 mode
         case CMD_FRANZ_MODE_4_SOUND_ON:     setMode(FRANZ_MODE_V4, TRUE);       break;  // set Franz in v4 mode with sound
         case CMD_FRANZ_MODE_4_SOUND_OFF:    setMode(FRANZ_MODE_V4, FALSE);      break;  // set Franz in v4 mode without sound
+        case CMD_FRANZ_MODE_4_POWER_OFF:    GPIOB->BSRR = DEVICE_OFF_H;         break;  // set DEVICE_OFF_H to H - to turn off device now
     }
 }
 

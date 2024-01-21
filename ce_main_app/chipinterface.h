@@ -64,6 +64,7 @@
 #define CMD_FRANZ_MODE_1            0xc0        // Franz in v1/v2 mode
 #define CMD_FRANZ_MODE_4_SOUND_ON   0xc1        // Franz in v4 mode + do floppy seek sound
 #define CMD_FRANZ_MODE_4_SOUND_OFF  0xc2        // Franz in v4 mode + don't make the floppy seek sound
+#define CMD_FRANZ_MODE_4_POWER_OFF  0xc5        // turn off the power of this device
 
 #define MAKEWORD(A, B)  ( (((uint16_t)A)<<8) | ((uint16_t)B) )
 

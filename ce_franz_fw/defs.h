@@ -107,7 +107,7 @@ GPIOA_8  - RDATA                        (using TIM1_CH1)
 
 GPIOB_0  - DEVICE_OFF_H
 GPIOB_1  - BEEPER - on Franz v4
-GPIOB_5  - SDA 
+GPIOB_5  - IFACE_DETECT
 
 GPIOB_8  - WRITE_PROTECT
 GPIOB_9  - DISK_CHANGE
@@ -117,7 +117,7 @@ GPIOB_15 - ATTENTION (need more data / data available to retrieve)
 
 GPIOA_11 - DENSITY
 GPIOA_12 - FLLC_OE
-GPIOA_15 - SCL
+
 */
 
 // on GPIOA

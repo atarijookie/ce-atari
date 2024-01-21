@@ -50,6 +50,7 @@ BYTE timeout(void);
 #define CMD_FRANZ_MODE_1            0xc0        // Franz in v1/v2 mode
 #define CMD_FRANZ_MODE_4_SOUND_ON   0xc1        // Franz in v4 mode + do floppy seek sound
 #define CMD_FRANZ_MODE_4_SOUND_OFF  0xc2        // Franz in v4 mode + don't make the floppy seek sound
+#define CMD_FRANZ_MODE_4_POWER_OFF  0xc5        // Franz in v4 mode - turn the power off
 
 #define MFM_4US     1
 #define MFM_6US     2

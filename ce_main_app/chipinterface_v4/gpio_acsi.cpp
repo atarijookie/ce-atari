@@ -57,7 +57,7 @@ void GpioAcsi::reset(void)
         const char* eotLevel = (bcm2835_gpio_lev(EOT) == LOW) ? "LOW" : "HIGH";
         Debug::out(LOG_DEBUG, "GpioAcsi::reset - did RESET INT/DRQ, now it's %s", eotLevel);
     } else {
-        Debug::out(LOG_DEBUG, "GpioAcsi::reset - skipped the RESET of INT/DRQ as it was HIGH");
+        // Debug::out(LOG_DEBUG, "GpioAcsi::reset - skipped the RESET of INT/DRQ as it was HIGH");
     }
 
     bcm2835_gpio_write(INT_TRIG, LOW);      // CLK back to L
@@ -158,13 +158,20 @@ bool GpioAcsi::sendBlock(uint8_t *pData, uint32_t dataCount)
 #endif
 
         if(!waitForEOT()) { // failed to get EOT?
+            Debug::out(LOG_WARNING, "GpioAcsi::sendBlock failed on byte %d out of %d.", i, dataCount);
             reset();
             return false;
         }
     }
 
     if(withStatus) {        // if block transfer should end with status, send it now
-        return sendStatus(scsiStatus);
+        bool ok = sendStatus(scsiStatus);
+
+        if(!ok) {
+            Debug::out(LOG_WARNING, "GpioAcsi::sendBlock failed on sendStatus");
+        }
+
+        return ok;
     }
 
     return true;            // all OK
@@ -182,6 +189,7 @@ bool GpioAcsi::recvBlock(uint8_t *pData, uint32_t dataCount)
 #endif
 
         if(!waitForEOT()) { // failed to get EOT?
+            Debug::out(LOG_WARNING, "GpioAcsi::recvBlock failed on byte %d out of %d.", i, dataCount);
             reset();
             return false;
         }
@@ -190,7 +198,13 @@ bool GpioAcsi::recvBlock(uint8_t *pData, uint32_t dataCount)
     }
 
     if(withStatus) {        // if block transfer should end with status, send it now
-        return sendStatus(scsiStatus);
+        bool ok = sendStatus(scsiStatus);
+
+        if(!ok) {
+            Debug::out(LOG_WARNING, "GpioAcsi::recvBlock failed on sendStatus.");
+        }
+
+        return ok;
     }
 
     return true;            // all OK
