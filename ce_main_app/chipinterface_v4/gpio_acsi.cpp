@@ -308,25 +308,16 @@ void GpioAcsi::setDataDirection(uint8_t sendNotRecv)
 uint8_t GpioAcsi::dataIn(void)
 {
 #ifndef ONPC
-/*
+    // data bits are at these GPIO pins:
+    // D7 D6     D5 D4 D3 D2 D1 D0
+    // 24 23     21 20 19 18 17 16
+
     // single GPIO read
     volatile uint32_t* paddr = bcm2835_gpio + BCM2835_GPLEV0/4;
     uint32_t value = bcm2835_peri_read(paddr);
-    value = value & 0x1BF0000;          // leave only data bits
-
-    uint32_t bits5to0 = value >> 16;
-    uint32_t bits76 = value >> 17;
-    uint32_t data = bits76 | bits5to0;  // merge bits
-*/
-
-    // GPIO read by bits
-    uint8_t data = 0;
-    int dataPins[8] = {DATA0, DATA1, DATA2, DATA3, DATA4, DATA5, DATA6, DATA7};
-    for(int i=0; i<8; i++) {
-        if(bcm2835_gpio_lev(dataPins[i]) == HIGH) {
-            data = data | (1 << i);
-        }
-    }
+    uint32_t bits5to0 = (value >> 16) & 0x3F;
+    uint32_t bits76 = (value >> 17) & 0xC0;
+    uint8_t data = bits76 | bits5to0;          // merge bits
 #else
     uint8_t data = 0;
 #endif
@@ -341,22 +332,10 @@ void GpioAcsi::dataOut(uint8_t data)
     // D7 D6     D5 D4 D3 D2 D1 D0
     // 24 23     21 20 19 18 17 16
 
-/*
     uint32_t data32 = (uint32_t) data;
     data32 = ((data32 & 0xc0) << 17) | ((data32 & 0x3f) << 16);     // data bits now moved to expected positions 24-23 + 21-16
-    uint32_t invData = (~data32) & 0x1BF0000;    // inverted data bits
 
-    bcm2835_gpio_set_multi(data32);     // set bits which should be 1
-    bcm2835_gpio_clr_multi(invData);    // clear bits which should be 0
-*/
-
-    // GPIO write by bits
-    int dataPins[8] = {DATA0, DATA1, DATA2, DATA3, DATA4, DATA5, DATA6, DATA7};
-    for(int i=0; i<8; i++) {
-        bool bitSet = data & (1 << i);
-        bcm2835_gpio_write(dataPins[i], bitSet ? HIGH : LOW);
-    }
-
+    bcm2835_gpio_write_mask(data32, 0x01BF0000);     // write value with mask
 #endif
 }
 
@@ -381,12 +360,24 @@ uint8_t GpioAcsi::getCmdLengthFromCmdBytesAcsi(uint8_t* cmd)
 
 void GpioAcsi::timeoutStart(uint32_t durationMs)
 {
+    timeoutCount = IS_TIMEOUT_CACHED_COUNT;     // set count to max expected value, so next call to isTimeout() will actually do the real time check
     timeoutTime = Utils::getEndTime(durationMs);
 }
 
 bool GpioAcsi::isTimeout(void)
 {
-    return (Utils::getCurrentMs() >= timeoutTime);
+    static bool lastIsTimeout = false;
+
+    // if not enough calls happened, just return the last isTimeout value
+    if(timeoutCount < IS_TIMEOUT_CACHED_COUNT) {
+        timeoutCount++;             // increment
+        return lastIsTimeout;       // return cached value instead of time calculation
+    }
+
+    // we've used all the calls to avoid the system call, now we really have to to it
+    timeoutCount = 0;               // restart counter
+    lastIsTimeout = (Utils::getCurrentMs() >= timeoutTime); // check if timeout happened and cache it for future calls
+    return lastIsTimeout;           // return this fresh value of isTimeout
 }
 
 void GpioAcsi::resetCmd1st(void)

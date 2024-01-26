@@ -7,6 +7,8 @@
 #define DIR_SEND    1
 #define DIR_RECV    0
 
+#define IS_TIMEOUT_CACHED_COUNT     1000
+
 class GpioAcsi
 {
 public: 
@@ -33,7 +35,8 @@ private:
     uint8_t scsiStatus;
     bool withStatus;
 
-    uint32_t timeoutTime;
+    uint32_t timeoutTime;       // timestamp after which the current operation will be considered as timeout
+    int timeoutCount;           // count of calls to isTimeout() which were just using the cached value of isTimeout
 
     void setDataDirection(uint8_t sendNotRecv);
 
