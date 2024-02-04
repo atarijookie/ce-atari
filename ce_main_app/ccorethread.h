@@ -19,6 +19,7 @@ class FloppyService;
 class ScreencastService;
 class AcsiDataTrans;
 class RetryModule;
+class ExtensionHandler;
 
 class CCoreThread: public ISettingsUser
 {
@@ -38,8 +39,9 @@ private:
     bool shouldRun;
     bool running;
 
-    AcsiDataTrans   *dataTrans;
-    ConsoleAppsStream    *configStream;
+    AcsiDataTrans       *dataTrans;
+    ConsoleAppsStream   *configStream;
+    ExtensionHandler    *extensionHandler;
 
     //-----------------------------------
     // settings and config stuff

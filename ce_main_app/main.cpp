@@ -20,6 +20,7 @@
 #include "update.h"
 #include "version.h"
 #include "cmdsockthread.h"
+#include "extension/extensionrecvthread.h"
 #include "display/displaythread.h"
 #include "floppy/floppyencoder.h"
 #include "chipinterface_v1_v2/chipinterface12.h"
@@ -198,6 +199,7 @@ int runCore(int instanceNo, bool localNotNetwork)
     pthread_t   floppyEncThreadInfo;
     pthread_t   displayThreadInfo;
     pthread_t   cmdSockThreadInfo;
+    pthread_t   extensionThreadInfo;
 
     flags.localNotNetwork = localNotNetwork;            // store if this core runs as local device or as network server
     flags.instanceNo = instanceNo;
@@ -239,6 +241,7 @@ int runCore(int instanceNo, bool localNotNetwork)
     handlePthreadCreate("ikbd", &ikbdThreadInfo, (void*) ikbdThreadCode);
     handlePthreadCreate("floppy encode", &floppyEncThreadInfo, (void*) floppyEncodeThreadCode);
     handlePthreadCreate("command socket", &cmdSockThreadInfo, (void*) cmdSockThreadCode);
+    handlePthreadCreate("extension", &extensionThreadInfo, (void*) extensionThreadCode);
 
     if(hasDisplay) {
         Debug::out(LOG_INFO, "Running on RPi 2 or newer (%x), starting displayThread.", rpiConfig.revisionInt);
@@ -259,6 +262,7 @@ int runCore(int instanceNo, bool localNotNetwork)
     pthread_kill_join("ikbd", ikbdThreadInfo);
     pthread_kill_join("floppy encoder", floppyEncThreadInfo);
     pthread_kill_join("command socket", cmdSockThreadInfo);
+    pthread_kill_join("extension", extensionThreadInfo);
 
     if(hasDisplay) {             // kill display thread
         pthread_kill_join("display", displayThreadInfo);

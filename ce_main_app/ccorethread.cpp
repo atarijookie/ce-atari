@@ -23,6 +23,8 @@
 #include "floppy/imagestorage.h"
 #include "floppy/floppyencoder.h"
 
+#include "extension/extensionhandler.h"
+
 #define DEV_CHECK_TIME_MS       3000
 #define UPDATE_CHECK_TIME       1000
 #define INET_IFACE_CHECK_TIME   1000
@@ -101,6 +103,9 @@ CCoreThread::CCoreThread()
     configStream = new ConsoleAppsStream();
     configStream->setAcsiDataTrans(dataTrans);
     configStream->setSettingsReloadProxy(&settingsReloadProxy);
+
+    extensionHandler = new ExtensionHandler();
+    extensionHandler->setAcsiDataTrans(dataTrans);
 }
 
 CCoreThread::~CCoreThread()
@@ -108,6 +113,7 @@ CCoreThread::~CCoreThread()
     delete configStream;
     delete dataTrans;
     delete retryMod;
+    delete extensionHandler;
 
     sharedObjects_destroy();
 }
@@ -497,6 +503,12 @@ void CCoreThread::handleAcsiCommand(uint8_t *bufIn)
             misc.processCommand(pCmd);
             break;
         }
+    }
+
+    // if this command belongs to extensions, let it to ExtensionHandler
+    if(extensionHandler->isExtensionCall(justCmd)) {
+        extensionHandler->processCommand(pCmd);
+        wasHandled = true;
     }
 
     if(!wasHandled) {           // if the command was not previously handled, it's probably just some SCSI command

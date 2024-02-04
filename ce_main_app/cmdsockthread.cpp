@@ -39,17 +39,17 @@ void handleSceencastAction(std::string& action, json& data);
 void handleDisksAction(std::string& action, json& data);
 void closeFifo(bool keybNotMouse);
 
-int createRecvSocket(void)
+int createRecvSocket(const char* dotEnvKey)
 {
 	// create a UNIX DGRAM socket
 	int sock = socket(AF_UNIX, SOCK_DGRAM, 0);
 
 	if (sock < 0) {
-	    Debug::out(LOG_ERROR, "cmdSockThreadCode: Failed to create command Socket!");
+	    Debug::out(LOG_ERROR, "Failed to create command Socket!");
 	    return -1;
 	}
 
-    std::string sockPath = Utils::dotEnvValue("CORE_SOCK_PATH");
+    std::string sockPath = Utils::dotEnvValue(dotEnvKey);
     unlink(sockPath.c_str());       // delete sock file if exists
 
     struct sockaddr_un addr;
@@ -58,7 +58,7 @@ int createRecvSocket(void)
 
     int res = bind(sock, (struct sockaddr *) &addr, strlen(addr.sun_path) + sizeof(addr.sun_family));
     if (res < 0) {
-	    Debug::out(LOG_ERROR, "cmdSockThreadCode: Failed to bind command socket to %s - errno: %d", sockPath.c_str(), errno);
+	    Debug::out(LOG_ERROR, "Failed to bind command socket to %s - errno: %d", sockPath.c_str(), errno);
 	    return -1;
     }
 
@@ -68,7 +68,7 @@ int createRecvSocket(void)
 void *cmdSockThreadCode(void *ptr)
 {
     Debug::out(LOG_INFO, "Command Socket thread starting...");
-    int sock = createRecvSocket();
+    int sock = createRecvSocket("CORE_SOCK_PATH");
 
     if(sock < 0) {              // without socket this thread has no use
         return 0;
@@ -136,6 +136,8 @@ void *cmdSockThreadCode(void *ptr)
             Debug::out(LOG_WARNING, "cmdSockThreadCode: module or action is missing in the received data, ignoring message!");
         }
     }
+
+    close(sock);
 
     closeFifo(true);
     closeFifo(false);
