@@ -1,8 +1,11 @@
 #
 # This is an CosmosEx extension example in python3.
 # You can base your own extension based on this example, you just need to change
-# in_socket_path and also define your exported functions in functions.py file.
-# No other changes to this file are not needed. 
+# EXTENSION_NAME and also define your exported functions in functions.py file.
+# No other changes to this file are not needed.
+#
+# EXTENSION_NAME should match the directory name of this extension, so CE core will know
+# where to look for start.sh and stop.sh scripts.
 #
 # Jookie, 2024
 #
@@ -16,7 +19,8 @@ import traceback
 from defs import *
 from functions import *
 
-in_socket_path = "/tmp/extension_example.sock"      # where we will get commands from CE <<< CHANGE THIS IN YOUR OWN EXTENSION
+EXTENSION_NAME = "extension_example"                # <<< CHANGE THIS IN YOUR OWN EXTENSION TO SOMETHING ELSE
+IN_SOCKET_PATH = f"/tmp/{EXTENSION_NAME}.sock"      # where we will get commands from CE
 out_socket_path = ""                                # where we should send responses to commands
 
 should_run = True           # this extension should run while this flag is true
@@ -28,18 +32,18 @@ latest_data = bytearray()   # will hold received binary data and raw data
 # from CE core. 
 def create_socket():
     try:
-        os.unlink(in_socket_path)
+        os.unlink(IN_SOCKET_PATH)
     except Exception as ex:
-        if os.path.exists(in_socket_path):
-            print(f"failed to unlink sock path: {in_socket_path} : {str(ex)}")
+        if os.path.exists(IN_SOCKET_PATH):
+            print(f"failed to unlink sock path: {IN_SOCKET_PATH} : {str(ex)}")
             raise
 
     sckt = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
 
     try:
-        sckt.bind(in_socket_path)
+        sckt.bind(IN_SOCKET_PATH)
         sckt.settimeout(1.0)
-        print(f'Success, got socket: {in_socket_path}')
+        print(f'Success, got socket: {IN_SOCKET_PATH}')
         return sckt
     except Exception as e:
         print(f'exception on bind: {str(e)}')
@@ -114,6 +118,9 @@ def send_response(fun_name, status, data_out):
     data += status.to_bytes(1, 'big')               # 1 B: status byte
 
     if data_out is not None:                        # get length if can
+        if type(data_out) == str:                   # string to ascii bytes if needed
+            data_out = data_out.encode('ascii')
+
         data_len = len(data_out)
     else:                                           # use None if can't get length
         data_len = 0
@@ -145,7 +152,7 @@ def send_exported_functions_table():
 
 # Function used to send notification to CE core that this extension has closed.
 def send_closed_notification():
-    send_response("CEX_FUN_CLOSE", STATUS_OK, None)
+    send_response("CEX_FUN_CLOSE", STATUS_OK, EXTENSION_NAME)       # send also extension name, so core won't accidentally mark other extension closed
 
 
 # Function gets signature of single exported function identified by name.
@@ -273,7 +280,7 @@ if __name__ == "__main__":
     print(f"Sending exported function signatures")
     send_exported_functions_table()
 
-    print(f"Entering main loop, waiting for messages via: {in_socket_path}")
+    print(f"Entering main loop, waiting for messages via: {IN_SOCKET_PATH}")
 
     # This receiving main loop with receive messages via UNIX domain sockets and submit them to thread pool executor.
     while should_run:
@@ -307,4 +314,4 @@ if __name__ == "__main__":
     # exited main loop and now terminating
     should_run = False
     send_closed_notification()
-    os.unlink(in_socket_path)
+    os.unlink(IN_SOCKET_PATH)

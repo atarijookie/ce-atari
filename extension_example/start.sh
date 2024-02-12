@@ -4,13 +4,14 @@
 #
 # params: 
 #   $1 - path to unix socket of CE, where the responses should be sent
+#   $2 - extension id - id (index) under which the CE core has this extension stored
 #
 
 # stop this extension if already running and now being instructed to start again
 ./stop.sh
 
 # start the extension - detached, so it doesn't block this start script from finishing
-python3 main.py $1 &
+python3 main.py $1 $2 &
 
 # store PID to some file for usage in stop.sh
 EXT_PID=$!

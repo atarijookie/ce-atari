@@ -2,7 +2,8 @@ import socket
 import os
 import sys
 import json
-from main import in_socket_path as ext_socket_path
+from main import IN_SOCKET_PATH as ext_socket_path
+from main import EXTENSION_NAME
 from defs import *
 
 extension_id = 2
@@ -207,7 +208,9 @@ if __name__ == "__main__":
     msg = {'function': 'CEX_FUN_CLOSE', 'args': []}
     send_to_ext(json.dumps(msg))
     data = get_data_from_sock(sock)
-    verify_id_name_status_len(data, 'CEX_FUN_CLOSE', STATUS_OK, 0)
+    verify_id_name_status_len(data, 'CEX_FUN_CLOSE', STATUS_OK, len(EXTENSION_NAME))
+    ext_name = data[38:].decode('ascii')
+    assert ext_name == EXTENSION_NAME, f"received ext_name mismatch - '{ext_name}' != '{EXTENSION_NAME}'"
 
     #---------
     sock.close()
