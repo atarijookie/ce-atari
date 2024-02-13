@@ -45,12 +45,16 @@ int createRecvSocket(const char* dotEnvKey)
 	int sock = socket(AF_UNIX, SOCK_DGRAM, 0);
 
 	if (sock < 0) {
-	    Debug::out(LOG_ERROR, "Failed to create command Socket!");
+	    Debug::out(LOG_ERROR, "createRecvSocket - failed to create socket!");
 	    return -1;
 	}
 
+    fchmod(sock, S_IRUSR | S_IWUSR);        // restrict permissions before bind
+
     std::string sockPath = Utils::dotEnvValue(dotEnvKey);
-    unlink(sockPath.c_str());       // delete sock file if exists
+    Debug::out(LOG_DEBUG, "createRecvSocket - %s = %s", dotEnvKey, sockPath.c_str());
+
+    unlink(sockPath.c_str());               // delete sock file if exists
 
     struct sockaddr_un addr;
     strcpy(addr.sun_path, sockPath.c_str());
@@ -58,10 +62,13 @@ int createRecvSocket(const char* dotEnvKey)
 
     int res = bind(sock, (struct sockaddr *) &addr, strlen(addr.sun_path) + sizeof(addr.sun_family));
     if (res < 0) {
-	    Debug::out(LOG_ERROR, "Failed to bind command socket to %s - errno: %d", sockPath.c_str(), errno);
+	    Debug::out(LOG_ERROR, "createRecvSocket - failed to bind socket to %s - errno: %d", sockPath.c_str(), errno);
 	    return -1;
     }
 
+    chmod(addr.sun_path, 0666);             // loosen permissions
+
+    Debug::out(LOG_DEBUG, "createRecvSocket - %s created, sock: %d", sockPath.c_str(), sock);
     return sock;
 }
 

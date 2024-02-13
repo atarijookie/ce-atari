@@ -187,34 +187,7 @@ void AcsiDataTrans::sendDataAndStatus(bool fromRetryModule)
     //---------------------------------------
     if(dumpNextData) {
         Debug::out(LOG_DEBUG, "sendDataAndStatus: %d bytes", count);
-        uint8_t *src = buffer;
-
-        uint16_t dumpCnt = 0;
-
-        int lines = count / 32;
-        if((count % 32) != 0) {
-            lines++;
-        }
-
-        for(int i=0; i<lines; i++) {
-            char bfr[1024];
-            char *b = &bfr[0];
-
-            for(int j=0; j<32; j++) {
-                int val = (int) *src;
-                src++;
-                sprintf(b, "%02x ", val);
-                b += 3;
-
-                dumpCnt++;
-                if(dumpCnt >= count) {
-                    break;
-                }
-            }
-
-            Debug::out(LOG_DEBUG, "%s", bfr);
-        }
-
+        Debug::outBfr(buffer, count);
         dumpNextData = false;
     }
     //---------------------------------------

@@ -15,6 +15,7 @@ import os
 import sys
 import json
 import traceback
+import logging
 
 from defs import *
 from functions import *
@@ -28,6 +29,7 @@ extension_id = -1           # CE knows this extension under this id (index), we 
 
 latest_data = bytearray()   # will hold received binary data and raw data
 
+
 # Create socket on which this extension will receive commands / exported function calls
 # from CE core. 
 def create_socket():
@@ -35,7 +37,7 @@ def create_socket():
         os.unlink(IN_SOCKET_PATH)
     except Exception as ex:
         if os.path.exists(IN_SOCKET_PATH):
-            print(f"failed to unlink sock path: {IN_SOCKET_PATH} : {str(ex)}")
+            logging.warning(f"failed to unlink sock path: {IN_SOCKET_PATH} : {str(ex)}")
             raise
 
     sckt = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
@@ -43,10 +45,10 @@ def create_socket():
     try:
         sckt.bind(IN_SOCKET_PATH)
         sckt.settimeout(1.0)
-        print(f'Success, got socket: {IN_SOCKET_PATH}')
+        logging.debug(f'Success, got socket: {IN_SOCKET_PATH}')
         return sckt
     except Exception as e:
-        print(f'exception on bind: {str(e)}')
+        logging.warning(f'exception on bind: {str(e)}')
         return False
 
 
@@ -54,13 +56,13 @@ def create_socket():
 def send_to_ce(data):
     """ send an item to core """
     try:
-        print(f"sending data to {out_socket_path}")
+        logging.debug(f"sending data to {out_socket_path} - {len(data)} bytes")
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
         sock.connect(out_socket_path)
         sock.send(data)
         sock.close()
     except Exception as ex:
-        print(f"failed to send - {str(ex)}")
+        logging.warning(f"failed to send - {str(ex)}")
 
 
 # convert supplied function name string to bytearray, padded to expected length
@@ -68,7 +70,7 @@ def function_name_to_bytearray(name):
     max_len = MAX_FUNCTION_NAME_LEN - 1
 
     if len(name) > max_len:
-        print(f"Exported function name {name} is longer than {max_len}, this will not work. Make the name shorter!")
+        logging.warning(f"Exported function name {name} is longer than {max_len}, this will not work. Make the name shorter!")
         exit(1)
 
     ret_val = bytearray(b'')
@@ -84,7 +86,7 @@ def function_name_to_bytearray(name):
 # with the expected structure in the CE core. 
 def function_signature_to_bytearray(name, argumentTypes, returnValueType):
     if len(argumentTypes) > MAX_FUNCTION_ARGUMENTS:
-        print(f"Exported function name {name} has {len(argumentTypes)} arguments, but only {MAX_FUNCTION_ARGUMENTS} are allowed. This will not work. Use less arguments!")
+        logging.warning(f"Exported function name {name} has {len(argumentTypes)} arguments, but only {MAX_FUNCTION_ARGUMENTS} are allowed. This will not work. Use less arguments!")
         exit(1)
 
     signature = function_name_to_bytearray(name)            # start with function name
@@ -93,7 +95,7 @@ def function_signature_to_bytearray(name, argumentTypes, returnValueType):
     for i in range(0, MAX_FUNCTION_ARGUMENTS):              # add name to signature, pad with zeros up to max_len
         if i < len(argumentTypes):
             if argumentTypes[i] < TYPE_NOT_PRESENT or argumentTypes[i] > TYPE_BIN_DATA:     # invalid type?
-                print(f"Invalid argument type {argumentTypes[i]}. This will not work. Use some of the TYPE_* values!")
+                logging.warning(f"Invalid argument type {argumentTypes[i]}. This will not work. Use some of the TYPE_* values!")
                 exit(1)
 
             signature.append(argumentTypes[i])              # append argument type
@@ -101,7 +103,7 @@ def function_signature_to_bytearray(name, argumentTypes, returnValueType):
             signature.append(0)                             # append zeros
 
     if returnValueType < TYPE_NOT_PRESENT or returnValueType > TYPE_BIN_DATA:           # invalid type?
-        print(f"Invalid return value type {returnValueType}. This will not work. Use some of the TYPE_* values!")
+        logging.warning(f"Invalid return value type {returnValueType}. This will not work. Use some of the TYPE_* values!")
         exit(1)
 
     signature.append(returnValueType)                       # add return value type
@@ -133,6 +135,13 @@ def send_response(fun_name, status, data_out):
     send_to_ce(data)                                # send to CE now
 
 
+def remove_trailing_zeros(data):
+    while data[-1] == 0:        # while last char is zero, remove it
+        data = data[:-1]
+
+    return data
+
+
 # This is a mandatory function which after the start of this extension will send signatures of exported functions
 # to CE core, so the CE core will know that this extension has started and what function it exports.
 #
@@ -146,6 +155,8 @@ def send_exported_functions_table():
     for fun_name, fun_args_retval in fns.items():   # go through the exported functions and append their signatures to data
         args, retval = fun_args_retval
         data += function_signature_to_bytearray(fun_name, args, retval)
+
+    data += IN_SOCKET_PATH.encode('ascii')          # add path to extension socket
 
     send_response("CEX_FUN_OPEN", len(fns), data)   # exported functions count instead of OK status
 
@@ -184,8 +195,10 @@ def handleRawData(data):
 # RAW WRITE message will have raw_write in message set to something that evals as true, 
 # then the previously raw binary data will be appended to arguments.
 def handleJsonMessage(data):
+    data = remove_trailing_zeros(data)              # JSON message must not contain trailing zero in data
+
     message = json.loads(data)                          # convert from json string to dictionary
-    print(f'received message: {message}')
+    logging.debug(f'received message: {message}')
 
     fun_name = message['function']
     args = message.get('args', [])
@@ -196,7 +209,7 @@ def handleJsonMessage(data):
         args.append(latest_data)
 
     if fun_name == 'CEX_FUN_CLOSE':         # when this was a request to terminate this extension
-        print("Received command from CE that we should terminate, so terminating now.")
+        logging.debug("Received command from CE that we should terminate, so terminating now.")
         global should_run
         should_run = False
         return
@@ -204,7 +217,7 @@ def handleJsonMessage(data):
     fun = globals().get(fun_name)
 
     if not fun:      # function not found? fail here
-        print(f"Could not find function {fun_name}, message not handled")
+        logging.warning(f"Could not find function {fun_name}, message not handled")
         return
 
     arg_types, retval_type = get_exported_function_signature(fun_name)
@@ -218,7 +231,7 @@ def handleJsonMessage(data):
     elif expected_args_count < supplied_args_count:     # should have less args? truncate args
         args = args[0 : expected_args_count]
 
-    print(f"calling extension function {fun_name} with arguments: {args}")
+    logging.debug(f"calling extension function {fun_name} with arguments: {args}")
     ret_val = fun(*args)                        # call the function
 
     # based on what was returned (nothing, integer, tuple, something else) try to split the return value into status and data
@@ -229,7 +242,7 @@ def handleJsonMessage(data):
     elif type(ret_val) is int:                  # if returning just integer, use it as status
         status_byte, raw_data = ret_val, []
     else:                                       # we don't know what to do with other options
-        print(f"Function {fun_name} should return nothing, integer or tuple, but returned {type(ret_val)}")
+        logging.warning(f"Function {fun_name} should return nothing, integer or tuple, but returned {type(ret_val)}")
         exit(1)
 
     if is_raw_write:                            # if this is a RAW WRITE, we always return just status (never data)
@@ -262,9 +275,13 @@ def handleJsonMessage(data):
 # python3 main.py /tmp/test.sock 2
 #
 if __name__ == "__main__":
+    logging.basicConfig(filename='/tmp/extension_example.log', level=logging.DEBUG, format="%(asctime)s [%(levelname)s] %(message)s",)
+    logging.getLogger().addHandler(logging.StreamHandler())
+    logging.info('Started and log configured.')
+
     # path to CE sock must be supplied
     if(len(sys.argv)) < 3:
-        print("path to CE socket and and extension ID not supplied, not starting!")
+        logging.warning("path to CE socket and and extension ID not supplied, not starting!")
         exit(1)
 
     out_socket_path = sys.argv[1]
@@ -274,13 +291,13 @@ if __name__ == "__main__":
     sock = create_socket()
 
     if not sock:
-        print("Cannot run without socket! Terminating.")
+        logging.warning("Cannot run without socket! Terminating.")
         exit(1)
 
-    print(f"Sending exported function signatures")
+    logging.debug(f"Sending exported function signatures")
     send_exported_functions_table()
 
-    print(f"Entering main loop, waiting for messages via: {IN_SOCKET_PATH}")
+    logging.debug(f"Entering main loop, waiting for messages via: {IN_SOCKET_PATH}")
 
     # This receiving main loop with receive messages via UNIX domain sockets and submit them to thread pool executor.
     while should_run:
@@ -288,7 +305,7 @@ if __name__ == "__main__":
             data, address = sock.recvfrom(1024)         # receive message
 
             if len(data) < 2:
-                print(f'received message too short, ignoring message')
+                logging.warning(f'received message too short, ignoring message')
                 continue
 
             data2 = data[0:2]                           # get just first 2 bytes and convert them to string
@@ -299,17 +316,17 @@ if __name__ == "__main__":
             elif data2[0] == '{':                       # data starting with '{' - it's JSON message
                 handleJsonMessage(data)
             else:
-                print(f'unknown message start, ignoring message')
+                logging.warning(f'unknown message start, ignoring message')
                 continue
 
         except socket.timeout:          # when socket fails to receive data
             pass
         except KeyboardInterrupt:
-            print("Got keyboard interrupt, terminating.")
+            logging.warning("Got keyboard interrupt, terminating.")
             break
         except Exception as ex:
-            print(f"got exception: {str(ex)}")
-            print(traceback.format_exc())
+            logging.warning(f"got exception: {str(ex)}")
+            logging.warning(traceback.format_exc())
 
     # exited main loop and now terminating
     should_run = False

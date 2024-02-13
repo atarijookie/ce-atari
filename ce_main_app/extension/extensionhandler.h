@@ -44,6 +44,7 @@ private:
     uint8_t sendCallRawToExtension(uint8_t extensionId, char* functionName);
     uint8_t sendCallLongToExtension(uint8_t extensionId, uint8_t functionIndex, char* functionName);
 
+    void sendCloseToExtension(uint8_t extensionId);
     bool sendStringToExtension(uint8_t extensionId, const char* str);
     bool sendDataToExtension(uint8_t extensionId, const uint8_t* data, uint32_t dataLen);
     bool sendDataToSocket(const char* socketPath, const uint8_t* data, uint32_t dataLen);

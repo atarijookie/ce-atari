@@ -7,6 +7,13 @@
 #   $2 - extension id - id (index) under which the CE core has this extension stored
 #
 
+# Find out where this start script it located and change to that directory.
+# We need to do this because if this script is called from CE core or TaskQ, it may be
+# having different current directory and then finding stop script or main.py won't work.
+EXT_DIR=$( realpath $( dirname $0 ) )
+echo "Extension running in dir: $EXT_DIR"
+cd $EXT_DIR
+
 # stop this extension if already running and now being instructed to start again
 ./stop.sh
 

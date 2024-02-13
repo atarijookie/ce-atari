@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "../debug.h"
 #include "../utils.h"
 #include "functionsignature.h"
 #include "extensiondefs.h"
@@ -55,6 +56,8 @@ void FunctionSignature::store(char* name, uint8_t argumentsCount, uint8_t* argum
 
     used = true;        // mark signature as used
     setName(name);      // copy name, calc hash
+
+    Debug::out(LOG_DEBUG, "FunctionSignature::store - function '%s', hash: %04x, argumentsCount: %d", name, nameHash, argumentsCount);
 
     // store arguments
     int storeArgsCount = MIN((int) argumentsCount, MAX_FUNCTION_ARGUMENTS);

@@ -94,7 +94,7 @@ void ExtensionHandler::processCommand(uint8_t *command)
     dataTrans->clear();         // clean data transporter before handling
 
     Debug::out(LOG_DEBUG, "ExtensionHandler::processCommand -- CMD: %02x %02x %02x %02x %02x %02x - %s", 
-                command[0], command[0], command[0], command[0], command[0], command[0],
+                command[0], command[1], command[2], command[3], command[4], command[5],
                 getCommandName(justCmd));
 
     // if we're handling WRITE commands, we can get the data
@@ -120,7 +120,7 @@ void ExtensionHandler::processCommand(uint8_t *command)
         default:                        cexExtensionFunction(justCmd, cmd->extensionId, cmd->functionId, cmd->sectorCount); break;
     }
 
-    Debug::out(LOG_DEBUG, "ExtensionHandler::processCommand -- now the acsiDataTrans will handle transfer to Hans");
+    Debug::out(LOG_DEBUG, "ExtensionHandler::processCommand -- send data and status after handling");
     dataTrans->sendDataAndStatus();                 // send all the stuff after handling, if we got any
 }
 
@@ -186,10 +186,13 @@ void ExtensionHandler::cexOpen(void)
     std::string startScriptCommand = startScriptPath;
     startScriptCommand += " ";
 
+    char bfr[32];
     std::string extHandlerSockPath;
     getExtensionHandlerSockPath(extHandlerSockPath);    // get path to this handler's socket, where the extension should send responses
-    startScriptCommand += extHandlerSockPath;   // cmd like: /ce/extensions/my_extension/start.sh /var/run/ce/extensions.sock
-    startScriptCommand += " &";                 // run command detached to not wait for it to terminate
+    startScriptCommand += extHandlerSockPath;           // cmd like: /ce/extensions/my_extension/start.sh /var/run/ce/extensions.sock
+    startScriptCommand += " ";
+    startScriptCommand += intToStr(extensionId, bfr);   // cmd like: /ce/extensions/my_extension/start.sh /var/run/ce/extensions.sock 1
+    startScriptCommand += " &";                         // run command detached to not wait for it to terminate
 
     Debug::out(LOG_DEBUG, "ExtensionHandler::cexOpen - startScriptPath: '%s', startScriptCommand: '%s'", startScriptPath.c_str(), startScriptCommand.c_str());
 
@@ -217,13 +220,17 @@ void ExtensionHandler::cexOpen(void)
     jsonRequest += startScriptCommand;          // run this command after install
     jsonRequest += "\"}";
 
+    Debug::out(LOG_DEBUG, "ExtensionHandler::cexOpen - start script does not exist, so sending JSON: '%s' to TaskQ - for extension installation", jsonRequest.c_str());
+
     std::string taskQsockPath = Utils::dotEnvValue("TASKQ_SOCK_PATH");      // path to TaskQ socket
     bool ok = sendDataToSocket(taskQsockPath.c_str(), (uint8_t*) jsonRequest.c_str(), jsonRequest.length());       // try to send data
 
     if(ok) {    // sending ok?
+        Debug::out(LOG_DEBUG, "Sending to TaskQ ok, marking extension state as EXT_STATE_INSTALLING");
         ext->state = EXT_STATE_INSTALLING;
         dataTrans->setStatus(extensionId);          // return index of this extension
     } else {    // sending failed?
+        Debug::out(LOG_WARNING, "Sending to TaskQ failed, extension not started. Returning STATUS_EXT_ERROR.");
         ext->clear();
         dataTrans->setStatus(STATUS_EXT_ERROR);     // failed to send data means failed to start
     }
@@ -320,6 +327,9 @@ void ExtensionHandler::cexClose(uint8_t extensionId)
         mutexUnlock();
         return;
     }
+
+    // send CLOSE request via socket
+    sendCloseToExtension(extensionId);
 
     // find path to stop script
     std::string stopScriptCommand;
@@ -520,6 +530,11 @@ uint8_t ExtensionHandler::sendCallLongToExtension(uint8_t extensionId, uint8_t f
     return ext->response.funcCallId;
 }
 
+void ExtensionHandler::sendCloseToExtension(uint8_t extensionId)
+{
+    sendStringToExtension(extensionId, "{\"function\": \"CEX_FUN_CLOSE\"}");
+}
+
 bool ExtensionHandler::sendStringToExtension(uint8_t extensionId, const char* str)
 {
     return sendDataToExtension(extensionId, (const uint8_t*) str, strlen(str) + 1);
@@ -540,6 +555,8 @@ bool ExtensionHandler::sendDataToSocket(const char* socketPath, const uint8_t* d
 	    return false;
 	}
 
+    Debug::out(LOG_DEBUG, "ExtensionHandler::sendDataToSocket: opened socket %s", socketPath);
+
     struct sockaddr_un addr;
     strcpy(addr.sun_path, socketPath);
     addr.sun_family = AF_UNIX;
@@ -550,7 +567,7 @@ bool ExtensionHandler::sendDataToSocket(const char* socketPath, const uint8_t* d
     if(res < 0) {       // if failed to send
 	    Debug::out(LOG_ERROR, "ExtensionHandler::sendDataToSocket: sendto failed - errno: %d", errno);
     } else {
-        Debug::out(LOG_DEBUG, "ExtensionHandler::sendDataToSocket: data sent");
+        Debug::out(LOG_DEBUG, "ExtensionHandler::sendDataToSocket: %d bytes of data sent", dataLen);
     }
 
     close(sockFd);

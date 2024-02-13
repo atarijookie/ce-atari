@@ -1,5 +1,5 @@
-#ifndef EXTENSION_H
-#define EXTENSION_H
+#ifndef __EXTENSION_H__
+#define __EXTENSION_H__
 
 #include <string>
 #include <stdint.h>

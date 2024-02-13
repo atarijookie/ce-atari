@@ -42,7 +42,7 @@ void Extension::getStartScriptPath(std::string& outScriptPath)
 
 void Extension::getStopScriptPath(std::string& outScriptPath)
 {
-    getScriptPath(outScriptPath, "start.sh");
+    getScriptPath(outScriptPath, "stop.sh");
 }
 
 void Extension::getScriptPath(std::string& outScriptPath, const char* scriptFile)

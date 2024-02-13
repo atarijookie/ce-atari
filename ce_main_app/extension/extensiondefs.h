@@ -16,7 +16,7 @@
 #define STATUS_EXT_NOT_RUNNING  0xFC
 #define STATUS_EXT_ERROR        0xFB
 
-// Supported data types in arguments and return values.
+// Supported data types in arguments
 #define TYPE_NOT_PRESENT        0       // when this type is not specified / used
 #define TYPE_UINT8              1       // uint8_t
 #define TYPE_UINT16             2       // uint16_t
@@ -27,6 +27,12 @@
 #define TYPE_CSTRING            7       // zero terminated string
 #define TYPE_PATH               8       // file / dir path, as zero terminated string
 #define TYPE_BIN_DATA           9       // size + binary data buffer
+
+// Supported response types
+#define RESP_TYPE_NONE              0   // no return value from function, will be turned into STATUS_OK and no data
+#define RESP_TYPE_STATUS            1   // return only status byte
+#define RESP_TYPE_STATUS_BIN_DATA   2   // return status byte and binary data buffer (could be also string)
+#define RESP_TYPE_STATUS_PATH       3   // return status byte and path, which needs transformation
 
 #define MAX_FUNCTION_ARGUMENTS  10
 #define MAX_FUNCTION_NAME_LEN   32
@@ -67,7 +73,9 @@ typedef struct
     uint8_t arg2;
 } __attribute__((packed)) AcsiCommand;
 
-
+/*
+    This is the signature as it's received from extension.
+*/
 typedef struct 
 {
     char    name[MAX_FUNCTION_NAME_LEN];
@@ -76,6 +84,9 @@ typedef struct
     uint8_t returnValueType;
 } __attribute__((packed)) ReceivedSignature;
 
+/*
+    This is the binary signature we will send to ST.
+*/
 typedef struct
 {
     uint8_t index;
@@ -85,5 +96,17 @@ typedef struct
 } __attribute__((packed)) BinarySignatureForST;
 
 #define MAX_BINARY_SIGNATURE_RESPONSE_SIZE  (MAX_EXPORTED_FUNCTIONS * sizeof(BinarySignatureForST))
+
+/*
+    The format of the response from extension on function call.
+*/
+typedef struct
+{
+    uint8_t extensionId;                            // index of extension under which CE is keeping it
+    char    functionName[MAX_FUNCTION_NAME_LEN];    // function that this is a response to
+    uint8_t statusByte;                             // status byte
+    uint8_t dataLen[4];                             // length of data
+    uint8_t data;                                   // data starts here, should have length of dataLen
+} __attribute__((packed)) ResponseFromExtension;
 
 #endif
