@@ -17,43 +17,55 @@
 #include "extensiondefs.h"
 #include "extension.h"
 
-pthread_mutex_t extensionMutex;
+pthread_mutex_t extensionMutex = PTHREAD_MUTEX_INITIALIZER;
 Extension extensions[3];
 
-void ExtensionHandler::mutexLock(void)
+void ExtensionHandler::mutexLock(const char* file, int line)
 {
+    // Debug::out(LOG_DEBUG, "mutexLock() - %s : %d", file, line);
     pthread_mutex_lock(&extensionMutex);
 }
 
-void ExtensionHandler::mutexUnlock(void)
+void ExtensionHandler::mutexUnlock(const char* file, int line)
 {
+    // Debug::out(LOG_DEBUG, "mutexUnlock() - %s : %d", file, line);
     pthread_mutex_unlock(&extensionMutex);
 }
 
-pthread_mutex_t wait_ready_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t wait_ready_cond = PTHREAD_COND_INITIALIZER;
+// Note: it would be nicer to do waitForSignal using pthread_cond_timedwait, but that was getting stuck, 
+// so this is the simplest working alternative.
+volatile sig_atomic_t extSignalReceived = 0;
 
 void ExtensionHandler::waitForSignal(uint32_t ms)
 {
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);     // get current time
-    ts.tv_nsec = (ms * 1000000);            // supplied miliseconds to nanoseconds
+    uint32_t start = Utils::getCurrentMs();
 
-    if(ts.tv_nsec > 1000000000) {           // nano-seconds greater than 1s value? increment seconds, decreate ns
-        ts.tv_sec += 1;
-        ts.tv_nsec -= 1000000000;
+    while(1) {
+        uint32_t now = Utils::getCurrentMs();
+        uint32_t diff = now - start;
+
+        if(extSignalReceived) {     // got signal? quit now
+            Debug::out(LOG_DEBUG, "waitForSignal - signal received after %d ms", diff);
+            break;
+        }
+
+        if(diff >= ms) {            // timeout? quit
+            Debug::out(LOG_DEBUG, "waitForSignal timeout after %d ms", diff);
+            break;
+        }
+
+        Utils::sleepMs(1);
     }
-
-    pthread_mutex_lock(&wait_ready_mutex);
-    pthread_cond_timedwait(&wait_ready_cond, &wait_ready_mutex, &ts);   // wait for condition or timeout
-    pthread_mutex_unlock(&wait_ready_mutex);
 }
 
 void ExtensionHandler::setSignal(void)
 {
-  pthread_mutex_lock(&wait_ready_mutex);
-  pthread_cond_signal(&wait_ready_cond);
-  pthread_mutex_unlock(&wait_ready_mutex);
+    extSignalReceived = 1;
+}
+
+void ExtensionHandler::clearSignal(void)
+{
+    extSignalReceived = 0;
 }
 
 ExtensionHandler::ExtensionHandler(void)
@@ -97,19 +109,28 @@ void ExtensionHandler::processCommand(uint8_t *command)
                 command[0], command[1], command[2], command[3], command[4], command[5],
                 getCommandName(justCmd));
 
+    uint32_t expectedBytesOnRead = 0;   // this will hold count of bytes we want to return on read (will stay 0 for write)
+
     // if we're handling WRITE commands, we can get the data
     if(justCmd == CMD_CALL_RAW_WRITE || justCmd == CMD_CALL_LONG_WRITE_ARGS) {
-        byteCountInDataBuffer = cmd->sectorCount * 512;  // sectors to bytes - this much data in recv buffer
+        byteCountInDataBuffer = ((uint32_t) cmd->sectorCount) * 512;  // sectors to bytes - this much data in recv buffer
 
-        // prepare the data buffer header in a form that can be sent directly to extension without further modification
-        dataBuffer[0] = 'D';        // this buffer has data and DA is the marker
-        dataBuffer[1] = 'A';
-        Utils::storeDword(dataBuffer + 2, byteCountInDataBuffer);   // bytes 2,3,4,5
-        dataTrans->recvData(dataBuffer + 6, byteCountInDataBuffer); // bytes 6 and next
-        byteCountInDataBuffer += 6;                 // we got 6 more bytes in this buffer
+        if(byteCountInDataBuffer > 0) {
+            Debug::out(LOG_DEBUG, "justCmd: %02x, will receive %d bytes first", justCmd, byteCountInDataBuffer);
+
+            // prepare the data buffer header in a form that can be sent directly to extension without further modification
+            dataBuffer[0] = 'D';        // this buffer has data and DA is the marker
+            dataBuffer[1] = 'A';
+            Utils::storeDword(dataBuffer + 2, byteCountInDataBuffer);   // bytes 2,3,4,5
+            dataTrans->recvData(dataBuffer + 6, byteCountInDataBuffer); // bytes 6 and next
+            byteCountInDataBuffer += 6;                 // we got 6 more bytes in this buffer
+        }
     } else {                                        // not write, so clear 1 kB from start
         byteCountInDataBuffer = 0;                  // no data in recv buffer
         memset(dataBuffer, 0, 1024);
+        expectedBytesOnRead =  ((uint32_t) cmd->sectorCount) * 512;
+
+        Debug::out(LOG_DEBUG, "justCmd: %02x, the data read phase will expect %d bytes", justCmd, expectedBytesOnRead);
     }
 
     // call one of the basic functions or try to call function from extension
@@ -121,6 +142,11 @@ void ExtensionHandler::processCommand(uint8_t *command)
     }
 
     Debug::out(LOG_DEBUG, "ExtensionHandler::processCommand -- send data and status after handling");
+
+    if(expectedBytesOnRead > 0) {       // if we should fill bytes to expected size on read
+        dataTrans->addZerosUntilSize(expectedBytesOnRead);
+    }
+
     dataTrans->sendDataAndStatus();                 // send all the stuff after handling, if we got any
 }
 
@@ -133,7 +159,7 @@ void ExtensionHandler::processCommand(uint8_t *command)
 */
 void ExtensionHandler::cexOpen(void)
 {
-    mutexLock();
+    EXT_MUTEX_LOCK;
 
     char* extName = (char*) dataBuffer + 6;
     char* extUrl = (char*) (dataBuffer + 32 + 6);
@@ -144,7 +170,7 @@ void ExtensionHandler::cexOpen(void)
             extensions[i].touch();
             Debug::out(LOG_DEBUG, "ExtensionHandler::cexOpen - extension %s found at index %d", extName, i);
             dataTrans->setStatus(i);                // return index of this extension
-            mutexUnlock();
+            EXT_MUTEX_UNLOCK;
             return;
         }
     }
@@ -203,7 +229,7 @@ void ExtensionHandler::cexOpen(void)
         Debug::out(LOG_DEBUG, "ExtensionHandler::cexOpen - now executing '%s'", startScriptCommand.c_str());
         system(startScriptCommand.c_str());     // execute the command
         dataTrans->setStatus(extensionId);      // return index of this extension
-        mutexUnlock();
+        EXT_MUTEX_UNLOCK;
         return;
     }
 
@@ -235,7 +261,7 @@ void ExtensionHandler::cexOpen(void)
         dataTrans->setStatus(STATUS_EXT_ERROR);     // failed to send data means failed to start
     }
 
-    mutexUnlock();
+    EXT_MUTEX_UNLOCK;
 }
 
 /*
@@ -243,49 +269,61 @@ void ExtensionHandler::cexOpen(void)
     If response is not available, will wait a little and then try again.
     Can return STATUS_NO_RESPONSE if response not available after that.
 */
-void ExtensionHandler::cexStatusOrResponse(uint8_t extensionId, uint8_t funcCallId, uint8_t sectorCount)
+void ExtensionHandler::cexStatusOrResponse(uint8_t extensionId, uint8_t functionId, uint8_t sectorCount)
 {
+    Debug::out(LOG_DEBUG, "ExtensionHandler::cexStatusOrResponse - extensionId: %d, functionId: %d, sectorCount: %d", extensionId, functionId, sectorCount);
+
     if(extensionId >= MAX_EXTENSIONS_OPEN) {        // bad extension id?
         Debug::out(LOG_WARNING, "ExtensionHandler::cexStatusOrResponse - extension index %d out of bounds", extensionId);
         dataTrans->setStatus(STATUS_BAD_ARGUMENT);
         return;
     }
 
-    mutexLock();
+    EXT_MUTEX_LOCK;
     Extension* ext = &extensions[extensionId];  // use pointer to extension for simpler reading
     ext->touch();
 
     uint32_t sendDataSize = sectorCount * 512;  // how many bytes ST is ready to get (based on sector count)
 
-    if(funcCallId == CEX_FUN_OPEN) {            // if trying to get status of this extension - if it's open, then...
-        if(ext->state == EXT_STATE_RUNNING) {                               // if extesion is running, send function table
+    if(functionId == CEX_FUN_OPEN) {            // if trying to get status of this extension - if it's open, then...
+        if(ext->state == EXT_STATE_RUNNING) {   // if extesion is running, send function table
             uint32_t dataLen = ext->functionTable.exportBinarySignatures(dataBuffer);     // export signatures in binary form
             Debug::out(LOG_DEBUG, "ExtensionHandler::cexStatusOrResponse - signatures have %d bytes, will send %d bytes (based on sector count)", dataLen, sendDataSize);
             dataTrans->addDataBfr(dataBuffer, sendDataSize, true);
+            dataTrans->setStatus(STATUS_OK);
+        } else {                                // extension not running yet
+            Debug::out(LOG_DEBUG, "ExtensionHandler::cexStatusOrResponse - extension not running, returning STATUS_EXT_NOT_RUNNING");
+            dataTrans->setStatus(STATUS_EXT_NOT_RUNNING);
         }
+
+        EXT_MUTEX_UNLOCK;
+        return;
     }
 
-    if(funcCallId <= CEX_FUN_CLOSE) {           // for fixed (base) functions return not/running status
+    if(functionId <= CEX_FUN_CLOSE) {           // for fixed (base) functions return not/running status
         uint8_t openCloseStatus = (ext->state == EXT_STATE_RUNNING) ? STATUS_OK : STATUS_EXT_NOT_RUNNING;    // if running, return OK (0), otherwise returning NOT_RUNNING
-        Debug::out(LOG_DEBUG, "ExtensionHandler::cexStatusOrResponse - returning status on %d - status: %02x", funcCallId, openCloseStatus);
+        Debug::out(LOG_DEBUG, "ExtensionHandler::cexStatusOrResponse - functionId: %d - returning status: %02x", functionId, openCloseStatus);
         dataTrans->setStatus(openCloseStatus);
-        mutexUnlock();
+        EXT_MUTEX_UNLOCK;
         return;
     }
 
     Response* resp = &ext->response;
 
-    if(resp->funcCallId != funcCallId) {     // bad funcCallId?
-        Debug::out(LOG_WARNING, "ExtensionHandler::cexStatusOrResponse - no response stored for funcCallId %d (either not called yet, or rewritten by next function call)", funcCallId);
-        dataTrans->setStatus(STATUS_BAD_ARGUMENT);
-        mutexUnlock();
-        return;
-    }
+    // The following lines are for supporting multiple responses and their identification by funcCallId, but currently it's not working
+    // if(resp->funcCallId != funcCallId) {     // bad functionId?
+    //     Debug::out(LOG_WARNING, "ExtensionHandler::cexStatusOrResponse - no response stored for functionId %d (either not called yet, or rewritten by next function call)", functionId);
+    //     dataTrans->setStatus(STATUS_BAD_ARGUMENT);
+    //     EXT_MUTEX_UNLOCK;
+    //     return;
+    // }
 
     if(resp->state == RESP_STATE_NOT_RECEIVED) {    // if response not received yet, wait for it
-        mutexUnlock();                              // unlock before waiting, so the other thread can access data
+        ExtensionHandler::clearSignal();            // if signal is set from previous event, just clear it now
+        Debug::out(LOG_DEBUG, "ExtensionHandler::cexStatusOrResponse - response not received yet, will now wait");
+        EXT_MUTEX_UNLOCK;            // unlock before waiting, so the other thread can access data
         ExtensionHandler::waitForSignal(500);       // waitForResponse - up to 500 ms
-        mutexLock();                                // we're going to access the shared data now
+        EXT_MUTEX_LOCK;              // we're going to access the shared data now
     }
 
     if(resp->state == RESP_STATE_RECEIVED) {        // got the response now? return it
@@ -293,6 +331,8 @@ void ExtensionHandler::cexStatusOrResponse(uint8_t extensionId, uint8_t funcCall
 
         if(sendResponseSize < resp->dataLen) {      // not sending whole response - response will be truncated?
             Debug::out(LOG_WARNING, "ExtensionHandler::cexStatusOrResponse - response size is %d bytes, but will send only %d bytes to ST - response truncated", resp->dataLen, sendResponseSize);
+        } else {
+            Debug::out(LOG_WARNING, "ExtensionHandler::cexStatusOrResponse - will return data response of %d bytes and status %02x", sendResponseSize, resp->statusByte);
         }
 
         dataTrans->addDataBfr(resp->data, sendResponseSize, true);
@@ -302,7 +342,7 @@ void ExtensionHandler::cexStatusOrResponse(uint8_t extensionId, uint8_t funcCall
         Debug::out(LOG_DEBUG, "ExtensionHandler::cexStatusOrResponse - response not received yet");
     }
 
-    mutexUnlock();
+    EXT_MUTEX_UNLOCK;
 }
 
 /*
@@ -316,7 +356,7 @@ void ExtensionHandler::cexClose(uint8_t extensionId)
         return;
     }
 
-    mutexLock();
+    EXT_MUTEX_LOCK;
 
     Extension* ext = &extensions[extensionId];  // use pointer to extension for simpler reading
 
@@ -324,7 +364,7 @@ void ExtensionHandler::cexClose(uint8_t extensionId)
         Debug::out(LOG_DEBUG, "ExtensionHandler::cexClose - extension at index %d not running, NO OP", extensionId);
         ext->clear();
         dataTrans->setStatus(STATUS_OK);
-        mutexUnlock();
+        EXT_MUTEX_UNLOCK;
         return;
     }
 
@@ -339,7 +379,7 @@ void ExtensionHandler::cexClose(uint8_t extensionId)
         Debug::out(LOG_WARNING, "ExtensionHandler::cexClose - extension at index %d - stop script %s does not exist!", extensionId, stopScriptCommand.c_str());
         ext->clear();
         dataTrans->setStatus(STATUS_EXT_ERROR);
-        mutexUnlock();
+        EXT_MUTEX_UNLOCK;
         return;
     }
 
@@ -349,7 +389,7 @@ void ExtensionHandler::cexClose(uint8_t extensionId)
 
     ext->clear();                           // clean up all the internal vars holding function table, function call statuses and responses
     dataTrans->setStatus(STATUS_OK);
-    mutexUnlock();
+    EXT_MUTEX_UNLOCK;
 }
 
 void ExtensionHandler::cexExtensionFunction(uint8_t justCmd, uint8_t extensionId, uint8_t functionId, uint32_t sectorCount)
@@ -360,7 +400,6 @@ void ExtensionHandler::cexExtensionFunction(uint8_t justCmd, uint8_t extensionId
         return;
     }
 
-    Extension* ext = &extensions[extensionId];      // use pointer to extension for simpler reading
     int functionIndex = functionId - (CEX_FUN_CLOSE + 1);       // turn passed in function id 3 to exported function index 0
 
     if(extensionId >= MAX_EXTENSIONS_OPEN) {        // bad extension id?
@@ -369,12 +408,14 @@ void ExtensionHandler::cexExtensionFunction(uint8_t justCmd, uint8_t extensionId
         return;
     }
 
-    mutexLock();
+    EXT_MUTEX_LOCK;
+    Extension* ext = &extensions[extensionId];      // use pointer to extension for simpler reading
+    ext->dumpToLog();
 
-    if(ext->state != EXT_STATE_NOT_RUNNING) {        // extension not running?
-        Debug::out(LOG_WARNING, "ExtensionHandler::cexExtensionFunction - extension index %d out of bounds", extensionId);
+    if(ext->state != EXT_STATE_RUNNING) {           // extension not running?
+        Debug::out(LOG_WARNING, "ExtensionHandler::cexExtensionFunction - extension at index %d NOT RUNNING", extensionId);
         dataTrans->setStatus(STATUS_EXT_NOT_RUNNING);
-        mutexUnlock();
+        EXT_MUTEX_UNLOCK;
         return;
     }
 
@@ -383,38 +424,43 @@ void ExtensionHandler::cexExtensionFunction(uint8_t justCmd, uint8_t extensionId
     if(functionIndex > MAX_EXPORTED_FUNCTIONS || !ext->functionTable.signatures[functionIndex].used) {
         Debug::out(LOG_WARNING, "ExtensionHandler::cexExtensionFunction - functionIndex %d is not used (expoted) or functionIndex %d > %d", functionIndex, functionIndex, MAX_EXPORTED_FUNCTIONS);
         dataTrans->setStatus(STATUS_BAD_ARGUMENT);
-        mutexUnlock();
+        EXT_MUTEX_UNLOCK;
         return;
     }
 
     // resolve functionId / functionIndex to functionName
     char functionName[32];
     ext->functionTable.signatures[functionIndex].getName(functionName, sizeof(functionName));
-
-    uint8_t funcCallId;
+    Debug::out(LOG_DEBUG, "ExtensionHandler::cexExtensionFunction  extensionId: %d, functionId: %d, functionIndex: %d, functionName: '%s'", extensionId, functionId, functionIndex, functionName);
 
     if(justCmd == CMD_CALL_RAW_WRITE || justCmd == CMD_CALL_RAW_READ) {     // raw WRITE and raw READ
-        funcCallId = sendCallRawToExtension(extensionId, functionName);
+        Debug::out(LOG_DEBUG, "ExtensionHandler::cexExtensionFunction - justCmd: %d, extensionId: %d, will do raw call of function '%s'", justCmd, extensionId, functionName);
+
+        sendCallRawToExtension(extensionId, functionName);
+        EXT_MUTEX_UNLOCK;        // unlock mutex now, because cexStatusOrResponse() will do own lock and unlock
 
         // if it's WRITE, there will be no data read, so return only STATUS. For read return data + status == full response.
         uint8_t responseSectorCount = (justCmd == CMD_CALL_RAW_READ) ? sectorCount : 0;
-        cexStatusOrResponse(extensionId, funcCallId, responseSectorCount);
+        cexStatusOrResponse(extensionId, functionId, responseSectorCount);
     } else if(justCmd == CMD_CALL_LONG_WRITE_ARGS) {                        // long call - write args to extension
-        funcCallId = sendCallLongToExtension(extensionId, functionIndex, functionName);
-        cexStatusOrResponse(extensionId, funcCallId, 0);                    // no returning sector count
+        Debug::out(LOG_DEBUG, "ExtensionHandler::cexExtensionFunction - justCmd: %d, extensionId: %d, will do LONG WRITE ARGS call of function '%s'", justCmd, extensionId, functionName);
+
+        sendCallLongToExtension(extensionId, functionIndex, functionName);
+        EXT_MUTEX_UNLOCK;        // unlock mutex now, because cexStatusOrResponse() will do own lock and unlock
+
+        cexStatusOrResponse(extensionId, functionId, 0);                    // no returning sector count
     } else {                                                                // something else? fail
         Debug::out(LOG_WARNING, "ExtensionHandler::cexExtensionFunction - bad justCmd %d passed to this method", justCmd);
         dataTrans->setStatus(STATUS_BAD_ARGUMENT);
+        EXT_MUTEX_UNLOCK;
     }
-
-    mutexUnlock();
 }
 
 // used in CMD_CALL_RAW_WRITE and CMD_CALL_RAW_READ to do the extension function call 
 uint8_t ExtensionHandler::sendCallRawToExtension(uint8_t extensionId, char* functionName)
 {
-    // first send data to extension if some data was received (WRITE cmd)
-    if(byteCountInDataBuffer > 0) {
+    // first send data to extension if some data was received (WRITE cmd) (6 is just our header, so if it's only 6, then there's no data)
+    if(byteCountInDataBuffer > 6) {
         sendDataToExtension(extensionId, dataBuffer, byteCountInDataBuffer);
     }
 
@@ -431,7 +477,7 @@ uint8_t ExtensionHandler::sendCallRawToExtension(uint8_t extensionId, char* func
     funcCallJson += "]}";
 
     Extension* ext = &extensions[extensionId];      // use pointer to extension for simpler reading
-    ext->response.updateBeforeSend();                       // update response internals before sending out function call
+    ext->response.updateBeforeSend();               // update response internals before sending out function call
 
     // now send the JSON with function name and args to extension
     sendStringToExtension(extensionId, funcCallJson.c_str());

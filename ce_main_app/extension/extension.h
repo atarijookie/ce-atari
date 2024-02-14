@@ -32,6 +32,8 @@ public:
     void getInstallPath(std::string& outPath);
     static void installPath(char* extName, std::string& outPath);
 
+    void dumpToLog(void);
+
     char name[32];                  // name of the extension
     char url[256];                  // url of the extension source
 

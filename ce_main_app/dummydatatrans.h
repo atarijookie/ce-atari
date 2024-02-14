@@ -13,6 +13,7 @@ public:
 
     void copyInDummyData(uint8_t *data, uint32_t cnt);
     uint8_t getStatus(void);
+    uint8_t *getBuffer(void);
 
 protected:
     virtual bool recvData(uint8_t *data, uint32_t cnt);

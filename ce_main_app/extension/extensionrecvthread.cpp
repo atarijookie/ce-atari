@@ -40,6 +40,8 @@ void handleExtOpen(Extension* ext, uint8_t funcCount, uint8_t* data, uint32_t da
     char* pSockPath = (char*) (data + (funcStoreCount * sizeof(ReceivedSignature)));    // the path to socket is behind the received signatures
     strcpy(ext->outSocketPath, pSockPath);      // store the path to extension's socket
     ext->state = EXT_STATE_RUNNING;             // mark extension as running
+
+    Debug::out(LOG_DEBUG, "handleExtOpen: sock path: %s, state: %d", pSockPath, ext->state);
 }
 
 void *extensionThreadCode(void *ptr)
@@ -102,11 +104,14 @@ void *extensionThreadCode(void *ptr)
             continue;
         }
 
+        Debug::out(LOG_DEBUG, "extensionThreadCode - will handle extensionId: %d, functionName: '%s'", resp->extensionId, resp->functionName);
+
         if(functionIndex == FAKE_INDEX_OPEN) {      // on open
             Debug::out(LOG_DEBUG, "extensionThreadCode - handling OPEN response");
-            ExtensionHandler::mutexLock();
+            EXT_MUTEX_LOCK;
             handleExtOpen(ext, resp->statusByte, data, dataCount);  // the statusByte field actually holds count of exported functions
-            ExtensionHandler::mutexUnlock();
+            EXT_MUTEX_UNLOCK;
+            Debug::out(LOG_DEBUG, "extensionThreadCode - handling OPEN response done");
             continue;
         }
 
@@ -120,16 +125,17 @@ void *extensionThreadCode(void *ptr)
             }
 
             Debug::out(LOG_INFO, "extensionThreadCode - extension '%s' at index %d reported CLOSE, clearing internals", ext->name, resp->extensionId);
-            ExtensionHandler::mutexLock();
+            EXT_MUTEX_LOCK;
             ext->clear();
-            ExtensionHandler::mutexUnlock();
+            EXT_MUTEX_UNLOCK;
+            Debug::out(LOG_DEBUG, "extensionThreadCode - handling CLOSE response done");
             continue;
         }
 
         Debug::out(LOG_DEBUG, "extensionThreadCode - handling other response");
 
         // it's not one of our special functions, so it's one of the functions from function table - let's handle it now
-        ExtensionHandler::mutexLock();
+        EXT_MUTEX_LOCK;
 
         ext->response.store(resp->statusByte, data, dataCount);    // store data
 
@@ -139,9 +145,10 @@ void *extensionThreadCode(void *ptr)
             // TODO: currently no method to to long-to-short path conversion???
         }
 
-        ExtensionHandler::mutexUnlock();        // unlock mutex protecting extensions array
+        EXT_MUTEX_UNLOCK;        // unlock mutex protecting extensions array
 
         ExtensionHandler::setSignal();          // notify possibly waiting command (see where ExtensionHandler::waitForSignal is called)
+        Debug::out(LOG_DEBUG, "extensionThreadCode - handling of response done");
     }
 
     Debug::out(LOG_INFO, "extensionThreadCode - terminated.");

@@ -33,8 +33,12 @@ void DummyDataTrans::sendDataAndStatus(bool fromRetryModule)
     Debug::outBfr(buffer, count);
 }
 
-uint8_t  DummyDataTrans::getStatus(void)
+uint8_t DummyDataTrans::getStatus(void)
 {
     return status;
 }
 
+uint8_t* DummyDataTrans::getBuffer(void)
+{
+    return buffer;
+}

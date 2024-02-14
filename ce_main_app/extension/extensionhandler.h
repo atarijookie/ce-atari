@@ -18,11 +18,12 @@ public:
     void setAcsiDataTrans(AcsiDataTrans *dt);
     void processCommand(uint8_t *command);
 
-    static void mutexLock(void);
-    static void mutexUnlock(void);
+    static void mutexLock(const char* file, int line);
+    static void mutexUnlock(const char* file, int line);
 
     static void waitForSignal(uint32_t ms);
     static void setSignal(void);
+    static void clearSignal(void);
 
 private:
     AcsiDataTrans *dataTrans;
@@ -37,7 +38,7 @@ private:
     const char *getCommandName(uint8_t cmd);
 
     void cexOpen(void);
-    void cexStatusOrResponse(uint8_t extensionId, uint8_t funcCallId, uint8_t sectorCount);
+    void cexStatusOrResponse(uint8_t extensionId, uint8_t functionId, uint8_t sectorCount);
     void cexClose(uint8_t extensionId);
     void cexExtensionFunction(uint8_t justCmd, uint8_t extensionId, uint8_t functionId, uint32_t sectorCount);
 

@@ -109,4 +109,7 @@ typedef struct
     uint8_t data;                                   // data starts here, should have length of dataLen
 } __attribute__((packed)) ResponseFromExtension;
 
+#define EXT_MUTEX_LOCK      ExtensionHandler::mutexLock(__FILE__, __LINE__);
+#define EXT_MUTEX_UNLOCK    ExtensionHandler::mutexUnlock(__FILE__, __LINE__);
+
 #endif
