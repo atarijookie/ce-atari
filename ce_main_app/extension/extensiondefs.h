@@ -16,6 +16,12 @@
 #define STATUS_EXT_NOT_RUNNING  0xFC
 #define STATUS_EXT_ERROR        0xFB
 
+// How the function should be accessed from ST
+#define FUNC_NONE               0
+#define FUNC_RAW_READ           1       // raw read function - 2 params (cmd[4] and cmd[5]), raw binary data returned as response
+#define FUNC_RAW_WRITE          2       // raw write function - 2 params (cmd[4] and cmd[5]), raw binary data is written to ST and sent to function upon calling function
+#define FUNC_LONG_ARGS          3       // function has multiple arguments which are sent from ST using data write, they are processed by CE core and passed to extension
+
 // Supported data types in arguments
 #define TYPE_NOT_PRESENT        0       // when this type is not specified / used
 #define TYPE_UINT8              1       // uint8_t
@@ -79,9 +85,10 @@ typedef struct
 typedef struct 
 {
     char    name[MAX_FUNCTION_NAME_LEN];
+    uint8_t funcType;                               // one of FUNC_*
     uint8_t argumentsCount;
-    uint8_t argumentTypes[MAX_FUNCTION_ARGUMENTS];
-    uint8_t returnValueType;
+    uint8_t argumentTypes[MAX_FUNCTION_ARGUMENTS];  // contains TYPE_* values
+    uint8_t returnValueType;                        // one of RESP_TYPE_*
 } __attribute__((packed)) ReceivedSignature;
 
 /*
@@ -91,8 +98,10 @@ typedef struct
 {
     uint8_t index;
     uint8_t nameHash[2];
-    uint8_t argumentTypes[MAX_FUNCTION_ARGUMENTS];
-    uint8_t returnValueType;
+    uint8_t funcType;                               // one of FUNC_*
+    uint8_t argumentsCount;
+    uint8_t argumentTypes[MAX_FUNCTION_ARGUMENTS];  // contains TYPE_* values
+    uint8_t returnValueType;                        // one of RESP_TYPE_*
 } __attribute__((packed)) BinarySignatureForST;
 
 #define MAX_BINARY_SIGNATURE_RESPONSE_SIZE  (MAX_EXPORTED_FUNCTIONS * sizeof(BinarySignatureForST))

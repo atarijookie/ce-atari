@@ -5,18 +5,22 @@ from defs import *
 # Place all your exported functions here. 
 
 # Place the functions which should be exported in this function. 
-# Return value is a dictionary, where key is exported function name and value
-# is a tupple - argument types list and return value type
+# Return value is a dictionary, where:
+#   - key is exported function name
+#   - value is a tupple with:
+#       - function call type (where the args are, also read / write direction when calling)
+#       - argument types list (what argument will be stored and later retrieved from the buffer / cmd[4] cmd[5])
+#       - return value type
 def get_exported_functions():
     fns = {}
 
-    fns["no_in_no_out"] = [], RESP_TYPE_NONE                                            # this function has no arguments, returns nothing
-    fns["one_in_one_out"] = [TYPE_UINT8], RESP_TYPE_STATUS                              # function expects 1 uint8 argument, returns uint8
-    fns["sum_of_two"] = [TYPE_INT16, TYPE_INT16], RESP_TYPE_STATUS_BIN_DATA             # 2 arguments in, int16 out
-    fns["reverse_str"] = [TYPE_CSTRING], RESP_TYPE_STATUS_BIN_DATA                      # string as argument, string as return value
-    fns["fun_path_in"] = [TYPE_PATH], RESP_TYPE_STATUS_PATH                             # string path in, string as return value
-    fns["raw_data_in"] = [TYPE_UINT8, TYPE_UINT8, TYPE_BIN_DATA], RESP_TYPE_STATUS      # raw data in can have 2 input bytes (from cmd4 and cmd5) and bin data, returns just status
-    fns["raw_data_out"] = [TYPE_UINT8, TYPE_UINT8], RESP_TYPE_STATUS_BIN_DATA           # raw data out can have 2 input bytes (from cmd4 and cmd5), returns bin data and status
+    fns["no_in_no_out"] = FUNC_RAW_WRITE, [], RESP_TYPE_NONE                                        # this function has no arguments, returns nothing
+    fns["one_in_one_out"] = FUNC_RAW_WRITE, [TYPE_UINT8], RESP_TYPE_STATUS                          # function expects 1 uint8 argument, returns uint8
+    fns["sum_of_two"] = FUNC_LONG_ARGS, [TYPE_INT16, TYPE_INT16], RESP_TYPE_STATUS_BIN_DATA         # 2 arguments in, int16 out
+    fns["reverse_str"] = FUNC_LONG_ARGS, [TYPE_CSTRING], RESP_TYPE_STATUS_BIN_DATA                  # string as argument, string as return value
+    fns["fun_path_in"] = FUNC_LONG_ARGS, [TYPE_PATH], RESP_TYPE_STATUS_PATH                         # string path in, string as return value
+    fns["raw_data_in"] = FUNC_RAW_WRITE, [TYPE_UINT8, TYPE_UINT8, TYPE_BIN_DATA], RESP_TYPE_STATUS  # raw data in can have 2 input bytes (from cmd4 and cmd5) and bin data, returns just status
+    fns["raw_data_out"] = FUNC_RAW_READ, [TYPE_UINT8, TYPE_UINT8], RESP_TYPE_STATUS_BIN_DATA        # raw data out can have 2 input bytes (from cmd4 and cmd5), returns bin data and status
 
     return fns
 

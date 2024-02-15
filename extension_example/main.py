@@ -84,12 +84,13 @@ def function_name_to_bytearray(name):
 
 # This function turns the supplied function name, arguments and return value into byte array
 # with the expected structure in the CE core. 
-def function_signature_to_bytearray(name, argumentTypes, returnValueType):
+def function_signature_to_bytearray(fun_type, name, argumentTypes, returnValueType):
     if len(argumentTypes) > MAX_FUNCTION_ARGUMENTS:
         logging.warning(f"Exported function name {name} has {len(argumentTypes)} arguments, but only {MAX_FUNCTION_ARGUMENTS} are allowed. This will not work. Use less arguments!")
         exit(1)
 
     signature = function_name_to_bytearray(name)            # start with function name
+    signature.append(fun_type)                              # type of function
     signature.append(len(argumentTypes))                    # add argumentsCount
 
     for i in range(0, MAX_FUNCTION_ARGUMENTS):              # add name to signature, pad with zeros up to max_len
@@ -120,8 +121,8 @@ def send_response(fun_name, status, data_out):
     data += status.to_bytes(1, 'big')               # 1 B: status byte
 
     if data_out is not None:                        # get length if can
-        if type(data_out) == str:                   # string to ascii bytes if needed
-            data_out = data_out.encode('ascii')
+        if type(data_out) == str:                   # string to ascii bytes if needed, append terminating zero
+            data_out = data_out.encode('ascii') + b'\0'
 
         data_len = len(data_out)
     else:                                           # use None if can't get length
@@ -153,8 +154,8 @@ def send_exported_functions_table():
     fns = get_exported_functions()
 
     for fun_name, fun_args_retval in fns.items():   # go through the exported functions and append their signatures to data
-        args, retval = fun_args_retval
-        data += function_signature_to_bytearray(fun_name, args, retval)
+        fun_type, args, retval = fun_args_retval
+        data += function_signature_to_bytearray(fun_type, fun_name, args, retval)
 
     data += IN_SOCKET_PATH.encode('ascii')          # add path to extension socket
 
@@ -168,15 +169,15 @@ def send_closed_notification():
 
 # Function gets signature of single exported function identified by name.
 def get_exported_function_signature(fun_name):
-    arg_types, retval_type = [], TYPE_NOT_PRESENT
+    fun_type, arg_types, retval_type = FUNC_RAW_WRITE, [], TYPE_NOT_PRESENT
 
     funs = get_exported_functions()             # get all exported functions
     signature = funs.get(fun_name, None)        # extract only the wanted function
 
     if signature is not None:                   # extraction found that function
-        arg_types, retval_type = signature
+        fun_type, arg_types, retval_type = signature
 
-    return arg_types, retval_type
+    return fun_type, arg_types, retval_type
 
 
 # Handle RAW data from CE - sent when extension uses RAW call, or sends TYPE_BIN_DATA buffer.
@@ -202,7 +203,9 @@ def handleJsonMessage(data):
 
     fun_name = message['function']
     args = message.get('args', [])
-    is_raw_write = message.get('raw_write', 0)  # set to True if this is raw write
+    fun_type, arg_types, retval_type = get_exported_function_signature(fun_name)
+
+    is_raw_write = fun_type == FUNC_RAW_WRITE   # True if this is raw write
 
     if is_raw_write:                        # if this is raw write, last argument should be latest binary data
         global latest_data
@@ -220,7 +223,6 @@ def handleJsonMessage(data):
         logging.warning(f"Could not find function {fun_name}, message not handled")
         return
 
-    arg_types, retval_type = get_exported_function_signature(fun_name)
     expected_args_count = len(arg_types)        # how many arguments are expected
     supplied_args_count = len(args)             # how many arguments were actually supplied
 

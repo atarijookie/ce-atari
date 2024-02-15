@@ -2,10 +2,11 @@ import socket
 import os
 import sys
 import json
-from main import IN_SOCKET_PATH as ext_socket_path
-from main import EXTENSION_NAME
+from time import sleep
+from main import EXTENSION_NAME, IN_SOCKET_PATH, remove_trailing_zeros
 from defs import *
 
+ext_socket_path = ""
 extension_id = 2
 TEST_SOCK_PATH = "/tmp/test.sock"
 
@@ -71,6 +72,8 @@ def verify_id_name_status_len(data, name, status, len):
     data_rest_len = int.from_bytes(data[34:38], byteorder ='big')
     assert data_rest_len == len, f"rest of data length wrong - {data_rest_len} != {len}"
 
+    return data[38:]        # returns raw response data part (== everything after header)
+
 
 def get_data_from_sock(sock):
     while True:
@@ -99,35 +102,51 @@ if __name__ == "__main__":
     sock = create_socket()
 
     #---------
-    data = get_data_from_sock(sock)
-    verify_id_name_status_len(data, 'CEX_FUN_OPEN', 7, 7 * 44)        # should receive CEX_FUN_OPEN first, instead of status it returns count of exported functions
+    print("Stoping and starting extension...")
+    os.system("./stop.sh")                          # stop the extension if it's running
+    start_command = f"./start.sh {TEST_SOCK_PATH} {extension_id} &"
+    print("start command: ", start_command)
+    os.system(start_command)                        # start the extension now
+
+    #---------
+    # should receive CEX_FUN_OPEN first, instead of status it returns count of exported functions, also returns path to socket
+    response_raw = get_data_from_sock(sock)
+
+    exported_func_count = 7
+    func_signature_size = 45
+    all_signatures_size = exported_func_count * func_signature_size
+
+    resp_data = verify_id_name_status_len(response_raw, 'CEX_FUN_OPEN', exported_func_count, all_signatures_size + len(IN_SOCKET_PATH))
     print("CEX_FUN_OPEN - ok")
+
+    ext_socket_path = resp_data[all_signatures_size:].decode('ascii')     # get extension's socket path - stored after all signatures
+    print(f"extensions socket path: {ext_socket_path}")
 
     #---------
     # call function without arguments
     msg = {'function': 'no_in_no_out', 'args': []}
     send_to_ext(json.dumps(msg))
 
-    data = get_data_from_sock(sock)
-    verify_id_name_status_len(data, 'no_in_no_out', STATUS_OK, 0)        # should receive no_in_no_out
+    response_raw = get_data_from_sock(sock)
+    resp_data = verify_id_name_status_len(response_raw, 'no_in_no_out', STATUS_OK, 0)        # should receive no_in_no_out
     print("no_in_no_out - ok")
 
     #---------
     # call function with excessive arguments - will truncate excessive arguments
     msg = {'function': 'no_in_no_out', 'args': [1, 2]}
     send_to_ext(json.dumps(msg))
-    data = get_data_from_sock(sock)
-    verify_id_name_status_len(data, 'no_in_no_out', STATUS_OK, 0)        # should receive no_in_no_out
+    response_raw = get_data_from_sock(sock)
+    resp_data = verify_id_name_status_len(response_raw, 'no_in_no_out', STATUS_OK, 0)        # should receive no_in_no_out
     print("no_in_no_out excessive - ok")
 
     #---------
     # call function to do the sum, return value in data
     msg = {'function': 'sum_of_two', 'args': [2, 3]}
     send_to_ext(json.dumps(msg))
-    data = get_data_from_sock(sock)
-    verify_id_name_status_len(data, 'sum_of_two', STATUS_OK, 4)
+    response_raw = get_data_from_sock(sock)
+    resp_data = verify_id_name_status_len(response_raw, 'sum_of_two', STATUS_OK, 4)
 
-    sum = int.from_bytes(data[38:42], byteorder ='big')
+    sum = int.from_bytes(resp_data[0:4], byteorder ='big')
     assert sum == 5, f"Wrong sum of 2+3 - {sum}"
     print("sum_of_two - ok")
 
@@ -135,10 +154,10 @@ if __name__ == "__main__":
     # call function to do the sum with insufficient argument count - will fill the rest of args with zeros
     msg = {'function': 'sum_of_two', 'args': [7]}
     send_to_ext(json.dumps(msg))
-    data = get_data_from_sock(sock)
-    verify_id_name_status_len(data, 'sum_of_two', STATUS_OK, 4)
+    response_raw = get_data_from_sock(sock)
+    resp_data = verify_id_name_status_len(response_raw, 'sum_of_two', STATUS_OK, 4)
 
-    sum = int.from_bytes(data[38:42], byteorder ='big')
+    sum = int.from_bytes(resp_data[0:4], byteorder ='big')
     assert sum == 7, f"Wrong sum of 7+0 - {sum}"
     print("sum_of_two insufficient - ok")
 
@@ -146,10 +165,10 @@ if __name__ == "__main__":
     # call function with string argument and string response
     msg = {'function': 'reverse_str', 'args': ['input string']}
     send_to_ext(json.dumps(msg))
-    data = get_data_from_sock(sock)
-    verify_id_name_status_len(data, 'reverse_str', STATUS_OK, 13)   # length is 13 because it counts also the terminating zero
+    response_raw = get_data_from_sock(sock)
+    resp_data = verify_id_name_status_len(response_raw, 'reverse_str', STATUS_OK, 13)   # length is 13 because it counts also the terminating zero
 
-    resp_str = data[38:]
+    resp_str = resp_data
     resp_str = trim_trailing_zeros(resp_str)
     resp_str = resp_str.decode('ascii')
     assert resp_str == 'gnirts tupni', f"Wrong response string - '{resp_str}' != 'gnirts tupni'"
@@ -159,10 +178,10 @@ if __name__ == "__main__":
     # call function with path argument and path response
     msg = {'function': 'fun_path_in', 'args': ['/tmp/bla.txt']}
     send_to_ext(json.dumps(msg))
-    data = get_data_from_sock(sock)
-    verify_id_name_status_len(data, 'fun_path_in', STATUS_OK, 13)   # length is 13 because it counts also the terminating zero
+    response_raw = get_data_from_sock(sock)
+    resp_data = verify_id_name_status_len(response_raw, 'fun_path_in', STATUS_OK, 13)   # length is 13 because it counts also the terminating zero
 
-    resp_str = data[38:]
+    resp_str = resp_data
     resp_str = trim_trailing_zeros(resp_str)
     resp_str = resp_str.decode('ascii')
     assert resp_str == '/tmp/bla.txt', f"Wrong response string - '{resp_str}' != '/tmp/bla.txt'"
@@ -182,24 +201,24 @@ if __name__ == "__main__":
     raw_data_packet += raw_data                             # rest: actual raw data
     send_to_ext(raw_data_packet)        # send raw data before calling raw data function handler
 
-    msg = {'function': 'raw_data_in', 'args': [2, 5], 'raw_write': True}        # 2 args from cmd4 and cmd5, additional flag that this is raw_write
+    msg = {'function': 'raw_data_in', 'args': [2, 5]}        # 2 args from cmd4 and cmd5
     send_to_ext(json.dumps(msg))
-    data = get_data_from_sock(sock)
-    verify_id_name_status_len(data, 'raw_data_in', 17, 0)   # no response data in RAW WRITE, returns sum of raw data and both args
+    response_raw = get_data_from_sock(sock)
+    resp_data = verify_id_name_status_len(response_raw, 'raw_data_in', 17, 0)   # no response data in RAW WRITE, returns sum of raw data and both args
     print("raw_data_in - ok")
 
     #---------
     # call raw read function
     msg = {'function': 'raw_data_out', 'args': [10, 69]}     # call raw_data_out and it should return buffer with 10x value 69
     send_to_ext(json.dumps(msg))
-    data = get_data_from_sock(sock)
-    verify_id_name_status_len(data, 'raw_data_out', STATUS_OK, 10)  # response length was specified in args[0]
+    response_raw = get_data_from_sock(sock)
+    resp_data = verify_id_name_status_len(response_raw, 'raw_data_out', STATUS_OK, 10)  # response length was specified in args[0]
 
     data_expected = bytearray()
     for i in range(0, 10):          # generate expected data
         data_expected.append(69)
 
-    data_in = data[38:]             # get received data
+    data_in = resp_data             # get received data
     assert data_in == data_expected, f"received data mismatch - '{data_in}' != '{data_expected}'"
     print("raw_data_out - ok")
 
@@ -207,12 +226,14 @@ if __name__ == "__main__":
     # tell the extension to close
     msg = {'function': 'CEX_FUN_CLOSE', 'args': []}
     send_to_ext(json.dumps(msg))
-    data = get_data_from_sock(sock)
-    verify_id_name_status_len(data, 'CEX_FUN_CLOSE', STATUS_OK, len(EXTENSION_NAME))
-    ext_name = data[38:].decode('ascii')
-    assert ext_name == EXTENSION_NAME, f"received ext_name mismatch - '{ext_name}' != '{EXTENSION_NAME}'"
+    response_raw = get_data_from_sock(sock)
+    resp_data = verify_id_name_status_len(response_raw, 'CEX_FUN_CLOSE', STATUS_OK, len(EXTENSION_NAME) + 1)
+    ext_name = remove_trailing_zeros(resp_data).decode('ascii')
+    assert ext_name == EXTENSION_NAME, f"received ext_name mismatch - '{type(ext_name)} {ext_name}' != '{EXTENSION_NAME} {type(EXTENSION_NAME)}'"
 
     #---------
+    os.system("./stop.sh")                          # stop the extension if it's running
+
     sock.close()
     os.unlink(TEST_SOCK_PATH)
     print("Test finished.")

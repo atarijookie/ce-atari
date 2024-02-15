@@ -6,6 +6,12 @@ STATUS_BAD_ARGUMENT = 0xFD
 STATUS_EXT_NOT_RUNNING = 0xFC
 STATUS_EXT_ERROR = 0xFB
 
+# How the function should be accessed from ST
+FUNC_NONE = 0
+FUNC_RAW_READ = 1               # raw read function - 2 params (cmd[4] and cmd[5]), raw binary data returned as response
+FUNC_RAW_WRITE = 2              # raw write function - 2 params (cmd[4] and cmd[5]), raw binary data is written to ST and sent to function upon calling function
+FUNC_LONG_ARGS = 3              # function has multiple arguments which are sent from ST using data write, they are processed by CE core and passed to extension
+
 # Supported data types in arguments and return values.
 TYPE_NOT_PRESENT = 0            # when this type is not specified / used
 TYPE_UINT8 = 1                  # uint8_t

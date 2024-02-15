@@ -53,7 +53,7 @@ void FunctionTable::storeReceivedSignatures(uint8_t* buffer, uint8_t funcCount)
 
     // store all the signatures
     for(uint8_t i=0; i<funcCount; i++) {
-        signatures[i].store(sign->name, sign->argumentsCount, sign->argumentTypes, sign->returnValueType);
+        signatures[i].store(sign);
         sign++;     // move to next signature by incrementing pointer
     }
 

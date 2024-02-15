@@ -428,9 +428,18 @@ void ExtensionHandler::cexExtensionFunction(uint8_t justCmd, uint8_t extensionId
         return;
     }
 
+    FunctionSignature* sign = &ext->functionTable.signatures[functionIndex];        // use pointer to signature for simpler reading
+    uint8_t expectedJustCmd = sign->getAcsiCmdForFuncType();                // what justCmd must match for this function
+    if(justCmd != expectedJustCmd) {        // wrong CMD used? fail
+        Debug::out(LOG_WARNING, "ExtensionHandler::cexExtensionFunction - expected cmd is %02x, but cmd that came is %02x", expectedJustCmd, justCmd);
+        dataTrans->setStatus(STATUS_BAD_ARGUMENT);
+        EXT_MUTEX_UNLOCK;
+        return;
+    }
+
     // resolve functionId / functionIndex to functionName
     char functionName[32];
-    ext->functionTable.signatures[functionIndex].getName(functionName, sizeof(functionName));
+    sign->getName(functionName, sizeof(functionName));
     Debug::out(LOG_DEBUG, "ExtensionHandler::cexExtensionFunction  extensionId: %d, functionId: %d, functionIndex: %d, functionName: '%s'", extensionId, functionId, functionIndex, functionName);
 
     if(justCmd == CMD_CALL_RAW_WRITE || justCmd == CMD_CALL_RAW_READ) {     // raw WRITE and raw READ
@@ -481,6 +490,7 @@ uint8_t ExtensionHandler::sendCallRawToExtension(uint8_t extensionId, char* func
 
     // now send the JSON with function name and args to extension
     sendStringToExtension(extensionId, funcCallJson.c_str());
+    Debug::out(LOG_DEBUG, "ExtensionHandler::sendCallRawToExtension - funcCallJson: '%s'", funcCallJson.c_str());
 
     return ext->response.funcCallId;     // return this function call id
 }
@@ -488,6 +498,8 @@ uint8_t ExtensionHandler::sendCallRawToExtension(uint8_t extensionId, char* func
 // used in CMD_CALL_LONG_WRITE_ARGS to do the extension function call 
 uint8_t ExtensionHandler::sendCallLongToExtension(uint8_t extensionId, uint8_t functionIndex, char* functionName)
 {
+    Debug::out(LOG_DEBUG, "ExtensionHandler::sendCallLongToExtension - extensionId: %d, functionIndex: %d, functionName: '%s'", extensionId, functionIndex, functionName);
+
     std::string funcCallJson;
     funcCallJson += "{\"function\": \"";
     funcCallJson += functionName;
@@ -556,9 +568,13 @@ uint8_t ExtensionHandler::sendCallLongToExtension(uint8_t extensionId, uint8_t f
 
                 dataBuffer2[0] = 'D';                   // this buffer has data and DA is the marker
                 dataBuffer2[1] = 'A';
-                Utils::storeDword(dataBuffer2 + 2, binDataLen);     // bytes 2,3,4,5
-                memcpy(dataBuffer2 + 6, param + 4, binDataLen);     // copy over data to bytes 6 .. (binDataLen+6)
-                sendDataToExtension(extensionId, dataBuffer2, binDataLen + 6);  // send data + 6 bytes of header 
+
+                uint32_t binDataLenVerified = MIN(binDataLen, EXT_BUFFER_SIZE - 6);
+                Debug::out(LOG_DEBUG, "ExtensionHandler::sendCallLongToExtension - binDataLen: %d, EXT_BUFFER_SIZE: %d, using smaller: %d", binDataLen, EXT_BUFFER_SIZE-6, binDataLenVerified);
+
+                Utils::storeDword(dataBuffer2 + 2, binDataLenVerified);     // bytes 2,3,4,5
+                memcpy(dataBuffer2 + 6, param + 4, binDataLenVerified);     // copy over data to bytes 6 .. (binDataLenVerified+6)
+                sendDataToExtension(extensionId, dataBuffer2, binDataLenVerified + 6);  // send data + 6 bytes of header 
 
                 param += binDataLen + 4;                // advance by data size + the length size (4 bytes)
                 break;
@@ -567,7 +583,8 @@ uint8_t ExtensionHandler::sendCallLongToExtension(uint8_t extensionId, uint8_t f
     }
 
     funcCallJson += "]}";       // terminate arguments and JSON
-    
+    Debug::out(LOG_DEBUG, "ExtensionHandler::sendCallLongToExtension - funcCallJson: '%s'", funcCallJson.c_str());
+
     ext->response.updateBeforeSend();   // update response internals before sending out function call
 
     // now send the JSON with function name and args to extension
