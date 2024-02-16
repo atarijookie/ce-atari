@@ -24,3 +24,4 @@ test_sting/test_server
 **/venv_*/
 __pycache__/
 **/__pycache__/
+**/.vscode/
