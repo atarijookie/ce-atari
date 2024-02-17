@@ -17,6 +17,7 @@
 #include "gemdos_errno.h"
 #include "bios.h"
 #include "main.h"
+#include "ce_extension.h"
 
 /*
  * CosmosEx GEMDOS driver by Jookie, 2013 & 2014
@@ -597,6 +598,17 @@ int32_t custom_fopen( void *sp )
 	char *fileName	= (char *)	*((DWORD *) params);
 	params += 4;
 	WORD mode		= (WORD)	*((WORD *)  params);
+
+	// is this the call of the CE extension?
+	if(mode == TAG_CE && strncmp(fileName, "CEDD", 4) == 0) {	// mode matches CE, filename matches CEDD - respond with CEDD
+		return RET_CEDD;
+	}
+
+	if(mode == TAG_CX && strncmp(fileName, "CEXT", 4) == 0) {	// mode matches CX, filename matches CEXT - do the extension call
+		CEXcall *cc = (CEXcall*) *((uint32_t*) (fileName + 4));	// get pointer to CEXcall which is right after CEXT tag
+		ceExtensionCall(cc);
+		return RET_CEXT;
+	}
 
 	WORD drive = getDriveFromPath(fileName);
 

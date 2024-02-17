@@ -40,21 +40,25 @@ uint8_t cexOpen(char* extensionName, char* extensionSourceUrl, uint16_t timeoutS
 
     uint8_t extId = __doTheCall(&cc);       // send this to CE
 
-    if(extId & 0xf0) {  // if the response to OPEN has something in the upper nibble, it's an error, return it
+    if(extId & 0xf0) {          // if the response to OPEN has something in the upper nibble, it's an error, return it
         return extId;
     }
 
     int i;
-    for(i=0; i<timeoutSeconds; i++) {       // wait for extension to start this long
-        uint8_t res = cexResponse(extId, "CEX_FUN_OPEN", 512, __getBuffer());   // get status of opening the extension
+    for(i=0; i<timeoutSeconds; i++) {       // wait for extension to start until open or timeout
+        uint8_t res = cexResponse(extId, "CEX_FUN_OPEN", 512, bfr);     // get status of opening the extension
 
         if(res == STATUS_OK) {              // extension open? stop waiting, return extension ID
+            memcpy(signatures, bfr, MAX_EXPORTED_FUNCTIONS * sizeof(BinarySignatureForST));  // use the received signatures to fill the signatures[] array
+            (void) Cconws("cexOpen OK\r\n");
             return extId;
         }
 
+        (void) Cconws("cexOpen waiting for extension start.\r\n");
         sleep(1);
     }
 
+    (void) Cconws("cexOpen timeout!\r\n");
     return STATUS_EXT_NOT_RUNNING;          // extension not running if got here
 }
 
@@ -409,9 +413,32 @@ uint8_t* __getBuffer(void)
     return pBfrEven;
 }
 
+// Pass this call specified in cc to CE_DD driver, which will do the actual sending of data to CE.
 uint8_t __doTheCall(CEXcall* cc)
 {
-    // TODO: send this to CE
+    uint32_t res;
+    // When this is a OPEN call, verify that the CE_DD is present and responsing. 
+    // Don't do this check for other calls - for higher call speed.
+    if(cc->functionId == CEX_FUN_OPEN) {
+        res = Fopen("CEDD", TAG_CE);        // filename: "CEDD", mode: 'CE'
 
-    return 0;
+        if(res != RET_CEDD) {               // if return value is not 'CEDD', fail
+            (void) Cconws("CE_DD not running or old version.\r\n");
+            return STATUS_EXT_NOT_RUNNING;
+        }
+    }
+
+    // fill the call string with special tag and pointer to structure
+    uint8_t callStr[10];
+    memcpy(callStr, "CEXT", 4);                 // 0-3: 'CEXT' - our special tag
+    storeDword(callStr + 4, (uint32_t) cc);     // 4-7: pointer to CEXcall struct
+    callStr[8] = 0;                             // 8: zero termination
+
+    // do the actual call - for this the CE_DD must be running and responding on special Fopen call
+    res = Fopen(callStr, TAG_CX);               // filename: call string, mode: 'CX'
+    if(res != RET_CEXT) {                       // return value not 'CEXT'? fail
+        return STATUS_EXT_NOT_RUNNING;
+    }
+
+    return cc->statusByte;      // return the status byte
 }
