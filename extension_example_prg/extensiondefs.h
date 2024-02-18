@@ -15,6 +15,8 @@
 #define STATUS_EXT_NOT_RUNNING  0xFC
 #define STATUS_EXT_ERROR        0xFB
 
+#define ANY_ERROR               0xF0    // lowest possible error value. If returned status is greater than this, it's an error
+
 // How the function should be accessed from ST
 #define FUNC_NONE               0
 #define FUNC_RAW_READ           1       // raw read function - 2 params (cmd[4] and cmd[5]), raw binary data returned as response
