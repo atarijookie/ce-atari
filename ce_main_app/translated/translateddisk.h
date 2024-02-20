@@ -134,6 +134,7 @@ public:
     bool driveIsEnabled(int driveIndex);
     void driveGetReport(int driveIndex, std::string &reportString);
 	const char * driveGetHostPath(int driveIndex) const {
+        if(driveIndex < 0 || driveIndex > MAX_DRIVES) return NULL;
 		if(!conf[driveIndex].enabled) return NULL;
 		return conf[driveIndex].hostRootPath.c_str();
 	}

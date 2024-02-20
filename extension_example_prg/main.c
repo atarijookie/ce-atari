@@ -40,8 +40,9 @@ int main(void)
     uint8_t extId = cexOpen("extension_example", "", 5);        // open extension
 
     if(extId > ANY_ERROR) {     // on error, fail
-        (void) Cconws("Opening extension failed\r\n");
+        (void) Cconws("Opening extension failed (press any key)\r\n");
         sleep(3);
+        (void) Cnecin();
         return 0;
     }
     
@@ -118,10 +119,11 @@ int main(void)
     //------
     // Example call of function with Atari path in a string argument using cexCallLong().
     // Path will be translated from Atari path to host path, so the extension will get path that is valid on host (linux).
+    // Atari path in argument must be full path, e.g. C:\FILE.EXT . If you don't suply fully path, the path translation will return wrong path.
     // The response (data and status byte) will be retrieved with additional call to cexResponse().
     // If the extension needs longer time to generate response than 500 ms, then this cexResponse() function will return STATUS_NO_RESPONSE.
     // Keep calling cexResponse() until you get expected status, then the response will be in pBuffer.
-    res = cexCallLong(extId, "fun_path_in", 1, "O:\\TESTS\\CE_HDD.TOS");    // call function with long arguments, will translated path
+    res = cexCallLong(extId, "fun_path_in", 1, "O:\\TESTS\\CE_TSTHD.TOS");    // call function with long arguments, will translated path
 
     if(res != STATUS_OK) {      // calling function failed?
         (void) Cconws("fun_path_in - call failed\r\n");
@@ -131,8 +133,10 @@ int main(void)
         if(res != STATUS_OK) {  // getting response failed?
             (void) Cconws("fun_path_in - cexResponse failed\r\n");
         } else {
-            if(strncmp((char*) pBuffer, "O:\\TESTS\\CE_HDD.TOS", 19) != 0) {     // wrong string returned?
-                (void) Cconws("fun_path_in - string BAD\r\n");
+            if(strncmp((char*) pBuffer, "/var/run/ce/trans/O/tests/ce_tsthd.tos", 38) != 0) {     // wrong string returned?
+                (void) Cconws("fun_path_in - string BAD - '");
+                (void) Cconws(pBuffer);
+                (void) Cconws("'\r\n");
             } else {
                 (void) Cconws("fun_path_in - string OK\r\n");
             }
@@ -193,7 +197,8 @@ int main(void)
     (void) Cconws("Closing extension.\r\n");
     cexClose(extId);        // close extension
 
-    (void) Cconws("Terminatimg example.\r\n");
+    (void) Cconws("Terminatimg example (press any key)\r\n");
     sleep(3);
+    (void) Cnecin();
     return 0;
 }

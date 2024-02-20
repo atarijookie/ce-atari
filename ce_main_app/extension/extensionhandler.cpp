@@ -13,6 +13,7 @@
 #include "../debug.h"
 #include "../utils.h"
 #include "../libdospath/libdospath.h"
+#include "../translated/translateddisk.h"
 #include "extensionhandler.h"
 #include "extensiondefs.h"
 #include "extension.h"
@@ -546,12 +547,33 @@ uint8_t ExtensionHandler::sendCallLongToExtension(uint8_t extensionId, uint8_t f
 
             case TYPE_PATH:
             {
+                // PATH param must always be full path, so something like: O:\\CE_DD.PRG
                 len = strlen((char*) param);
 
                 // param points now to short Atari path, we need to convert it
                 funcCallJson += "\"";
 
                 std::string shortPath = (char*) param;
+
+                if(param[1] != ':' || param[2] != '\\') {   // path doesn't start with 'X:\'? not a full path!
+                    Debug::out(LOG_WARNING, "ExtensionHandler::sendCallLongToExtension - supplied PATH argument is not full path, ldp_shortToLongPath() will return wrong value");
+                } else {                        // path starts with 'X:\', it's a full path.
+                    int driveNo = param[0];     // get drive character from path
+                    if(driveNo >= 'A' && driveNo <= 'P') {          // upper case drive letter, valid range - letter to drive number
+                        driveNo -= 'A';
+                    } else if(driveNo >= 'a' && driveNo <= 'p') {   // lower case drive letter, valid range - letter to drive number
+                        driveNo -= 'a';
+                    } else {                    // it's an invalid letter
+                        Debug::out(LOG_WARNING, "ExtensionHandler::sendCallLongToExtension - drive letter '%c' seems wrong!", driveNo);
+                        driveNo = 2;            // assume drive C
+                    }
+
+                    TranslatedDisk* translated = TranslatedDisk::getInstance();
+                    shortPath = translated->driveGetHostPath(driveNo);      // get host root path of this drive
+                    std::string pathWithoutDrive = (char*) (param + 3);     // skip 'X:\' on start of param
+                    Utils::mergeHostPaths(shortPath, pathWithoutDrive);     // short path = root + full atari path
+                }
+
                 std::string outFullHostPath;
                 ldp_shortToLongPath(shortPath, outFullHostPath, true, NULL);    // short path to long path
 

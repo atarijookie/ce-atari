@@ -13,7 +13,7 @@ BinarySignatureForST signatures[MAX_EXPORTED_FUNCTIONS];
 BinarySignatureForST signOpen = {
     CEX_FUN_OPEN,
     0x190e,                         // hash of "CEX_FUN_OPEN"
-    FUNC_RAW_WRITE,                 // cmd that should be used
+    FUNC_RAW_WRITE,                 // FUNC_ that should be used
     0,                              // argumentsCount
     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // no official args
     RESP_TYPE_STATUS
@@ -30,7 +30,7 @@ uint8_t cexOpen(char* extensionName, char* extensionSourceUrl, uint16_t timeoutS
 
     CEXcall cc;
     cc.readNotWrite = DATA_DIR_WRITE;
-    cc.cmd = FUNC_RAW_WRITE;                // ACSI command that will be used
+    cc.cmd = CMD_CALL_RAW_WRITE;                // ACSI command that will be used
     cc.extensionId = 0;                     // no extension id when opening
     cc.functionId = CEX_FUN_OPEN;
     cc.sectorCount = 1;                     // 1 sector to transfer
@@ -66,7 +66,7 @@ void cexClose(uint8_t extensionId)
 {
     CEXcall cc;
     cc.readNotWrite = DATA_DIR_WRITE;
-    cc.cmd = FUNC_RAW_WRITE;                // ACSI command that will be used
+    cc.cmd = CMD_CALL_RAW_WRITE;            // ACSI command that will be used
     cc.extensionId = extensionId;           // ID of extension
     cc.functionId = CEX_FUN_CLOSE;
     cc.sectorCount = 0;
@@ -88,7 +88,7 @@ uint8_t cexCallRawWrite(uint8_t extensionId, char* functionName, uint8_t arg1, u
 
     CEXcall cc;
     cc.readNotWrite = DATA_DIR_WRITE;
-    cc.cmd = FUNC_RAW_WRITE;        // ACSI command that will be used
+    cc.cmd = CMD_CALL_RAW_WRITE;    // ACSI command that will be used
     cc.extensionId = extensionId;   // ID of extension
     cc.functionId = sign->index;    // function id is index in the signature table
     cc.sectorCount = __bytesLenToSectorsLen(dataLenBytes);      // bytes count to sector count
@@ -110,7 +110,7 @@ uint8_t cexCallRawRead(uint8_t extensionId, char* functionName, uint8_t arg1, ui
 
     CEXcall cc;
     cc.readNotWrite = DATA_DIR_READ;
-    cc.cmd = FUNC_RAW_READ;         // ACSI command that will be used
+    cc.cmd = CMD_CALL_RAW_READ;     // ACSI command that will be used
     cc.extensionId = extensionId;   // ID of extension
     cc.functionId = sign->index;    // function id is index in the signature table
     cc.sectorCount = __bytesLenToSectorsLen(dataLenBytes);      // bytes count to sector count
@@ -200,7 +200,7 @@ uint8_t cexCallLong(uint8_t extensionId, char* functionName, int argc, ...)
     // do the actual function call
     CEXcall cc;
     cc.readNotWrite = DATA_DIR_WRITE;
-    cc.cmd = FUNC_RAW_WRITE;        // ACSI command that will be used
+    cc.cmd = CMD_CALL_LONG_WRITE_ARGS;  // ACSI command that will be used
     cc.extensionId = extensionId;   // ID of extension
     cc.functionId = sign->index;    // function id is index in the signature table
     cc.sectorCount = __bytesLenToSectorsLen(argsBytes);     // bytes count to sector count
@@ -225,7 +225,7 @@ uint8_t cexResponse(uint8_t extensionId, char* functionName, uint32_t expectResp
 
     CEXcall cc;
     cc.readNotWrite = DATA_DIR_READ;
-    cc.cmd = FUNC_RAW_READ;                 // ACSI command that will be used
+    cc.cmd = CMD_CALL_GET_RESPONSE;         // ACSI command that will be used
     cc.extensionId = extensionId;           // ID of extension
     cc.functionId = CEX_FUN_GET_RESPONSE;
     cc.sectorCount = __bytesLenToSectorsLen(expectRespLenBytes);      // bytes count to sector count
