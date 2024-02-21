@@ -217,7 +217,7 @@ def system_custom(command_str, to_log=True, shell=False):
 
         @param command_str: command with arguments as string
         @param to_log: if true, log the output of the command
-        @param shell: if true, subprocess.run() runs the command with shell binary (== heavier than shel=False)
+        @param shell: if true, subprocess.run() runs the command with shell binary (== heavier than shell=False)
     """
 
     # subprocess.run() can accept command with arguments as:

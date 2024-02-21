@@ -1,8 +1,10 @@
 import socket
 import os
+import shutil
 import json
 import urllib3
 import threading
+import zipfile
 from datetime import datetime
 from time import time
 from enum import Enum
@@ -191,6 +193,52 @@ def update_time_from_ntp(item):
     # set date time
     cmd_set_datetime = f"date +'%Y-%m-%d %H:%M:%S %z' -s '{date_str} {time_str} {tz_str}'"
     system_custom(cmd_set_datetime, to_log=True, shell=True)
+
+
+@app_log.catch
+def start_extension(install_dir, start_cmd):
+    """ make scripts in the install dir executable and execute the start cmd """
+
+    scripts_wildcard = os.path.join(install_dir, "*.sh")
+    app_log.info(f"start_extension - dir_path: {install_dir}, scripts_wildcard: {scripts_wildcard}")
+    system_custom(f"chmod ugo+x {scripts_wildcard}", to_log=True, shell=True)   # make scripts in the extension dir executable
+
+    app_log.info(f"will now execute {start_cmd}")
+    system_custom(start_cmd, to_log=True, shell=True)   # run the start command
+
+
+@app_log.catch
+def install_extension(item):
+    """ action handler for action 'install_extension' """
+
+    url_or_path = item.get('url', '')
+
+    if os.path.exists(url_or_path):         # the content seems to exist on local filesystem
+        dest = item.get('destination', '')
+        start_cmd = item.get('start_cmd', '')
+
+        app_log.info(f"install_extension: path {url_or_path} exists locally, copying to {dest}")
+        shutil.copytree(url_or_path, dest)  # copy it from path to destination
+
+        start_extension(dest, start_cmd)    # star the extension now
+    else:                                   # file / dir doesn't exist localy, do the download
+        app_log.info(f"install_extension: path {url_or_path} doesn't exist locally, will download...")
+        item['install_dest'] = item['destination']                  # move the 'destination' (where it whould be installed) to other key
+        item['destination'] = os.path.join('/tmp', os.path.basename(url_or_path))  # 'destination' for download will be /tmp/ + extension filename
+        item['after_action'] = 'after_extension_downloaded'
+        download_file(item)
+
+
+@app_log.catch
+def after_extension_downloaded(item):
+    """ this will be called when the extension is downloaded """
+
+    app_log.info(f"after_extension_downloaded: extension downloaded, will extract {item['destination']} to {item['install_dest']}")
+
+    with zipfile.ZipFile(item['destination'], 'r') as zip_ref:      # extract files from zip
+        zip_ref.extractall(item['install_dest'])
+
+    start_extension(item['install_dest'], item['start_cmd'])        # start the extension now
 
 
 def create_socket():
