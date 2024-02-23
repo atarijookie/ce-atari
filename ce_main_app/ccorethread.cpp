@@ -154,142 +154,170 @@ void CCoreThread::run(void)
 
     loadSettings();
 
-    //------------------------------
-    // stuff related to checking of Franz and Hans being alive and then possibly flashing them
-    bool    shouldCheckHansFranzAlive   = true;                         // when true and the 15 second timeout since start passed, check for Hans and Franz being alive
-    uint32_t   hansFranzAliveCheckTime     = Utils::getEndTime(15000);     // get the time when we should check if Hans and Franz are alive
-
-    flags.gotHansFwVersion  = false;
-    flags.gotFranzFwVersion = false;
-
-    if(flags.noFranz) {                                                     // if running without Franz, pretend we got his FW version
-        flags.gotFranzFwVersion = true;
-    }
-
-    if(flags.noReset) {                                                     // if we're debugging Hans or Franz (noReset is set to true), don't do this alive check
-        shouldCheckHansFranzAlive = false;
-    } else {                                                            // if we should reset Hans and Franz on start, do it (and we're probably not debugging Hans or Franz)
+    if(!flags.noReset) {            // if we should reset Hans and Franz on start, do it (and we're probably not debugging Hans or Franz)
         chipInterface->resetHDDandFDD();
     }
 
-    Debug::out(LOG_DEBUG, "Will check for Hans and Franz alive: %s", (shouldCheckHansFranzAlive ? "yes" : "no") );
     //------------------------------
-
-    uint32_t getHwInfoTimeout = Utils::getEndTime(3000);                  // create a time when we already should have info about HW, and if we don't have that by that time, then fail
 
     lastFwInfoTime.nextDisplay = Utils::getEndTime(1000);
     lastFwInfoTime.hansResetTime = Utils::getCurrentMs();
     lastFwInfoTime.franzResetTime = Utils::getCurrentMs();
 
-    uint32_t nextHousekeeping = Utils::getEndTime(1000);
-
     bool needsAction;
     bool hardNotFloppy;
 
-    uint32_t nextFloppyEncodingCheck   = Utils::getEndTime(1000);
-    //bool prevFloppyEncodingRunning  = false;
-    load.clear();                       // clear load counter
+    load.clear();                               // clear load counter
+
+    // The loop count and no-sleep-loops-count will allow us to avoid handling other stuff and sleeping
+    // when there was a command from HDD or FDD, which we want to handle without further delays.
+    #define NO_SLEEP_LOOPS_AFTER_COMMAND    10000
+    int loopCount = 0;
 
     while(sigintReceived == 0) {
-        bool gotAtn = false;                                            // no ATN received yet?
+        bool gotAcsiCommand = false;
+        bool gotFddCommand = false;
 
-        // if should just get the HW version and HDD interface, but timeout passed, quit
-        if(flags.getHwInfo && Utils::getCurrentMs() >= getHwInfoTimeout) {
-            showHwVersion();                                            // show the default HW version
-            sigintReceived = 1;                                         // quit
-        }
-
-        uint32_t now = Utils::getCurrentMs();
-        if(now >= lastFwInfoTime.nextDisplay) {
-            lastFwInfoTime.nextDisplay  = Utils::getEndTime(1000);
-            displayStatusToConsole(now);
-        }
-
-        // minor house-keeping tasks might be launched here, just be sure they take little time to finish
-        if(now >= nextHousekeeping) {
-            nextHousekeeping = Utils::getEndTime(1000);
-
-            configStream->houseKeeping(now);
-        }
-
-        // should we check if Hans and Franz are alive?
-        if(shouldCheckHansFranzAlive) {
-            if(Utils::getCurrentMs() >= hansFranzAliveCheckTime) {          // did enough time pass since the Hans and Franz reset?
-                if(!flags.gotHansFwVersion || !flags.gotFranzFwVersion) {   // if don't have version from Hans or Franz, then they're not alive
-                    // Removed flashing first FW when the chips don't reply -- something this detection goes bad,
-                    // and this resulted in writing FW to chips even if it was not needed. Now this possible action will be left for
-                    // user manual launch (to avoid automatic writing FW over and over again if it won't help).
-
-                    Debug::out(LOG_INFO, "No answer from Hans or Franz, will quit app, hopefully app restart will solve this.");
-                    Debug::out(LOG_INFO, "If not, and this will happen in a loop, consider writing chips firmware again.");
-                    sigintReceived = 1;
-                } else {
-                    Debug::out(LOG_DEBUG, "Got answers from both Hans and Franz :)");
-                }
-
-                shouldCheckHansFranzAlive = false;                      // don't check this again
-            }
-        }
-
-        if(now >= nextFloppyEncodingCheck) {
-            nextFloppyEncodingCheck = Utils::getEndTime(1000);
-
-            //if(prevFloppyEncodingRunning && !ImageSilo::getFloppyEncodingRunning()) {   // if floppy encoding was running, but not it's not running
-                if(newFloppyImageLedAfterEncode != -2) {                                // if we should set the new newFloppyImageLed after encoding is done
-                    setEnabledFloppyImgs    = true;
-                    setNewFloppyImageLed    = true;
-                    newFloppyImageLed       = newFloppyImageLedAfterEncode;
-
-                    newFloppyImageLedAfterEncode = -2;
-                }
-            //}
-            //prevFloppyEncodingRunning = ImageSilo::getFloppyEncodingRunning();
-        }
-
-        load.busy.markStart();                          // mark the start of the busy part of the code
+        load.busy.markStart();                  // mark the start of the busy part of the code
 
         needsAction = chipInterface->actionNeeded(hardNotFloppy, inBuff);
 
         if(needsAction && hardNotFloppy) {      // hard drive needs action?
-            gotAtn = true;                      // we've some ATN
-            handleHdd(now, inBuff);
+            gotAcsiCommand = handleHdd(inBuff);
         }
 
-        if(events.insertSpecialFloppyImageId != 0) {                       // very stupid way of letting web IF to insert special image
-            insertSpecialFloppyImage(events.insertSpecialFloppyImageId);
-            events.insertSpecialFloppyImageId = 0;
+        if(!flags.noFranz && needsAction && !hardNotFloppy) {   // not running without Franz & floppy drive needs action?
+            gotFddCommand = handleFdd(inBuff);
         }
 
-        // check for any ATN code waiting from Franz
-        if(flags.noFranz) {                         // if running without Franz, don't communicate
-            needsAction = false;
+        load.busy.markEnd();                    // mark the end of the busy part of the code
+
+        // If HDD or FDD command was received, w're restarting the loop count to zero.
+        if(gotAcsiCommand || gotFddCommand) {
+            loopCount = 0;
         }
 
-        if(needsAction && !hardNotFloppy) {         // floppy drive needs action?
-            gotAtn = true;                          // we've some ATN
-            handleFdd(now, inBuff);
-        }
-
-        load.busy.markEnd();                        // mark the end of the busy part of the code
-
-        if(!gotAtn) {                               // no ATN was processed?
-            Utils::sleepMs(1);                      // wait 1 ms...
+        // If we're in this period after last command, just increase the loop count and don't sleep.
+        // We're doing this to avoid running the other stuff and sleeping when we need low latency to respond to sequence of commands.
+        if(loopCount < NO_SLEEP_LOOPS_AFTER_COMMAND) {
+            loopCount++;
+        } else {        // There was no command in the last few loops, so we can now hande other stuff and sleep a little.
+            handleOtherStuff();         // handle the other stuff, which doesn't need to be called when we're transferring data
+            Utils::sleepMs(1);          // wait 1 ms...
         }
     }
 }
 
-void CCoreThread::handleHdd(uint32_t now, uint8_t* inBuff)
+void CCoreThread::handleOtherStuff(void)
 {
+    static bool initialized = false;
+    static uint32_t nextFloppyEncodingCheck = 0;
+    static uint32_t getHwInfoTimeout = 0;
+    static uint32_t nextHousekeeping = 0;
+    static bool shouldCheckHansFranzAlive = false;
+    static uint32_t hansFranzAliveCheckTime = 0;
+
+    if(!initialized) {          // timers and flags not initialized yet?
+        initialized = true;
+
+        nextFloppyEncodingCheck = Utils::getEndTime(1000);
+        getHwInfoTimeout = Utils::getEndTime(3000);         // create a time when we already should have info about HW, and if we don't have that by that time, then fail
+        nextHousekeeping = Utils::getEndTime(1000);
+
+        shouldCheckHansFranzAlive = true;                   // when true and the 15 second timeout since start passed, check for Hans and Franz being alive
+        hansFranzAliveCheckTime = Utils::getEndTime(15000); // get the time when we should check if Hans and Franz are alive
+
+        flags.gotHansFwVersion  = false;
+        flags.gotFranzFwVersion = false;
+
+        if(flags.noFranz) {                                 // if running without Franz, pretend we got his FW version
+            flags.gotFranzFwVersion = true;
+        }
+
+        if(flags.noReset) {                                 // if we're debugging Hans or Franz (noReset is set to true), don't do this alive check
+            shouldCheckHansFranzAlive = false;
+        }
+
+        Debug::out(LOG_DEBUG, "Will check for Hans and Franz alive: %s", (shouldCheckHansFranzAlive ? "yes" : "no") );
+    }
+
+    uint32_t now = Utils::getCurrentMs();
+
+    if(events.insertSpecialFloppyImageId != 0) {            // very stupid way of letting web IF to insert special image
+        insertSpecialFloppyImage(events.insertSpecialFloppyImageId);
+        events.insertSpecialFloppyImageId = 0;
+    }
+
+    // if should just get the HW version and HDD interface, but timeout passed, quit
+    if(flags.getHwInfo && now >= getHwInfoTimeout) {
+        showHwVersion();                                            // show the default HW version
+        sigintReceived = 1;                                         // quit
+    }
+
+    if(now >= lastFwInfoTime.nextDisplay) {
+        lastFwInfoTime.nextDisplay  = Utils::getEndTime(1000);
+        displayStatusToConsole(now);
+    }
+
+    // minor house-keeping tasks might be launched here, just be sure they take little time to finish
+    if(now >= nextHousekeeping) {
+        nextHousekeeping = Utils::getEndTime(1000);
+
+        configStream->houseKeeping(now);
+    }
+
+    // should we check if Hans and Franz are alive?
+    if(shouldCheckHansFranzAlive) {
+        if(now >= hansFranzAliveCheckTime) {                            // did enough time pass since the Hans and Franz reset?
+            if(!flags.gotHansFwVersion || !flags.gotFranzFwVersion) {   // if don't have version from Hans or Franz, then they're not alive
+                // Removed flashing first FW when the chips don't reply -- something this detection goes bad,
+                // and this resulted in writing FW to chips even if it was not needed. Now this possible action will be left for
+                // user manual launch (to avoid automatic writing FW over and over again if it won't help).
+
+                Debug::out(LOG_INFO, "No answer from Hans or Franz, will quit app, hopefully app restart will solve this.");
+                Debug::out(LOG_INFO, "If not, and this will happen in a loop, consider writing chips firmware again.");
+                sigintReceived = 1;
+            } else {
+                Debug::out(LOG_DEBUG, "Got answers from both Hans and Franz :)");
+            }
+
+            shouldCheckHansFranzAlive = false;                      // don't check this again
+        }
+    }
+
+    if(now >= nextFloppyEncodingCheck) {
+        nextFloppyEncodingCheck = Utils::getEndTime(1000);
+
+        //if(prevFloppyEncodingRunning && !ImageSilo::getFloppyEncodingRunning()) {   // if floppy encoding was running, but not it's not running
+            if(newFloppyImageLedAfterEncode != -2) {                                // if we should set the new newFloppyImageLed after encoding is done
+                setEnabledFloppyImgs    = true;
+                setNewFloppyImageLed    = true;
+                newFloppyImageLed       = newFloppyImageLedAfterEncode;
+
+                newFloppyImageLedAfterEncode = -2;
+            }
+        //}
+        //prevFloppyEncodingRunning = ImageSilo::getFloppyEncodingRunning();
+    }
+}
+
+bool CCoreThread::handleHdd(uint8_t* inBuff)
+{
+    bool isAcsiCommand = false;
+    uint32_t now = Utils::getCurrentMs();
+
     switch(inBuff[3]) {
         case ATN_FW_VERSION:
             statuses.hans.aliveTime = now;
             statuses.hans.aliveSign = ALIVE_FWINFO;
 
-            lastFwInfoTime.hans = Utils::getCurrentMs();
+            lastFwInfoTime.hans = now;
             handleFwVersion_hans();
             break;
 
         case ATN_ACSI_COMMAND:
+            isAcsiCommand = true;
+
             dbgVars.isInHandleAcsiCommand = 1;
 
             statuses.hdd.aliveTime  = now;
@@ -307,10 +335,15 @@ void CCoreThread::handleHdd(uint32_t now, uint8_t* inBuff)
         Debug::out(LOG_ERROR, "CCoreThread received weird ATN code %02x waitForATN()", inBuff[3]);
         break;
     }
+
+    return isAcsiCommand;
 }
 
-void CCoreThread::handleFdd(uint32_t now, uint8_t* inBuff)
+bool CCoreThread::handleFdd(uint8_t* inBuff)
 {
+    bool isFddCommand = false;
+    uint32_t now = Utils::getCurrentMs();
+
     switch(inBuff[3]) {
     case ATN_FW_VERSION:                    // device has sent FW version
         statuses.franz.aliveTime = now;
@@ -321,6 +354,8 @@ void CCoreThread::handleFdd(uint32_t now, uint8_t* inBuff)
         break;
 
     case ATN_SECTOR_WRITTEN:                // device has sent written sector data
+        isFddCommand = true;
+
         statuses.fdd.aliveTime   = now;
         statuses.fdd.aliveSign   = ALIVE_WRITE;
 
@@ -331,6 +366,8 @@ void CCoreThread::handleFdd(uint32_t now, uint8_t* inBuff)
         break;
 
     case ATN_SEND_TRACK:                    // device requests data of a whole track
+        isFddCommand = true;
+
         statuses.franz.aliveTime = now;
         statuses.franz.aliveSign = ALIVE_READ;
 
@@ -344,6 +381,8 @@ void CCoreThread::handleFdd(uint32_t now, uint8_t* inBuff)
         Debug::out(LOG_ERROR, "CCoreThread received weird ATN code %02x waitForATN()", inBuff[3]);
         break;
     }
+
+    return isFddCommand;
 }
 
 void CCoreThread::displayStatusToConsole(uint32_t now)
@@ -355,8 +394,8 @@ void CCoreThread::displayStatusToConsole(uint32_t now)
     load.calculate();                                           // calculate load
 
     if(load.suspicious) {                                       // load is suspiciously high?
-        Debug::out(LOG_DEBUG, ">>> Suspicious core cycle load -- cycle time: %4d ms, load: %3d %%", load.cycle.total, load.loadPercents);
-        printf(">>> Suspicious core cycle load -- cycle time: %4d ms, load: %3d %%\n", load.cycle.total, load.loadPercents);
+        Debug::out(LOG_DEBUG, ">>> Suspicious core cycle load -- load: %3d %%", load.loadPercents);
+        printf(">>> Suspicious core cycle load -- load: %3d %%\n", load.loadPercents);
 
         lastFwInfoTime.hansResetTime    = now;
         lastFwInfoTime.franzResetTime   = now;

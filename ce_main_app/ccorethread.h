@@ -55,7 +55,7 @@ private:
     AcsiIDinfo      acsiIdInfo;
     RetryModule     *retryMod;
 
-    void handleHdd(uint32_t now, uint8_t* inBuff);
+    bool handleHdd(uint8_t* inBuff);
     void handleAcsiCommand(uint8_t *bufIn);
     void handleConsoleAppsStream(uint8_t *cmd);
 
@@ -83,7 +83,7 @@ private:
     int                 newFloppyImageLed;
     int                 newFloppyImageLedAfterEncode;
 
-    void handleFdd(uint32_t now, uint8_t* inBuff);
+    bool handleFdd(uint8_t* inBuff);
     void handleSendTrack(uint8_t *inBuf);
     void handleSectorWritten(void);
 
@@ -104,6 +104,8 @@ private:
 
     void fillDisplayLines(void);
     void displayStatusToConsole(uint32_t now);
+
+    void handleOtherStuff(void);
 };
 
 class LoadTracker {
@@ -145,7 +147,7 @@ public:
     }
 
     void clear(void) {      // call this on the start of new 1 second interval to clear everything
-        loadPercents= 0;
+        loadPercents = 0;
         suspicious  = false;
 
         cycle.total = 0;
