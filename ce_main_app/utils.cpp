@@ -817,6 +817,7 @@ void Utils::toUpperCaseString(std::string &st)
 void Utils::loadDotEnv(void)
 {
     /* try to load .env from multiple locations in their priority order */
+    loadDotEnvFrom("/etc/ce.env");                  // load the one which will never be overwritten by update
 
     bool good = false;
     good = loadDotEnvFrom("/ce/services/.env");     // try to load from main location

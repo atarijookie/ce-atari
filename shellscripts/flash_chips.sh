@@ -17,21 +17,45 @@ read_from_file()
   [ -f "$1" ] && cat $1 || echo $2
 }
 
+get_chip_interface()
+{
+  unset ci
+  . /etc/ce.env 2> /dev/null    # try to source this env file, which could hold 'ci=4' for chip interface v4
+
+  [ "$ci" = "4" ] && echo "4" && return    # if ci=4, we can return 4 and return
+
+  echo "1"    # in other cases just assume chip interface v1/v2
+}
+
 should_update_chip()
 {
   # $1 - chip name - e.g. hans / franz / xilinx
   # $2 - flash_all - if '1', then should flash all chips
   # $3 - flash_xilinx - additional flag for just xilinx flashing
 
-  ([ "$2" = "1" ] || [ "$3" = "1" ]) && ( printf "should flash %-8s: 1\n" "$1" 1>&2 ) && echo "1" && return    # if flash all or flash xilinx, then flash this
+  ver_curr=0
+  ver_new=0
 
-  [ "$1" = "xilinx" ] && postfix='_used' || postfix=''    # for xilinx chip use this postfix in the new version file
+  ci=$( get_chip_interface )
 
-  ver_curr=$( read_from_file /ce/update/$1.current 0 )
-  ver_new=$( read_from_file /ce/update/${1}${postfix}.version 1 )
+  # if this is chip interface v4, device has only Franz, and we're not asking for Franz, so don't update...
+  if [ "$ci" = "4" ] && [ "$1" != "franz" ]; then
+    update=0
+  else      # For v4 and Franz OR v1 and any chip the rest logic applies
+    # for xilinx chip use this postfix in the new version file
+    [ "$1" = "xilinx" ] && postfix='_used' || postfix=''
 
-  # should flash if got different version
-  [ "$ver_new" != "$ver_curr" ] && update=1 || update=0
+    ver_curr=$( read_from_file /ce/update/$1.current 0 )
+    ver_new=$( read_from_file /ce/update/${1}${postfix}.version 1 )
+
+    # if flash-all or flash xilinx, then flash this
+    if [ "$2" = "1" ] || [ "$3" = "1" ]; then
+      update=1
+    else  # not flash_all and not flash_xilinx, should flash if got different version
+      [ "$ver_new" != "$ver_curr" ] && update=1 || update=0
+    fi
+  fi
+
   printf "should flash %-8s: $update (new: $ver_new, current: $ver_curr)\n" "$1" 1>&2
   echo "$update"
 }

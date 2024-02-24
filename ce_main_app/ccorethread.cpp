@@ -231,10 +231,12 @@ void CCoreThread::handleOtherStuff(void)
         flags.gotFranzFwVersion = false;
 
         if(flags.noFranz) {                                 // if running without Franz, pretend we got his FW version
+            Debug::out(LOG_DEBUG, "noFranz: %d", flags.noFranz);
             flags.gotFranzFwVersion = true;
         }
 
         if(flags.noReset) {                                 // if we're debugging Hans or Franz (noReset is set to true), don't do this alive check
+            Debug::out(LOG_DEBUG, "noReset: %d", flags.noReset);
             shouldCheckHansFranzAlive = false;
         }
 

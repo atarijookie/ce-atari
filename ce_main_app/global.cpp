@@ -13,6 +13,8 @@ std::string PATH_CE_DD_BS_L2;
 std::string PATH_CE_DD_PRG_PATH_AND_FILENAME;
 std::string CONFIG_DRIVE_PATH;
 
+extern TFlags flags;
+
 void preloadGlobalsFromDotEnv(void)
 {
     corePath = Utils::dotEnvValue("CORE_SERVICE_PATH");     // path to where the core service is stored
@@ -32,4 +34,12 @@ void preloadGlobalsFromDotEnv(void)
     Debug::out(LOG_DEBUG, "CORE_SERVICE_PATH: %s", corePath.c_str());
     Debug::out(LOG_DEBUG, "driversPath      : %s", driversPath.c_str());
     Debug::out(LOG_DEBUG, "CONFIG_DRIVE_PATH: %s", CONFIG_DRIVE_PATH.c_str());
+
+    // chip interface could be specified in env vars to set it permanently
+    std::string chipInterface = Utils::dotEnvValue("ci", "-1");
+    int ci = atoi(chipInterface.c_str());
+    if(ci != -1) {      // not the default value?
+        Debug::out(LOG_DEBUG, "Using chip interface value from env: %d", ci);
+        flags.chipInterface = ci;
+    }
 }

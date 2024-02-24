@@ -98,6 +98,9 @@ int main(int argc, char *argv[])
         return 0;
     }
 
+    Debug::out(LOG_INFO, "logLevel: %d, chipInterface: %d, justDoReset: %d, noReset: %d, test: %d, noFranz: %d, noCapture: %d",
+        flags.logLevel, flags.chipInterface, flags.justDoReset, flags.noReset, flags.test, flags.noFranz, flags.noCapture);
+
     //------------------------------------------------------------
     // Opening of chip interface.
 
