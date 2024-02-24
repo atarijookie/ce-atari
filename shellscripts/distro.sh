@@ -5,7 +5,8 @@
 
 echoerr() { echo "$@" 1>&2; }
 
-DISTRO=$( getdotenv.sh DISTRO "" )
+[ ! -f /ce/services/.env ] && echo ".env file not found!" && exit 1
+. /ce/services/.env       # source env variables
 
 # no DISTRO from .env file? fail
 if [ -z "$DISTRO" ]; then

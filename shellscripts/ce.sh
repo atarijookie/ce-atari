@@ -14,6 +14,9 @@ if [ $(id -u) != 0 ]; then
   exit 0
 fi
 
+[ ! -f /ce/services/.env ] && echo ".env file not found!" && exit 1
+. /ce/services/.env       # source env variables
+
 # if symlink to this script for users doesn't exist, create it
 if [ ! -L /usr/local/bin/ce ]; then
     ln -fs $0 /usr/local/bin/ce
@@ -21,10 +24,6 @@ fi
 
 # get and create data and log dirs as we will need them during the apps start
 PATH=$PATH:/ce/update     # add our update folder to path so we can use relative paths when referencing our scripts
-
-DATA_DIR=$( getdotenv.sh DATA_DIR "" )
-LOG_DIR=$( getdotenv.sh LOG_DIR "" )
-SETTINGS_DIR=$( getdotenv.sh SETTINGS_DIR "" )
 
 mkdir -p $DATA_DIR
 mkdir -p $LOG_DIR
@@ -60,14 +59,12 @@ start_update()
 {
   if [ "$1" = "upforce" ]; then
     echo "Starting UPDATE with FORCED CHIPS FLASHING!"
-    CE_FLASH_ALL=$( getdotenv.sh CE_FLASH_ALL "" )
     touch "$CE_FLASH_ALL"     # create this file, so ce_update.sh will do flashing in any case
     echo "Created CE_FLASH_ALL file: $CE_FLASH_ALL"
   else
     echo "Starting UPDATE with flashing chips only when needed."
   fi
 
-  CE_UPDATE_TRIGGER=$( getdotenv.sh CE_UPDATE_TRIGGER "" )
   touch "$CE_UPDATE_TRIGGER"
   echo "Created CE_UPDATE_TRIGGER file: $CE_UPDATE_TRIGGER"
   echo "This should trigger CE update within few seconds."

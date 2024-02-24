@@ -6,9 +6,11 @@ if [ $(id -u) != 0 ]; then
   exit 0
 fi
 
+[ ! -f /ce/services/.env ] && echo ".env file not found!" && exit 1
+. /ce/services/.env       # source env variables
+
 # get log path, generate current date and logfile with that date, redirect output to log and console
 PATH=$PATH:/ce/update       # add our update folder to path so we can use relative paths when referencing our scripts
-LOG_DIR=$( getdotenv.sh LOG_DIR "/var/log/ce" )
 NOW=$( date +"%Y%m%d_%H%M%S" )
 LOG_FILE="$LOG_DIR/update_$NOW.log"
 {
@@ -38,7 +40,6 @@ online_file_exists()
 settings_backup()
 {
   # back up current CE settings
-  SETTINGS_DIR=$( getdotenv.sh SETTINGS_DIR "/ce/settings" )
   BACKUP_DIR=/tmp/ce_settings
   echo "backup settings      : $SETTINGS_DIR  =>  $BACKUP_DIR"
 
@@ -49,7 +50,6 @@ settings_backup()
 
 settings_restore()
 {
-  SETTINGS_DIR=$( getdotenv.sh SETTINGS_DIR "/ce/settings" )
   BACKUP_DIR=/tmp/ce_settings
   echo "restore settings     : $BACKUP_DIR  =>  $SETTINGS_DIR"
 
@@ -67,7 +67,7 @@ if [ -f "$UPDATE_PATH_USB" ]; then                # if file was found on some US
   echo "moving update        : $UPDATE_PATH_USB  =>  $UPDATE_LOCAL"
   mv "$UPDATE_PATH_USB" "$UPDATE_LOCAL"
 else                                              # no file from USB, try to fetch it online
-  UPDATE_BASE_URL=$( getdotenv.sh UPDATE_URL "http://joo.kie.sk/cosmosex/update" )
+  UPDATE_BASE_URL=$UPDATE_URL
   UPDATE_URL="$UPDATE_BASE_URL/$DISTRO.zip"       # URL where to get the ZIP file
 
   echo "update source        : internet"
@@ -92,7 +92,6 @@ fi
 settings_backup                         # backup CE settings
 
 # unzip archive
-CE_DIR=$( getdotenv.sh CE_DIR "/ce" )
 unzip -o $UPDATE_LOCAL -d $CE_DIR       # unzip update into /ce directory, overwrite without prompting
 [ $? -ne 0 ] && echo "update fail          : unzip $UPDATE_LOCAL failed!." && rm -f $UPDATE_LOCAL && exit 1  # exit if failed to unzip
 
@@ -101,8 +100,6 @@ echo "delete after unzip   : $UPDATE_LOCAL"
 rm -f $UPDATE_LOCAL
 
 # copy new to current version
-CE_UPDATE_VERSION_NEW=$( getdotenv.sh CE_UPDATE_VERSION_NEW "/tmp/software.version" )                 # path to file containing new version for this distro
-CE_UPDATE_VERSION_CURRENT=$( getdotenv.sh CE_UPDATE_VERSION_CURRENT "/ce/update/software.current" )   # path to file containing current version for this distro
 [ -f "$CE_UPDATE_VERSION_NEW" ] && echo "copy sw version      : $CE_UPDATE_VERSION_NEW  =>  $CE_UPDATE_VERSION_CURRENT" && \
     cp -f "$CE_UPDATE_VERSION_NEW" "$CE_UPDATE_VERSION_CURRENT" && rm -f "$CE_UPDATE_VERSION_NEW"     # if file with new version exist, copy new to current version
 

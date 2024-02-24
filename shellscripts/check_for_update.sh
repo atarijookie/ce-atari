@@ -6,18 +6,15 @@ if [ $(id -u) != 0 ]; then
   exit 0
 fi
 
+[ ! -f /ce/services/.env ] && echo ".env file not found!" && exit 1
+. /ce/services/.env       # source env variables
+
 PATH=$PATH:/ce/update     # add our update folder to path so we can use relative paths when referencing our scripts
 
 # get log path, generate current date and logfile with that date, redirect output to log and console
-LOG_DIR=$( getdotenv.sh LOG_DIR "/var/log/ce" )
 NOW=$( date +"%Y%m%d_%H%M%S" )
 LOG_FILE="$LOG_DIR/update_check_$NOW.log"
 {
-
-# read these .env variables for usage further below
-FILE_UPDATE_STATUS=$( getdotenv.sh FILE_UPDATE_STATUS "" )
-FILE_UPDATE_PENDING_YES=$( getdotenv.sh FILE_UPDATE_PENDING_YES "" )
-FILE_UPDATE_PENDING_NO=$( getdotenv.sh FILE_UPDATE_PENDING_NO "" )
 
 rm -f "$FILE_UPDATE_STATUS" "$FILE_UPDATE_PENDING_YES" "$FILE_UPDATE_PENDING_NO"   # delete update pending answer files
 echo "Checking for update..." | tee "$FILE_UPDATE_STATUS"                 # fill update check status
@@ -77,13 +74,10 @@ UPDATE_PATH_USB=$( check_for_update_usb.sh )
 
 #----------------------------------------------
 # check for update online
-UPDATE_URL=$( getdotenv.sh UPDATE_URL "http://joo.kie.sk/cosmosex/update" )
-CE_DIR=$( getdotenv.sh CE_DIR "/ce" )
-CE_UPDATE_DIR=$( getdotenv.sh CE_UPDATE_DIR "/ce/update" )
 
 # get paths for new version and currrent version files
-UPDATE_VERSION_NEW_LOCAL=$( getdotenv.sh CE_UPDATE_VERSION_NEW "/tmp/software.version" )                 # path to file containing new version for this distro
-UPDATE_VERSION_CURR_LOCAL=$( getdotenv.sh CE_UPDATE_VERSION_CURRENT "/ce/update/software.current" )   # path to file containing current version for this distro
+UPDATE_VERSION_NEW_LOCAL=$CE_UPDATE_VERSION_NEW         # path to file containing new version for this distro
+UPDATE_VERSION_CURR_LOCAL=$CE_UPDATE_VERSION_CURRENT    # path to file containing current version for this distro
 
 UPDATE_VERSION_NEW_URL="$UPDATE_URL/$DISTRO.version"        # url to file containing new version for this distro
 

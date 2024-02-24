@@ -9,6 +9,9 @@
 # to output the value which will be used as result from this script for the calling script.
 echoerr() { echo "$@" 1>&2; }
 
+[ ! -f /ce/services/.env ] && echo ".env file not found!" && exit 1
+. /ce/services/.env       # source env variables
+
 PATH=$PATH:/ce/update     # add our update folder to path so we can use relative paths when referencing our scripts
 DISTRO=$( distro.sh )     # fetch distro name
 
@@ -17,7 +20,6 @@ DISTRO=$( distro.sh )     # fetch distro name
 echoerr "running on distro    : $DISTRO"
 
 # look for update on mounted disks
-DATA_DIR=$( getdotenv.sh DATA_DIR "/var/run/ce/" )
 UPDATE_FILE="$DISTRO.zip"
 echoerr "searching on path    : $DATA_DIR"
 echoerr "searching for file   : $UPDATE_FILE"

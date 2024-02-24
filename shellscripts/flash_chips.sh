@@ -1,5 +1,8 @@
 #!/bin/sh
 
+[ ! -f /ce/services/.env ] && echo ".env file not found!" && exit 1
+. /ce/services/.env       # source env variables
+
 echo "flash_chips          : START"
 
 # This script will compare current and new version of chips firmware versions
@@ -69,8 +72,6 @@ PATH=$PATH:/ce/update     # add our update folder to path so we can use relative
 # check what chips we really need to flash
 
 # turn trigger files into variables and delete those files
-CE_FLASH_ALL=$( getdotenv.sh CE_FLASH_ALL "" )
-CE_FLASH_XILINX=$( getdotenv.sh CE_FLASH_XILINX "" )
 [ -f "$CE_FLASH_ALL" ]    && flash_all=1    || flash_all=0
 [ -f "$CE_FLASH_XILINX" ] && flash_xilinx=1 || flash_xilinx=0
 echo "should flash all     : $flash_all"

@@ -1,5 +1,11 @@
 #!/bin/sh
 
+# check if running as root, and if not, execute this script with sudo
+if [ $(id -u) != 0 ]; then
+  sudo $0 "$@"
+  exit 0
+fi
+
 rm -rf /ce/services/*
 mkdir -p /ce/services
 REPO_PATH='/shared/ce-atari'
@@ -9,7 +15,7 @@ cp -f appviasock/appviasock.elf shellscripts/.env shellscripts/ce.sh \
   /ce/services
 
 cd $REPO_PATH/shellscripts
-cp -f ce_update.sh getdotenv.sh distro.sh check_for_update.sh check_for_update_usb.sh post_install.sh \
+cp -f ce_update.sh distro.sh check_for_update.sh check_for_update_usb.sh post_install.sh \
   flash_chips.sh flash_stm32.sh flash_xilinx.sh \
   /ce/update
 
