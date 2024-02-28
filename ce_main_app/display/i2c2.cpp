@@ -2,50 +2,50 @@
 
 #ifndef ONPC
     #include <bcm2835.h>
-
-    #define PIN_SCL             RPI_V2_GPIO_P1_29
-    #define PIN_SDA             RPI_V2_GPIO_P1_31
 #endif
 
-i2c2::i2c2() : i2c_started(false)
+i2c2::i2c2(uint32_t gpioScl, uint32_t gpioSda)
 {
+    i2c_started = false;
+    this->gpioScl = gpioScl;
+    this->gpioSda = gpioSda;
 }
 
-    bool i2c2::read_SCL() // Set SCL as input and return current level of line, 0 or 1
-    {
+bool i2c2::read_SCL() // Set SCL as input and return current level of line, 0 or 1
+{
 #ifndef ONPC
-        bcm2835_gpio_fsel(PIN_SCL, BCM2835_GPIO_FSEL_INPT);
-        return (bcm2835_gpio_lev(PIN_SCL) == HIGH);
+    bcm2835_gpio_fsel(gpioScl, BCM2835_GPIO_FSEL_INPT);
+    return (bcm2835_gpio_lev(gpioScl) == HIGH);
 #else
-        return true;
+    return true;
 #endif
-    }
+}
 
-    bool i2c2::read_SDA() // Set SDA as input and return current level of line, 0 or 1
-    {
+bool i2c2::read_SDA() // Set SDA as input and return current level of line, 0 or 1
+{
 #ifndef ONPC
-        bcm2835_gpio_fsel(PIN_SDA, BCM2835_GPIO_FSEL_INPT);
-        return (bcm2835_gpio_lev(PIN_SDA) == HIGH);
+    bcm2835_gpio_fsel(gpioSda, BCM2835_GPIO_FSEL_INPT);
+    return (bcm2835_gpio_lev(gpioSda) == HIGH);
 #else
-        return true;
+    return true;
 #endif
-    }
+}
 
-    void i2c2::clear_SCL() // Actively drive SCL signal low
-    {
+void i2c2::clear_SCL() // Actively drive SCL signal low
+{
 #ifndef ONPC
-        bcm2835_gpio_fsel(PIN_SCL, BCM2835_GPIO_FSEL_OUTP);
-        bcm2835_gpio_write(PIN_SCL, LOW);
+    bcm2835_gpio_fsel(gpioScl, BCM2835_GPIO_FSEL_OUTP);
+    bcm2835_gpio_write(gpioScl, LOW);
 #endif
-    }
+}
 
-    void i2c2::clear_SDA() // Actively drive SDA signal low
-    {
+void i2c2::clear_SDA() // Actively drive SDA signal low
+{
 #ifndef ONPC
-        bcm2835_gpio_fsel(PIN_SDA, BCM2835_GPIO_FSEL_OUTP);
-        bcm2835_gpio_write(PIN_SDA, LOW);
+    bcm2835_gpio_fsel(gpioSda, BCM2835_GPIO_FSEL_OUTP);
+    bcm2835_gpio_write(gpioSda, LOW);
 #endif
-    }
+}
 
 void i2c2::arbitration_lost(char *where)
 {

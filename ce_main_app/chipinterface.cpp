@@ -185,7 +185,14 @@ void ChipInterface::setInstanceIndex(int index)
     instanceIndex = index;
 }
 
-int  ChipInterface::getInstanceIndex(void)
+int ChipInterface::getInstanceIndex(void)
 {
     return instanceIndex;
+}
+
+// Get on which GPIO pins the i2c display is. Not real values on base ChipInterface class.
+void ChipInterface::getDisplayGpioSignals(uint32_t& gpioScl, uint32_t& gpioSda)
+{
+    gpioScl = 0;
+    gpioSda = 0;
 }

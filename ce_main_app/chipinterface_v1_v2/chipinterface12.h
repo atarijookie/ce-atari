@@ -63,6 +63,7 @@ public:
     void handleBeeperCommand(int beeperCommand, bool floppySoundEnabled);
     bool handlesDisplay(void);                              // returns true if should handle i2c display from RPi
     void displayBuffer(uint8_t *bfr, uint16_t size);        // send this display buffer data to remote display
+    void getDisplayGpioSignals(uint32_t& gpioScl, uint32_t& gpioSda);   // which GPIO pins are used for i2c display
     //----------------
 private:
     CConSpi *conSpi;

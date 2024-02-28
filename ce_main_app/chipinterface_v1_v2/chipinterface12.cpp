@@ -550,3 +550,15 @@ void ChipInterface12::displayBuffer(uint8_t *bfr, uint16_t size)
 {
     // nothing to do in v1/v2 here, as display is handled locally
 }
+
+// Get on which GPIO pins the i2c display is. Pins valid for ChipInterface v1 and v2.
+void ChipInterface12::getDisplayGpioSignals(uint32_t& gpioScl, uint32_t& gpioSda)
+{
+#ifndef ONPC
+    gpioScl = RPI_V2_GPIO_P1_29;
+    gpioSda = RPI_V2_GPIO_P1_31;
+#else
+    gpioScl = 0;
+    gpioSda = 0;
+#endif
+}

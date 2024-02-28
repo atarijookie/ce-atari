@@ -536,3 +536,15 @@ void ChipInterface4::displayBuffer(uint8_t *bfr, uint16_t size)
     displayDataSize = copySize + 4;                 // how much data should be transfered
     memcpy(displayData + 4, bfr, copySize);         // copy in the data
 }
+
+// Get on which GPIO pins the i2c display is. Pins valid for ChipInterface v4.
+void ChipInterface4::getDisplayGpioSignals(uint32_t& gpioScl, uint32_t& gpioSda)
+{
+#ifndef ONPC
+    gpioScl = RPI_V2_GPIO_P1_05;
+    gpioSda = RPI_V2_GPIO_P1_13;
+#else
+    gpioScl = 0;
+    gpioSda = 0;
+#endif
+}

@@ -24,7 +24,10 @@ SSD1306::SSD1306()
 {
     buffer = new uint8_t[SSD1306_BUFFER_SIZE];
 
-    i2c = (chipInterface && chipInterface->handlesDisplay()) ? new i2c2() : NULL;
+    uint32_t gpioScl, gpioSda;
+    chipInterface->getDisplayGpioSignals(gpioScl, gpioSda);
+
+    i2c = (chipInterface && chipInterface->handlesDisplay()) ? new i2c2(gpioScl, gpioSda) : NULL;
 }
 
 SSD1306::~SSD1306()

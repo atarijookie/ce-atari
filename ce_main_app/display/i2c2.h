@@ -16,7 +16,7 @@ class i2c2
         bool i2c_started;
 
     public:
-        i2c2();
+        i2c2(uint32_t gpioScl, uint32_t gpioSda);
 
     private:
         bool read_SCL(); // Set SCL as input and return current level of line, 0 or 1
@@ -35,25 +35,21 @@ class i2c2
         bool i2c_write_byte(bool send_start, bool send_stop, uint8_t byte);
         uint8_t i2c_read_byte(bool nack, bool send_stop);
 
+        uint32_t gpioScl;
+        uint32_t gpioSda;
     public:
-        // KERNEL-LIKE I2C METHODS
-        //#include <linux/i2c-dev.h> linux/i2c.h
-        // source/drivers/i2c/i2c-core.c
-        //https://www.kernel.org/doc/htmldocs/device-drivers/i2c.html
-
-        // This executes the SMBus “write byte” protocol, returning negative errno else zero on success.
+        // This executes the SMBus write byte protocol, returning negative errno else zero on success.
         int32_t i2c_smbus_write_byte_data(uint8_t i2c_address, uint8_t command, uint8_t value);
 
-        // This executes the SMBus “read byte” protocol, returning negative errno else a data byte received from the device.
+        // This executes the SMBus read byte protocol, returning negative errno else a data byte received from the device.
         int32_t i2c_smbus_read_byte_data(uint8_t i2c_address, uint8_t command);
 
-        // This executes the SMBus “block write” protocol, returning negative errno else zero on success.
+        // This executes the SMBus block write protocol, returning negative errno else zero on success.
         int32_t i2c_smbus_write_i2c_block_data (uint8_t i2c_address, uint8_t command, uint8_t length, const uint8_t * values);
 
-        // This executes the SMBus “block read” protocol, returning negative errno else the number
+        // This executes the SMBus block read protocol, returning negative errno else the number
         // of data bytes in the slave's response.
         int32_t i2c_smbus_read_i2c_block_data (uint8_t i2c_address, uint8_t command, uint8_t length, uint8_t* values);
-
     };
 
 #endif /* I2C_BIT_BANG_H_ */
