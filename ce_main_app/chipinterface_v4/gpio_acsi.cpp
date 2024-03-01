@@ -25,8 +25,8 @@ void GpioAcsi::init(uint8_t hddEnabledIDs, uint8_t sdCardId)
     }
 
     // configure those as outputs
-    int outputs[5] = {INT_TRIG, DRQ_TRIG, FF12D, IN_OE, OUT_OE};
-    int outVals[5] = {LOW,      LOW,      HIGH,  LOW,   HIGH  };
+    int outputs[5] = {INT_TRIG, DRQ_TRIG, FF12D, OUT_OE};
+    int outVals[5] = {LOW,      LOW,      HIGH,  HIGH  };
     for(int i=0; i<5; i++) {
         bcm2835_gpio_fsel(outputs[i],  BCM2835_GPIO_FSEL_OUTP);
         bcm2835_gpio_write(outputs[i], outVals[i]);
@@ -289,9 +289,10 @@ void GpioAcsi::setDataDirection(uint8_t sendNotRecv)
     sendNotRecvNow = sendNotRecv;           // remember what we're just setting
 
 #ifndef ONPC
-    // stop output of both bus transcievers
-    bcm2835_gpio_write(IN_OE, HIGH);
-    bcm2835_gpio_write(OUT_OE, HIGH);
+    // if output from RPi, set OUT_OE to L before switching RPi pins directions
+    if(sendNotRecv == DIR_SEND) {
+        bcm2835_gpio_write(OUT_OE, LOW);
+    }
 
     // set RPi GPIO pins as outputs / inputs
     uint32_t dir = (sendNotRecv == DIR_SEND) ? BCM2835_GPIO_FSEL_OUTP : BCM2835_GPIO_FSEL_INPT;
@@ -300,8 +301,10 @@ void GpioAcsi::setDataDirection(uint8_t sendNotRecv)
         bcm2835_gpio_fsel(dataPins[i],  dir);
     }
 
-    // enable only 1 transciever
-    bcm2835_gpio_write((sendNotRecv == DIR_SEND) ? OUT_OE : IN_OE, LOW);
+    // if input to RPi, set OUT_OE to H after switching RPi pins directions
+    if(sendNotRecv == DIR_RECV) {
+        bcm2835_gpio_write(OUT_OE, HIGH);
+    }
 #endif
 }
 

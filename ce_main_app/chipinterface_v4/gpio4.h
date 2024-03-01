@@ -33,7 +33,6 @@
 #define DRQ_TRIG    RPI_V2_GPIO_P1_33
 #define FF12D       RPI_V2_GPIO_P1_29
 #define EOT         RPI_V2_GPIO_P1_32
-#define IN_OE       RPI_V2_GPIO_P1_05
 #define OUT_OE      RPI_V2_GPIO_P1_07
 #define DATA0       RPI_V2_GPIO_P1_36
 #define DATA1       RPI_V2_GPIO_P1_11
