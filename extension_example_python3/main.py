@@ -193,8 +193,7 @@ def handleRawData(data):
 
 
 # Handle JSON message from CE - used for calling exported functions (even the raw ones).
-# RAW WRITE message will have raw_write in message set to something that evals as true, 
-# then the previously raw binary data will be appended to arguments.
+# When RAW WRITE message is received, then the previously raw binary data will be appended to arguments.
 def handleJsonMessage(data):
     data = remove_trailing_zeros(data)              # JSON message must not contain trailing zero in data
 

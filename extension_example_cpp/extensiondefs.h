@@ -91,20 +91,9 @@ typedef struct
     uint8_t returnValueType;                        // one of RESP_TYPE_*
 } __attribute__((packed)) ReceivedSignature;
 
-/*
-    This is the binary signature we will send to ST.
-*/
-typedef struct
-{
-    uint8_t index;
-    uint8_t nameHash[2];
-    uint8_t funcType;                               // one of FUNC_*
-    uint8_t argumentsCount;
-    uint8_t argumentTypes[MAX_FUNCTION_ARGUMENTS];  // contains TYPE_* values
-    uint8_t returnValueType;                        // one of RESP_TYPE_*
-} __attribute__((packed)) BinarySignatureForST;
 
-#define MAX_BINARY_SIGNATURE_RESPONSE_SIZE  (MAX_EXPORTED_FUNCTIONS * sizeof(BinarySignatureForST))
+#define RESPONSE_HEADER_SIZE    (38)
+#define MAX_RESPONSE_DATA_SIZE  (EXT_BUFFER_SIZE - RESPONSE_HEADER_SIZE)
 
 /*
     The format of the response from extension on function call.
@@ -115,10 +104,16 @@ typedef struct
     char    functionName[MAX_FUNCTION_NAME_LEN];    // function that this is a response to
     uint8_t statusByte;                             // status byte
     uint8_t dataLen[4];                             // length of data
-    uint8_t data;                                   // data starts here, should have length of dataLen
+    uint8_t data[MAX_RESPONSE_DATA_SIZE];           // data starts here, should have length of dataLen
 } __attribute__((packed)) ResponseFromExtension;
 
-#define EXT_MUTEX_LOCK      ExtensionHandler::mutexLock(__FILE__, __LINE__);
-#define EXT_MUTEX_UNLOCK    ExtensionHandler::mutexUnlock(__FILE__, __LINE__);
+typedef struct
+{
+    void* pFunc;
+    char name[MAX_FUNCTION_NAME_LEN];
+} ExportedFunctionNameToPointer;
+
+extern uint8_t latestData[EXT_BUFFER_SIZE];         // will hold received binary data and raw data
+extern uint32_t latestDataLen;
 
 #endif
