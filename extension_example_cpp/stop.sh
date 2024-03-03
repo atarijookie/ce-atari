@@ -11,12 +11,12 @@ if [ -f "$PID_FILE" ]; then     # if PID file exist
 
     if ps -p $PID > /dev/null 2>&1; then        # pid running?
         echo "Will now terminate PID" $PID
-        kill -15 $PID           # ask extension to terminate and wait a while
+        pkill -15 -P $PID       # ask extension to terminate and wait a while (pkill to match parent process and children)
         sleep 1
 
         if ps -p $PID > /dev/null 2>&1; then    # pid STILL running?
             echo "Will force terminate PID" $PID
-            kill -9 $PID            # force termination
+            pkill -9 -P $PID    # force termination (pkill to match parent process and children)
             echo "PID now terminated."
         fi
     else
