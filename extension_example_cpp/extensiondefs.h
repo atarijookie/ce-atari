@@ -92,8 +92,9 @@ typedef struct
 } __attribute__((packed)) ReceivedSignature;
 
 
-#define RESPONSE_HEADER_SIZE    (38)
-#define MAX_RESPONSE_DATA_SIZE  (EXT_BUFFER_SIZE - RESPONSE_HEADER_SIZE)
+
+#define RESPONSE_HEADER_SIZE    (38)                // The size of ResponseFromExtension without the data[] field
+#define MAX_RESPONSE_DATA_SIZE  (EXT_BUFFER_SIZE - RESPONSE_HEADER_SIZE)    // how big can the data[] field be
 
 /*
     The format of the response from extension on function call.

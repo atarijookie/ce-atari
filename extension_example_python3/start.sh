@@ -7,6 +7,9 @@
 #   $2 - extension id - id (index) under which the CE core has this extension stored
 #
 
+EXT_NAME=extension_example          # <<< CHANGE THIS IN YOUR OWN EXTENSION TO SOMETHING ELSE
+PID_FILE=/tmp/${EXT_NAME}.pid
+
 # Find out where this start script it located and change to that directory.
 # We need to do this because if this script is called from CE core or TaskQ, it may be
 # having different current directory and then finding stop script or main.py won't work.

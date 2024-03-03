@@ -14,12 +14,16 @@ void no_in_no_out(json args, ResponseFromExtension* resp)
 // Function with 1 in argument, returned back as status byte.
 void one_in_one_out(json args, ResponseFromExtension* resp)
 {
+    printf("one_in_one_out was called\n");
+
     resp->statusByte = args.at(0);
 }
 
 // Add two numbers together, store the result in buffer.
 void sum_of_two(json args, ResponseFromExtension* resp)
 {
+    printf("sum_of_two was called\n");
+
     int16_t a = args.at(0);         // 0th argument
     int16_t b = args.at(1);         // 1st argument
     int32_t sum = a + b;            // add those together
@@ -31,6 +35,8 @@ void sum_of_two(json args, ResponseFromExtension* resp)
 // String going in, being reversed and returned as binary data buffer
 void reverse_str(json args, ResponseFromExtension* resp)
 {
+    printf("reverse_str was called\n");
+
     std::string str = args.at(0);               // input string as 0th argument 
 
     std::reverse(str.begin(), str.end());       // reverse it
@@ -42,6 +48,8 @@ void reverse_str(json args, ResponseFromExtension* resp)
 // Path supplied will be returned as path again.
 void fun_path_in(json args, ResponseFromExtension* resp)
 {
+    printf("fun_path_in was called\n");
+
     std::string str = args.at(0);               // get 0th argument
     strcpy((char*) resp->data, str.c_str());    // copy it to response buffer
 
@@ -57,6 +65,8 @@ RAW WRITE always sends:
 */
 void raw_data_in(json args, ResponseFromExtension* resp)
 {
+    printf("raw_data_in was called\n");
+
     uint8_t a = args.at(0);     // 0th argument - cmd4 (uint8_t)
     uint8_t b = args.at(1);     // 1st argument - cmd5 (uint8_t)
 
@@ -79,6 +89,8 @@ RAW WRITE always sends:
 */
 void raw_data_out(json args, ResponseFromExtension* resp)
 {
+    printf("raw_data_out was called\n");
+
     uint8_t count = args.at(0);     // 0th argument - cmd4 - count of items that should be placed on buffer
     uint8_t value = args.at(1);     // 1st argument - cmd5 - value that should be placed on buffer count-times
 

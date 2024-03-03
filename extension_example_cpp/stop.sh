@@ -3,7 +3,8 @@
 # This script is used to stop running extension based on the PID stored in file.
 #
 
-PID_FILE=/tmp/extension_example_c.pid
+EXT_NAME=extension_example_c    # <<< CHANGE THIS IN YOUR OWN EXTENSION TO SOMETHING ELSE
+PID_FILE=/tmp/${EXT_NAME}.pid
 
 if [ -f "$PID_FILE" ]; then     # if PID file exist
     PID=$( cat $PID_FILE )

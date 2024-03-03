@@ -1,24 +1,25 @@
-#include <stdio.h>
-#include <string.h>
-#include <string>
-#include <signal.h>
-#include <stdlib.h>
-#include <pthread.h>
 #include <unistd.h>
-#include <queue>
-#include <sys/file.h>
-#include <errno.h>
-#include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/stat.h>
-#include <limits.h>
 
 #include "extensiondefs.h"
 #include "main.h"
 #include "functions.h"
 #include "json.h"
+
+/*
+This is an CosmosEx extension example in C++.
+You can base your own extension based on this example, you just need to change
+EXTENSION_NAME and also define your exported functions in functions.cpp file.
+No other changes to this file are not needed (unless you need something special).
+
+EXTENSION_NAME should match the directory name of this extension, so CE core will know
+where to look for start.sh and stop.sh scripts.
+
+Jookie, 2024
+*/
 
 volatile sig_atomic_t shouldStop = 0;
 using json = nlohmann::json;
@@ -92,17 +93,22 @@ int main(int argc, char *argv[])
             continue;
         }
 
+        bfr[recvCnt] = 0;           // zero terminate the received data)
+
         printf("received size: %d\n", (int) recvCnt);
+        // printf("received data: %s\n", bfr);  // show all the received data as-is on console
 
         if(bfr[0] == 'D' && bfr[1] == 'A') {    // data starting with 'DA' - it's raw data
             handleRawData(bfr);
         } else if(bfr[0] == '{') {              // data starting with '{' - it's JSON message
             handleJsonMessage(bfr);
-        } else {        // some other start of packet, ignore it
+        } else {                    // some other start of packet, ignore it
             printf("unknown message start, ignoring message");
             continue;
         }
     }
+
+    sendClosedNotification();       // tell the CE core that we're closing
 
     close(sock);
     printf("Terminated...\n");
@@ -145,11 +151,11 @@ bool sendDataToSocket(const char* socketPath, const uint8_t* data, uint32_t data
 	int sockFd = socket(AF_UNIX, SOCK_DGRAM, 0);
 
 	if (sockFd < 0) {   // if failed to create socket
-	    printf("ExtensionHandler::sendDataToSocket: failed to create socket - errno: %d\n", errno);
+	    printf("sendDataToSocket: failed to create socket - errno: %d\n", errno);
 	    return false;
 	}
 
-    printf("ExtensionHandler::sendDataToSocket: opened socket %s\n", socketPath);
+    // printf("sendDataToSocket: opened socket %s\n", socketPath);
 
     struct sockaddr_un addr;
     strcpy(addr.sun_path, socketPath);
@@ -159,9 +165,9 @@ bool sendDataToSocket(const char* socketPath, const uint8_t* data, uint32_t data
     int res = sendto(sockFd, data, dataLen, 0, (struct sockaddr *) &addr, sizeof(struct sockaddr_un));
 
     if(res < 0) {       // if failed to send
-	    printf("ExtensionHandler::sendDataToSocket: sendto failed - errno: %d\n", errno);
+	    printf("sendDataToSocket: sendto failed - errno: %d\n", errno);
     } else {
-        printf("ExtensionHandler::sendDataToSocket: %d bytes of data sent\n", dataLen);
+        // printf("sendDataToSocket: %d bytes of data sent\n", dataLen);
     }
 
     close(sockFd);
@@ -208,6 +214,8 @@ void functionSignatureToBytes(const char* name, uint8_t fun_type, uint8_t* argum
 // Function to formulate response in expected format and send it to CE core.
 void sendResponse(const char* funName, uint8_t status, uint8_t* data, uint32_t dataLen)
 {
+    printf("sendResponse - funName: %s, status: %d, dataLen: %d\n", funName, status, dataLen);
+
     ResponseFromExtension resp;
     responseInit(&resp, funName);
     responseStoreStatusAndDataLen(&resp, status, dataLen);
@@ -237,7 +245,7 @@ void responseStoreDataLen(ResponseFromExtension* resp, uint32_t dataLen)
 
 void responseInit(ResponseFromExtension* resp, const char* funName)
 {
-    memset(&resp, 0, RESPONSE_HEADER_SIZE);                         // clear the reponse header
+    memset(resp, 0, RESPONSE_HEADER_SIZE);                          // clear the reponse header
     resp->extensionId = extensionId;                                // extension id
     strncpy(resp->functionName, funName, MAX_FUNCTION_NAME_LEN);    // function name
 }
@@ -304,7 +312,8 @@ void sendExportedFunctionsTable(void)
     char* pBeyondFuncs = (char*) (outBuffer + exportedFunctionsSizeInBytes);    // pointer to place beyond the exported functions
     strncpy(pBeyondFuncs, IN_SOCKET_PATH, MAX_SOCKET_PATH);     // copy in socket path beyond the exported functions
 
-    sendResponse("CEX_FUN_OPEN", exportedFunctionsCount, outBuffer, BUFFER_SIZE);     // exported functions count instead of OK status
+    uint32_t openRespLen = exportedFunctionsSizeInBytes + strlen(IN_SOCKET_PATH) + 1;
+    sendResponse("CEX_FUN_OPEN", exportedFunctionsCount, outBuffer, openRespLen);   // exported functions count instead of OK status
 }
 
 void sendClosedNotification(void)
@@ -343,8 +352,8 @@ void handleJsonMessage(uint8_t* bfr)
         return;
     }
 
-    std::string s = data.dump();
-    printf("received json message: %s\n", s.c_str());
+    // std::string s = data.dump();
+    // printf("received json message: %s\n", s.c_str());    // show received json message after parsing
 
     if(!data.contains("function")) {    // the function name must be present in received json message
         printf("'function' missing in received message.\n");
@@ -384,15 +393,23 @@ void handleJsonMessage(uint8_t* bfr)
     ResponseFromExtension resp;             // response will be stored here
     responseInit(&resp, funName.c_str());   // init header, copy name in
 
-    printf("calling extension function '%s'", funName.c_str());
+    printf("calling extension function '%s'\n", funName.c_str());
 
-    // call the function
-    if(data.contains("args")) {             // if args are present in JSON, use them
-        ((ExportedFunction_t*) pFunc) (data["args"], &resp);
-    } else {                                // args are not in JSON, use empty array instead of them
-        json emptyArray;
-        ((ExportedFunction_t*) pFunc) (emptyArray, &resp);
+    json emptyArray;
+    json args = data.contains("args") ? data["args"] : emptyArray;      // if args are present in JSON, use them; otherwise use empty array
+
+    // In case there are some function arguments missing, we're just adding zero arguments instead of them.
+    // We could also reject the message in this case, but it might be more helpful to help getting the message through.
+    // But do warn that this happened, as this might cause other issues.
+    int missingArgs = sign->argumentsCount - args.size();
+    if(missingArgs > 0) {                   // some args are missing compared to expected args count from signature?
+        printf("the received message is missing %d arguments, padding with zeros\n", missingArgs);  // at least warn that this happened
+        for(int i=0; i<missingArgs; i++) {  // fill missing args with zeros
+            args.push_back(0);
+        }
     }
+
+    ((ExportedFunction_t*) pFunc) (args, &resp);    // call the function
 
     if(is_raw_write) {                      // if this is a RAW WRITE, we always return just status (never data)
         responseStoreDataLen(&resp, 0);
