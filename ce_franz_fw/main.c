@@ -51,11 +51,10 @@ BYTE franzMode = FRANZ_MODE_V1_V2;      // starting in the v1/v2 mode
 BYTE soundOn   = FALSE;                 // not using sound by default
 
 BYTE buttonPressed = FALSE;
-BYTE buttonPressedPrev = FALSE;
-WORD buttonTimeDown = 0;
 
 BYTE sendShutdownRequest = FALSE;
 WORD shutdownStart = 0;
+void setMode(BYTE newFranzMode, BYTE newSoundOn);
 
 void trackRequest(BYTE forceRequest) 
 {
@@ -86,9 +85,9 @@ void trackRequest(BYTE forceRequest)
 
 void beeperOff(void)
 {
-    if(franzMode == FRANZ_MODE_V4) {            // touch pin only in Franz mode v4
+  if(franzMode == FRANZ_MODE_V4) {            // touch pin only in Franz mode v4
         GPIOB->BRR = BEEPER;
-    }
+  }
 }
 
 void beeperToggle(BYTE isFloppySound)
@@ -125,11 +124,14 @@ void beeperOn(BYTE isFloppySound)
 void handleButton(void)
 {
     static WORD lastHandleTime = 0;
-    WORD timeSinceShutdownRequest;
+    WORD timeSinceShutdownRequest = 0;
+    static WORD timeSinceShutdownRequestPrev = 0;
     BYTE isInShutdownTimeInterval = 0;
     WORD timeNow = TIM4->CNT;
     WORD diff;
-    WORD pressDuration;
+    WORD pressDurationDs;
+    static BYTE buttonPressedPrev = FALSE;
+    static WORD buttonTimeDown = 0;
 
     // handle button only every 100 ms (don't handle too often)
     diff = timeNow - lastHandleTime;
@@ -138,9 +140,9 @@ void handleButton(void)
     }
     lastHandleTime = timeNow;   // we're handling it now
 
-    pressDuration = timeNow - buttonTimeDown;  // how long the button is pressed
-    pressDuration = pressDuration >> 1;             // 1 tick is 0.5 ms, convert them to ms by dividing by 2
-    isInShutdownTimeInterval = (pressDuration >= PWR_OFF_PRESS_TIME_MIN) && (pressDuration < PWR_OFF_PRESS_TIME_MAX);  // if press length is in the 'power off' interval
+    pressDurationDs = timeNow - buttonTimeDown;  // how long the button is pressed
+    pressDurationDs = pressDurationDs / 200;        // 1 tick is 0.5 ms, convert them to ms by dividing by 2, and covert to deciseconds (1/10ths of second)
+    isInShutdownTimeInterval = (pressDurationDs >= PWR_OFF_PRESS_TIME_MIN) && (pressDurationDs < PWR_OFF_PRESS_TIME_MAX);  // if press length is in the 'power off' interval
 
     buttonPressed = (GPIOA->IDR & BTN) == BTN;      // get button bit, pressed if H
 
@@ -161,6 +163,17 @@ void handleButton(void)
         }
     }
 
+    // is the button press on recovery-level boundary? short beep
+    if(buttonPressed) {
+        if(pressDurationDs == 50 || pressDurationDs == 100 || pressDurationDs == 150) {     // at 5.0 s, 10.0 s and 15.0 - beeper on
+            beeperOn(0);
+        }
+    }
+
+    if(pressDurationDs == 51 || pressDurationDs == 101 || pressDurationDs == 151) {     // at 5.1 s, 10.1 s and 15.1 - beeper off, even if button not pressed anymore
+        beeperOff();
+    }
+
     // button pressed - handle long press
     if(buttonPressed && isInShutdownTimeInterval) { // pressed and in shutdown interval?
         beeperToggle(0);
@@ -171,8 +184,17 @@ void handleButton(void)
         timeSinceShutdownRequest = timeNow - shutdownStart;         // ticks since shutdown start
         timeSinceShutdownRequest = timeSinceShutdownRequest / 2000; // seconds since shutdown start
 
+        // if another second passed (previous seconds and this seconds don't match), beep for 100 ms
+        if(timeSinceShutdownRequestPrev != timeSinceShutdownRequest) {
+            beeperOn(0);
+        } else {
+            beeperOff();
+        }
+
+        timeSinceShutdownRequestPrev = timeSinceShutdownRequest;    // remember the current time since shutdown request
+
         if(timeSinceShutdownRequest >= PWR_OFF_AFTER_REQUEST) {     // enough time passed since shutdown request?
-            GPIOB->BSRR = DEVICE_OFF_H;                             // set DEVICE_OFF_H to H - to turn off device now
+            GPIOB->BRR = DEVICE_OFF_L;                              // set DEVICE_OFF_L to L - to turn off device now
         }
     }
 }
@@ -652,6 +674,7 @@ void setMode(BYTE newFranzMode, BYTE newSoundOn)
     // update mode, sound and dir bit
     franzMode = newFranzMode;
     soundOn = newSoundOn;
+    beeperOff();
 }
 
 void processHostCommand(BYTE val)
@@ -670,7 +693,7 @@ void processHostCommand(BYTE val)
         case CMD_FRANZ_MODE_1:              setMode(FRANZ_MODE_V1_V2, FALSE);   break;  // set Franz in v1/v2 mode
         case CMD_FRANZ_MODE_4_SOUND_ON:     setMode(FRANZ_MODE_V4, TRUE);       break;  // set Franz in v4 mode with sound
         case CMD_FRANZ_MODE_4_SOUND_OFF:    setMode(FRANZ_MODE_V4, FALSE);      break;  // set Franz in v4 mode without sound
-        case CMD_FRANZ_MODE_4_POWER_OFF:    GPIOB->BSRR = DEVICE_OFF_H;         break;  // set DEVICE_OFF_H to H - to turn off device now
+        case CMD_FRANZ_MODE_4_POWER_OFF:    GPIOB->BRR = DEVICE_OFF_L;          break;  // set DEVICE_OFF_L to L - to turn off device now
     }
 }
 

@@ -1,8 +1,8 @@
 #ifndef DEFS_H_
 #define DEFS_H_
 
-#define PWR_OFF_PRESS_TIME_MIN          1000
-#define PWR_OFF_PRESS_TIME_MAX          2000
+#define PWR_OFF_PRESS_TIME_MIN          10
+#define PWR_OFF_PRESS_TIME_MAX          20
 #define PWR_OFF_AFTER_REQUEST           10
 
 #define BTN_RELEASED    0
@@ -105,7 +105,7 @@ outputs:
 GPIOA_1  - INDEX                        (using TIM2_CH2)
 GPIOA_8  - RDATA                        (using TIM1_CH1)
 
-GPIOB_0  - DEVICE_OFF_H
+GPIOB_0  - DEVICE_OFF_L
 GPIOB_1  - BEEPER - on Franz v4
 GPIOB_5  - IFACE_DETECT
 
@@ -126,7 +126,7 @@ GPIOA_12 - FLLC_OE
 #define FLLC_OE             (1 <<  12)
 
 // on GPIOB
-#define DEVICE_OFF_H        (1 <<   0)
+#define DEVICE_OFF_L        (1 <<   0)
 #define BEEPER              (1 <<   1)
 #define DIR                 (1 <<   2)
 #define STEP                (1 <<   3)
