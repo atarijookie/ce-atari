@@ -43,10 +43,6 @@
 #define DATA6       RPI_V2_GPIO_P1_16
 #define DATA7       RPI_V2_GPIO_P1_18
 
-// To turn off the power to device, set this pin to output and set output level to H.
-// For normal operation of device leave this as input.
-#define DEVICE_OFF_H    RPI_V2_GPIO_P1_03
-
 #endif      // end of ONPC
 
 bool gpio4_open(void);

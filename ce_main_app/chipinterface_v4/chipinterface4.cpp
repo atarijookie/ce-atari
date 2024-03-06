@@ -300,8 +300,11 @@ void ChipInterface4::getFWversion(bool hardNotFloppy, uint8_t *inFwVer)
 
         handleIfaceReport(inFwVer[4]);                  // handle interface report - can witch between ACSI and SCSI
 
-        if(inFwVer[5] == BTN_SHUTDOWN) {
-            // TODO: handle shutdown
+        if(inFwVer[5] == BTN_SHUTDOWN) {                // handle shutdown
+            Debug::out(LOG_INFO, ">>> EXECUTING SYSTEM SHUTDOWN <<<");
+            sigintReceived = 1;                         // terminate the core
+            Utils::sleepMs(100);
+            system("shutdown now");                     // execute system shutdown
         } else {
             btnDown = (inFwVer[5] == BTN_PRESSED);      // Franz v4 sends button pressed status
 

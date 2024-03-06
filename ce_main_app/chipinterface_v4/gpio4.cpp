@@ -38,9 +38,9 @@ bool gpio4_open(void)
     }
 
     // configure those as outputs
-    int outputs[7] = {INT_TRIG, DRQ_TRIG, FF12D, IN_OE, OUT_OE, PIN_RESET_FRANZ, PIN_BOOT0_FRANZ};
-    int outVals[7] = {LOW,      LOW,      LOW,   HIGH,  HIGH  , HIGH           , LOW};
-    for(int i=0; i<7; i++) {
+    int outputs[6] = {INT_TRIG, DRQ_TRIG, FF12D, OUT_OE, PIN_RESET_FRANZ, PIN_BOOT0_FRANZ};
+    int outVals[6] = {LOW,      LOW,      LOW,   HIGH  , HIGH           , LOW};
+    for(int i=0; i<6; i++) {
         bcm2835_gpio_fsel(outputs[i],  BCM2835_GPIO_FSEL_OUTP);
         bcm2835_gpio_write(outputs[i], outVals[i]);
     }
