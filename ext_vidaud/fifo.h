@@ -9,6 +9,7 @@
 class Fifo {
 public:
     Fifo(void);
+    void clear(void);
 
     void add(uint8_t val);
     uint8_t get(void);

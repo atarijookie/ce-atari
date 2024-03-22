@@ -4,6 +4,8 @@
 
 #include "utils.h"
 
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
 bool fileExists(const char* path)
 {
     struct stat sb;
@@ -16,3 +18,12 @@ bool fileExists(const char* path)
     return false;
 }
 
+void mutexLock(void)
+{
+    pthread_mutex_lock(&mutex);
+}
+
+void mutexUnlock(void)
+{
+    pthread_mutex_unlock(&mutex);
+}

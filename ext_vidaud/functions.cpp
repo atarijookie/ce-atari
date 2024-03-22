@@ -4,10 +4,13 @@
 #include "main.h"
 #include "utils.h"
 #include "recv.h"
+#include "fifo.h"
 
 using json = nlohmann::json;
 
 bool streamRunning = false;
+extern Fifo* fifoAudio;
+extern Fifo* fifoVideo;
 
 const char* getResolutionString(uint8_t resolution)
 {
@@ -110,6 +113,9 @@ void start(json args, ResponseFromExtension* resp)
         resp->statusByte = STATUS_BAD_ARGUMENT;
         return;
     }
+
+    fifoAudio->clear();
+    fifoVideo->clear();
 
     char cmd[1024];
     createShellCommand(cmd, sizeof(cmd), filePath.c_str(), videoFps, videoResolution, audioRateHz, audioChannels);

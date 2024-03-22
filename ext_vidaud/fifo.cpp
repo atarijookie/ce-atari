@@ -8,6 +8,11 @@
 
 Fifo::Fifo(void)
 {
+    clear();
+}
+
+void Fifo::clear(void)
+{
     count = 0;
     addPos = 0;
     getPos = 0;
