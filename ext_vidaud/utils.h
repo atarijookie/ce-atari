@@ -17,4 +17,8 @@ void mutexUnlock(void);
 
 bool fileExists(const char* path);
 
+uint32_t getCurrentMs(void);
+uint32_t getEndTime(uint32_t offsetFromNow);
+void sleepMs(uint32_t ms);
+
 #endif

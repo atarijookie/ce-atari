@@ -13,6 +13,8 @@
 #define AUDIO_MONO      1
 #define AUDIO_STEREO    2
 
+#define STATUS_NO_MORE_FRAMES   0xF0
+
 void exportFunctionSignatures(void);
 
 #endif
