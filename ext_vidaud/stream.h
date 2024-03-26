@@ -28,11 +28,13 @@ struct TStream {
     uint16_t audioRateHz;
     uint8_t audioChannels;
     std::string filePath;
-    bool running = false;
+    bool running;
+    FILE* pipe;
 };
 
 class Fifo;
 
+void stopStream(void);
 void exportFunctionSignatures(void);
 const char *getResolutionString(uint8_t resolution);
 const char *getPixelFormat(uint8_t resolution);

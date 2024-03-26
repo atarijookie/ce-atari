@@ -29,6 +29,7 @@ args:
 void start(json args, ResponseFromExtension* resp)
 {
     createRecvThreadIfNeeded();
+    stopStream();
 
     stream.videoFps = args.at(0);
     stream.videoResolution = args.at(1);
@@ -56,9 +57,11 @@ void start(json args, ResponseFromExtension* resp)
     char cmd[1024];
     createShellCommand(cmd, sizeof(cmd), stream.filePath.c_str(), stream.videoFps, stream.videoResolution, stream.audioRateHz, stream.audioChannels);
 
-    // TODO: start ffmpeg
+    // start ffmpeg
+    stream.pipe = popen(cmd, "r");
+    stream.running = stream.pipe > NULL;    // running if got valid handle
 
-    resp->statusByte = STATUS_OK;
+    resp->statusByte = stream.running ? STATUS_OK : STATUS_EXT_ERROR;
 }
 
 /*
@@ -66,8 +69,7 @@ void start(json args, ResponseFromExtension* resp)
 */
 void stop(json args, ResponseFromExtension* resp)
 {
-    // TODO: stop ffmpeg
-
+    stopStream();
     resp->statusByte = STATUS_OK;
 }
 
