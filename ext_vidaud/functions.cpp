@@ -5,92 +5,15 @@
 #include "utils.h"
 #include "recv.h"
 #include "fifo.h"
+#include "stream.h"
 
 using json = nlohmann::json;
 
 extern Fifo* fifoAudio;
 extern Fifo* fifoVideo;
 
-struct {
-    uint8_t videoFps;
-    uint8_t videoResolution;
-    uint16_t audioRateHz;
-    uint8_t audioChannels;
-    std::string filePath;
-    bool running = false;
-} stream;
-
-uint8_t frameDataRGB[640*400*3];
-
-const char* getResolutionString(uint8_t resolution)
-{
-    switch(resolution) {
-        case VID_RES_ST_LOW: return "320x200";
-        case VID_RES_ST_MID: return "640x200";
-        case VID_RES_ST_HIGH: return "640x400";
-    }
-
-    return NULL;
-}
-
-const char* getPixelFormat(uint8_t resolution)
-{
-    switch(resolution) {
-        case VID_RES_ST_LOW: return "rgb24";
-        case VID_RES_ST_MID: return "rgb24";
-        case VID_RES_ST_HIGH: return "monow";
-    }
-
-    return NULL;
-}
-
-void createShellCommand(char* cmdBuffer, int cmdBufferLen, const char* inputFile, uint8_t vidFps, uint8_t vidRes, uint16_t audioRate, uint16_t audioChannels)
-{
-    // these are the format strings for commands
-    const char* cmdFormatAV =                                   // audio + video output
-        "ffmpeg -re -i %s "                                     // input path with filename
-        "-map 0:v -pix_fmt %s -r %d -s %s -f rawvideo unix:%s " // video output: pixel format, frame rate, resolution, output to unix socket path
-        "-map 0:a -ar %d -ac %d -f au -c pcm_s8 unix:%s";       // audio output: audio rate, audio channels, output to unix socket path
-
-    const char* cmdFormatA =                                    // audio only output
-        "ffmpeg -re -i %s "                                     // input path with filename
-        "-vn "                                                  // no video output
-        "-map 0:a -ar %d -ac %d -f au -c pcm_s8 unix:%s";       // audio output: audio rate, audio channels, output to unix socket path
-
-    const char* cmdFormatV =                                    // video only output
-        "ffmpeg -re -i %s "                                     // input path with filename
-        "-map 0:v -pix_fmt %s -r %d -s %s -f rawvideo unix:%s " // video output: pixel format, frame rate, resolution, output to unix socket path
-        "-an";                                                  // no audio output
-
-    // get resolution as string
-    const char* resolutionStr = getResolutionString(vidRes);
-    const char* pixelFormat = getPixelFormat(vidRes);
-
-    // video only?
-    if(audioChannels == AUDIO_OFF) {
-        snprintf(cmdBuffer, cmdBufferLen - 1, 
-            cmdFormatV,                                                         // format string
-            inputFile,                                                          // input path with filename
-            pixelFormat, vidFps, resolutionStr, SOCK_PATH_RECV_FFMPEG_VIDEO);   // video output: pixel format, frame rate, resolution, output to unix socket path
-        return;
-    } 
-
-    // audio only?
-    if(vidRes == VID_RES_OFF) {
-        snprintf(cmdBuffer, cmdBufferLen - 1, 
-            cmdFormatA,                                                         // format string
-            inputFile,                                                          // input path with filename
-            audioRate, audioChannels, SOCK_PATH_RECV_FFMPEG_AUDIO);             // audio output: audio rate, audio channels, output to unix socket path
-        return;
-    } 
-
-    // audio and video output
-    snprintf(cmdBuffer, cmdBufferLen - 1, 
-        cmdFormatAV,                                                         // format string
-        inputFile,                                                          // input path with filename
-        pixelFormat, vidFps, resolutionStr, SOCK_PATH_RECV_FFMPEG_VIDEO,    // video output: pixel format, frame rate, resolution, output to unix socket path
-        audioRate, audioChannels, SOCK_PATH_RECV_FFMPEG_AUDIO);             // audio output: audio rate, audio channels, output to unix socket path
-}
+TStream stream;
+uint8_t frameDataRGB[RGB_FRAME_SIZE_BYTES];
 
 /*
     Start audio-video streaming with specified audio and video params.
@@ -98,6 +21,7 @@ void createShellCommand(char* cmdBuffer, int cmdBufferLen, const char* inputFile
 args:
     - video fps - mow hany fps the video should be, plus how large the audio chunks will be
     - video resolution - VID_RES_ST_* value (VID_RES_OFF for no video)
+    - video palette type - VID_PALETTE_* value (to generate different palette for ST and STE)
     - audio samplerate - in Hz
     - audio - AUDIO_* value (AUDIO_OFF for no audio)
     - filePath - path to audio / video file which will be streamed
@@ -108,9 +32,10 @@ void start(json args, ResponseFromExtension* resp)
 
     stream.videoFps = args.at(0);
     stream.videoResolution = args.at(1);
-    stream.audioRateHz = args.at(2);
-    stream.audioChannels = args.at(3);
-    stream.filePath = args.at(4);
+    stream.videoPaletteType = args.at(2);
+    stream.audioRateHz = args.at(3);
+    stream.audioChannels = args.at(4);
+    stream.filePath = args.at(5);
 
     // bad param? fail
     if(stream.videoFps > 30 || stream.videoResolution > VID_RES_ST_HIGH || stream.audioRateHz > 50000 || stream.audioChannels > AUDIO_STEREO) {
@@ -144,42 +69,6 @@ void stop(json args, ResponseFromExtension* resp)
     // TODO: stop ffmpeg
 
     resp->statusByte = STATUS_OK;
-}
-
-bool waitForBytesInFifo(Fifo* fifo, uint32_t bytesWant, uint32_t waitFrames)
-{
-    uint32_t oneFrameMs = 1000 / stream.videoFps;       // how many ms one frame takes
-    uint32_t waitDurationMs = waitFrames * oneFrameMs;  // how many ms we should wait before failing
-
-    uint32_t endTime = getEndTime(waitDurationMs);      // when the waiting will be over
-
-    while(endTime <= getCurrentMs()) {              // while not timeout
-        mutexLock();
-
-        if(fifo->usedBytes() >= bytesWant) {        // got enough data? get it and send it
-            return true;
-        }
-
-        mutexUnlock();
-
-        sleepMs(5);     // not enough data, so sleep a little to wait
-    }
-
-    // if got here, then timeout happened before buffer had enough data
-    return false;
-}
-
-void convertVideoFrameToSt(uint8_t* frameDataRGB, uint32_t videoBytesPerFrame, uint8_t* stFrame)
-{
-    // no special conversion for ST high, just copy the data
-    if(stream.videoResolution == VID_RES_ST_HIGH) {
-        memset(stFrame, 0, 32);                     // clear the pallete to zeros
-        memcpy(stFrame + 32, frameDataRGB, 32000);  // copy black-white pixels as-is
-        return;
-    }
-
-    // TODO: convert data to expected video mode format
-
 }
 
 /*
@@ -322,8 +211,8 @@ void exportFunctionSignatures(void)
 {
     createRecvThreadIfNeeded();
 
-    uint8_t args1[5] = {TYPE_UINT8, TYPE_UINT8, TYPE_UINT16, TYPE_UINT8, TYPE_PATH};
-    addFunctionSignature((void*) start, "start", FUNC_LONG_ARGS, args1, 5, RESP_TYPE_STATUS);
+    uint8_t args1[6] = {TYPE_UINT8, TYPE_UINT8, TYPE_UINT8, TYPE_UINT16, TYPE_UINT8, TYPE_PATH};
+    addFunctionSignature((void*) start, "start", FUNC_LONG_ARGS, args1, 6, RESP_TYPE_STATUS);
 
     addFunctionSignature((void*) stop, "stop", FUNC_RAW_WRITE, NULL, 0, RESP_TYPE_STATUS);
 

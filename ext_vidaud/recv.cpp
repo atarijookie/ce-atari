@@ -99,7 +99,11 @@ void readFromSockToFifo(int sock, Fifo* fifo, uint8_t* bfr, uint32_t bfrLen)
     int bytesAvailable;
     int rv = ioctl(sock, FIONREAD, &bytesAvailable);    // how many bytes we can read?
 
-    int bytesToRead = MIN(bytesAvailable, bfrLen);      // we can only read either bytes that are ready or up to buffer size
+    if(rv == -1) {  // ioctl failed?
+        bytesAvailable = 0;
+    }
+
+    int bytesToRead = MIN(bytesAvailable, (int) bfrLen);    // we can only read either bytes that are ready or up to buffer size
 
     ssize_t recvCnt = recv(sock, bfr, bytesToRead, 0);
 

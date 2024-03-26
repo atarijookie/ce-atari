@@ -193,7 +193,7 @@ void functionSignatureToBytes(const char* name, uint8_t fun_type, uint8_t* argum
     }
 
     memset(signature, 0, sizeof(ReceivedSignature));            // set everything to zeros
-    strncpy(signature->name, name, MAX_FUNCTION_NAME_LEN);      // copy in name
+    strncpy(signature->name, name, MAX_FUNCTION_NAME_LEN - 1);  // copy in name
     signature->funcType = fun_type;                             // store function type
     signature->argumentsCount = argumentTypesCount;             // store count of arguments
     memcpy(signature->argumentTypes, argumentTypes, argumentTypesCount);    // copy in the argument types
@@ -242,7 +242,7 @@ void responseInit(ResponseFromExtension* resp, const char* funName)
 {
     memset(resp, 0, RESPONSE_HEADER_SIZE);                          // clear the reponse header
     resp->extensionId = extensionId;                                // extension id
-    strncpy(resp->functionName, funName, MAX_FUNCTION_NAME_LEN);    // function name
+    strncpy(resp->functionName, funName, MAX_FUNCTION_NAME_LEN - 1); // function name
 }
 
 uint16_t getWord(uint8_t *bfr)
@@ -366,7 +366,7 @@ void handleJsonMessage(uint8_t* bfr)
     ReceivedSignature* sign = getExportedFunctionSignature(funName.c_str());
 
     if(!sign) {         // failed to find function signature by name?
-        printf("function '%s' not found in exported functions signatures\n", funName);
+        printf("function '%s' not found in exported functions signatures\n", funName.c_str());
         return;
     }
 
@@ -381,7 +381,7 @@ void handleJsonMessage(uint8_t* bfr)
     }
 
     if(!pFunc) {        // function pointer not found? quit
-        printf("Could not find function '%s', message not handled\n", funName);
+        printf("Could not find function '%s', message not handled\n", funName.c_str());
         return;
     }
 
