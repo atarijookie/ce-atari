@@ -18,7 +18,7 @@ extern TStream stream;
 extern uint8_t frameDataRGB[RGB_FRAME_SIZE_BYTES];
 
 void stopStream(void) {
-    if(stream.pipe > NULL) {    // got the pipe? close it
+    if(stream.pipe != NULL) {   // got the pipe? close it
         pclose(stream.pipe);
         stream.pipe = NULL;
     }

@@ -24,7 +24,7 @@ EXECUTABLE="./${EXT_NAME}.elf"
 
 # if the executable doesn't exist, run the compilation
 if [ ! -f "${EXECUTABLE}" ]; then
-    ./build.sh
+    make
 fi
 
 # start the extension - detached, so it doesn't block this start script from finishing

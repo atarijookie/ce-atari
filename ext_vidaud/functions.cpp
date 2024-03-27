@@ -59,7 +59,7 @@ void start(json args, ResponseFromExtension* resp)
 
     // start ffmpeg
     stream.pipe = popen(cmd, "r");
-    stream.running = stream.pipe > NULL;    // running if got valid handle
+    stream.running = stream.pipe != NULL;    // running if got valid handle
 
     resp->statusByte = stream.running ? STATUS_OK : STATUS_EXT_ERROR;
 }
