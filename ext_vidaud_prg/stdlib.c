@@ -224,3 +224,79 @@ void storeDword(uint8_t *bfr, uint32_t val)
     bfr[2] = val >>  8; // store mid lo
     bfr[3] = val;       // store lo
 }
+
+uint8_t getMachineType(void)
+{
+    uint32_t *cookieJarAddr    = (uint32_t *) 0x05A0;
+    uint32_t *cookieJar        = (uint32_t *) *cookieJarAddr;     // get address of cookie jar
+
+    if(cookieJar == 0) {                        // no cookie jar? it's an old ST
+        return MACHINE_ST;
+    }
+
+    uint32_t cookieKey, cookieValue;
+
+    while(1) {                                  // go through the list of cookies
+        cookieKey   = *cookieJar++;
+        cookieValue = *cookieJar++;
+
+        if(cookieKey == 0) {                    // end of cookie list? then cookie not found, it's an ST
+            break;
+        }
+
+        if(cookieKey == 0x5f4d4348) {           // is it _MCH key?
+            uint16_t machineMajor = cookieValue >> 16;
+            uint16_t machineMinor = (uint16_t) cookieValue;
+
+            switch(machineMajor) {
+                case 0: return MACHINE_ST;
+
+                case 1: {   // major is 1, determine specific machine based on minor
+                    if(machineMinor == 0 || machineMinor == 16) {   // 0 and 16 are STE and Mega STE
+                        return MACHINE_STE;
+                    }
+                    break;
+                };
+
+                case 2: return MACHINE_TT;
+                case 3: return MACHINE_FALCON;
+            }
+
+            break;                              // or it's ST
+        }
+    }
+
+    return MACHINE_ST;                          // it's an ST
+}
+
+void showMessage(const char* message, int sleepTime)
+{
+    (void) Cconws(message);
+    sleep(sleepTime);
+    (void) Cnecin();
+}
+
+// create buffer pointer to even address
+uint8_t* addrToEven(uint8_t* addrIn)
+{
+    uint32_t toEven = (uint32_t) addrIn;
+
+    if(toEven & 1) {        // not even number?
+        toEven++;
+    }
+
+    return (uint8_t*) toEven; 
+}
+
+// create buffer pointer to address with the lowest byte being zero
+uint8_t* addrToLowestByteZero(uint8_t* addrIn)
+{
+    uint32_t toEven = (uint32_t) addrIn;
+
+    if((toEven & 0xff) != 0) {          // 8 lowest bits are not zero?
+        toEven = toEven & 0xffffff00;   // clear lowest 8 bits
+        toEven += 0x00000100;           // increate the address to next boundary with all zeros lowest byte
+    }
+
+    return (uint8_t*) toEven; 
+}
