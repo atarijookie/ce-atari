@@ -31,8 +31,8 @@ AT_0 := @
 AT_1 :=
 AT = $(AT_$(V))
 
-HDR		= extension.h extensiondefs.h stdlib.h stream.h playback.h
-CSRC	= main.c stdlib.c extension.c playback.c
+HDR		= extension.h extensiondefs.h stdlib.h stream.h playback.h fifo.h
+CSRC	= main.c stdlib.c extension.c playback.c fifo.c
 
 CFLAGS	+= -nostdlib
 STARTUP	= startup.s

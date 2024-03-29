@@ -12,6 +12,7 @@
 #include "extension.h"
 #include "stream.h"
 #include "playback.h"
+#include "fifo.h"
 
 // +256 because ST video RAM has to be aligned to multiple of 256 (no Video Base Address Low register)
 // +1 uint8_t to align to even address, +1 sector to make sure that last sector read doesn't overflow the boundary
@@ -24,10 +25,8 @@ uint8_t audioBuffer1[AUDIO_PART_SIZE + 1 + 512];
 uint8_t audioBuffer2[AUDIO_PART_SIZE + 1 + 512];
 uint8_t* pAudioBuffer[2];
 
-int videoIndexPlay = 0;
-int videoIndexGet = 1;
-int audioIndexPlay = 0;
-int audioIndexGet = 1;
+int videoIndexGet = -1;
+int audioIndexGet = -1;
 
 extern TMachine machine;
 extern uint8_t extId;
@@ -39,14 +38,14 @@ uint8_t* pOriginalScreen;
 uint8_t originalPalette[ST_PALETTE_SIZE];
 uint8_t originalVideoData[ST_VIDEODATA_SIZE];
 
-uint8_t* pNextPalette;      // what palette should be set next
-uint8_t* pNextVideoData;    // what video address should be set next
-
 #define REG_VIDEOBASE_HIGH  ((uint8_t*) 0xffff8201)
 #define REG_VIDEOBASE_MID   ((uint8_t*) 0xffff8203)
 #define REG_VIDEOBASE_LOW   ((uint8_t*) 0xffff820D)     // only on STE
 
 #define REG_VIDEO_PALETTE   ((uint16_t*) 0xffff8240)
+
+Fifo videoFifo;
+uint8_t streamEOF = 0;  // non-zero if we did reach end of stream
 
 uint8_t* getCurrentVideoAddr(void)
 {
@@ -76,8 +75,18 @@ void setCurrentVideoAddr(uint8_t* pData)
 // To show next frame, set pointer to pNextPalette to point to palette and pNextVideoData to point where the video data is.
 void showFrame(void)
 {
-    memcpy(REG_VIDEO_PALETTE, pNextPalette, ST_PALETTE_SIZE);   // set new palette
-    setCurrentVideoAddr(pNextVideoData);                        // set video register to next video data
+    uint32_t palette, videoData;
+    fifoGet(&videoFifo, &palette, &videoData);  // fetch data from Fifo
+
+    if(palette == 0 || videoData == 0) {        // no data? no change
+        return;
+    }
+
+    if(machine.resolution != VID_RES_ST_HIGH) {     // don't set palette on ST high
+        memcpy(REG_VIDEO_PALETTE, (uint8_t*) palette, ST_PALETTE_SIZE);   // set new palette
+    }
+
+    setCurrentVideoAddr((uint8_t*) videoData);                        // set video register to next video data
 }
 
 // preserve current screen content with palette
@@ -86,22 +95,62 @@ void storeCurrentScreen(void)
     uint8_t* pScreen = getCurrentVideoAddr();   // where HW points that the screen is
     pOriginalScreen = pScreen;                  // store for later restoring
 
-    memcpy(originalPalette,   REG_VIDEO_PALETTE, ST_PALETTE_SIZE);    // save palette
-    memcpy(originalVideoData, pScreen,           ST_VIDEODATA_SIZE);  // save videodata
+    if(machine.resolution != VID_RES_ST_HIGH) {     // don't save palette on ST high
+        memcpy(originalPalette, REG_VIDEO_PALETTE, ST_PALETTE_SIZE);  // save palette
+    }
+
+    memcpy(originalVideoData, pScreen, ST_VIDEODATA_SIZE);  // save videodata
 }
 
 // restore original screen content with palette
 void restoreCurrentScreen(void)
 {
-    pNextPalette = originalPalette;                                 // point next palette to the original one
     memcpy(pOriginalScreen, originalVideoData, ST_VIDEODATA_SIZE);  // restore original video data to original screen
-    pNextVideoData = pOriginalScreen;                               // point next video data to original screen
+
+    fifoInit(&videoFifo);   // clear the fifo to remove any existing frames from it
+    fifoAdd(&videoFifo, (uint32_t) originalPalette, (uint32_t) pOriginalScreen);
 
     showFrame();
 }
 
+void getVideoFrames(void)
+{
+    // update index for get (that ++ and if allows us to start from -1 which is no-previous-frames)
+    videoIndexGet++;
+    if(videoIndexGet > 1) {     // we got only 2 buffers, so go back to 0 after index overflow
+        videoIndexGet = 0;
+    }
+
+    uint8_t res = cexCallRawRead(extId, "get_frames", ACSI_MAX_VIDEO_FPT, 0, VIDEO_BUFFER_SIZE, pVideoBuffer[videoIndexGet]);
+
+    if(res == STATUS_NO_MORE_FRAMES) {  // end of stream? we're done
+        streamEOF = 1;
+        return;
+    }
+
+    // The status byte of 'get_frames' function is the count of frames the returned data holds.
+    // If no frames were received or it's more then requested-frames-count, then it's an error 
+    // and we should not handle the content.
+    if(res < 1 || res > ACSI_MAX_VIDEO_FPT) {
+        // (void) Cconws("get_frames failed\r\n");
+        return;
+    }
+
+    int i;
+    uint32_t framesReceived = res;
+    uint8_t* pVideoData = pVideoBuffer[videoIndexGet];                      // start of video data
+    uint8_t* pPalette = pVideoData + (framesReceived * ST_VIDEODATA_SIZE);  // start of palettes
+
+    for(i=0; i<framesReceived; i++) {               // put all the frames into video fifo
+        fifoAdd(&videoFifo, (uint32_t) pVideoData, (uint32_t) pPalette);
+        pVideoData += ST_VIDEODATA_SIZE;            // move to next frame
+        pPalette += ST_PALETTE_SIZE;                // move to next palette
+    }
+}
+
 void playback(void)
 {
+    fifoInit(&videoFifo);           // init the video fifo
     Supexec(storeCurrentScreen);    // preserve current screen content with palette
 
     pVideoBuffer[0] = addrToLowestByteZero(videoBuffer1);
@@ -110,18 +159,24 @@ void playback(void)
     pAudioBuffer[0] = addrToEven(audioBuffer1);
     pAudioBuffer[1] = addrToEven(audioBuffer2);
 
-    while(1) {
-        // uint8_t res;
+    streamEOF = 0;          // not EOF at the start
+    videoIndexGet = -1;     // start with -1 here to do the 1st get into 0th buffer
+    audioIndexGet = -1;
 
-        // res = cexCallRawRead(extId, "get_frames", ACSI_MAX_VIDEO_FPT, 0, VIDEO_BUFFER_SIZE, pVideoBuffer[0]);
+    // get first video frames and audio samples
+    getVideoFrames();
 
-        // if(res == STATUS_NO_MORE_FRAMES) {  // end of stream? we're done
-        //     return;
-        // }
+    // TODO: install VBL routine
 
-        // if(res != STATUS_OK) {
-        //     (void) Cconws("get_frames failed\r\n");
-        // }
+    // keep playing while not at the end of stream and we still got some frames
+    while(!streamEOF && videoFifo.count > 0) {
+        // We are using 2 buffers for receiving frames, each fits ACSI_MAX_VIDEO_FPT frames into it.
+        // If we're completelly full, fifo holds 2*ACSI_MAX_VIDEO_FPT frames, and if we're 
+        // half-full then fifo has ACSI_MAX_VIDEO_FPT frames in it (or less). This is the moment we
+        // can fetch more frames, because this means that one of the buffers is empty.
+        if(!streamEOF && videoFifo.count <= ACSI_MAX_VIDEO_FPT) {
+            getVideoFrames();
+        }
 
         // res = cexCallRawRead(extId, "get_samples", AUDIO_FPT, 0, AUDIO_PART_SIZE, pAudioBuffer[0]);
 
@@ -129,6 +184,8 @@ void playback(void)
         //     (void) Cconws("get_samples failed\r\n");
         // }
     }
+
+    // TODO: uninstall VBL routine
 
     Supexec(restoreCurrentScreen);    // restore original screen content with palette
 }
