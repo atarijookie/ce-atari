@@ -15,6 +15,8 @@ extern Fifo* fifoVideo;
 TStream stream;
 uint8_t frameDataRGB[RGB_FRAME_SIZE_BYTES];
 
+#define MAX_GET_FRAMES  25
+
 /*
     Start audio-video streaming with specified audio and video params.
 
@@ -84,6 +86,11 @@ void get_frames(json args, ResponseFromExtension* resp)
     uint32_t framesCount = args.at(0);
     uint32_t videoBytesPerFrame = 0;
 
+    if(framesCount > MAX_GET_FRAMES) {  // asking for more frames than allowed? fail
+        resp->statusByte = STATUS_BAD_ARGUMENT;
+        return;
+    }
+
     if(stream.videoFps > 0) {
         switch(stream.videoResolution) {
             case VID_RES_ST_LOW:    videoBytesPerFrame = 320*200*3; break;      // ST low * 3 RGB bytes per pixel
@@ -118,6 +125,8 @@ void get_frames(json args, ResponseFromExtension* resp)
 
     framesCount = bytesWant / videoBytesPerFrame;               // update received frames to count of how many frames we can get from the data in FIFO
 
+    uint8_t stPalettes[MAX_GET_FRAMES * ST_PALETTE_SIZE];
+
     // fetch and process video data by each frame
     for(uint32_t i=0; i<framesCount; i++) {
         mutexLock();
@@ -125,9 +134,13 @@ void get_frames(json args, ResponseFromExtension* resp)
         mutexUnlock();
 
         // convert data to expected video mode format
-        uint32_t stFrameOffset = i * 32032;
-        convertVideoFrameToSt(frameDataRGB, videoBytesPerFrame, resp->data + stFrameOffset);
+        uint32_t stFrameOffset = i * ST_FRAME_SIZE;
+        uint32_t stPaletteOffset = i * ST_PALETTE_SIZE;
+        convertVideoFrameToSt(frameDataRGB, videoBytesPerFrame, resp->data + stFrameOffset, stPalettes + stPaletteOffset);
     }
+
+    // after the conversion copy in the palettes after the video frames
+    memcpy(resp->data + (framesCount * ST_FRAME_SIZE), stPalettes, framesCount * ST_PALETTE_SIZE);
 
     uint32_t respSizeBytes = framesCount * 32032;
     responseStoreStatusAndDataLen(resp, framesCount, respSizeBytes);    // the status holds how many frames we are returning to ST

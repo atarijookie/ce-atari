@@ -11,7 +11,7 @@
 #include "json.h"
 
 /*
-This is an CosmosEx extension example for video and audio streaming.
+This is an CosmosEx extension for video and audio streaming.
 
 Jookie, 2024
 */
@@ -20,8 +20,6 @@ volatile sig_atomic_t shouldStop = 0;
 using json = nlohmann::json;
 
 #define MAX_SOCKET_PATH     255
-#define EXTENSION_NAME      "ext_vid_aud"
-#define IN_SOCKET_PATH      "/tmp/" EXTENSION_NAME ".sock"  // where we will get commands from CE
 char outSocketPath[MAX_SOCKET_PATH + 1];                // where we should send responses to commands
 int extensionId = -1;                                   // CE knows this extension under this id (index), we must send it in responses
 uint8_t latestData[EXT_BUFFER_SIZE];                    // will hold received binary data and raw data
@@ -59,10 +57,10 @@ int main(int argc, char *argv[])
     // get all the signatures into the exportedFunctions array for usage in sendExportedFunctionsTable() and in every function call
     exportFunctionSignatures();
 
-    printf("Sending exported function signatures\n");
+    log(LOG_INFO, "Sending exported function signatures");
     sendExportedFunctionsTable();       // let CE core know that this extension has started
 
-    printf("Entering main loop, waiting for messages via: %s\n", IN_SOCKET_PATH);
+    log(LOG_INFO, "Entering main loop, waiting for messages via: %s", IN_SOCKET_PATH);
 
     uint8_t bfr[EXT_BUFFER_SIZE];
 
@@ -84,21 +82,21 @@ int main(int argc, char *argv[])
         ssize_t recvCnt = recv(sock, bfr, sizeof(bfr), 0);  // receive now
 
         if(recvCnt < 2) {           // received data too short?
-            printf("received message too short, ignoring message\n");
+            log(LOG_WARNING, "received message too short, ignoring message");
             continue;
         }
 
         bfr[recvCnt] = 0;           // zero terminate the received data)
 
-        printf("received size: %d\n", (int) recvCnt);
-        // printf("received data: %s\n", bfr);  // show all the received data as-is on console
+        log(LOG_DEBUG, "received size: %d", (int) recvCnt);
+        // log(LOG_DEBUG, "received data: %s", bfr);  // show all the received data as-is on console
 
         if(bfr[0] == 'D' && bfr[1] == 'A') {    // data starting with 'DA' - it's raw data
             handleRawData(bfr);
         } else if(bfr[0] == '{') {              // data starting with '{' - it's JSON message
             handleJsonMessage(bfr);
         } else {                    // some other start of packet, ignore it
-            printf("unknown message start, ignoring message");
+            log(LOG_WARNING, "unknown message start, ignoring message");
             continue;
         }
     }
@@ -106,7 +104,7 @@ int main(int argc, char *argv[])
     sendClosedNotification();       // tell the CE core that we're closing
 
     close(sock);
-    printf("Terminated...\n");
+    log(LOG_INFO, "Terminated...");
     return 0;
 }
 
@@ -116,7 +114,7 @@ int createRecvSocket(const char* pathToSocket)
 	int sock = socket(AF_UNIX, SOCK_DGRAM, 0);
 
 	if (sock < 0) {
-	    printf("createRecvSocket - failed to create socket!\n");
+	    log(LOG_WARNING, "createRecvSocket - failed to create socket!");
 	    return -1;
 	}
 
@@ -130,13 +128,13 @@ int createRecvSocket(const char* pathToSocket)
 
     int res = bind(sock, (struct sockaddr *) &addr, strlen(addr.sun_path) + sizeof(addr.sun_family));
     if (res < 0) {
-	    printf("createRecvSocket - failed to bind socket to %s - errno: %d\n", pathToSocket, errno);
+	    log(LOG_WARNING, "createRecvSocket - failed to bind socket to %s - errno: %d", pathToSocket, errno);
 	    return -1;
     }
 
     chmod(addr.sun_path, 0666);             // loosen permissions
 
-    printf("createRecvSocket - %s created, sock: %d\n", pathToSocket, sock);
+    log(LOG_DEBUG, "createRecvSocket - %s created, sock: %d", pathToSocket, sock);
     return sock;
 }
 
@@ -146,11 +144,11 @@ bool sendDataToSocket(const char* socketPath, const uint8_t* data, uint32_t data
 	int sockFd = socket(AF_UNIX, SOCK_DGRAM, 0);
 
 	if (sockFd < 0) {   // if failed to create socket
-	    printf("sendDataToSocket: failed to create socket - errno: %d\n", errno);
+	    log(LOG_WARNING, "sendDataToSocket: failed to create socket - errno: %d", errno);
 	    return false;
 	}
 
-    // printf("sendDataToSocket: opened socket %s\n", socketPath);
+    // log(LOG_DEBUG, "sendDataToSocket: opened socket %s", socketPath);
 
     struct sockaddr_un addr;
     strcpy(addr.sun_path, socketPath);
@@ -160,9 +158,9 @@ bool sendDataToSocket(const char* socketPath, const uint8_t* data, uint32_t data
     int res = sendto(sockFd, data, dataLen, 0, (struct sockaddr *) &addr, sizeof(struct sockaddr_un));
 
     if(res < 0) {       // if failed to send
-	    printf("sendDataToSocket: sendto failed - errno: %d\n", errno);
+	    log(LOG_WARNING, "sendDataToSocket: sendto failed - errno: %d\n", errno);
     } else {
-        // printf("sendDataToSocket: %d bytes of data sent\n", dataLen);
+        // log(LOG_DEBUG, "sendDataToSocket: %d bytes of data sent", dataLen);
     }
 
     close(sockFd);
@@ -172,7 +170,7 @@ bool sendDataToSocket(const char* socketPath, const uint8_t* data, uint32_t data
 void addFunctionSignature(void* pFunc, const char* name, uint8_t fun_type, uint8_t* argumentTypes, uint8_t argumentTypesCount, uint8_t returnValueType)
 {
     if(exportedFunctionsCount >= MAX_EXPORTED_FUNCTIONS) {   // cannot add more?
-        printf("You have reached the maximum exported functions count - %d!", MAX_EXPORTED_FUNCTIONS);
+        log(LOG_WARNING, "You have reached the maximum exported functions count - %d!", MAX_EXPORTED_FUNCTIONS);
         exit(1);
     }
 
@@ -188,7 +186,7 @@ void addFunctionSignature(void* pFunc, const char* name, uint8_t fun_type, uint8
 void functionSignatureToBytes(const char* name, uint8_t fun_type, uint8_t* argumentTypes, uint8_t argumentTypesCount, uint8_t returnValueType, ReceivedSignature* signature)
 {
     if(argumentTypesCount > MAX_FUNCTION_ARGUMENTS) {
-        printf("Exported function name %s has %d arguments, but only %d are allowed. This will not work. Use less arguments!", name, argumentTypesCount, MAX_FUNCTION_ARGUMENTS);
+        log(LOG_WARNING, "Exported function name %s has %d arguments, but only %d are allowed. This will not work. Use less arguments!", name, argumentTypesCount, MAX_FUNCTION_ARGUMENTS);
         exit(1);
     }
 
@@ -199,7 +197,7 @@ void functionSignatureToBytes(const char* name, uint8_t fun_type, uint8_t* argum
     memcpy(signature->argumentTypes, argumentTypes, argumentTypesCount);    // copy in the argument types
 
     if(returnValueType < TYPE_NOT_PRESENT || returnValueType > TYPE_BIN_DATA) { // invalid type?
-        printf("Invalid return value type %d. This will not work. Use some of the TYPE_* values!", returnValueType);
+        log(LOG_WARNING, "Invalid return value type %d. This will not work. Use some of the TYPE_* values!", returnValueType);
         exit(1);
     }
 
@@ -209,7 +207,7 @@ void functionSignatureToBytes(const char* name, uint8_t fun_type, uint8_t* argum
 // Function to formulate response in expected format and send it to CE core.
 void sendResponse(const char* funName, uint8_t status, uint8_t* data, uint32_t dataLen)
 {
-    printf("sendResponse - funName: %s, status: %d, dataLen: %d\n", funName, status, dataLen);
+    log(LOG_DEBUG, "sendResponse - funName: %s, status: %d, dataLen: %d", funName, status, dataLen);
 
     ResponseFromExtension resp;
     responseInit(&resp, funName);
@@ -231,7 +229,7 @@ void responseStoreStatusAndDataLen(ResponseFromExtension* resp, uint8_t status, 
 void responseStoreDataLen(ResponseFromExtension* resp, uint32_t dataLen)
 {
     if(dataLen > MAX_RESPONSE_DATA_SIZE) {      // dataLen too big?
-        printf("Invalid dataLen %d. This will not work. Maximum allowed size is: %d", dataLen, MAX_RESPONSE_DATA_SIZE);
+        log(LOG_WARNING, "Invalid dataLen %d. This will not work. Maximum allowed size is: %d", dataLen, MAX_RESPONSE_DATA_SIZE);
         exit(1);
     }
 
@@ -343,22 +341,22 @@ void handleJsonMessage(uint8_t* bfr)
     catch(...)                     // on any exception - log it, don't crash
     {
         std::exception_ptr p = std::current_exception();
-        printf("json::parse raised an exception: %s\n", (p ? p.__cxa_exception_type()->name() : "null"));
+        log(LOG_WARNING, "json::parse raised an exception: %s", (p ? p.__cxa_exception_type()->name() : "null"));
         return;
     }
 
     // std::string s = data.dump();
-    // printf("received json message: %s\n", s.c_str());    // show received json message after parsing
+    // log(LOG_DEBUG, "received json message: %s\n", s.c_str());    // show received json message after parsing
 
     if(!data.contains("function")) {    // the function name must be present in received json message
-        printf("'function' missing in received message.\n");
+        log(LOG_WARNING, "'function' missing in received message.");
         return;
     }
 
     std::string funName = data["function"].get<std::string>();
 
     if(funName.compare("CEX_FUN_CLOSE") == 0) {     // when this was a request to terminate this extension
-        printf("Received command from CE that we should terminate, so terminating now.\n");
+        log(LOG_INFO, "Received command from CE that we should terminate, so terminating now.");
         shouldStop = 1;
         return;
     }
@@ -366,7 +364,7 @@ void handleJsonMessage(uint8_t* bfr)
     ReceivedSignature* sign = getExportedFunctionSignature(funName.c_str());
 
     if(!sign) {         // failed to find function signature by name?
-        printf("function '%s' not found in exported functions signatures\n", funName.c_str());
+        log(LOG_WARNING, "function '%s' not found in exported functions signatures", funName.c_str());
         return;
     }
 
@@ -381,14 +379,14 @@ void handleJsonMessage(uint8_t* bfr)
     }
 
     if(!pFunc) {        // function pointer not found? quit
-        printf("Could not find function '%s', message not handled\n", funName.c_str());
+        log(LOG_WARNING, "Could not find function '%s', message not handled", funName.c_str());
         return;
     }
 
     ResponseFromExtension resp;             // response will be stored here
     responseInit(&resp, funName.c_str());   // init header, copy name in
 
-    printf("calling extension function '%s'\n", funName.c_str());
+    log(LOG_DEBUG, "calling extension function '%s'", funName.c_str());
 
     json emptyArray;
     json args = data.contains("args") ? data["args"] : emptyArray;      // if args are present in JSON, use them; otherwise use empty array
@@ -398,7 +396,7 @@ void handleJsonMessage(uint8_t* bfr)
     // But do warn that this happened, as this might cause other issues.
     int missingArgs = sign->argumentsCount - args.size();
     if(missingArgs > 0) {                   // some args are missing compared to expected args count from signature?
-        printf("the received message is missing %d arguments, padding with zeros\n", missingArgs);  // at least warn that this happened
+        log(LOG_WARNING, "the received message is missing %d arguments, padding with zeros", missingArgs);  // at least warn that this happened
         for(int i=0; i<missingArgs; i++) {  // fill missing args with zeros
             args.push_back(0);
         }

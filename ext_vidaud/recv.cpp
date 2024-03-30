@@ -32,7 +32,7 @@ void createUnixRecvStreamSocket(int &fdListen, const char* pathToSocket)
 	int sock = socket(AF_UNIX, SOCK_STREAM, 0);
 
 	if (sock < 0) {
-	    printf("createRecvSocket - failed to create socket!\n");
+	    log(LOG_WARNING, "createRecvSocket - failed to create socket!");
 	    return;
 	}
 
@@ -48,7 +48,7 @@ void createUnixRecvStreamSocket(int &fdListen, const char* pathToSocket)
 
     int res = bind(sock, (struct sockaddr *) &addr, strlen(addr.sun_path) + sizeof(addr.sun_family));
     if (res < 0) {
-	    printf("createRecvSocket - failed to bind socket to %s - errno: %d\n", pathToSocket, errno);
+	    log(LOG_WARNING, "createRecvSocket - failed to bind socket to %s - errno: %d", pathToSocket, errno);
 	    return;
     }
 
@@ -57,7 +57,7 @@ void createUnixRecvStreamSocket(int &fdListen, const char* pathToSocket)
 
     chmod(addr.sun_path, 0666);             // loosen permissions
 
-    printf("createRecvSocket - %s created, sock: %d\n", pathToSocket, sock);
+    log(LOG_DEBUG, "createRecvSocket - %s created, sock: %d", pathToSocket, sock);
 }
 
 void acceptSocketIfNeededAndPossible(int fdListen, int& fdClient)
@@ -116,7 +116,7 @@ void readFromSockToFifo(int sock, Fifo* fifo, uint8_t* bfr, uint32_t bfrLen)
 
 void *recvThreadCode(void *ptr)
 {
-    printf("recvThreadCode starting");
+    log(LOG_INFO, "recvThreadCode starting");
 
     // create listening sockets
     int sockListenAudio = -1, sockListenVideo = -1;
@@ -178,7 +178,7 @@ void *recvThreadCode(void *ptr)
     delete fifoAudio;
     delete fifoVideo;
 
-    printf("recvThreadCode terminated.");
+    log(LOG_INFO, "recvThreadCode terminated.");
     return 0;
 }
 
@@ -191,11 +191,11 @@ void createRecvThreadIfNeeded(void)
     int res = pthread_create(&recvThreadInfo, NULL, (void* (*)(void*)) recvThreadCode, NULL);
 
     if(res != 0) {
-        printf("Failed to create recv thread");
+        log(LOG_WARNING, "Failed to create recv thread");
         return;
     }
 
     threadCreated = true;
-    printf("recv thread created");
+    log(LOG_DEBUG, "recv thread created");
     pthread_setname_np(recvThreadInfo, "recvThread");
 }

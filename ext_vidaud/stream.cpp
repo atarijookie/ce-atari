@@ -10,6 +10,7 @@
 #include "recv.h"
 #include "fifo.h"
 #include "stream.h"
+#include "utils.h"
 
 #include <GraphicsMagick/Magick++.h>
 using namespace Magick;
@@ -207,12 +208,12 @@ void c2p(uint8_t* buffer, const Image& image, int bitsPerPixel)
     For ST high the frameDataRGB are black-white pixels packed into byte.
     For ST mid and ST low the frameDataRGB are RGB pixels (8 bits each).
 */
-void convertVideoFrameToSt(uint8_t* frameDataRGB, uint32_t videoBytesPerFrame, uint8_t* stFrame)
+void convertVideoFrameToSt(uint8_t* frameDataRGB, uint32_t videoBytesPerFrame, uint8_t* stFrame, uint8_t* stPalette)
 {
     // no special conversion for ST high, just copy the data
     if(stream.videoResolution == VID_RES_ST_HIGH) {
-        memset(stFrame, 0, 32);                     // clear the pallete to zeros
-        memcpy(stFrame + 32, frameDataRGB, 32000);  // copy black-white pixels as-is
+        memset(stPalette, 0, ST_PALETTE_SIZE);          // clear the pallete to zeros
+        memcpy(stFrame, frameDataRGB, ST_FRAME_SIZE);   // copy black-white pixels as-is
         return;
     }
 
@@ -245,16 +246,16 @@ void convertVideoFrameToSt(uint8_t* frameDataRGB, uint32_t videoBytesPerFrame, u
     image.quantize();
 
     if(image.type() != PaletteType) {
-        printf("convertVideoFrameToSt - image.type() != PaletteType\n");
+        log(LOG_WARNING, "convertVideoFrameToSt - image.type() != PaletteType");
         return;
     }
 
     if (image.colorMapSize() > (1u << bitsPerPixel)) {
-        printf("convertVideoFrameToSt - Too few bpp for %d colos\n", image.colorMapSize());
+        log(LOG_DEBUG, "convertVideoFrameToSt - Too few bpp for %d colors", image.colorMapSize());
         return;
     }
     
-    // save palette on start of ST frame, then the pixels
-    save_palette(stFrame, image);
-    c2p(stFrame + 32, image, bitsPerPixel);
+    // save palette and pixels
+    save_palette(stPalette, image);
+    c2p(stFrame, image, bitsPerPixel);
 }

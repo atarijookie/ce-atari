@@ -2,6 +2,11 @@
 #define __MAIN_H__
 
 #include <stdint.h>
+#include "extensiondefs.h"
+
+#define EXTENSION_NAME      "ext_vid_aud"
+#define IN_SOCKET_PATH      "/tmp/" EXTENSION_NAME ".sock"  // where we will get commands from CE
+#define LOG_FILE_NAME       "/tmp/" EXTENSION_NAME ".log"
 
 int createRecvSocket(const char* pathToSocket);
 void addFunctionSignature(void* pFunc, const char* name, uint8_t fun_type, uint8_t* argumentTypes, uint8_t argumentTypesCount, uint8_t returnValueType);

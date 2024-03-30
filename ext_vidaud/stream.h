@@ -21,6 +21,9 @@
 
 #define STATUS_NO_MORE_FRAMES   0xF0
 
+#define ST_PALETTE_SIZE 32
+#define ST_FRAME_SIZE   32000
+
 struct TStream {
     uint8_t videoFps;
     uint8_t videoResolution;
@@ -40,6 +43,6 @@ const char *getResolutionString(uint8_t resolution);
 const char *getPixelFormat(uint8_t resolution);
 void createShellCommand(char *cmdBuffer, int cmdBufferLen, const char *inputFile, uint8_t vidFps, uint8_t vidRes, uint16_t audioRate, uint16_t audioChannels);
 bool waitForBytesInFifo(Fifo *fifo, uint32_t bytesWant, uint32_t waitFrames);
-void convertVideoFrameToSt(uint8_t *frameDataRGB, uint32_t videoBytesPerFrame, uint8_t *stFrame);
+void convertVideoFrameToSt(uint8_t *frameDataRGB, uint32_t videoBytesPerFrame, uint8_t *stFrame, uint8_t* stPalette);
 
 #endif
