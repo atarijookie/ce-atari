@@ -12,6 +12,9 @@
 #include "stream.h"
 #include "utils.h"
 
+// To install ImageMagick libraries, run:
+// sudo apt install libgraphicsmagick++1-dev
+
 #include <GraphicsMagick/Magick++.h>
 using namespace Magick;
 

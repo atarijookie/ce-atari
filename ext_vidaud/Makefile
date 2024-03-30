@@ -9,6 +9,7 @@ LDLIBS   += $(shell GraphicsMagick++-config --libs)
 all: $(TARGET)
 
 $(TARGET): main.o fifo.o functions.o utils.o recv.o stream.o
+	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 .PHONY: clean
 clean:

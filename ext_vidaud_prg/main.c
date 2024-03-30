@@ -31,7 +31,7 @@ void getScreenRateFromSyncMode(void)
 // get current palette type, screen resolution, screen rate
 void getMachineDetails(void)
 {
-    machine.type = getMachineType();
+    Supexec(getMachineType);
 
     switch(machine.type) {
         case MACHINE_ST:    machine.paletteType = VID_PALETTE_ST; break;
@@ -84,7 +84,7 @@ int main(void)
     //------
     audioInitParams();  // init audio params - need to do this for the audio.* values to be set
 
-    uint8_t res = cexCallLong(extId, "start", 6, VIDEO_FPS, machine.resolution, machine.paletteType, audio.rateHz, audio.channels, "/tmp/bad_apple.mp4");
+    uint8_t res = cexCallLong(extId, "start", 6, VIDEO_FPS, machine.resolution, machine.paletteType, audio.rateHz, audio.channels, "/home/jookie/bad_apple.mp4");
 
     if(res != STATUS_OK) {      // calling function failed?
         showMessage("start - call failed\r\n", 3);

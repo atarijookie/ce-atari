@@ -1,6 +1,7 @@
 #include <mint/sysbind.h>
 #include <mint/osbind.h>
 
+#include "main.h"
 #include "stdlib.h"
 
 void* memcpy(void* destination, const void* source, int num)
@@ -225,13 +226,14 @@ void storeDword(uint8_t *bfr, uint32_t val)
     bfr[3] = val;       // store lo
 }
 
-uint8_t getMachineType(void)
+void getMachineType(void)
 {
     uint32_t *cookieJarAddr    = (uint32_t *) 0x05A0;
     uint32_t *cookieJar        = (uint32_t *) *cookieJarAddr;     // get address of cookie jar
 
     if(cookieJar == 0) {                        // no cookie jar? it's an old ST
-        return MACHINE_ST;
+        machine.type = MACHINE_ST;
+        return;
     }
 
     uint32_t cookieKey, cookieValue;
@@ -249,24 +251,25 @@ uint8_t getMachineType(void)
             uint16_t machineMinor = (uint16_t) cookieValue;
 
             switch(machineMajor) {
-                case 0: return MACHINE_ST;
+                case 0: machine.type = MACHINE_ST; return;
 
                 case 1: {   // major is 1, determine specific machine based on minor
                     if(machineMinor == 0 || machineMinor == 16) {   // 0 and 16 are STE and Mega STE
-                        return MACHINE_STE;
+                        machine.type = MACHINE_STE;
+                        return;
                     }
                     break;
                 };
 
-                case 2: return MACHINE_TT;
-                case 3: return MACHINE_FALCON;
+                case 2: machine.type = MACHINE_TT; return;
+                case 3: machine.type = MACHINE_FALCON; return;
             }
 
-            break;                              // or it's ST
+            break;              // or it's ST
         }
     }
 
-    return MACHINE_ST;                          // it's an ST
+    machine.type = MACHINE_ST;  // it's an ST
 }
 
 void showMessage(const char* message, int sleepTime)

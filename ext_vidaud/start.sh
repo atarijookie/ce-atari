@@ -24,6 +24,14 @@ EXECUTABLE="./${EXT_NAME}.elf"
 
 # if the executable doesn't exist, run the compilation
 if [ ! -f "${EXECUTABLE}" ]; then
+    # check if required lib is installed
+    got_lib=$( dpkg -l libgraphicsmagick++1-dev | grep libgraphicsmagick++1-dev | wc -l )
+
+    if [ "got_lib" -eq "0" ]; then      # if required lib not present, install it
+        sudo apt -y install libgraphicsmagick++1-dev
+    fi
+
+    # build the executable
     make
 fi
 

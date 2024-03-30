@@ -40,14 +40,19 @@ void start(json args, ResponseFromExtension* resp)
     stream.audioChannels = args.at(4);
     stream.filePath = args.at(5);
 
+    log(LOG_DEBUG, "start - fps: %d, resolution: %d, palette: %d, audio rate: %d, audio channels: %d, file: %s", 
+        stream.videoFps, stream.videoResolution, stream.videoPaletteType, stream.audioRateHz, stream.audioChannels, stream.filePath.c_str());
+
     // bad param? fail
     if(stream.videoFps > 30 || stream.videoResolution > VID_RES_ST_HIGH || stream.audioRateHz > 50000 || stream.audioChannels > AUDIO_STEREO) {
+        log(LOG_WARNING, "start - bad argument!");
         resp->statusByte = STATUS_BAD_ARGUMENT;
         return;
     }
 
     // file not found? fail
     if(!fileExists(stream.filePath.c_str())) {
+        log(LOG_WARNING, "start - file does not exist: %s", stream.filePath.c_str());
         resp->statusByte = STATUS_BAD_ARGUMENT;
         return;
     }
@@ -64,6 +69,7 @@ void start(json args, ResponseFromExtension* resp)
     stream.running = stream.pipe != NULL;    // running if got valid handle
 
     resp->statusByte = stream.running ? STATUS_OK : STATUS_EXT_ERROR;
+    log(LOG_DEBUG, "start -- statusByte: %d", resp->statusByte);
 }
 
 /*
@@ -87,6 +93,7 @@ void get_frames(json args, ResponseFromExtension* resp)
     uint32_t videoBytesPerFrame = 0;
 
     if(framesCount > MAX_GET_FRAMES) {  // asking for more frames than allowed? fail
+        log(LOG_WARNING, "get_frames -- bad argument!");
         resp->statusByte = STATUS_BAD_ARGUMENT;
         return;
     }
@@ -104,11 +111,12 @@ void get_frames(json args, ResponseFromExtension* resp)
     // stream is not running? update the bytesWant to only what remains in FIFO
     if(!stream.running) {
         mutexLock();
-        bytesWant = fifoAudio->usedBytes();
+        bytesWant = fifoVideo->usedBytes();
         mutexUnlock();
 
         // stream not running and no more data in FIFO? no more frames!
         if(bytesWant == 0) {
+            log(LOG_INFO, "get_frames -- no more frames");
             resp->statusByte = STATUS_NO_MORE_FRAMES;
             return;
         }
@@ -119,6 +127,7 @@ void get_frames(json args, ResponseFromExtension* resp)
 
     // not engouh bytes in FIFO? don't send data now
     if(!canGetBytes) {
+        log(LOG_WARNING, "get_frames -- waitForBytesInFifo couldn't get bytes");
         resp->statusByte = STATUS_NO_RESPONSE;
         return;
     }
@@ -141,6 +150,8 @@ void get_frames(json args, ResponseFromExtension* resp)
 
     // after the conversion copy in the palettes after the video frames
     memcpy(resp->data + (framesCount * ST_FRAME_SIZE), stPalettes, framesCount * ST_PALETTE_SIZE);
+
+    log(LOG_DEBUG, "get_frames -- returning %d frames", framesCount);
 
     uint32_t respSizeBytes = framesCount * 32032;
     responseStoreStatusAndDataLen(resp, framesCount, respSizeBytes);    // the status holds how many frames we are returning to ST
@@ -167,6 +178,7 @@ void get_samples(json args, ResponseFromExtension* resp)
     uint32_t bytesWant = framesCount * audioBytesPerFrame;  // how many bytes we want transfer now
 
     if(bytesWant > MAX_RESPONSE_DATA_SIZE) {        // the bytes we want couldn't fit in the reponse, fail here
+        log(LOG_DEBUG, "get_samples -- bad argument!");
         resp->statusByte = STATUS_BAD_ARGUMENT;
         return;
     }
@@ -179,6 +191,7 @@ void get_samples(json args, ResponseFromExtension* resp)
 
         // stream not running and no more data in FIFO? no more frames!
         if(bytesWant == 0) {
+            log(LOG_INFO, "get_samples -- no more frames");
             resp->statusByte = STATUS_NO_MORE_FRAMES;
             return;
         }
@@ -188,6 +201,7 @@ void get_samples(json args, ResponseFromExtension* resp)
     bool canGetBytes = waitForBytesInFifo(fifoAudio, bytesWant, framesCount);
 
     if(!canGetBytes) {  // not engouh bytes in FIFO? don't send data now
+        log(LOG_WARNING, "get_samples -- waitForBytesInFifo couldn't get bytes");
         resp->statusByte = STATUS_NO_RESPONSE;
         return;
     }
@@ -210,6 +224,7 @@ void get_samples(json args, ResponseFromExtension* resp)
         bytesWant += paddBytes;                         // increase the received bytes to full frame
     }
 
+    log(LOG_DEBUG, "get_samples -- returning %d frames", framesReceived);
     responseStoreStatusAndDataLen(resp, framesReceived, bytesWant);     // the status holds how many frames we are returning to ST
 }
 

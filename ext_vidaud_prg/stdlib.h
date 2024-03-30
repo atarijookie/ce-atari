@@ -36,7 +36,7 @@ void storeDword(uint8_t *bfr, uint32_t val);
 #define MACHINE_STE     1
 #define MACHINE_TT      2
 #define MACHINE_FALCON  3
-uint8_t getMachineType(void);
+void getMachineType(void);
 
 void showMessage(const char* message, int sleepTime);
 uint8_t* addrToEven(uint8_t* addrIn);
