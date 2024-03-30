@@ -14,6 +14,7 @@
 #include "playback.h"
 #include "fifo.h"
 #include "video.h"
+#include "audio.h"
 
 uint8_t streamEOF = 0;  // non-zero if we did reach end of stream
 
@@ -23,9 +24,12 @@ void playback(void)
     videoInit();
 
     // get first video frames and audio samples
+    audioGetSamplesFirstTime();
     getVideoFrames();
 
-    vblInstallHandler();    // install VBL routine
+    // start video and audio playback
+    vblInstallHandler();
+    audioPlay();
 
     // keep playing while not at the end of stream and we still got some frames
     while(!streamEOF && videoFifo.count > 0) {
@@ -36,8 +40,15 @@ void playback(void)
         if(!streamEOF && videoFifo.count <= ACSI_MAX_VIDEO_FPT) {
             getVideoFrames();
         }
+
+        // call this periodically to check if the audio stream needs refilling and feed it
+        audioCheckAndFeed();
     }
     
-    vblRemoveHandler();             // uninstall VBL routine
-    Supexec(restoreCurrentScreen);  // restore original screen content with palette
+    // stop audio and video playback
+    audioStop();
+    vblRemoveHandler();
+
+    // restore original screen content with palette
+    Supexec(restoreCurrentScreen);
 }
