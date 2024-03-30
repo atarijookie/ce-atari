@@ -39,18 +39,17 @@ void fifoAdd(Fifo* fifo, uint32_t val1, uint32_t val2)
 
     fifoMutex = MUTEX_LOCKED;
 
-    fifo->count++;
-
     // store data at the right position
     fifo->data1[fifo->indexAdd] = val1;
     fifo->data2[fifo->indexAdd] = val2;
 
     fifo->indexAdd++;
 
-    if(fifo->indexAdd >= FIFO_SIZE) {    // if reached end of buffer, go to start
+    if(fifo->indexAdd >= FIFO_SIZE) {   // if reached end of buffer, go to start
         fifo->indexAdd = 0;
     }
 
+    fifo->count++;                      // on add - we want the count to be updated as late as possible
     fifoMutex = MUTEX_OPEN;
 }
 
@@ -62,7 +61,7 @@ void fifoGet(Fifo* fifo, uint32_t* val1, uint32_t* val2)
         return;
     }
 
-    fifo->count--;
+    fifo->count--;  // on get - we want the count to be updated as soon as possible
 
     // get data from fifo
     *val1 = fifo->data1[fifo->indexGet];

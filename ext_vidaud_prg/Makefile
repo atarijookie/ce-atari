@@ -31,14 +31,15 @@ AT_0 := @
 AT_1 :=
 AT = $(AT_$(V))
 
-HDR		= extension.h extensiondefs.h stdlib.h stream.h playback.h fifo.h
-CSRC	= main.c stdlib.c extension.c playback.c fifo.c
+HDR		= extension.h extensiondefs.h stdlib.h stream.h playback.h fifo.h video.h audio.h
+CSRC	= main.c stdlib.c extension.c playback.c fifo.c video.c audio.c
+SSRC    = screenirq.s
 
 CFLAGS	+= -nostdlib
 STARTUP	= startup.s
 
 DEPS = $(CSRC:.c=.d)
-OBJS = $(patsubst %.c,%.o,$(CSRC))
+OBJS = $(patsubst %.c,%.o,$(CSRC)) $(SSRC:.s=.o)
 OBJS030	= 
 
 $(TARGET): $(STARTUP) $(OBJS) $(OBJS030)

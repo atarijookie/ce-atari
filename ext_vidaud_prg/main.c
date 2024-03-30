@@ -10,16 +10,25 @@
 
 #include "stdlib.h"
 #include "extension.h"
+#include "main.h"
 #include "stream.h"
 #include "playback.h"
+#include "video.h"
+#include "audio.h"
 
-#define BUFFER_SIZE (1024 + 2)       // extra 2 bytes, because pBuffer will be aligned to even address
 uint8_t buffer[BUFFER_SIZE];
 uint8_t *pBuffer;
 
 TMachine machine;
 uint8_t extId;
 
+void getScreenRateFromSyncMode(void)
+{
+    uint8_t syncMode = *REG_VIDEO_SHIFTER_SYNC_MODE;
+    machine.screenRateHz = (syncMode & 2) ? 60 : 50;    // bit 1 set means 60 Hz, otherwise 50 Hz
+}
+
+// get current palette type, screen resolution, screen rate
 void getMachineDetails(void)
 {
     machine.type = getMachineType();
@@ -37,6 +46,12 @@ void getMachineDetails(void)
         case 1: machine.resolution = VID_RES_ST_MID; break;
         case 2: machine.resolution = VID_RES_ST_HIGH; break;
         default: machine.resolution = VID_RES_OFF; break;
+    }
+
+    if(machine.resolution == VID_RES_ST_HIGH) { // ST high runs on 70 Hz
+        machine.screenRateHz = 70;
+    } else {    // for ST mid and ST low find out the frequency
+        Supexec(getScreenRateFromSyncMode);
     }
 }
 
@@ -67,7 +82,9 @@ int main(void)
     }
 
     //------
-    uint8_t res = cexCallLong(extId, "start", 6, VIDEO_FPS, machine.resolution, machine.paletteType, AUDIO_RATE, AUDIO_CHANNELS, "/tmp/bad_apple.mp4");
+    audioInitParams();  // init audio params - need to do this for the audio.* values to be set
+
+    uint8_t res = cexCallLong(extId, "start", 6, VIDEO_FPS, machine.resolution, machine.paletteType, audio.rateHz, audio.channels, "/tmp/bad_apple.mp4");
 
     if(res != STATUS_OK) {      // calling function failed?
         showMessage("start - call failed\r\n", 3);
