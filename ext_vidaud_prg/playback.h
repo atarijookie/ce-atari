@@ -18,6 +18,14 @@ typedef struct {
     uint8_t screenRateHz;   // how many Hz does the current screen run on
 } TMachine;
 
+// some info and flags on playback
+typedef struct {
+    uint8_t video;
+    uint8_t audio;
+} TPlay;
+
+extern TPlay play;
+
 extern uint8_t streamEOF;
 void playback(void);
 

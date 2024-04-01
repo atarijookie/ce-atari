@@ -68,7 +68,21 @@ void start(json args, ResponseFromExtension* resp)
     stream.pipe = popen(cmd, "r");
     stream.running = stream.pipe != NULL;    // running if got valid handle
 
-    resp->statusByte = stream.running ? STATUS_OK : STATUS_EXT_ERROR;
+    if(stream.running) {    // when stream running
+        resp->statusByte = 0;
+
+        // bit 0 set if playing video, bit 1 set if playing audio
+        if(stream.playVideo) {
+            resp->statusByte |= 1;
+        }
+
+        if(stream.playAudio) {
+            resp->statusByte |= 2;
+        }
+    } else {                // when stream failed to start
+        resp->statusByte = STATUS_EXT_ERROR;
+    }
+
     log(LOG_DEBUG, "start -- statusByte: %d", resp->statusByte);
 }
 

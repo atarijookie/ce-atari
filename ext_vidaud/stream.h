@@ -33,6 +33,8 @@ struct TStream {
     std::string filePath;
     bool running;
     FILE* pipe;
+    uint8_t playVideo;
+    uint8_t playAudio;
 };
 
 class Fifo;

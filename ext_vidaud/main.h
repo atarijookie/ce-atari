@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include "extensiondefs.h"
 
-#define EXTENSION_NAME      "ext_vid_aud"
+#define EXTENSION_NAME      "ext_vidaud"
 #define IN_SOCKET_PATH      "/tmp/" EXTENSION_NAME ".sock"  // where we will get commands from CE
 #define LOG_FILE_NAME       "/tmp/" EXTENSION_NAME ".log"
 

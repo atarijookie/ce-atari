@@ -71,17 +71,20 @@ void createShellCommand(char* cmdBuffer, int cmdBufferLen, const char* inputFile
     const char* cmdFormatAV =                                   // audio + video output
         "ffmpeg -re -i %s "                                     // input path with filename
         "-map 0:v -pix_fmt %s -r %d -s %s -f rawvideo unix:%s " // video output: pixel format, frame rate, resolution, output to unix socket path
-        "-map 0:a -ar %d -ac %d -f au -c pcm_s8 unix:%s";       // audio output: audio rate, audio channels, output to unix socket path
+        "-map 0:a -ar %d -ac %d -f au -c pcm_s8 unix:%s "       // audio output: audio rate, audio channels, output to unix socket path
+        " 2>&1 ";                                               // redirect output
 
     const char* cmdFormatA =                                    // audio only output
         "ffmpeg -re -i %s "                                     // input path with filename
         "-vn "                                                  // no video output
-        "-map 0:a -ar %d -ac %d -f au -c pcm_s8 unix:%s";       // audio output: audio rate, audio channels, output to unix socket path
+        "-map 0:a -ar %d -ac %d -f au -c pcm_s8 unix:%s "       // audio output: audio rate, audio channels, output to unix socket path
+        "2>&1 ";                                                // redirect output
 
     const char* cmdFormatV =                                    // video only output
         "ffmpeg -re -i %s "                                     // input path with filename
         "-map 0:v -pix_fmt %s -r %d -s %s -f rawvideo unix:%s " // video output: pixel format, frame rate, resolution, output to unix socket path
-        "-an";                                                  // no audio output
+        "-an "                                                  // no audio output
+        "2>&1 ";                                                // redirect output
 
     // get resolution as string
     const char* resolutionStr = getResolutionString(vidRes);
@@ -89,6 +92,9 @@ void createShellCommand(char* cmdBuffer, int cmdBufferLen, const char* inputFile
 
     // video only?
     if(audioChannels == AUDIO_OFF) {
+        stream.playVideo = 1;
+        stream.playAudio = 0;
+
         snprintf(cmdBuffer, cmdBufferLen - 1, 
             cmdFormatV,                                                         // format string
             inputFile,                                                          // input path with filename
@@ -98,6 +104,9 @@ void createShellCommand(char* cmdBuffer, int cmdBufferLen, const char* inputFile
 
     // audio only?
     if(vidRes == VID_RES_OFF) {
+        stream.playVideo = 0;
+        stream.playAudio = 1;
+
         snprintf(cmdBuffer, cmdBufferLen - 1, 
             cmdFormatA,                                                         // format string
             inputFile,                                                          // input path with filename
@@ -106,6 +115,9 @@ void createShellCommand(char* cmdBuffer, int cmdBufferLen, const char* inputFile
     } 
 
     // audio and video output
+    stream.playVideo = 1;
+    stream.playAudio = 1;
+
     snprintf(cmdBuffer, cmdBufferLen - 1, 
         cmdFormatAV,                                                         // format string
         inputFile,                                                          // input path with filename

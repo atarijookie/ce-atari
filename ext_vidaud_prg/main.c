@@ -21,6 +21,7 @@ uint8_t *pBuffer;
 
 TMachine machine;
 uint8_t extId;
+TPlay play;
 
 void getScreenRateFromSyncMode(void)
 {
@@ -86,10 +87,13 @@ int main(void)
 
     uint8_t res = cexCallLong(extId, "start", 6, VIDEO_FPS, machine.resolution, machine.paletteType, audio.rateHz, audio.channels, "/home/jookie/bad_apple.mp4");
 
-    if(res != STATUS_OK) {      // calling function failed?
+    if(res == 0 || res > 3) {       // bits 0 and 1 are flags, so max value on ok is 3, if greater than calling function failed
         showMessage("start - call failed\r\n", 3);
         return 0;
     }
+
+    play.video = res & 1;   // play video if bit 0 set
+    play.audio = res & 2;   // play audio if bit 1 set
 
     playback();
 

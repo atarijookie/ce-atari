@@ -21,34 +21,48 @@ uint8_t streamEOF = 0;  // non-zero if we did reach end of stream
 void playback(void)
 {
     streamEOF = 0;          // not EOF at the start
-    videoInit();
 
-    // get first video frames and audio samples
-    audioGetSamplesFirstTime();
-    getVideoFrames();
+    // get first video frames and audio samples, then start playing
+    if(play.audio) {
+        audioGetSamplesFirstTime();
+    }
+
+    if(play.video) {
+        videoInit();
+        getVideoFrames();
+        vblInstallHandler();
+    }
 
     // start video and audio playback
-    vblInstallHandler();
-    audioPlay();
+    if(play.audio) {
+        audioPlay();
+    }
 
     // keep playing while not at the end of stream and we still got some frames
     while(!streamEOF && videoFifo.count > 0) {
-        // We are using 2 buffers for receiving frames, each fits ACSI_MAX_VIDEO_FPT frames into it.
-        // If we're completelly full, fifo holds 2*ACSI_MAX_VIDEO_FPT frames, and if we're 
-        // half-full then fifo has ACSI_MAX_VIDEO_FPT frames in it (or less). This is the moment we
-        // can fetch more frames, because this means that one of the buffers is empty.
-        if(!streamEOF && videoFifo.count <= ACSI_MAX_VIDEO_FPT) {
-            getVideoFrames();
+        if(play.video) {
+            // We are using 2 buffers for receiving frames, each fits ACSI_MAX_VIDEO_FPT frames into it.
+            // If we're completelly full, fifo holds 2*ACSI_MAX_VIDEO_FPT frames, and if we're 
+            // half-full then fifo has ACSI_MAX_VIDEO_FPT frames in it (or less). This is the moment we
+            // can fetch more frames, because this means that one of the buffers is empty.
+            if(!streamEOF && videoFifo.count <= ACSI_MAX_VIDEO_FPT) {
+                getVideoFrames();
+            }
         }
 
-        // call this periodically to check if the audio stream needs refilling and feed it
-        audioCheckAndFeed();
+        if(play.audio) {
+            // call this periodically to check if the audio stream needs refilling and feed it
+            audioCheckAndFeed();
+        }
     }
     
     // stop audio and video playback
-    audioStop();
-    vblRemoveHandler();
+    if(play.audio) {
+        audioStop();
+    }
 
-    // restore original screen content with palette
-    Supexec(restoreCurrentScreen);
+    if(play.video) {
+        vblRemoveHandler();
+        Supexec(restoreCurrentScreen);  // restore original screen content with palette
+    }
 }
