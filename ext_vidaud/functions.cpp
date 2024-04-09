@@ -95,22 +95,23 @@ void stop(json args, ResponseFromExtension* resp)
     resp->statusByte = STATUS_OK;
 }
 
-/*
-    Get current video frames
-
-args:
-    - count of video frames to fetch
-*/
-void get_frames(json args, ResponseFromExtension* resp)
+uint32_t getAudioBytesPerFrame(void)
 {
-    uint32_t framesCount = args.at(0);
-    uint32_t videoBytesPerFrame = 0;
+    uint32_t audioBytesPerFrame = 0;
 
-    if(framesCount > MAX_GET_FRAMES) {  // asking for more frames than allowed? fail
-        log(LOG_WARNING, "get_frames -- bad argument!");
-        resp->statusByte = STATUS_BAD_ARGUMENT;
-        return;
+    if(stream.videoFps > 0) {
+        // calculate how many audio bytes we get for each video frame, like:
+        // (25000 Hz / 10 fps) * 2 channels = 5000 bytes per each video frame
+        audioBytesPerFrame = (stream.audioRateHz / stream.videoFps) * stream.audioChannels;
     }
+
+    return audioBytesPerFrame;
+}
+
+// how many bytes one video frame in FIFO has
+uint32_t getVideoBytesPerFrame(void)
+{
+    uint32_t videoBytesPerFrame = 0;
 
     if(stream.videoFps > 0) {
         switch(stream.videoResolution) {
@@ -120,6 +121,66 @@ void get_frames(json args, ResponseFromExtension* resp)
         }
     }
 
+    return videoBytesPerFrame;
+}
+
+/*
+    Get count of frames available in FIFO.
+
+args:
+    - 1 for video frames count, 2 for audio frames count, other for MIN(video_frames, audio_frames)
+*/
+void get_frame_count(json args, ResponseFromExtension* resp)
+{
+    uint8_t whichFrames = args.at(0);
+
+    // how many bytes of audio / video one frame is
+    uint32_t audioBytesPerFrame = getAudioBytesPerFrame();
+    uint32_t videoBytesPerFrame = getVideoBytesPerFrame();
+
+    // how many bytes of audio / video we have
+    mutexLock();
+    uint32_t videoBytes = fifoVideo->usedBytes();
+    uint32_t audioBytes = fifoAudio->usedBytes();
+    mutexUnlock();
+
+    // how many audio / video frames we got
+    uint32_t videoFrames = videoBytes / videoBytesPerFrame;
+    uint32_t audioFrames = audioBytes / audioBytesPerFrame;
+
+    log(LOG_DEBUG, "get_frame_count - whichFrames: %d, videoFrames: %d, audioFrames: %d", whichFrames, videoFrames, audioFrames);
+
+    if(whichFrames == 1) {  // only video frames
+        resp->statusByte = videoFrames;
+        return;
+    }
+
+    if(whichFrames == 2) {  // only audio frames
+        resp->statusByte = audioFrames;
+        return;
+    }
+
+    // minimum from audio and video frames
+    resp->statusByte = MIN(audioFrames, videoFrames);
+}
+
+/*
+    Get current video frames
+
+args:
+    - count of video frames to fetch
+*/
+void get_frames(json args, ResponseFromExtension* resp)
+{
+    uint32_t framesCount = args.at(0);
+
+    if(framesCount > MAX_GET_FRAMES) {  // asking for more frames than allowed? fail
+        log(LOG_WARNING, "get_frames -- bad argument!");
+        resp->statusByte = STATUS_BAD_ARGUMENT;
+        return;
+    }
+
+    uint32_t videoBytesPerFrame = getVideoBytesPerFrame();
     uint32_t bytesWant = framesCount * videoBytesPerFrame;  // how many bytes we want transfer now
 
     // stream is not running? update the bytesWant to only what remains in FIFO
@@ -181,14 +242,7 @@ args:
 void get_samples(json args, ResponseFromExtension* resp)
 {
     uint32_t framesCount = args.at(0);
-    uint32_t audioBytesPerFrame = 0;
-
-    if(stream.videoFps > 0) {
-        // calculate how many audio bytes we get for each video frame, like:
-        // (25000 Hz / 10 fps) * 2 channels = 5000 bytes per each video frame
-        audioBytesPerFrame = (stream.audioRateHz / stream.videoFps) * stream.audioChannels;
-    }
-
+    uint32_t audioBytesPerFrame = getAudioBytesPerFrame();
     uint32_t bytesWant = framesCount * audioBytesPerFrame;  // how many bytes we want transfer now
 
     if(bytesWant > MAX_RESPONSE_DATA_SIZE) {        // the bytes we want couldn't fit in the reponse, fail here
@@ -260,8 +314,10 @@ void exportFunctionSignatures(void)
 
     addFunctionSignature((void*) stop, "stop", FUNC_RAW_WRITE, NULL, 0, RESP_TYPE_STATUS);
 
-    uint8_t args3[2] = {TYPE_UINT8, TYPE_UINT8};
-    addFunctionSignature((void*) get_frames, "get_frames", FUNC_RAW_READ, args3, 2, RESP_TYPE_STATUS_BIN_DATA);
+    uint8_t args3[2] = {TYPE_UINT8};
+    addFunctionSignature((void*) get_frames, "get_frames", FUNC_RAW_READ, args3, 1, RESP_TYPE_STATUS_BIN_DATA);
 
-    addFunctionSignature((void*) get_samples, "get_samples", FUNC_RAW_READ, args3, 2, RESP_TYPE_STATUS_BIN_DATA);
+    addFunctionSignature((void*) get_samples, "get_samples", FUNC_RAW_READ, args3, 1, RESP_TYPE_STATUS_BIN_DATA);
+
+    addFunctionSignature((void*) get_frame_count, "get_frame_count", FUNC_RAW_READ, args3, 1, RESP_TYPE_STATUS);
 }

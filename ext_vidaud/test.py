@@ -119,6 +119,9 @@ if __name__ == "__main__":
     #---------
     print("Stoping and starting extension...")
     os.system("./stop.sh")                          # stop the extension if it's running
+
+    sleep(5)
+
     start_command = f"./start.sh {TEST_SOCK_PATH} {extension_id} &"
     print("start command: ", start_command)
     os.system(start_command)                        # start the extension now
@@ -127,7 +130,7 @@ if __name__ == "__main__":
     # should receive CEX_FUN_OPEN first, instead of status it returns count of exported functions, also returns path to socket
     response_raw = get_data_from_sock(sock)
 
-    exported_func_count = 4
+    exported_func_count = 5
     func_signature_size = 45
     all_signatures_size = exported_func_count * func_signature_size
 
@@ -145,6 +148,19 @@ if __name__ == "__main__":
     response_raw = get_data_from_sock(sock)
     resp_data = verify_id_name_status_len(response_raw, 'start', 3, 0)      # 3 means play video and audio
     print("start - ok")
+
+    #--------
+    for i in range(10):
+        msg = {'function': 'get_frame_count', 'args': [0]}
+        send_to_ext(json.dumps(msg))
+        response_raw = get_data_from_sock(sock)
+        status = verify_id_name(response_raw, 'get_frame_count')
+        print(f"get_frame_count: {status}")
+
+        if status > 10 and status < 100:     # got at least 10 frames, but not too many (would be error)
+            break
+
+        sleep(0.3)
 
     #---------
     # get the frames

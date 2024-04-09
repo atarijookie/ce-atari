@@ -75,6 +75,7 @@ void acceptSocketIfNeededAndPossible(int fdListen, int& fdClient)
     int newSock = accept(fdListen, (struct sockaddr *) &remote, &addrSize);
 
     if(newSock < 0) {       // nothing to accept, would block? quit
+        log(LOG_DEBUG, "acceptSocketIfNeededAndPossible - nothing to accept");
         return;
     }
 
@@ -82,6 +83,8 @@ void acceptSocketIfNeededAndPossible(int fdListen, int& fdClient)
     tv.tv_sec = 0;
     tv.tv_usec = 500000;    // 500 ms timeout on blocking reads
     setsockopt(newSock, SOL_SOCKET, SO_RCVTIMEO, (const char*) &tv, sizeof(tv));
+
+    log(LOG_DEBUG, "acceptSocketIfNeededAndPossible - accepted socket %d", newSock);
 
     // got the new client socket now
     fdClient = newSock;
@@ -101,6 +104,7 @@ void readFromSockToFifo(int sock, Fifo* fifo, uint8_t* bfr, uint32_t bfrLen)
 
     if(rv == -1) {  // ioctl failed?
         bytesAvailable = 0;
+        return;
     }
 
     int bytesToRead = MIN(bytesAvailable, (int) bfrLen);    // we can only read either bytes that are ready or up to buffer size
@@ -108,6 +112,8 @@ void readFromSockToFifo(int sock, Fifo* fifo, uint8_t* bfr, uint32_t bfrLen)
     ssize_t recvCnt = recv(sock, bfr, bytesToRead, 0);
 
     if(recvCnt > 0) {
+        log(LOG_DEBUG, "readFromSockToFifo - bytesToRead: %d, recvCnt: %d", bytesToRead, recvCnt);
+
         mutexLock();
         fifo->addBfr(bfr, recvCnt);
         mutexUnlock();
@@ -150,6 +156,7 @@ void *recvThreadCode(void *ptr)
         int res = select(maxSock + 1, &readFds, NULL, NULL, &timeout);     // wait for data or timeout here
 
         if(res < 0) {   // select timed out, no other handling
+            log(LOG_DEBUG, "recvThreadCode - timeout");
             continue;
         }
 
