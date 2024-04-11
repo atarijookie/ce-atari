@@ -32,7 +32,8 @@ struct TStream {
     uint8_t audioChannels;
     std::string filePath;
     bool running;
-    FILE* pipe;
+    FILE* pipeFILE;
+    int   pipeFd;
     uint8_t playVideo;
     uint8_t playAudio;
 };
@@ -44,7 +45,7 @@ void exportFunctionSignatures(void);
 const char *getResolutionString(uint8_t resolution);
 const char *getPixelFormat(uint8_t resolution);
 void createShellCommand(char *cmdBuffer, int cmdBufferLen, const char *inputFile, uint8_t vidFps, uint8_t vidRes, uint16_t audioRate, uint16_t audioChannels);
-bool waitForBytesInFifo(Fifo *fifo, uint32_t bytesWant, uint32_t waitFrames);
+uint8_t waitForBytesInFifo(Fifo *fifo, uint32_t framesWant, uint32_t bytesPerFrame);
 void convertVideoFrameToSt(uint8_t *frameDataRGB, uint32_t videoBytesPerFrame, uint8_t *stFrame, uint8_t* stPalette);
 
 #endif

@@ -18,40 +18,12 @@ void Fifo::clear(void)
     getPos = 0;
 }
 
-void Fifo::add(uint8_t val)
-{
-    if(freeBytes() == 0) {          // buffer full? quit
-        return;
-    }
-    count++;                        // update count
-
-    buf[addPos] = val;              // store data
-
-    addPos++;                       // update 'add' position
-    addPos = addPos & CYCLIC_BUF_MASK;
-}
-
-uint8_t Fifo::get(void)
-{
-    if(usedBytes() == 0) {          // buffer empty? quit
-        return 0;
-    }
-    count--;                        // update count
-
-    uint8_t val = buf[getPos];      // get data
-
-    getPos++;                       // update 'get' position
-    getPos = getPos & CYCLIC_BUF_MASK;
-
-    return val;
-}
-
-uint32_t Fifo::usedBytes(void)
+volatile uint32_t Fifo::usedBytes(void)
 {
     return count;
 }
 
-uint32_t Fifo::freeBytes(void)
+volatile uint32_t Fifo::freeBytes(void)
 {
     return (CYCLIC_BUF_SIZE - count);
 }
@@ -82,7 +54,7 @@ void Fifo::addBfr(uint8_t* bfr, uint32_t size)
 
 void Fifo::getBfr(uint8_t* bfr, uint32_t size)
 {
-    uint32_t usedCnt = usedBytes();
+    volatile uint32_t usedCnt = usedBytes();
 
     if(usedCnt == 0) {              // buffer empty? quit
         return;
@@ -99,8 +71,9 @@ void Fifo::getBfr(uint8_t* bfr, uint32_t size)
         getPos = cntAtStart;                                // next time get after the part at the start
         count -= getCnt;                                    // we've retrieved whole getCount
     } else {    // getting of data will not go beyond the end
+        // log(LOG_DEBUG, "getBfr - getPos: %d, getCnt: %d, bfr: %p,  &buf[getPos]: %p", getPos, getCnt, bfr, &buf[getPos]);
         memcpy(bfr, &buf[getPos], getCnt);
-        getPos -= getCnt;
+        getPos += getCnt;
         count -= getCnt;
     }
 }

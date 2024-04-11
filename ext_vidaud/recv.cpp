@@ -14,6 +14,7 @@
 #include "recv.h"
 #include "fifo.h"
 #include "utils.h"
+#include "stream.h"
 
 bool threadCreated = false;
 pthread_t recvThreadInfo;
@@ -21,6 +22,7 @@ extern volatile sig_atomic_t shouldStop;
 
 Fifo* fifoAudio;
 Fifo* fifoVideo;
+extern TStream stream;
 
 void createUnixRecvStreamSocket(int &fdListen, const char* pathToSocket)
 {
@@ -112,11 +114,13 @@ void readFromSockToFifo(int sock, Fifo* fifo, uint8_t* bfr, uint32_t bfrLen)
     ssize_t recvCnt = recv(sock, bfr, bytesToRead, 0);
 
     if(recvCnt > 0) {
-        log(LOG_DEBUG, "readFromSockToFifo - bytesToRead: %d, recvCnt: %d", bytesToRead, recvCnt);
-
         mutexLock();
         fifo->addBfr(bfr, recvCnt);
+        volatile uint32_t bytesInFifo = fifo->usedBytes();
         mutexUnlock();
+
+        log(LOG_DEBUG, "readFromSockToFifo - bytesToRead: %d, recvCnt: %d - fifo: %s %p, bytesInFifo: %d",
+            bytesToRead, recvCnt, (fifo == fifoAudio) ? "AUDIO" : "VIDEO", fifo, bytesInFifo);
     }
 }
 
@@ -152,6 +156,8 @@ void *recvThreadCode(void *ptr)
         if(sockRecvAudio > 0) FD_SET(sockRecvAudio, &readFds);
         if(sockRecvVideo > 0) FD_SET(sockRecvVideo, &readFds);
 
+        if(stream.pipeFd > 0) FD_SET(stream.pipeFd, &readFds);
+
         int maxSock = MAX(sockRecvAudio, sockRecvVideo);
         int res = select(maxSock + 1, &readFds, NULL, NULL, &timeout);     // wait for data or timeout here
 
@@ -163,6 +169,8 @@ void *recvThreadCode(void *ptr)
         // if listening socket is ready to accept, then accept connection
         if(FD_ISSET(sockListenAudio, &readFds)) acceptSocketIfNeededAndPossible(sockListenAudio, sockRecvAudio);
         if(FD_ISSET(sockListenVideo, &readFds)) acceptSocketIfNeededAndPossible(sockListenVideo, sockRecvVideo);
+
+        if(FD_ISSET(stream.pipeFd, &readFds)) readFromStreamPipe();
 
         // got audio recv socket?
         if(sockRecvAudio > 0 && FD_ISSET(sockRecvAudio, &readFds)) {
@@ -205,4 +213,25 @@ void createRecvThreadIfNeeded(void)
     threadCreated = true;
     log(LOG_DEBUG, "recv thread created");
     pthread_setname_np(recvThreadInfo, "recvThread");
+}
+
+uint8_t pipeReadBuffer[512*1024];
+
+void readFromStreamPipe(void)
+{
+    int bytesAvailable;
+    int rv = ioctl(stream.pipeFd, FIONREAD, &bytesAvailable);    // how many bytes we can read?
+
+    if(rv == -1) {  // ioctl failed?
+        return;
+    }
+
+    int bytesToRead = MIN(bytesAvailable, (int) sizeof(pipeReadBuffer));    // we can only read either bytes that are ready or up to buffer size
+
+    ssize_t recvCnt = read(stream.pipeFd, pipeReadBuffer, bytesToRead);
+
+    if(recvCnt == 0) {  // pipe closed?
+        stopStream();
+        log(LOG_INFO, "Pipe closed - ffmpeg exited.");
+    }
 }

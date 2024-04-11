@@ -11,20 +11,17 @@ public:
     Fifo(void);
     void clear(void);
 
-    void add(uint8_t val);
-    uint8_t get(void);
-
-    uint32_t usedBytes(void);
-    uint32_t freeBytes(void);
+    volatile uint32_t usedBytes(void);
+    volatile uint32_t freeBytes(void);
 
     void addBfr(uint8_t* bfr, uint32_t size);
     void getBfr(uint8_t* bfr, uint32_t size);
 
 private:
     uint8_t buf[CYCLIC_BUF_SIZE];
-    int  count;
-    int  addPos;
-    int  getPos;
+    volatile uint32_t count;
+    volatile uint32_t addPos;
+    volatile uint32_t getPos;
 };
 
 #endif

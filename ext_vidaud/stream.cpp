@@ -22,9 +22,11 @@ extern TStream stream;
 extern uint8_t frameDataRGB[RGB_FRAME_SIZE_BYTES];
 
 void stopStream(void) {
-    if(stream.pipe != NULL) {   // got the pipe? close it
-        pclose(stream.pipe);
-        stream.pipe = NULL;
+    if(stream.pipeFILE != NULL) {   // got the pipe? close it
+        pclose(stream.pipeFILE);
+        stream.pipeFILE = NULL;
+
+        stream.pipeFd = -1;
     }
 
     stream.running = false;
@@ -125,27 +127,34 @@ void createShellCommand(char* cmdBuffer, int cmdBufferLen, const char* inputFile
         audioRate, audioChannels, SOCK_PATH_RECV_FFMPEG_AUDIO);             // audio output: audio rate, audio channels, output to unix socket path
 }
 
-bool waitForBytesInFifo(Fifo* fifo, uint32_t bytesWant, uint32_t waitFrames)
+uint8_t waitForBytesInFifo(Fifo* fifo, uint32_t framesWant, uint32_t bytesPerFrame)
 {
     uint32_t oneFrameMs = 1000 / stream.videoFps;       // how many ms one frame takes
-    uint32_t waitDurationMs = waitFrames * oneFrameMs;  // how many ms we should wait before failing
+    uint32_t waitDurationMs = framesWant * oneFrameMs;  // how many ms we should wait before failing
 
     uint32_t endTime = getEndTime(waitDurationMs);      // when the waiting will be over
+    log(LOG_DEBUG, "waitForBytesInFifo - bytesPerFrame: %d, framesWant: %d, oneFrameMs: %d, waitDurationMs: %d, fifo: %p", 
+        bytesPerFrame, framesWant, oneFrameMs, waitDurationMs, fifo);
 
-    while(endTime <= getCurrentMs()) {              // while not timeout
+    uint32_t bytesWant = framesWant * bytesPerFrame;
+    volatile uint32_t gotBytes = 0;
+
+    while(endTime > getCurrentMs()) {       // while not timeout
         mutexLock();
-
-        if(fifo->usedBytes() >= bytesWant) {        // got enough data? get it and send it
-            return true;
-        }
-
+        gotBytes = fifo->usedBytes();
         mutexUnlock();
+
+        if(gotBytes >= bytesWant) {         // got enough data? get it and send it
+            return framesWant;
+        }
 
         sleepMs(5);     // not enough data, so sleep a little to wait
     }
 
     // if got here, then timeout happened before buffer had enough data
-    return false;
+    uint32_t framesGot = gotBytes / bytesPerFrame;
+    log(LOG_DEBUG, "waitForBytesInFifo - Wanted %d bytes / %d frames, but got only %d bytes / %d frames", bytesWant, framesWant, gotBytes, framesGot);
+    return framesGot;
 }
 
 void save_palette(uint8_t* pPalette, const Image& image)

@@ -65,10 +65,12 @@ void start(json args, ResponseFromExtension* resp)
     createShellCommand(cmd, sizeof(cmd), stream.filePath.c_str(), stream.videoFps, stream.videoResolution, stream.audioRateHz, stream.audioChannels);
 
     // start ffmpeg
-    stream.pipe = popen(cmd, "r");
-    stream.running = stream.pipe != NULL;    // running if got valid handle
+    stream.pipeFILE = popen(cmd, "r");
+    stream.running = stream.pipeFILE != NULL;    // running if got valid handle
 
     if(stream.running) {    // when stream running
+        stream.pipeFd = fileno(stream.pipeFILE);        // FILE* to fd
+
         resp->statusByte = 0;
 
         // bit 0 set if playing video, bit 1 set if playing audio
@@ -198,21 +200,19 @@ void get_frames(json args, ResponseFromExtension* resp)
     }
 
     // wait for enough data in buffer
-    bool canGetBytes = waitForBytesInFifo(fifoVideo, bytesWant, framesCount);
+    uint8_t gotFrames = waitForBytesInFifo(fifoVideo, framesCount, videoBytesPerFrame);
 
     // not engouh bytes in FIFO? don't send data now
-    if(!canGetBytes) {
+    if(!gotFrames) {
         log(LOG_WARNING, "get_frames -- waitForBytesInFifo couldn't get bytes");
         resp->statusByte = STATUS_NO_RESPONSE;
         return;
     }
 
-    framesCount = bytesWant / videoBytesPerFrame;               // update received frames to count of how many frames we can get from the data in FIFO
-
     uint8_t stPalettes[MAX_GET_FRAMES * ST_PALETTE_SIZE];
 
     // fetch and process video data by each frame
-    for(uint32_t i=0; i<framesCount; i++) {
+    for(uint32_t i=0; i<gotFrames; i++) {
         mutexLock();
         fifoVideo->getBfr(frameDataRGB, videoBytesPerFrame);    // get one frame in the buffer
         mutexUnlock();
@@ -224,12 +224,12 @@ void get_frames(json args, ResponseFromExtension* resp)
     }
 
     // after the conversion copy in the palettes after the video frames
-    memcpy(resp->data + (framesCount * ST_FRAME_SIZE), stPalettes, framesCount * ST_PALETTE_SIZE);
+    memcpy(resp->data + (gotFrames * ST_FRAME_SIZE), stPalettes, gotFrames * ST_PALETTE_SIZE);
 
-    log(LOG_DEBUG, "get_frames -- returning %d frames", framesCount);
+    log(LOG_DEBUG, "get_frames -- returning %d frames", gotFrames);
 
-    uint32_t respSizeBytes = framesCount * 32032;
-    responseStoreStatusAndDataLen(resp, framesCount, respSizeBytes);    // the status holds how many frames we are returning to ST
+    uint32_t respSizeBytes = gotFrames * 32032;
+    responseStoreStatusAndDataLen(resp, gotFrames, respSizeBytes);    // the status holds how many frames we are returning to ST
 }
 
 /*
@@ -266,34 +266,37 @@ void get_samples(json args, ResponseFromExtension* resp)
     }
 
     // wait for enough samples in buffer
-    bool canGetBytes = waitForBytesInFifo(fifoAudio, bytesWant, framesCount);
+    uint8_t gotFrames = waitForBytesInFifo(fifoAudio, framesCount, audioBytesPerFrame);
 
-    if(!canGetBytes) {  // not engouh bytes in FIFO? don't send data now
+    if(!gotFrames) {  // not engouh bytes in FIFO? don't send data now
         log(LOG_WARNING, "get_samples -- waitForBytesInFifo couldn't get bytes");
         resp->statusByte = STATUS_NO_RESPONSE;
         return;
     }
 
-    // got enough data? get it and send it
+    // got data? get it and send it
     mutexLock();
+    if(gotFrames < framesCount) {               // if can get less frames than wanted, then read all the remaining bytes
+        bytesWant = fifoAudio->usedBytes();
+    }
+
     fifoAudio->getBfr(resp->data, bytesWant);   // get the data into response
     mutexUnlock();
 
     // how many frames we were able to fetch from FIFO (e.g. at the end of stream)
-    uint32_t framesReceived = bytesWant / audioBytesPerFrame;
     uint32_t bytesInLastFrame = bytesWant % audioBytesPerFrame; // see if last frame is full (== remaining bytes are 0)
 
     // if not a full frame was in the buffer, increase received frames count
     if(bytesInLastFrame != 0) {
-        framesReceived++;
+        gotFrames++;
 
         uint32_t paddBytes = audioBytesPerFrame - bytesInLastFrame;
         memset(resp->data + bytesWant, 0, paddBytes);   // clear the padding bytes
         bytesWant += paddBytes;                         // increase the received bytes to full frame
     }
 
-    log(LOG_DEBUG, "get_samples -- returning %d frames", framesReceived);
-    responseStoreStatusAndDataLen(resp, framesReceived, bytesWant);     // the status holds how many frames we are returning to ST
+    log(LOG_DEBUG, "get_samples -- returning %d frames", gotFrames);
+    responseStoreStatusAndDataLen(resp, gotFrames, bytesWant);     // the status holds how many frames we are returning to ST
 }
 
 /*
