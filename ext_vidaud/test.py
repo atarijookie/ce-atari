@@ -116,7 +116,7 @@ if __name__ == "__main__":
     print("Starting test")
     sock = create_socket()
 
-    #---------
+    # ---------
     print("Stoping and starting extension...")
     os.system("./stop.sh")                          # stop the extension if it's running
 
@@ -126,7 +126,7 @@ if __name__ == "__main__":
     print("start command: ", start_command)
     os.system(start_command)                        # start the extension now
 
-    #---------
+    # ---------
     # should receive CEX_FUN_OPEN first, instead of status it returns count of exported functions, also returns path to socket
     response_raw = get_data_from_sock(sock)
 
@@ -139,6 +139,7 @@ if __name__ == "__main__":
 
     ext_socket_path = resp_data[all_signatures_size:].decode('ascii')     # get extension's socket path - stored after all signatures
     print(f"extensions socket path: {ext_socket_path}")
+    ext_socket_path = "/tmp/ext_vidaud.sock"
 
     #---------
     # start the stream
@@ -149,6 +150,7 @@ if __name__ == "__main__":
     resp_data = verify_id_name_status_len(response_raw, 'start', 3, 0)      # 3 means play video and audio
     print("start - ok")
 
+    ok = False
     #--------
     for i in range(10):
         msg = {'function': 'get_frame_count', 'args': [0]}
@@ -158,25 +160,31 @@ if __name__ == "__main__":
         print(f"get_frame_count: {status}")
 
         if status > 10 and status < 100:     # got at least 10 frames, but not too many (would be error)
+            ok = True
             break
 
         sleep(0.3)
 
+    if not ok:
+        print("failed to wait for frames")
+        exit(1)
+
     #---------
     # get the frames
     msg = {'function': 'get_frames', 'args': [4]}
-    send_to_ext(json.dumps(msg))
 
     for i in range(25):
         print("get_frames", i)
+        send_to_ext(json.dumps(msg))
         response_raw = get_data_from_sock(sock)
         status = verify_id_name(response_raw, 'get_frames')
         print("status", status)
 
-    print("get frames - ok")
+        if status == STATUS_NO_MORE_FRAMES:
+            print("get frames - no more frames, done with frames")
+            break
 
-    response_raw = get_data_from_sock(sock)
-    resp_data = verify_id_name_status_len(response_raw, 'get_frames', STATUS_NO_MORE_FRAMES, 0)
+    print("get frames - ok")
 
     #---------
     # stop the stream

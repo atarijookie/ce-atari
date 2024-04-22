@@ -7,4 +7,6 @@
 void readFromStreamPipe(void);
 void createRecvThreadIfNeeded(void);
 
+#define FD_NOT_OPEN     (-1)
+
 #endif

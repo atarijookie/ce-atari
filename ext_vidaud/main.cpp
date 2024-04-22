@@ -9,6 +9,7 @@
 #include "utils.h"
 #include "functions.h"
 #include "json.h"
+#include "recv.h"
 
 /*
 This is an CosmosEx extension for video and audio streaming.
@@ -50,7 +51,7 @@ int main(int argc, char *argv[])
 
     int sock = createRecvSocket(IN_SOCKET_PATH);    // create socket where we will get requests from CE core
 
-    if(sock == -1) {                    // if failed to create socket, quit
+    if(sock == FD_NOT_OPEN) {                       // if failed to create socket, quit
         return 1;
     }
 
@@ -115,7 +116,7 @@ int createRecvSocket(const char* pathToSocket)
 
 	if (sock < 0) {
 	    log(LOG_WARNING, "createRecvSocket - failed to create socket!");
-	    return -1;
+	    return FD_NOT_OPEN;
 	}
 
     fchmod(sock, S_IRUSR | S_IWUSR);        // restrict permissions before bind
@@ -129,7 +130,7 @@ int createRecvSocket(const char* pathToSocket)
     int res = bind(sock, (struct sockaddr *) &addr, strlen(addr.sun_path) + sizeof(addr.sun_family));
     if (res < 0) {
 	    log(LOG_WARNING, "createRecvSocket - failed to bind socket to %s - errno: %d", pathToSocket, errno);
-	    return -1;
+	    return FD_NOT_OPEN;
     }
 
     chmod(addr.sun_path, 0666);             // loosen permissions

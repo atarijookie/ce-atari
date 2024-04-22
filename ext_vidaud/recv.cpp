@@ -77,7 +77,7 @@ void acceptSocketIfNeededAndPossible(int fdListen, int& fdClient)
     int newSock = accept(fdListen, (struct sockaddr *) &remote, &addrSize);
 
     if(newSock < 0) {       // nothing to accept, would block? quit
-        log(LOG_DEBUG, "acceptSocketIfNeededAndPossible - nothing to accept");
+        // log(LOG_DEBUG, "acceptSocketIfNeededAndPossible - nothing to accept");
         return;
     }
 
@@ -95,11 +95,11 @@ void acceptSocketIfNeededAndPossible(int fdListen, int& fdClient)
 void closeSocket(int& fd) {
     if(fd > 0) {
         close(fd);
-        fd = -1;
+        fd = FD_NOT_OPEN;
     }
 }
 
-void readFromSockToFifo(int sock, Fifo* fifo, uint8_t* bfr, uint32_t bfrLen)
+void readFromSockToFifo(int& sock, Fifo* fifo, uint8_t* bfr, uint32_t bfrLen)
 {
     int bytesAvailable;
     int rv = ioctl(sock, FIONREAD, &bytesAvailable);    // how many bytes we can read?
@@ -112,6 +112,14 @@ void readFromSockToFifo(int sock, Fifo* fifo, uint8_t* bfr, uint32_t bfrLen)
     int bytesToRead = MIN(bytesAvailable, (int) bfrLen);    // we can only read either bytes that are ready or up to buffer size
 
     ssize_t recvCnt = recv(sock, bfr, bytesToRead, 0);
+    // log(LOG_DEBUG, "readFromSockToFifo - sock: %d, recvCnt: %d", sock, recvCnt);
+
+    // When a stream socket peer has performed an orderly shutdown, the return value will be 0 (the traditional "end-of-file" return).
+    if(recvCnt == 0) {
+        log(LOG_INFO, "readFromSockToFifo - closing sock: %d", sock);
+        closeSocket(sock);
+        return;
+    }
 
     if(recvCnt > 0) {
         mutexLock();
@@ -129,7 +137,7 @@ void *recvThreadCode(void *ptr)
     log(LOG_INFO, "recvThreadCode starting");
 
     // create listening sockets
-    int sockListenAudio = -1, sockListenVideo = -1;
+    int sockListenAudio = FD_NOT_OPEN, sockListenVideo = FD_NOT_OPEN;
     createUnixRecvStreamSocket(sockListenAudio, SOCK_PATH_RECV_FFMPEG_AUDIO);
     createUnixRecvStreamSocket(sockListenVideo, SOCK_PATH_RECV_FFMPEG_VIDEO);
 
@@ -138,7 +146,7 @@ void *recvThreadCode(void *ptr)
     fifoAudio = new Fifo();
     fifoVideo = new Fifo();
 
-    int sockRecvAudio = -1, sockRecvVideo = -1;
+    int sockRecvAudio = FD_NOT_OPEN, sockRecvVideo = FD_NOT_OPEN;
 
     while(!shouldStop) {
         struct timeval timeout;
@@ -180,6 +188,12 @@ void *recvThreadCode(void *ptr)
         // got video recv socket?
         if(sockRecvVideo > 0 && FD_ISSET(sockRecvVideo, &readFds)) {
             readFromSockToFifo(sockRecvVideo, fifoVideo, bfr, sizeof(bfr));
+        }
+
+        // both recv socks closed, but stream pipe not closed yet? stop stream
+        if(sockRecvAudio == FD_NOT_OPEN && sockRecvVideo == FD_NOT_OPEN && stream.pipeFd != FD_NOT_OPEN) {
+            log(LOG_INFO, "recvThreadCode - both receiving sockets closed, now stopping stream");
+            stopStream();
         }
     }
 
