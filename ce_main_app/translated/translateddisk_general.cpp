@@ -399,7 +399,7 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
     res = dataTrans->recvData(dataBuffer, 512);     // get data from Hans
 
     if(!res) {                                      // failed to get data? internal error!
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onInitialize - failed to receive data...");
+        Debug::out(LOG_ERROR, "TranslatedDisk::onInitialize - failed to receive data...");
         dataTrans->setStatus(EINTRN);
         return;
     }
@@ -924,7 +924,7 @@ void TranslatedDisk::onStLog(uint8_t *cmd)
     res = dataTrans->recvData(dataBuffer, 512);     // get data from Hans
 
     if(!res) {                                      // failed to get data? internal error!
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onStLog - failed to receive data...");
+        Debug::out(LOG_ERROR, "TranslatedDisk::onStLog - failed to receive data...");
         dataTrans->setStatus(EINTRN);
         return;
     }
@@ -941,7 +941,7 @@ void TranslatedDisk::onStHttp(uint8_t *cmd)
     res = dataTrans->recvData(dataBuffer, 512);     // get data from Hans
 
     if(!res) {                                      // failed to get data? internal error!
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onStHttp - failed to receive data...");
+        Debug::out(LOG_ERROR, "TranslatedDisk::onStHttp - failed to receive data...");
         dataTrans->setStatus(EINTRN);
         return;
     }

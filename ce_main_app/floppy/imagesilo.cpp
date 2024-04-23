@@ -73,7 +73,7 @@ ImageSilo::ImageSilo()
         Debug::out(LOG_DEBUG, "ImageSilo created empty image (for no selected image)");
         floppyEncoder_addEncodeWholeImageRequest(EMPTY_IMAGE_SLOT, EMPTY_IMAGE_PATH);
     } else {
-        Debug::out(LOG_DEBUG, "ImageSilo failed to create empty image! (for no selected image)");
+        Debug::out(LOG_ERROR, "ImageSilo failed to create empty image! (for no selected image)");
     }
     //-----------
 

@@ -80,13 +80,13 @@ void Misc::recvHwSerial(uint8_t *cmd)
     res = dataTrans->recvData(dataBuffer, 512);     // get data from Hans
 
     if(!res) {                                      // failed to get data? internal error!
-        Debug::out(LOG_DEBUG, "Misc::recvHwSerial - failed to receive data...");
+        Debug::out(LOG_ERROR, "Misc::recvHwSerial - failed to receive data...");
         dataTrans->setStatus(EINTRN);
         return;
     }
 
     if(dataBuffer[0] != 3) {                        // HW version not 3? fail
-        Debug::out(LOG_DEBUG, "Misc::recvHwSerial - wrong HW version");
+        Debug::out(LOG_ERROR, "Misc::recvHwSerial - wrong HW version");
         dataTrans->setStatus(EINTRN);
         return;
     }

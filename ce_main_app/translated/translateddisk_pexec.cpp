@@ -50,7 +50,7 @@ void TranslatedDisk::onPexec_createImage(uint8_t *cmd)
     bool res = dataTrans->recvData(dataBuffer, 512);    // get data from Hans
 
     if(!res) {
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_createImage() - failed to receive data...");
+        Debug::out(LOG_ERROR, "TranslatedDisk::onPexec_createImage() - failed to receive data...");
         dataTrans->setStatus(EINTRN);
         return;
     }
@@ -79,7 +79,7 @@ void TranslatedDisk::onPexec_createImage(uint8_t *cmd)
     }
 
     if(!res) {                                                      // the path doesn't bellong to us?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_createImage() - %s - createFullAtariPath failed", atariName.c_str());
+        Debug::out(LOG_ERROR, "TranslatedDisk::onPexec_createImage() - %s - createFullAtariPath failed", atariName.c_str());
 
 		dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
         return;
@@ -93,7 +93,7 @@ void TranslatedDisk::onPexec_createImage(uint8_t *cmd)
     }
 
     if(!hostPathExists(hostName, true)) {                           // and the file does not exist, quit with FILE NOT FOUND
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_createImage() - %s - fopen mode is just read, but the file does not exist, failed!", hostName.c_str());
+        Debug::out(LOG_ERROR, "TranslatedDisk::onPexec_createImage() - %s - fopen mode is just read, but the file does not exist, failed!", hostName.c_str());
 
         dataTrans->setStatus(EFILNF);
         return;
@@ -123,7 +123,7 @@ void TranslatedDisk::onPexec_createImage(uint8_t *cmd)
     FILE *f = fopen(hostName.c_str(), "rb");                        // open according to required mode
 
     if(!f) {
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_createImage() - %s - fopen failed!", hostName.c_str());
+        Debug::out(LOG_ERROR, "TranslatedDisk::onPexec_createImage() - %s - fopen failed!", hostName.c_str());
 
         dataTrans->setStatus(EACCDN);                               // if failed to create, access error
         return;
@@ -395,7 +395,7 @@ void TranslatedDisk::onPexec_readSector(uint8_t *cmd)
     Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_readSector() - startingSector: %d, sectorCount: %d", startingSector, sectorCount);
 
     if(startingSector + sectorCount > PEXEC_DRIVE_SIZE_SECTORS) {       // would be out of boundary? fail
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_readSector() - out of range!");
+        Debug::out(LOG_ERROR, "TranslatedDisk::onPexec_readSector() - out of range!");
 
         dataTrans->setStatus(EINTRN);
         return;
@@ -420,7 +420,7 @@ void TranslatedDisk::onPexec_writeSector(uint8_t *cmd)
     Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_writeSector() - startingSector: %d, sectorCount: %d", startingSector, sectorCount);
 
     if(startingSector + sectorCount > PEXEC_DRIVE_SIZE_SECTORS) {       // would be out of boundary? fail
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_writeSector() - out of range!");
+        Debug::out(LOG_ERROR, "TranslatedDisk::onPexec_writeSector() - out of range!");
 
         dataTrans->setStatus(EINTRN);
         return;
@@ -429,7 +429,7 @@ void TranslatedDisk::onPexec_writeSector(uint8_t *cmd)
     bool res = dataTrans->recvData(dataBuffer, byteCount);              // get data from Hans
 
     if(!res) {
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_writeSector() - failed to receive data...");
+        Debug::out(LOG_ERROR, "TranslatedDisk::onPexec_writeSector() - failed to receive data...");
         dataTrans->setStatus(EINTRN);
         return;
     }

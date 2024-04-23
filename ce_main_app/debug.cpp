@@ -45,19 +45,22 @@ void Debug::setLogFile(const char *path)
     strcpy(Debug::logFilePath, path);
 }
 
+const char* Debug::logLevelString(int ll)
+{
+    switch(ll) {
+        case LOG_OFF:       return "OFF  ";
+        case LOG_ERROR:     return "ERROR";
+        case LOG_WARNING:   return "WARN ";
+        case LOG_INFO:      return "INFO ";
+        case LOG_DEBUG:     return "DEBUG";
+        default:            return "???  ";
+    }
+}
+
 void Debug::printfLogLevelString(void)
 {
     printf("\nLog level: ");
-
-    switch(flags.logLevel) {
-        case LOG_OFF:       printf("OFF"); break;
-        case LOG_ERROR:     printf("ERROR"); break;
-        case LOG_WARNING:   printf("WARNING"); break;
-        case LOG_INFO:      printf("INFO"); break;
-        case LOG_DEBUG:     printf("DEBUG"); break;
-        default:            printf("unknown!"); break;
-    }
-
+    printf("%s", logLevelString(flags.logLevel));
     printf("\n\n");
 }
 
@@ -90,23 +93,24 @@ void Debug::out(int logLevel, const char *format, ...)
     uint32_t diff = now - prevLogOut;
     prevLogOut = now;
 
+    const char* ll = logLevelString(logLevel);
+
     char humanTime[128];
     struct timeval tv;
     if(gettimeofday(&tv, NULL) < 0) {
         memset(&tv, 0, sizeof(tv)); // failure
     }
     struct tm tm = *localtime(&tv.tv_sec);
-    sprintf(humanTime, "%04d-%02d-%02d %02d:%02d:%02d.%06ld",
-            tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, tv.tv_usec);
+    sprintf(humanTime, "%02d:%02d:%02d.%06ld", tm.tm_hour, tm.tm_min, tm.tm_sec, tv.tv_usec);
 
     if(logLevel == LOG_ERROR && dbgVars.isInHandleAcsiCommand) {    // it's an error, and we're debugging ACSI stuff
-        fprintf(f, "%08d %08d (%s)\n", now, diff, humanTime); // CLOCK in ms, diff in ms, date/time in human readable format
+        fprintf(f, "%08d %4d (%s) %s\n", now, diff, humanTime, ll); // CLOCK in ms, diff in ms, date/time in human readable format
         fprintf(f, "     LOG_ERROR occurred\n");
         fprintf(f, "     Time since beginning of ACSI command handling: %d\n", now - dbgVars.thisAcsiCmdTime);
         fprintf(f, "     Time between this and previous ACSI command  : %d\n", dbgVars.thisAcsiCmdTime - dbgVars.prevAcsiCmdTime);
     }
 
-    fprintf(f, "%08d %08d (%s)\t", now, diff, humanTime); // CLOCK in ms, diff in ms, date/time in human readable format
+    fprintf(f, "%08d %4d (%s) %s\t", now, diff, humanTime, ll); // CLOCK in ms, diff in ms, date/time in human readable format
 
     vfprintf(f, format, args);
     fprintf(f, "\n");

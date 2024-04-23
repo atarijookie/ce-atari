@@ -36,7 +36,7 @@ void TranslatedDisk::onDsetdrv(uint8_t *cmd)
     int newDrive = cmd[5];
 
     if(newDrive > 15) {                             // drive number out of range? not handled
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetdrv -- new drive index: %d (letter %c) -> out of range, FAIL", newDrive, newDrive + 'A');
+        Debug::out(LOG_ERROR, "TranslatedDisk::onDsetdrv -- new drive index: %d (letter %c) -> out of range, FAIL", newDrive, newDrive + 'A');
 
         dataTrans->setStatus(E_NOTHANDLED);
         return;
@@ -105,7 +105,7 @@ void TranslatedDisk::onDsetpath(uint8_t *cmd)
     res = dataTrans->recvData(dataBuffer, 512);     // get data from Hans
 
     if(!res) {                                      // failed to get data? internal error!
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - failed to receive data...");
+        Debug::out(LOG_ERROR, "TranslatedDisk::onDsetpath - failed to receive data...");
         dataTrans->setStatus(EINTRN);
         return;
     }
@@ -121,7 +121,7 @@ void TranslatedDisk::onDsetpath(uint8_t *cmd)
     res = createFullAtariPathAndFullHostPath(newAtariPath, fullAtariPath, atariDriveIndex, hostPath, waitingForMount);
 
     if(!res) {                                      // the path doesn't bellong to us?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - newAtariPath: %s, createFullAtariPath failed!", newAtariPath.c_str());
+        Debug::out(LOG_ERROR, "TranslatedDisk::onDsetpath - newAtariPath: %s, createFullAtariPath failed!", newAtariPath.c_str());
 
         dataTrans->setStatus(E_NOTHANDLED);         // if we don't have this, not handled
         return;
@@ -135,7 +135,7 @@ void TranslatedDisk::onDsetpath(uint8_t *cmd)
     }
 
     if(!hostPathExists(hostPath, true)) {           // path doesn't exists?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - newAtariPath: %s, hostPathExist failed for %s", newAtariPath.c_str(), hostPath.c_str());
+        Debug::out(LOG_ERROR, "TranslatedDisk::onDsetpath - newAtariPath: %s, hostPathExist failed for %s", newAtariPath.c_str(), hostPath.c_str());
 
         dataTrans->setStatus(EPTHNF);               // path not found
         return;
@@ -286,7 +286,7 @@ void TranslatedDisk::onFsfirst(uint8_t *cmd)
     res = createFullAtariPathAndFullHostPath(atariSearchString, fullAtariPath, atariDriveIndex, hostSearchString, waitingForMount, &isInArchive);
 
     if(!res) {                                      // the path doesn't bellong to us?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - atari search string: %s -- failed to create host path", atariSearchString.c_str());
+        Debug::out(LOG_ERROR, "TranslatedDisk::onFsfirst - atari search string: %s -- failed to create host path", atariSearchString.c_str());
 
         dataTrans->setStatus(E_NOTHANDLED);         // if we don't have this, not handled
         return;
@@ -313,7 +313,7 @@ void TranslatedDisk::onFsfirst(uint8_t *cmd)
     res = buildGemdosFindstorageData(tempFindStorage, hostSearchString, findAttribs, rootDir, isInArchive);
 
     if(!res) {
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - host search string: %s -- failed to build gemdos find storage data", hostSearchString.c_str());
+        Debug::out(LOG_ERROR, "TranslatedDisk::onFsfirst - host search string: %s -- failed to build gemdos find storage data", hostSearchString.c_str());
 
         dataTrans->setStatus(EFILNF);                               // file not found
         return;
@@ -342,7 +342,7 @@ void TranslatedDisk::onFsfirst(uint8_t *cmd)
         index = getEmptyFindStorageIndex();
 
         if(index == -1) {
-            Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - failed to find empty storage slot!");
+            Debug::out(LOG_ERROR, "TranslatedDisk::onFsfirst - failed to find empty storage slot!");
             dataTrans->setStatus(EFILNF);                               // file not found
             return;
         }
@@ -506,7 +506,7 @@ void TranslatedDisk::onDcreate(uint8_t *cmd)
     res = createFullAtariPathAndFullHostPath(newAtariPath, fullAtariPath, atariDriveIndex, hostPath, waitingForMount);
 
     if(!res) {                                      // the path doesn't bellong to us?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onDcreate - newAtariPath: %s -- createFullAtariPath failed", newAtariPath.c_str());
+        Debug::out(LOG_ERROR, "TranslatedDisk::onDcreate - newAtariPath: %s -- createFullAtariPath failed", newAtariPath.c_str());
 
         dataTrans->setStatus(E_NOTHANDLED);         // if we don't have this, not handled
         return;
@@ -552,7 +552,7 @@ void TranslatedDisk::onDcreate(uint8_t *cmd)
     status = errno;
 
     if(status == EEXIST || status == EACCES) {      // path already exists or other access problem?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onDcreate - newAtariPath: %s -> hostPath: %s -- failed to create dir", newAtariPath.c_str(), hostPath.c_str());
+        Debug::out(LOG_ERROR, "TranslatedDisk::onDcreate - newAtariPath: %s -> hostPath: %s -- failed to create dir", newAtariPath.c_str(), hostPath.c_str());
 
         dataTrans->setStatus(EACCDN);
         return;
@@ -583,7 +583,7 @@ void TranslatedDisk::onDdelete(uint8_t *cmd)
     res = createFullAtariPathAndFullHostPath(newAtariPath, fullAtariPath, atariDriveIndex, hostPath, waitingForMount);
 
     if(!res) {                                      // the path doesn't bellong to us?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onDdelete - newAtariPath: %s -- createFullAtariPath failed, the path doesn't bellong to us", newAtariPath.c_str());
+        Debug::out(LOG_ERROR, "TranslatedDisk::onDdelete - newAtariPath: %s -- createFullAtariPath failed, the path doesn't bellong to us", newAtariPath.c_str());
 
         dataTrans->setStatus(E_NOTHANDLED);         // if we don't have this, not handled
         return;
@@ -637,7 +637,7 @@ void TranslatedDisk::onFrename(uint8_t *cmd)
     }
 
     if(!res || !res2) {                                             // the path doesn't bellong to us?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFrename - failed to createFullAtariPath for %s or %s", oldAtariName.c_str(), newAtariName.c_str());
+        Debug::out(LOG_ERROR, "TranslatedDisk::onFrename - failed to createFullAtariPath for %s or %s", oldAtariName.c_str(), newAtariName.c_str());
 
         dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
         return;
@@ -681,7 +681,7 @@ void TranslatedDisk::onFdelete(uint8_t *cmd)
     res = createFullAtariPathAndFullHostPath(newAtariPath, fullAtariPath, atariDriveIndex, hostPath, waitingForMount);
 
     if(!res) {                                      // the path doesn't bellong to us?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFdelete - %s - createFullAtariPath failed", newAtariPath.c_str());
+        Debug::out(LOG_ERROR, "TranslatedDisk::onFdelete - %s - createFullAtariPath failed", newAtariPath.c_str());
 
         dataTrans->setStatus(E_NOTHANDLED);         // if we don't have this, not handled
         return;
@@ -730,7 +730,7 @@ void TranslatedDisk::onFdelete(uint8_t *cmd)
         return;
     }
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::onFdelete - %s - unlink failed", hostPath.c_str());
+    Debug::out(LOG_ERROR, "TranslatedDisk::onFdelete - %s - unlink failed", hostPath.c_str());
 
     int err = errno;
 
@@ -890,7 +890,7 @@ void TranslatedDisk::onFcreate(uint8_t *cmd)
     res = createFullAtariPathAndFullHostPath(atariName, fullAtariPath, atariDriveIndex, hostName, waitingForMount);
 
     if(!res) {                                                      // the path doesn't bellong to us?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - createFullAtariPath failed", atariName.c_str());
+        Debug::out(LOG_ERROR, "TranslatedDisk::onFcreate - %s - createFullAtariPath failed", atariName.c_str());
 
         dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
         return;
@@ -931,7 +931,7 @@ void TranslatedDisk::onFcreate(uint8_t *cmd)
                 status = EACCDN;                       // if failed to create, access error
         }
 
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - fopen failed : %s (ERROR %d)", hostName.c_str(), strerror(errno), status);
+        Debug::out(LOG_ERROR, "TranslatedDisk::onFcreate - %s - fopen failed : %s (ERROR %d)", hostName.c_str(), strerror(errno), status);
         dataTrans->setStatus(status);
         return;
     }
@@ -972,7 +972,7 @@ void TranslatedDisk::onFcreate(uint8_t *cmd)
     f = fopen(hostName.c_str(), "rb+");                             // read/update - file must exist
 
     if(!f) {
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - fopen failed for reopening", hostName.c_str());
+        Debug::out(LOG_ERROR, "TranslatedDisk::onFcreate - %s - fopen failed for reopening", hostName.c_str());
 
         dataTrans->setStatus(EACCDN);                               // if failed to create, access error
         return;
@@ -1012,7 +1012,7 @@ void TranslatedDisk::onFopen(uint8_t *cmd)
     res = createFullAtariPathAndFullHostPath(atariName, fullAtariPath, atariDriveIndex, hostName, waitingForMount);
 
     if(!res) {                                                      // the path doesn't bellong to us?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - createFullAtariPath failed", atariName.c_str());
+        Debug::out(LOG_ERROR, "TranslatedDisk::onFopen - %s - createFullAtariPath failed", atariName.c_str());
 
         dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
         return;
@@ -1026,7 +1026,7 @@ void TranslatedDisk::onFopen(uint8_t *cmd)
     }
 
     if((mode & 0x07) != 0) {      // if it's WRITE mode and read only, quit
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - fopen mode is write, but file is read only, fail! ", atariName.c_str());
+        Debug::out(LOG_ERROR, "TranslatedDisk::onFopen - %s - fopen mode is write, but file is read only, fail! ", atariName.c_str());
 
         dataTrans->setStatus(EACCDN);
         return;
@@ -1035,7 +1035,7 @@ void TranslatedDisk::onFopen(uint8_t *cmd)
     int index = findEmptyFileSlot();
 
     if(index == -1) {                                               // no place for new file? No more handles.
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - no empty slot, failed", atariName.c_str());
+        Debug::out(LOG_ERROR, "TranslatedDisk::onFopen - %s - no empty slot, failed", atariName.c_str());
 
         dataTrans->setStatus(ENHNDL);
         return;
@@ -1061,7 +1061,7 @@ void TranslatedDisk::onFopen(uint8_t *cmd)
 
     if(justRead) {                              // if we should just read from the file (not write and thus create if does not exist)
         if(!hostPathExists(hostName, true)) {   // and the file does not exist
-            Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - fopen mode is just read, but the file does not exist, failed!", hostName.c_str());
+            Debug::out(LOG_ERROR, "TranslatedDisk::onFopen - %s - fopen mode is just read, but the file does not exist, failed!", hostName.c_str());
 
             dataTrans->setStatus(EFILNF);       // quit with FILE NOT FOUND
             return;
@@ -1072,7 +1072,7 @@ void TranslatedDisk::onFopen(uint8_t *cmd)
     FILE *f = fopen(hostName.c_str(), fopenMode);                   // open according to required mode
 
     if(!f) {
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - fopen failed!", hostName.c_str());
+        Debug::out(LOG_ERROR, "TranslatedDisk::onFopen - %s - fopen failed!", hostName.c_str());
 
         dataTrans->setStatus(EACCDN);                               // if failed to create, access error
         return;
@@ -1104,7 +1104,7 @@ void TranslatedDisk::onFclose(uint8_t *cmd)
     bool res = dataTrans->recvData(dataBuffer, 16);                 // get data from Hans -- this is now here just to tell the whole software chain that this is a DMA WRITE operation (no real data needed)
 
     if(!res) {                                                      // failed to get data? internal error!
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFclose - failed to receive data...");
+        Debug::out(LOG_ERROR, "TranslatedDisk::onFclose - failed to receive data...");
         dataTrans->setStatus(EINTRN);
         return;
     }
@@ -1201,7 +1201,7 @@ void TranslatedDisk::onFread(uint8_t *cmd)
     }
 
     if(byteCount > (254 * 512)) {                                   // requesting to transfer more than 254 sectors at once? fail!
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFread - trying to transfer more than MAX SECTORS in one transfer (byteCount: %d)", byteCount);
+        Debug::out(LOG_ERROR, "TranslatedDisk::onFread - trying to transfer more than MAX SECTORS in one transfer (byteCount: %d)", byteCount);
 
         dataTrans->setStatus(EINTRN);
         return;
@@ -1211,7 +1211,7 @@ void TranslatedDisk::onFread(uint8_t *cmd)
         int res = fseek(files[index].hostHandle, seekOffset, SEEK_CUR);
 
         if(res != 0) {                                              // if seek failed
-            Debug::out(LOG_DEBUG, "TranslatedDisk::onFread - fseek %d failed", seekOffset);
+            Debug::out(LOG_ERROR, "TranslatedDisk::onFread - fseek %d failed", seekOffset);
 
             dataTrans->setStatus(EINTRN);
             return;
@@ -1253,14 +1253,14 @@ void TranslatedDisk::onFwrite(uint8_t *cmd)
     int index = findFileHandleSlot(atariHandle);
 
     if(index == -1) {                                               // handle not found? not handled, try somewhere else
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFwrite - atariHandle %d not found, not handled", atariHandle);
+        Debug::out(LOG_ERROR, "TranslatedDisk::onFwrite - atariHandle %d not found, not handled", atariHandle);
 
         dataTrans->setStatus(E_NOTHANDLED);
         return;
     }
 
     if(byteCount > (254 * 512)) {                                   // requesting to transfer more than 254 sectors at once? fail!
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFwrite - trying to transfer more than MAX SECTORS count of bytes (%d)", byteCount);
+        Debug::out(LOG_ERROR, "TranslatedDisk::onFwrite - trying to transfer more than MAX SECTORS count of bytes (%d)", byteCount);
 
         dataTrans->setStatus(EINTRN);
         return;
@@ -1279,7 +1279,7 @@ void TranslatedDisk::onFwrite(uint8_t *cmd)
     res = dataTrans->recvData(dataBuffer, transferSizeBytes);   // get data from Hans
 
     if(!res) {                                                  // failed to get data? internal error!
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFwrite - failed to get data from Hans");
+        Debug::out(LOG_ERROR, "TranslatedDisk::onFwrite - failed to get data from Hans");
 
         dataTrans->setStatus(EINTRN);
         return;
@@ -1344,7 +1344,7 @@ void TranslatedDisk::onFseek(uint8_t *cmd)
     int iRes = fseek(files[index].hostHandle, offset, hostSeekMode);
 
     if(iRes != 0) {                         // on ERROR
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFseek - fseek %d, %d failed", offset, hostSeekMode);
+        Debug::out(LOG_ERROR, "TranslatedDisk::onFseek - fseek %d, %d failed", offset, hostSeekMode);
 
         dataTrans->setStatus(EINTRN);
         return;
@@ -1354,7 +1354,7 @@ void TranslatedDisk::onFseek(uint8_t *cmd)
     int pos = ftell(files[index].hostHandle);                       // get stream position
 
     if(pos == -1) {                                                 // failed to get position?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFseek - ftell failed");
+        Debug::out(LOG_ERROR, "TranslatedDisk::onFseek - ftell failed");
 
         dataTrans->setStatus(EINTRN);
         return;
@@ -1576,7 +1576,7 @@ void TranslatedDisk::onTestWrite(uint8_t *cmd)
     bool res = dataTrans->recvData(dataBuffer, byteCount);   // get data from Hans
 
     if(!res) {
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onTestWrite - failed to receive data...");
+        Debug::out(LOG_ERROR, "TranslatedDisk::onTestWrite - failed to receive data...");
         dataTrans->setStatus(EINTRN);
         return;
     }
@@ -1590,7 +1590,7 @@ void TranslatedDisk::onTestWrite(uint8_t *cmd)
         counter++;
 
         if(valSt != valGen) {                           // data mismatch? fail
-            Debug::out(LOG_DEBUG, "TranslatedDisk::onTestWrite - data check failed on byte %d out of %d, values: %04X != %04X", i, byteCount, valSt, valGen);
+            Debug::out(LOG_ERROR, "TranslatedDisk::onTestWrite - data check failed on byte %d out of %d, values: %04X != %04X", i, byteCount, valSt, valGen);
 
             int iFail = i;
             int start = MAX(i - 6, 0);                  // go 6 bytes back before error, if it would be bellow index 0, just use 0
@@ -1652,7 +1652,7 @@ void TranslatedDisk::onSetACSIids(uint8_t *cmd)
     bool res = dataTrans->recvData(dataBuffer, 16);         // get data from Hans
 
     if(!res) {                                              // failed to get data? internal error!
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onSetACSIids - failed to receive data...");
+        Debug::out(LOG_ERROR, "TranslatedDisk::onSetACSIids - failed to receive data...");
         dataTrans->setStatus(EINTRN);
         return;
     }

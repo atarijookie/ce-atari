@@ -154,7 +154,7 @@ void Scsi::processCommand(uint8_t *command)
         } else {                                                // invalid command for non-zero LUN, fail
             storeSenseAndSendStatus(SCSI_ST_CHECK_CONDITION, SCSI_E_IllegalRequest, SCSI_ASC_LU_NOT_SUPPORTED, SCSI_ASCQ_NO_ADDITIONAL_SENSE);
 
-            Debug::out(LOG_DEBUG, "Scsi::processCommand() - non-zero LUN, failing");
+            Debug::out(LOG_ERROR, "Scsi::processCommand() - non-zero LUN, failing");
         }
     } else {            // if LUN is zero, we're fine
         if(isIcd) {                         // if it's a ICD command
@@ -461,7 +461,7 @@ void Scsi::ProcICD(uint8_t lun, uint8_t justCmd)
     if(devInfo[acsiId].accessType == SCSI_ACCESSTYPE_READ_ONLY) {
         if(justCmd == SCSI_C_WRITE10) {
             returnInvalidCommand();
-            Debug::out(LOG_DEBUG, "Scsi::ProcICD - tried to WRITE on READ ONLY media, fail");
+            Debug::out(LOG_ERROR, "Scsi::ProcICD - tried to WRITE on READ ONLY media, fail");
             return;
         }
     }
@@ -470,7 +470,7 @@ void Scsi::ProcICD(uint8_t lun, uint8_t justCmd)
     if(devInfo[acsiId].accessType == SCSI_ACCESSTYPE_NO_DATA) {
         if(justCmd == SCSI_C_WRITE10 || justCmd == SCSI_C_READ10 || justCmd == SCSI_C_VERIFY) {
             returnInvalidCommand();
-            Debug::out(LOG_DEBUG, "Scsi::ProcICD - READ / WRITE / VERIFY on empty media, fail");
+            Debug::out(LOG_ERROR, "Scsi::ProcICD - READ / WRITE / VERIFY on empty media, fail");
             return;
         }
     }
@@ -563,7 +563,7 @@ void Scsi::updateTranslatedBootMedia(void)
     }
 
     if(idOnBus == -1) {         // don't have this media?
-        Debug::out(LOG_DEBUG, "Scsi::updateTranslatedBootMedia() - could not find CE_DD bus ID, fail");
+        Debug::out(LOG_ERROR, "Scsi::updateTranslatedBootMedia() - could not find CE_DD bus ID, fail");
         return;
     } else {
         Debug::out(LOG_DEBUG, "Scsi::updateTranslatedBootMedia() - the bus ID of CE_DD is: %d", idOnBus);

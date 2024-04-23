@@ -138,7 +138,7 @@ bool Scsi::readSectors_small(uint32_t startSectorNo, uint32_t sectorCount)
     res = dataMedia->readSectors(startSectorNo, sectorCount, dataBuffer);
 
     if(!res) {
-        Debug::out(LOG_DEBUG, "Scsi::readSectors_small() - failed for startSectorNo: 0x%x, sectorCountNow: 0x%x", startSectorNo, sectorCount);
+        Debug::out(LOG_ERROR, "Scsi::readSectors_small() - failed for startSectorNo: 0x%x, sectorCountNow: 0x%x", startSectorNo, sectorCount);
         return false;
     }
 
@@ -176,7 +176,7 @@ bool Scsi::readSectors_big(uint32_t startSectorNo, uint32_t sectorCount)
         res = dataMedia->readSectors(startSectorNo, sectorCountNow, dataBuffer);
 
         if(!res) {
-            Debug::out(LOG_DEBUG, "Scsi::readSectors() - dataMedia->readSectors() failed for startSectorNo: 0x%x, sectorCountNow: 0x%x", startSectorNo, sectorCountNow);
+            Debug::out(LOG_ERROR, "Scsi::readSectors() - dataMedia->readSectors() failed for startSectorNo: 0x%x, sectorCountNow: 0x%x", startSectorNo, sectorCountNow);
             return false;
         }
 
@@ -188,7 +188,7 @@ bool Scsi::readSectors_big(uint32_t startSectorNo, uint32_t sectorCount)
         res = dataTrans->sendData_transferBlock(dataBuffer, byteCountNow);
 
         if(!res) {
-            Debug::out(LOG_DEBUG, "Scsi::readSectors() - dataTrans->sendData_transferBlock() failed for startSectorNo: 0x%x, sectorCountNow: 0x%x", startSectorNo, sectorCountNow);
+            Debug::out(LOG_ERROR, "Scsi::readSectors() - dataTrans->sendData_transferBlock() failed for startSectorNo: 0x%x, sectorCountNow: 0x%x", startSectorNo, sectorCountNow);
             return false;
         }
     }

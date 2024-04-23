@@ -29,7 +29,7 @@ void DesktopCreator::createToFile(DesktopConfig *dc)
     }
 
     if(!f) {                                    // if failed to create file, quit
-        Debug::out(LOG_DEBUG, "DesktopCreator::createToFile() -- failed to create file .INF file!");
+        Debug::out(LOG_ERROR, "DesktopCreator::createToFile() -- failed to create file .INF file!");
         return;
     }
 

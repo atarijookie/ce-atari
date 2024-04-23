@@ -141,7 +141,7 @@ int main(int argc, char *argv[])
         printf("\nHW_VER: UNKNOWN\n");
         printf("\nHDD_IF: UNKNOWN\n");
 
-        Debug::out(LOG_INFO, "ChipInterface - failed to open chip Interface %d, terminating.", flags.chipInterface);
+        Debug::out(LOG_ERROR, "ChipInterface - failed to open chip Interface %d, terminating.", flags.chipInterface);
         printf("\nChipInterface - failed to open chip Interface %d, terminating.\n", flags.chipInterface);
         return 0;
     }

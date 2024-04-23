@@ -21,6 +21,7 @@ public:
     static void out(int logLevel, const char *format, ...);
     static void outBfr(uint8_t *bfr, int count);
 
+    static const char* logLevelString(int ll);
     static void printfLogLevelString(void);
 
     static void setLogLevel(int newLogLevel);
