@@ -386,8 +386,8 @@ void generateDataOnPartition(void)
     VT52_Clear_home();
     (void) Cconws("Generated data on GEMDOS partition\r\n");
 
-        // show question
-    (void) Cconws("Data write, verify or both : W/V/B ");
+    // show question
+    (void) Cconws("Data write, read or both : W/R/B ");
 
     BYTE testType;
     while(1) {
@@ -402,12 +402,12 @@ void generateDataOnPartition(void)
             break;
         }
 
-        if(testType == 'v') {                        // verify
-            (void) Cconws("VERIFY\r\n");
+        if(testType == 'r') {                        // read
+            (void) Cconws("READ\r\n");
             break;
         }
 
-        if(testType == 'b') {                        // write and verify
+        if(testType == 'b') {                        // write and read
             (void) Cconws("BOTH\r\n");
             break;
         }
@@ -453,7 +453,7 @@ void generateDataOnPartition(void)
     
     //----------
     (void) Cconws("Choose test file size in MB: ");
-    int testFileSizeMb = getIntFromUser(1, 2);
+    int testFileSizeMb = getIntFromUser(1, 4);
 
     (void) Cconws("Choose test files count    : ");
     int testFileCount = getIntFromUser(1, 2);
@@ -490,10 +490,10 @@ void generateDataOnPartition(void)
     switch(testType) {
         // write
         case 'w':   doPartitionWriteOrVerify(TRUE,  testDrive, testFileSizeMb, testFileCount); break;
-        
-        // verify
-        case 'v':   doPartitionWriteOrVerify(FALSE, testDrive, testFileSizeMb, testFileCount); break;
-        
+
+        // read
+        case 'r':   doPartitionWriteOrVerify(FALSE, testDrive, testFileSizeMb, testFileCount); break;
+
         // both
         case 'b':   doPartitionWriteOrVerify(TRUE,  testDrive, testFileSizeMb, testFileCount);
                     doPartitionWriteOrVerify(FALSE, testDrive, testFileSizeMb, testFileCount);
@@ -516,7 +516,10 @@ void doPartitionWriteOrVerify(BYTE writeNotVerify, BYTE testDrive, int testFileS
     for(i=0; i<26; i++) {
         times[i] = 0;
     }
-    
+
+    int doneInBytes = 0;
+    int prevDoneInMB = -1;
+
     for(i=0; i<testFileCount; i++) {                // for all files
         char testFilePath[32] = "X:\\TSTFILEY.BIN"; // pattern for filename
         
@@ -531,7 +534,7 @@ void doPartitionWriteOrVerify(BYTE writeNotVerify, BYTE testDrive, int testFileS
             
             f = Fcreate(testFilePath, 0);           // create for writing
         } else {                                    // for read
-            (void) Cconws("Verifying ");
+            (void) Cconws("Reading ");
             (void) Cconws(testFilePath);
             (void) Cconws("  : ");
 
@@ -546,6 +549,17 @@ void doPartitionWriteOrVerify(BYTE writeNotVerify, BYTE testDrive, int testFileS
         int res;
         int bufferSize = MAXSECTORS * 512;
         for(j=0; j<fileSizeInBuffers; j++) {
+            doneInBytes += bufferSize;                  // increment done size in bytes
+            int doneInMB = doneInBytes / (1024*1024);   // convert bytes to MBs
+            if(prevDoneInMB != doneInMB && (doneInMB % 5) == 0) {   // crossed 5 MB boundary?
+                prevDoneInMB = doneInMB;
+                (void) Cconws("\r\n");
+                showInt(doneInMB, 4);
+                (void) Cconws(" of ");
+                showInt(testFileSizeMb, 4);
+                (void) Cconws(" MB -> ");
+            }
+
             if(writeNotVerify) {                    // for write
                 DWORD before, after, diff;
                 before = getTicksAsUser();
