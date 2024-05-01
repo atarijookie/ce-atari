@@ -37,6 +37,7 @@ void scsi_reset(void);
 void cs_inquiry(BYTE id, BYTE verbose);
 void CEread(BYTE verbose);
 void findDevice(void);
+void sequentialWrite(void);
 
 void CEwrite(void);
 int  writeHansTest(int byteCount, WORD xorVal);
@@ -365,6 +366,11 @@ int main(void)
             continue;
         }
 
+        if(key == 'W') {            // sequential write
+            sequentialWrite();
+            continue;
+        }
+
         if(key == 'l' || key == 'L') {
             largeRead();
         }
@@ -400,6 +406,7 @@ void showMenu(void)
     (void) Cconws("r -  1 x READ\r\n");
     (void) Cconws("R - 10 x READ\r\n");
     (void) Cconws("w - CE WRITE test\r\n");
+    (void) Cconws("W - write 50 MB to RAW device\r\n");
     (void) Cconws("L - large read\r\n");
     (void) Cconws("f - Find device on SCSI\r\n");
     (void) Cconws("c - clear screen\r\n");
@@ -507,15 +514,12 @@ int readHansTest(int byteCount, WORD xorVal, BYTE verbose)
 	return 0;
 }
 
-#define SCSI_C_READ6            0x08
-#define SCSI_C_REQUEST_SENSE    0x03
-
 void SDread(void)
 {
     BYTE cmd[6];
     
     memset(cmd, 0, 6);
-    cmd[0] = (deviceID << 5) | SCSI_C_READ6;
+    cmd[0] = (deviceID << 5) | SCSI_CMD_READ6;
     cmd[4] = 1;
     
     (void) Cconws("SD READ...\r\n");
@@ -534,7 +538,7 @@ void SDread(void)
     if(hdIf.success && hdIf.statusByte != 0) {
         (void) Cconws("REQUEST SENSE...\r\n");
 
-        cmd[0] = (deviceID << 5) | SCSI_C_REQUEST_SENSE;
+        cmd[0] = (deviceID << 5) | SCSI_CMD_REQUEST_SENSE;
         cmd[4] = 16;                                    // how many bytes should be sent
 
         hdIfCmdAsUser(1, cmd, 6, pBuffer, 1);
@@ -735,6 +739,58 @@ void findDevice(void)
 }
 
 //--------------------------------------------
+uint8_t scsiWrite(uint32_t sectorStart, uint8_t sectorCount, uint8_t* data)
+{
+    BYTE cmd[6];
+    cmd[0] = (deviceID << 5) | SCSI_CMD_WRITE6;
+    cmd[1] = (sectorStart >> 16);
+    cmd[2] = (sectorStart >>  8);
+    cmd[3] = (sectorStart      );
+    cmd[4] = sectorCount;
+    cmd[5] = 0;
+
+    hdIfCmdAsUser(ACSI_WRITE, cmd, 6, data, sectorCount);
+    
+    if(!hdIf.success) {
+        return 0xff;
+    }
+    return hdIf.statusByte;
+}
+
+void sequentialWrite(void)
+{
+    // show initial message
+    (void) Cconws("\r\nSequential write of 50 MB to RAW device.\r\n");
+
+    int i;
+    // fill buffer with data
+    for(i=0; i<(MAXSECTORS * 512); i++) {
+        pBuffer[i] = i;
+    }
+
+    // write 403 x 127 kB = 50 MB
+    uint32_t start = 0;
+    for(i=0; i<403; i++) {
+        if(i % 40 == 0) {   // every 5 MB
+            (void) Cconws("\r\n");
+            int megs = i / 40;
+            showInt(megs, 2);
+            (void) Cconws(" MB: ");
+        }
+
+        uint8_t res = scsiWrite(start, MAXSECTORS, pBuffer);
+        if(res == 0) {
+            (void) Cconws("*");
+        } else {
+            (void) Cconws("-");
+        }
+    }
+
+    (void) Cconws("\r\nDone.\r\nPress key to continue.\r\n");   // show message
+    Cnecin();   // wait for key
+    showMenu(); // show menu
+}
+
 void CEwrite(void)
 {
     commandLong[0] = (deviceID << 5) | 0x1f;			// cmd[0] = ACSI_id + ICD command marker (0x1f)	

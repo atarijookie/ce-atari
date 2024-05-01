@@ -3,6 +3,7 @@
 
 #include "acsi.h"
 
+int     memcmp(void * a, const void *b, int num);
 void *	memcpy ( void * destination, const void * source, int num );
 void *	memset ( void * ptr, int value, int num );
 int		strlen ( const char * str );

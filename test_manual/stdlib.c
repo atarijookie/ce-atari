@@ -3,6 +3,21 @@
 
 #include "stdlib.h"
 
+int memcmp(void * a, const void *b, int num)
+{
+	BYTE *aa = (BYTE *) a;
+	BYTE *bb = (BYTE *) b;
+	int i;
+	
+	for(i=0; i<num; i++) {
+		if(aa[i] != bb[i]) {
+			return 1;
+		}
+	}
+	
+	return 0;
+}
+
 void *memcpy ( void * destination, const void * source, int num )
 {
 	BYTE *dst = (BYTE *) destination;

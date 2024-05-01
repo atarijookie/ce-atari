@@ -55,7 +55,10 @@
 #define ACSI_READ	1
 #define ACSI_WRITE	0
 
-#define SCSI_CMD_INQUIRY	0x12
+#define SCSI_CMD_READ6          0x08
+#define SCSI_CMD_REQUEST_SENSE  0x03
+#define SCSI_CMD_WRITE6	        0x0a
+#define SCSI_CMD_INQUIRY	    0x12
 
 #define CMD_LENGTH_SHORT	6
 #define CMD_LENGTH_LONG		13
