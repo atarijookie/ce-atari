@@ -43,7 +43,6 @@ private:
     uint8_t getCmdByte(void);
     uint8_t dataIn(void);
     void dataOut(uint8_t data);
-    uint8_t getCmdLengthFromCmdBytesAcsi(uint8_t* cmd);
 
     void timeoutStart(uint32_t durationMs);
     bool isTimeout(void);

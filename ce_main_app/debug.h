@@ -2,6 +2,11 @@
 #define _DEBUG_H_
 
 #include <stdint.h>
+#include <cstdio>
+
+#define CORE_LOG_FILENAME   "core.log"
+#define CHIP_LOG_FILENAME   "chip.log"
+#define HDD_LOG_FILENAME    "hdd.log"
 
 #define LOG_OFF         0
 #define LOG_INFO        1       // info         - info which can be displayed when running at user's place
@@ -26,8 +31,6 @@ public:
 
     static void setLogLevel(int newLogLevel);
     static void setOutputToConsole(void);
-    static void setDefaultLogFile(void);
-    static void setDefaultLogFileFromEnvValue(void);
     static void setLogFile(const char *path);
 
     static void logRotateIfNeeded(const char *logFilePath);
@@ -35,8 +38,13 @@ public:
     static void chipLog(const char* bfr);
     static void chipLog(uint16_t cnt, char* bfr);
 
-private:    
-    static char logFilePath[128];
+    static void setDefaultLogFile(void);
+    static FILE* logFileOpen(const char* logFileName);
+
+    static void cmdMarkStartTime(void);
+    static void cmdStart(uint8_t* cmd, const char* tag);
+    static void cmdMid(bool readNotWrite, uint32_t count);
+    static void cmdEnd(uint8_t statusByte, bool succeeded);
 };
 
 #endif

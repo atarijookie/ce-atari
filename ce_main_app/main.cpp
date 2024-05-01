@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
 
     printf("\033[H\033[2J\n");
 
-    Debug::setDefaultLogFile();                                 // set some log file before .env is loaded
+    Debug::setDefaultLogFile();                // set log file before env vars available
     initializeFlags();                                          // initialize flags
     Debug::out(LOG_INFO, "\n\n"); Debug::out(LOG_INFO, "---------------------------------------------------");
 
@@ -72,10 +72,10 @@ int main(int argc, char *argv[])
     Debug::printfLogLevelString();
 
     Utils::loadDotEnv();                                        // load dotEnv before setting default log file
-    Debug::setDefaultLogFileFromEnvValue();                     // set log after .env is loaded
+    Debug::setDefaultLogFile();                // set log file after env vars available
 
     ldp_setParam(1, (uint64_t) flags.logLevel);                         // libDOSpath - set log level to file
-    std::string logDir = Utils::dotEnvValue("LOG_DIR", "/var/log/ce");  // path to logs dir
+    std::string logDir = Utils::dotEnvValue("LOG_DIR", LOG_DIR_DEFAULT);  // path to logs dir
     Utils::mergeHostPaths(logDir, "libdospath.log");                    // full path = logs dir + filename
     ldp_setParam(2, (uint64_t) logDir.c_str());                         // libDOSpath - set log file path
     Debug::out(LOG_ERROR, "setting libdospath log file to: %s and log level to: %d", logDir.c_str(), flags.logLevel);
@@ -284,7 +284,7 @@ int runCore(int instanceNo, bool localNotNetwork)
     }
 
     // remove PID file on termination
-    std::string pidFilePath = Utils::dotEnvValue("CORE_PID_FILE", "/var/run/ce/core.pid");
+    std::string pidFilePath = Utils::dotEnvValue("CORE_PID_FILE", DATA_DIR_DEFAULT "/core.pid");
     unlink(pidFilePath.c_str());
 
     Debug::out(LOG_INFO, "CosmosEx terminated.");
@@ -538,7 +538,7 @@ bool otherInstanceIsRunning(void)
     char self_exe[PATH_MAX];
 
     self_pid = getpid();
-    std::string pidFilePath = Utils::dotEnvValue("CORE_PID_FILE", "/var/run/ce/core.pid");
+    std::string pidFilePath = Utils::dotEnvValue("CORE_PID_FILE", DATA_DIR_DEFAULT "/core.pid");
 
     f = fopen(pidFilePath.c_str(), "r");
     if(!f) {    // can't open file? other instance probably not running (or is, but can't figure out, so screw it)

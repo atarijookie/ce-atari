@@ -2,11 +2,9 @@
 
 # get log path, generate current date and logfile with that date, redirect output to log and console
 PATH=$PATH:/ce/update       # add our update folder to path so we can use relative paths when referencing our scripts
-LOG_DIR=$( getdotenv.sh LOG_DIR "/var/log/ce" )
+. /ce/services/.env         # source env variables
 LOG_FILE="$LOG_DIR/updater_service.log"
 {
-CE_UPDATE_TRIGGER=$( getdotenv.sh CE_UPDATE_TRIGGER "" )   # if this file appears, we should do the update
-CE_UPDATE_RUNNING=$( getdotenv.sh CE_UPDATE_RUNNING "" )   # if this file is present, we are doing update
 
 services_stop()
 {

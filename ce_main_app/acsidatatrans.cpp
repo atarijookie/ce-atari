@@ -21,6 +21,8 @@ AcsiDataTrans::AcsiDataTrans()
     statusWasSet    = false;
     com             = NULL;
     dataDirection   = DATA_DIRECTION_READ;
+    receivedDataCount   = 0;
+    sentDataCount       = 0;
 
     dumpNextData    = false;
 
@@ -48,6 +50,8 @@ void AcsiDataTrans::clear(bool clearAlsoDataDirection)
     count           = 0;
     status          = SCSI_ST_OK;
     statusWasSet    = false;
+    receivedDataCount   = 0;
+    sentDataCount       = 0;
     
     if(clearAlsoDataDirection) {
         dataDirection   = DATA_DIRECTION_READ;
@@ -122,6 +126,8 @@ bool AcsiDataTrans::recvData(uint8_t *data, uint32_t cnt)
 {
     bool res;
 
+    receivedDataCount += cnt;
+
     dataDirection = DATA_DIRECTION_WRITE;                   // let the higher function know that we've done data write -- 130 048 Bytes
     res = recvData_start(cnt);                              // first send the command and tell Hans that we need WRITE data
 
@@ -177,7 +183,11 @@ void AcsiDataTrans::sendDataAndStatus(bool fromRetryModule)
 
     // for DATA write transmit just the status in a different way (on separate ATN)
     if(dataDirection == DATA_DIRECTION_WRITE) {
-        sendStatusToHans(status);
+        Debug::cmdMid(false, receivedDataCount);
+
+        bool success = sendStatusToHans(status);
+
+        Debug::cmdEnd(status, success);
         return;
     }
 
@@ -193,14 +203,18 @@ void AcsiDataTrans::sendDataAndStatus(bool fromRetryModule)
     //---------------------------------------
     // first send the command
     bool res;
-
     res = sendData_start(count, status, true);      // try to start the read data transfer, with status
 
     if(!res) {
+        Debug::cmdMid(true, 0);
+        Debug::cmdEnd(status, false);
         return;
     }
 
-    sendData_transferBlock(buffer, count);    // transfer this block
+    bool success = sendData_transferBlock(buffer, count);    // transfer this block
+
+    Debug::cmdMid(true, sentDataCount);
+    Debug::cmdEnd(status, success);
 }
 
 bool AcsiDataTrans::sendData_start(uint32_t totalDataCount, uint8_t scsiStatus, bool withStatus)
@@ -215,6 +229,7 @@ bool AcsiDataTrans::sendData_start(uint32_t totalDataCount, uint8_t scsiStatus, 
 
 bool AcsiDataTrans::sendData_transferBlock(uint8_t *pData, uint32_t dataCount)
 {
+    sentDataCount += dataCount;
     bool res = com->hdd_sendData_transferBlock(pData, dataCount);
 
     if(!res) {                                                  // failed? fail
@@ -247,13 +262,15 @@ bool AcsiDataTrans::recvData_transferBlock(uint8_t *pData, uint32_t dataCount)
     return res;
 }
 
-void AcsiDataTrans::sendStatusToHans(uint8_t statusByte)
+bool AcsiDataTrans::sendStatusToHans(uint8_t statusByte)
 {
     bool res = com->hdd_sendStatusToHans(statusByte);
 
     if(!res) {
         clear();            // clear all the variables
     }
+
+    return res;
 }
 
 uint32_t AcsiDataTrans::getCount(void)

@@ -257,6 +257,7 @@ bool ChipInterface3::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
         return false;
     }
 
+    Debug::cmdMarkStartTime();
     hardNotFloppy = rxPacket->isHdd();  // store is-hdd flag
 
     if(rxPacket->txLen() > INBUF_SIZE) {

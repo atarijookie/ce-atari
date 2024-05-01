@@ -65,9 +65,12 @@ public:
     virtual bool recvData_start         (uint32_t totalDataCount);
     virtual bool recvData_transferBlock (uint8_t *pData, uint32_t dataCount);
 
-    virtual void sendStatusToHans       (uint8_t statusByte);
+    virtual bool sendStatusToHans       (uint8_t statusByte);
 
 protected:
+    uint32_t    sentDataCount;
+    uint32_t    receivedDataCount;
+
     uint8_t    *buffer;
     uint32_t   count;
     uint8_t    status;

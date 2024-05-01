@@ -71,6 +71,9 @@ public:
 
     static const char * SourceTypeStr(int sourceType);
 
+    static bool isICDcommand(uint8_t cmd0);
+    static uint8_t getCmdLengthFromCmdBytesAcsi(uint8_t* cmd);
+
 private:
     AcsiDataTrans   *dataTrans;
 
@@ -94,8 +97,6 @@ private:
     AcsiIDinfo      acsiIdInfo;
 
     uint8_t *cmd;
-
-    bool isICDcommand(void);
 
     // for 6-byte long commands - from scsi6
     void ProcScsi6(uint8_t lun, uint8_t justCmd);

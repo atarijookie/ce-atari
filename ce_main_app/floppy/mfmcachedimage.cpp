@@ -289,7 +289,7 @@ void MfmCachedImage::indexToTrackAndSide(const int index, int &track, int &side)
 
 void MfmCachedImage::log(char *str)
 {
-    std::string logFilePath = Utils::dotEnvValue("LOG_DIR", "/var/log/ce");     // path to logs dir
+    std::string logFilePath = Utils::dotEnvValue("LOG_DIR", LOG_DIR_DEFAULT);     // path to logs dir
     Utils::mergeHostPaths(logFilePath, "mfmcached.log");             // full path = dir + filename
 
     FILE *f = fopen(logFilePath.c_str(), "a+t");

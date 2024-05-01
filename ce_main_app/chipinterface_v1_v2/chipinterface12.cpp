@@ -204,6 +204,8 @@ bool ChipInterface12::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
     bool res = conSpi->waitForATN(SPI_CS_HANS, (uint8_t) ATN_ANY, 0, inBuf);
 
     if(res) {    // HANS is signaling attention?
+        Debug::cmdMarkStartTime();
+
         if(inBuf[3] == ATN_ACSI_COMMAND) {
             moreData = 14;                              // all ACSI command bytes
         }

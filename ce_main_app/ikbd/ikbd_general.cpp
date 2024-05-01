@@ -332,7 +332,7 @@ void ikbdLog(const char *format, ...)
     FILE *f;
 
     if(ikbdLogFilePath.empty()) {   // construct this path once, reuse later
-        ikbdLogFilePath = Utils::dotEnvValue("LOG_DIR", "/var/log/ce");     // path to logs dir
+        ikbdLogFilePath = Utils::dotEnvValue("LOG_DIR", LOG_DIR_DEFAULT);     // path to logs dir
         Utils::mergeHostPaths(ikbdLogFilePath, "ikbd.log");                 // full path = logs dir + filename
     }
 

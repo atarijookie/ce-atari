@@ -249,7 +249,7 @@ void forkCEliteServer(int serverIndex)
 
     if(childPid == 0) {                 // code executed only by child
         char logPath[50];
-        sprintf(logPath, "/var/log/ce_server_%d.log", serverIndex);
+        sprintf(logPath, LOG_DIR_DEFAULT "/ce_server_%d.log", serverIndex);
         Debug::setLogFile(logPath);     // new network server will use different log file than the main thread
 
         runCore(serverIndex, false);    // run network (not local) device server with this serverIndex

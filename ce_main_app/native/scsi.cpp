@@ -138,7 +138,7 @@ void Scsi::processCommand(uint8_t *command)
         return;
     }
 
-    bool isIcd      = isICDcommand();                           // check if it's ICD command or SCSI(6) command
+    bool isIcd      = isICDcommand(cmd[0]);                        // check if it's ICD command or SCSI(6) command
     uint8_t lun        = isIcd ? (cmd[2] >> 5) : (cmd[1] >>   5);  // get LUN from command
     uint8_t justCmd    = isIcd ? (cmd[1]     ) : (cmd[0] & 0x1f);  // get just the command (remove ACSI ID)
 

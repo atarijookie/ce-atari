@@ -133,7 +133,7 @@ int main(void)
         if(res != STATUS_OK) {  // getting response failed?
             (void) Cconws("fun_path_in - cexResponse failed\r\n");
         } else {
-            if(strncmp((char*) pBuffer, "/var/run/ce/trans/O/tests/ce_tsthd.tos", 38) != 0) {     // wrong string returned?
+            if(strncmp((char*) pBuffer, "/tmp/ce/data/trans/O/tests/ce_tsthd.tos", 38) != 0) {     // wrong string returned?
                 (void) Cconws("fun_path_in - string BAD - '");
                 (void) Cconws(pBuffer);
                 (void) Cconws("'\r\n");

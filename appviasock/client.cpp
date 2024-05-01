@@ -118,10 +118,13 @@ ssize_t forwardData(int& fdIn, int& fdOut, char* bfr, int bfrLen, bool fromSock)
 
 int main(int argc, char *argv[])
 {
-    const char* fullSockPath = "/var/run/ce/app0.sock";
+    char* dataDir = getenv("DATA_DIR");
+    char fullSockPath[256];
+    strcpy(fullSockPath, dataDir);
+    strcat(fullSockPath, "/app0.sock");
 
     if(argc > 1) {
-        fullSockPath = argv[1];
+        strcpy(fullSockPath, argv[1]);
     }
 
     printf("\n\nWill connect to socket: %s\n", fullSockPath);

@@ -6,14 +6,13 @@
 #include "debug.h"
 #include "utils.h"
 
-#define LOG_FILE		"/var/log/ce.log"
 DWORD prevLogOut;
 
 extern TFlags   flags;
        BYTE     g_outToConsole;
 
 DebugVars dbgVars;
-       
+
 char Debug::logFilePath[128];
 
 void Debug::setOutputToConsole(void)
@@ -23,14 +22,17 @@ void Debug::setOutputToConsole(void)
 
 void Debug::setDefaultLogFile(void)
 {
-    setLogFile((char *) LOG_FILE);
+    char path[256];
+    strcpy(path, getenv("LOG_DIR"));
+    strcat(path, "/ce.log");
+    setLogFile(path);
 }
 
 void Debug::setLogFile(char *path)
 {
     strcpy(Debug::logFilePath, path);
 }
-    
+
 void Debug::printfLogLevelString(void)
 {
     printf("\nLog level: ");

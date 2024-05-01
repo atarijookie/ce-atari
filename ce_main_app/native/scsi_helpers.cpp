@@ -10,13 +10,33 @@
 #include "imagefilemedia.h"
 
 //----------------------------------------------
-bool Scsi::isICDcommand(void)
+bool Scsi::isICDcommand(uint8_t cmd0)
 {
-    if((cmd[0] & 0x1f)==0x1f) {              // if the command is '0x1f'
+    if((cmd0 & 0x1f)==0x1f) {              // if the command is '0x1f'
         return true;
     }
 
     return false;
+}
+
+//----------------------------------------------
+uint8_t Scsi::getCmdLengthFromCmdBytesAcsi(uint8_t* cmd)
+{
+    uint8_t cmdLen = 6;     // non-ICD commands have length of 6 bytes
+
+    // now it's time to set up the receiver buffer and length
+    if((cmd[0] & 0x1f)==0x1f)   {                           // if the command is '0x1f'
+        switch((cmd[1] & 0xe0)>>5)                          // get the length of the command
+        {
+            case  0: cmdLen =  7; break;
+            case  1: cmdLen = 11; break;
+            case  2: cmdLen = 11; break;
+            case  5: cmdLen = 13; break;
+            default: cmdLen =  7; break;
+        }
+    }
+
+    return cmdLen;
 }
 
 //----------------------------------------------

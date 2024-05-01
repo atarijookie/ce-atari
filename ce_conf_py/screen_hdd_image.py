@@ -9,9 +9,9 @@ import shared
 
 edit_imgpath = None
 
-DATA_DIR = '/var/run/ce/'
-FILE_HDDIMAGE_RESOLVED = os.path.join(DATA_DIR, 'HDDIMAGE_RESOLVED')    # where the resolved HDDIMAGE will end up
-
+def get_filepath_hddimage_resolved():
+    path = os.getenv('FILE_HDDIMAGE_RESOLVED')
+    return path
 
 def hdd_image_create(button):
     settings_load()
@@ -72,7 +72,7 @@ def hdd_img_save(button):
         back_to_main_menu(None)
         return
 
-    delete_file(FILE_HDDIMAGE_RESOLVED)     # delete the resolved image file, so we won't respond to existing file
+    delete_file(get_filepath_hddimage_resolved())     # delete the resolved image file, so we won't respond to existing file
 
     settings_save()                 # save the value to file, let mounter try to resolve it
     did_resolve = False
@@ -80,7 +80,7 @@ def hdd_img_save(button):
 
     for i in range(20):             # for some time try to see if mounter was able to resolve the HDD image filename
         sleep(0.1)
-        resolved_filename = text_from_file(FILE_HDDIMAGE_RESOLVED)
+        resolved_filename = text_from_file(get_filepath_hddimage_resolved())
 
         if not resolved_filename:       # still not resolved, try again
             continue

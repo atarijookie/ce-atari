@@ -1,6 +1,7 @@
 #include "../utils.h"
 #include "../debug.h"
 #include "gpio_acsi.h"
+#include "../native/scsi.h"
 
 GpioAcsi::GpioAcsi()
 {
@@ -101,6 +102,8 @@ bool GpioAcsi::getCmd(uint8_t* cmd)
         return false;
     }
 
+    Debug::cmdMarkStartTime();
+
     timeoutStart(1000);                     // start timeout
     bcm2835_gpio_write(FF12D, LOW);         // FF12D must be L for generating INT / DRQ signals
     uint8_t cmdLen = 6;                     // maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
@@ -115,7 +118,7 @@ bool GpioAcsi::getCmd(uint8_t* cmd)
         }
         
         if(i == 1) {                        // if we got also the 2nd byte, get actual cmd length
-            cmdLen = getCmdLengthFromCmdBytesAcsi(cmd);
+            cmdLen = Scsi::getCmdLengthFromCmdBytesAcsi(cmd);
             Debug::out(LOG_DEBUG, "GpioAcsi::getCmd - for cmd: %02x %02x -> cmdLen: %d", cmd[0], cmd[1], cmdLen);
         }             
     }
@@ -340,25 +343,6 @@ void GpioAcsi::dataOut(uint8_t data)
 
     bcm2835_gpio_write_mask(data32, 0x01BF0000);     // write value with mask
 #endif
-}
-
-uint8_t GpioAcsi::getCmdLengthFromCmdBytesAcsi(uint8_t* cmd)
-{
-    uint8_t cmdLen = 6;     // non-ICD commands have length of 6 bytes
-
-    // now it's time to set up the receiver buffer and length
-    if((cmd[0] & 0x1f)==0x1f)   {                           // if the command is '0x1f'
-        switch((cmd[1] & 0xe0)>>5)                          // get the length of the command
-        {
-            case  0: cmdLen =  7; break;
-            case  1: cmdLen = 11; break;
-            case  2: cmdLen = 11; break;
-            case  5: cmdLen = 13; break;
-            default: cmdLen =  7; break;
-        }
-    }
-
-    return cmdLen;
 }
 
 void GpioAcsi::timeoutStart(uint32_t durationMs)

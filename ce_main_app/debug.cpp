@@ -7,10 +7,14 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <string>
+#include <map>
+
 #include "global.h"
 #include "debug.h"
 #include "utils.h"
 #include "../libdospath/libdospath.h"
+#include "native/scsi.h"
 
 uint32_t prevLogOut;
 
@@ -19,7 +23,7 @@ extern TFlags   flags;
 
 DebugVars dbgVars;
 
-char Debug::logFilePath[128];
+std::map<std::string, std::string> logPaths;
 
 void Debug::setOutputToConsole(void)
 {
@@ -28,21 +32,21 @@ void Debug::setOutputToConsole(void)
 
 void Debug::setDefaultLogFile(void)
 {
-    // set default log file, without the need of dotEnv being loaded, so we can start logging as soon as possible,
-    // even during the the loading of dotEnv file
-    setLogFile("/var/log/ce/core.log");
-}
+    std::string filename = CORE_LOG_FILENAME;
+    std::map<std::string, std::string>::iterator i = logPaths.find(filename);
 
-void Debug::setDefaultLogFileFromEnvValue(void)
-{
-    std::string logFilePath = Utils::dotEnvValue("LOG_DIR", "/var/log/ce");     // path to logs dir
-    Utils::mergeHostPaths(logFilePath, "core.log");             // full path = dir + filename
-    setLogFile(logFilePath.c_str());                            // use full path here
+    if(i != logPaths.end()) {   // got this log file? erase it from map
+        logPaths.erase(i);
+    }
+
+    FILE* f = logFileOpen(CORE_LOG_FILENAME);   // call this to update map, then just close the file
+    fclose(f);
 }
 
 void Debug::setLogFile(const char *path)
 {
-    strcpy(Debug::logFilePath, path);
+    std::string pathStr = path;
+    logPaths[CORE_LOG_FILENAME] = pathStr;
 }
 
 const char* Debug::logLevelString(int ll)
@@ -78,8 +82,7 @@ void Debug::out(int logLevel, const char *format, ...)
     if(g_outToConsole) {                    // should log to console? f is null
         f = NULL;
     } else {                                    // log to file? open the file
-        Debug::logRotateIfNeeded(logFilePath);  // rotate log file if too big
-        f = fopen(logFilePath, "a+t");          // open the file
+        f = logFileOpen(CORE_LOG_FILENAME);
     }
 
     if(!f) {
@@ -125,7 +128,7 @@ void Debug::outBfr(uint8_t *bfr, int count)
         return;
     }
 
-    FILE *f = fopen(logFilePath, "a+t");
+    FILE* f = logFileOpen(CORE_LOG_FILENAME);
 
     if(!f) {
         return;
@@ -210,18 +213,12 @@ void Debug::chipLog(uint16_t cnt, char* bfr)
 {
     static std::string oneLine;
     static uint32_t prevLogOutChips = 0;
-    static std::string chipLogFilePath;
 
     uint32_t now = Utils::getCurrentMs();
     uint32_t diff = now - prevLogOutChips;
     prevLogOutChips = now;
 
-    if(chipLogFilePath.empty()) {
-        chipLogFilePath = Utils::dotEnvValue("LOG_DIR", "/var/log/ce");     // path to logs dir
-        Utils::mergeHostPaths(chipLogFilePath, "chip.log");             // full path = dir + filename
-    }
-
-    FILE *f = fopen(chipLogFilePath.c_str(), "a+t");
+    FILE* f = logFileOpen(CHIP_LOG_FILENAME);
 
     if(!f) {                    // no file? quit
         return;
@@ -239,4 +236,113 @@ void Debug::chipLog(uint16_t cnt, char* bfr)
     }
 
     fclose(f);      // close file at the end
+}
+
+FILE* Debug::logFileOpen(const char* logFileName)
+{
+    static std::string path;
+
+    std::string logFileStdStr = logFileName;
+    std::map<std::string, std::string>::iterator i = logPaths.find(logFileStdStr);
+    std::string logPath;
+
+    if(i == logPaths.end()) {   // don't have path for this file, create it, store it
+        logPath = Utils::dotEnvValue("LOG_DIR", LOG_DIR_DEFAULT);   // path to logs dir
+        Utils::mergeHostPaths(logPath, logFileStdStr);              // merge filename into path
+        logPaths[logFileStdStr] = logPath;                          // store to map for next time
+    } else {                    // have path, use value
+        logPath = i->second;
+    }
+
+    Debug::logRotateIfNeeded(logPath.c_str());   // rotate log file if too big
+
+    FILE *f = fopen(logPath.c_str(), "a+t");
+    return f;
+}
+
+uint32_t cmdStartTime;
+bool cmdEndCalled = false;
+uint32_t cmdBytesCount = 0;
+
+void Debug::cmdMarkStartTime(void)
+{
+    cmdStartTime = Utils::getCurrentMs();
+}
+
+void Debug::cmdStart(uint8_t* cmd, const char* tag)
+{
+    if(flags.logLevel < LOG_DEBUG) {    // log level is lower than debug? don't write
+        return;
+    }
+
+    FILE* f = logFileOpen(HDD_LOG_FILENAME);
+
+    if(!f) {
+        return;
+    }
+
+    uint8_t cmdLen = Scsi::getCmdLengthFromCmdBytesAcsi(cmd);
+
+    if(!cmdEndCalled) {     // if cmdEnd() wasn't called, terminate the previous line
+        fprintf(f, "\n");
+        cmdEndCalled = true;
+    }
+
+    switch(cmdLen) {
+        case 6:     fprintf(f, "%08d - cmd( 6): %02x %02x %02x %02x %02x %02x                      - %-8s - ", cmdStartTime, cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], tag); break;
+        case 7:     fprintf(f, "%08d - cmd( 7): %02x %02x %02x %02x %02x %02x %02x                   - %-8s - ", cmdStartTime, cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], tag); break;
+        case 11:    fprintf(f, "%08d - cmd(11): %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x       - %-8s - ", cmdStartTime, cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7], cmd[8], cmd[9], cmd[10], tag); break;
+        case 13:
+        default:    fprintf(f, "%08d - cmd(%2d): %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x - %-8s - ", cmdStartTime, cmdLen, cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7], cmd[8], cmd[9], cmd[10], cmd[11], cmd[12], tag); break;
+    }
+
+    fclose(f);
+}
+
+void Debug::cmdMid(bool readNotWrite, uint32_t count)
+{
+    cmdBytesCount = count;
+
+    if(flags.logLevel < LOG_DEBUG) {    // log level is lower than debug? don't write
+        return;
+    }
+
+    FILE* f = logFileOpen(HDD_LOG_FILENAME);
+
+    if(!f) {
+        return;
+    }
+
+    fprintf(f, "%s - len: %8d B - ", readNotWrite ? "READ " : "WRITE", count);
+    fclose(f);
+}
+
+void Debug::cmdEnd(uint8_t statusByte, bool succeeded)
+{
+    cmdEndCalled = true;                // this cmdEnd() was called
+
+    if(flags.logLevel < LOG_DEBUG) {    // log level is lower than debug? don't write
+        return;
+    }
+
+    FILE* f = logFileOpen(HDD_LOG_FILENAME);
+
+    if(!f) {
+        return;
+    }
+
+    uint32_t now = Utils::getCurrentMs();
+    uint32_t duration = now - cmdStartTime;
+
+    fprintf(f, "status: %02x - dur: %4d ms", statusByte, duration);
+    const char* ok = succeeded ? "OK" : "FAIL";
+
+    if(cmdBytesCount >= 1024) { // if at least 1kB transfered, calc and log speed
+        uint32_t kBps = ((cmdBytesCount/1024)*1000) / duration;
+        fprintf(f, ", %4d kB/s, %s\n", kBps, ok);
+    } else {                    // 
+        fprintf(f, ",          , %s\n", ok);
+    }
+
+    fclose(f);
 }
