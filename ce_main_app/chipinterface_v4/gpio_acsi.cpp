@@ -104,7 +104,8 @@ bool GpioAcsi::getCmd(uint8_t* cmd)
 
     Debug::cmdMarkStartTime();
 
-    timeoutStart(1000);                     // start timeout
+    timeoutStart(100);                      // start timeout - 100 ms to get whole command (only up to 13 bytes, so 100 ms is enough)
+
     bcm2835_gpio_write(FF12D, LOW);         // FF12D must be L for generating INT / DRQ signals
     uint8_t cmdLen = 6;                     // maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
 
@@ -131,6 +132,8 @@ bool GpioAcsi::getCmd(uint8_t* cmd)
                                 cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5]);
     }
 
+    timeoutStart(1000);     // update timeout to 1 second after we've got the command (it will be updated in startTransfer() later)
+
     return true;
 #else
     return false;
@@ -144,7 +147,26 @@ void GpioAcsi::startTransfer(uint8_t sendNotRecv, uint32_t totalDataCount, uint8
     this->scsiStatus = scsiStatus;
     this->withStatus = withStatus;
 
-    timeoutStart(1000);     // start timeout
+    #define BLOCK_SIZE  (127*1024)
+    uint32_t blocks = (totalDataCount / BLOCK_SIZE);    // how many 127 kB blocks we will transfer
+
+    if((totalDataCount % BLOCK_SIZE) != 0) {            // if transferring not exactly block size transfer, increment blocks count to account for the last incomplete block
+        blocks++;
+    }
+
+    uint32_t timeOutMs = blocks * 2000;                 // allow each 127 kB block to take up to 2 seconds
+
+    #define MAX_TIMEOUT_MS  15000
+    timeOutMs = MIN(timeOutMs, MAX_TIMEOUT_MS);     // cap the timeout time to the maximum
+
+    // Debug::out(LOG_DEBUG, "GpioAcsi::startTransfer - %d bytes -> %d blocks of 127 kB -> %d ms timeout", totalDataCount, blocks, timeOutMs);
+
+    // 127 kB will have 2 seconds timeout, 889 kB (7 blocks) will have 14 seconds timeout, 
+    // anything bigger than 7 blocks will be limited to 15 seconds timeout
+
+    // Due to linux writing data from cache to disk, I've seen 127 kB write to take 800 ms.
+
+    timeoutStart(timeOutMs);                        // start timeout derived from transfer size
 }
 
 bool GpioAcsi::sendBlock(uint8_t *pData, uint32_t dataCount)
