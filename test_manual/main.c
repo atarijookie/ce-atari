@@ -42,6 +42,9 @@ void sequentialWrite(void);
 void CEwrite(void);
 int  writeHansTest(int byteCount, WORD xorVal);
 void showInt(int value, int length);
+int getIntFromUser(BYTE allowZero, BYTE maxDigits);
+int getIntFromUserMinMax(const char* message, int minV, int maxV);
+char getHddInterfaceForTest(void);
 void largeRead(void);
 void SDread(void);
 
@@ -54,12 +57,10 @@ void logMsg(char *logMsg);
 
 BYTE  *pBufferOrig;
 BYTE  *pBuffer;
-DWORD largeMemSizeInBytes;
-DWORD largeMemSizeInSectors;
+DWORD memSizeBytes;
+DWORD memSizeSectors;
 
 void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
-
-DWORD largestMemBlock;
 
 //-------------------------------------------------- 
 #define MACHINE_ST      0
@@ -82,7 +83,8 @@ void getMachineType(void)
 
     DWORD cookieKey, cookieValue;
 
-    while(1) {                                  // go through the list of cookies
+    int i;
+    for(i=0; i<64; i++) {                       // go through the list of cookies, up to 64 cookies
         cookieKey   = *cookieJar++;
         cookieValue = *cookieJar++;
 
@@ -104,37 +106,11 @@ void getMachineType(void)
 
     // it's an ST
 }
-//-------------------------------------------------- 
-void getLargestMemBlock(void)
-{
-    _MPB mpb;
-
-    Getmpb(&mpb);                                   // get Memory parameter block
-    _MD *mpFree = mpb.mp_free;                      // get pointer to list of free blocks
-
-    largestMemBlock = 0;
-
-    while(mpFree != NULL) {                         // while there is a valid free block
-        DWORD blockStart    =  (DWORD) mpFree->md_start;    // get starting address
-        BYTE  isFastRam     =  (blockStart >= 0x1000000) ? TRUE  : FALSE;
-    
-        if(isFastRam) {                                     // if it's FAST RAM, ignore this block
-            continue;
-        }
-    
-        if(largestMemBlock < mpFree->md_length) {   // current block if larger than the largest found yet?
-            largestMemBlock = mpFree->md_length;
-        }
-
-        mpFree = mpFree->md_next;                   // move to next block
-    }
-}
 
 //--------------------------------------------------
 int main(void)
 {
     DWORD scancode;
-    BYTE key;
     DWORD toEven;
 
     Clear_home();
@@ -149,48 +125,37 @@ int main(void)
     // get what machine we're running on
     Supexec(getMachineType);
 
+    (void) Cconws("Running on: ");
+    switch(machineType) {
+        case MACHINE_ST:        (void) Cconws("ST\r\n"); break;
+        case MACHINE_TT:        (void) Cconws("TT\r\n"); break;
+        case MACHINE_FALCON:    (void) Cconws("Falcon\r\n"); break;
+        default:                (void) Cconws("???\r\n"); break;
+    }
     //-----------------------
-    // find the largest free block of memory
-    Supexec(getLargestMemBlock);
+    // get which HDD interface to user
+    char hddIface = getHddInterfaceForTest();
 
-    //            |                    |
-    (void) Cconws("Largest mem block   : ");
-    showHexDword(largestMemBlock);
-    (void) Cconws("\r\n");
-    
-    if(largestMemBlock < SIZE_MAXSECTORS) {
-        //            |                                        |             
-        (void) Cconws("Not enough free memory, expecting\r\n");
-        (void) Cconws("at least 128 kB free!\r\n");
-        (void) Cconws("Press any key to terminate.\r\n");
-        
-        Cnecin();
-        return 0;
-    }
-    
-    if(machineType == MACHINE_ST) {                     // for ST - just stick to max sectors size
-        largestMemBlock = SIZE_MAXSECTORS;
-    }
-    
-    if(largestMemBlock >= SIZE_13MB) {                  // something is bigger than 13 MB? Limit it to 13 MB, which is near max ST RAM size
-        largestMemBlock = SIZE_13MB;
+    if(hddIface == 'a') {   // using ACSI? we need only 128 kB of RAM
+        memSizeSectors = MAXSECTORS;
+        memSizeBytes = SIZE_MAXSECTORS;
+    } else {                // using SCSI? we can transfer megs, ask for allocation size
+        uint32_t memInMBs = getIntFromUserMinMax("How much MBs of RAM to allocate (1-13): ", 1, 13);
+        memSizeBytes = memInMBs * (1024*1024);       // MBs to bytes
+        memSizeSectors = memSizeBytes / 512;  // bytes to sectors
     }
 
-    //            |                    |
     (void) Cconws("Will try to alloc   : ");
-    showHexDword(largestMemBlock);
+    showHexDword(memSizeBytes);
     (void) Cconws("\r\n");
 
-    if(largestMemBlock < SIZE_4MB) {                    // less than 4 MB? use normal Malloc()
-        (void) Cconws("Doing Malloc()...\r\n");
-        pBufferOrig = (BYTE *) Malloc(largestMemBlock);
-    } else {                                            // more than 4 MB? use Mxalloc(), so we can force it into ST RAM
-        (void) Cconws("Doing Mxalloc()...\r\n");
-        pBufferOrig = (BYTE *) Mxalloc(largestMemBlock, 1);
+    if(machineType == MACHINE_ST) {     // use Malloc() on ST
+        pBufferOrig = (BYTE *) Malloc(memSizeBytes);
+    } else {                            // use Mxalloc on TT/Falcon, force to ST RAM
+        pBufferOrig = (BYTE *) Mxalloc(memSizeBytes, 0);
     }
 
     if(pBufferOrig == NULL) {
-        //            |                                        |             
         (void) Cconws("Failed to allocate memory!\r\n");
         (void) Cconws("Press any key to terminate.\r\n");
         
@@ -198,27 +163,16 @@ int main(void)
         return 0;
     }
     
-    largeMemSizeInBytes     = largestMemBlock;          // store how much we got - in bytes
-    largeMemSizeInSectors   = largeMemSizeInBytes >> 9; // how much we got       - in sectors
-
     // ---------------------- 
     // create buffer pointer to even address 
     toEven = (DWORD) &pBufferOrig[0];
 
     if(toEven & 0x0001) {       // not even number? 
         toEven++;
-        largeMemSizeInBytes--;
+        memSizeBytes--;
     }
 
     pBuffer = (BYTE *) toEven; 
-
-     //           |                    |
-    (void) Cconws("Large mem size (B)  : ");
-    showHexDword(largeMemSizeInBytes);
-    //                |                    |
-    (void) Cconws("\r\nLarge mem size (s)  : ");
-    showHexDword(largeMemSizeInSectors);
-    (void) Cconws("\r\n");
 
     // ---------------------- 
     // search for device on the ACSI / SCSI bus 
@@ -226,34 +180,10 @@ int main(void)
     
     //initialize lock
     mutex_unlock(&mtx);
-    
-    if(machineType == MACHINE_ST) {             // if it's ST, use ACSI
-        key = 'a';
-    } else if(machineType == MACHINE_FALCON) {  // if it's Falcon, use SCSI
-        key = 'f';
-    } else {                                    // if it's TT, let user choose
-        //            |                    |
-        (void) Cconws("Choose HDD interface:\r\n");
-        
-        while(1) {
-            (void) Cconws("'A' - ACSI \r\n");
-            (void) Cconws("'T' - TT SCSI \r\n");
 
-            key = Cnecin();
-            if(key >= 'A' && key <= 'Z') {
-                key += 32;
-            }
-            
-            if(key == 't' || key == 'a') {      // good key press? go on...
-                break;
-            }
-        }
-    }
-
-     //           |                    |
     (void) Cconws("HDD Interface       : ");
     
-    switch(key) {
+    switch(hddIface) {
         case 'a':   
             (void) Cconws("\33pACSI\33q");
             hdd_if_select(IF_ACSI);
@@ -285,7 +215,7 @@ int main(void)
     // main menu loop
     while(1) {
         scancode    = Bconin(DEV_CONSOLE); 		                    // get char form keyboard, no echo on screen 
-        key         =  scancode & 0xff;
+        char key    = scancode & 0xff;
 
         if(key == 'q') {
             (void) Cconws("Terminating...\r\n");
@@ -406,7 +336,7 @@ void showMenu(void)
     (void) Cconws("r -  1 x READ\r\n");
     (void) Cconws("R - 10 x READ\r\n");
     (void) Cconws("w - CE WRITE test\r\n");
-    (void) Cconws("W - write 50 MB to RAW device\r\n");
+    (void) Cconws("W - sequential write RAW device\r\n");
     (void) Cconws("L - large read\r\n");
     (void) Cconws("f - Find device on SCSI\r\n");
     (void) Cconws("c - clear screen\r\n");
@@ -436,7 +366,7 @@ void CEread(BYTE verbose)
 
 void largeRead(void)
 {
-    DWORD mbCount       = (largeMemSizeInSectors      >> 11);   // sectors to mega bytes
+    DWORD mbCount       = (memSizeSectors      >> 11);   // sectors to mega bytes
     DWORD timeoutSecs   = mbCount * 3;                          // mega bytes to seconds
     
     (void) Cconws("READ(10) - dev: ");
@@ -452,10 +382,10 @@ void largeRead(void)
     commandLong[0] = (deviceID << 5) | 0x1f;
     commandLong[1] = SCSI_C_READ10;
     
-    commandLong[8] = (BYTE) (largeMemSizeInSectors >> 8);
-    commandLong[9] = (BYTE) (largeMemSizeInSectors     );
+    commandLong[8] = (BYTE) (memSizeSectors >> 8);
+    commandLong[9] = (BYTE) (memSizeSectors     );
     
-    hdIfCmdAsUser(1, commandLong, 11, pBuffer, largeMemSizeInSectors);
+    hdIfCmdAsUser(1, commandLong, 11, pBuffer, memSizeSectors);
 
     (void) Cconws("Command success: ");
     showHexByte(hdIf.success);
@@ -707,13 +637,21 @@ void findDevice(void)
 
     deviceID = 0;
     BYTE good;
+    uint8_t firstId = 0xff;
 
     for(i=0; i<8; i++) {
         res     = cs_inquiry2(i);                                   // try to read the IDENTITY string
         good    = FALSE;
+        uint8_t isCE = FALSE;
 
         if(res) {
             if(memcmp(pBuffer + 16, "CosmosEx", 8) == 0) {          // inquiry string contains 'CosmosEx'
+                isCE = TRUE;
+
+                if(firstId == 0xff) {
+                    firstId = i;
+                }
+
                 if(memcmp(pBuffer + 27, "SD", 2) == 0) {            // it's CosmosEx SD card
                     good = TRUE;
                 } else {                                            // it's CosmosEx, but not SD card
@@ -724,7 +662,7 @@ void findDevice(void)
             }
         }
 
-        if(good) {          // good
+        if(isCE) {          // good
             (void) Cconws("\33p");
             Cconout('0' + i);
             (void) Cconws("\33q");
@@ -734,15 +672,23 @@ void findDevice(void)
             Cconout('0' + i);
         }
     }
-    
+
     (void) Cconws("\n\r");
+
+    if(good) {  // found CE with SD card or CosmoSolo? quit
+        return;
+    }
+
+    if(firstId != 0xff) {   // found CE without SD card, use it
+        deviceID = firstId;
+    }
 }
 
 //--------------------------------------------
-uint8_t scsiWrite(uint32_t sectorStart, uint8_t sectorCount, uint8_t* data)
+uint8_t scsiWrite(uint8_t devId, uint32_t sectorStart, uint8_t sectorCount, uint8_t* data)
 {
     BYTE cmd[6];
-    cmd[0] = (deviceID << 5) | SCSI_CMD_WRITE6;
+    cmd[0] = (devId << 5) | SCSI_CMD_WRITE6;
     cmd[1] = (sectorStart >> 16);
     cmd[2] = (sectorStart >>  8);
     cmd[3] = (sectorStart      );
@@ -760,25 +706,33 @@ uint8_t scsiWrite(uint32_t sectorStart, uint8_t sectorCount, uint8_t* data)
 void sequentialWrite(void)
 {
     // show initial message
-    (void) Cconws("\r\nSequential write of 50 MB to RAW device.\r\n");
+    (void) Cconws("\r\nSequential write to RAW device.\r\n");
 
-    int i;
+    uint8_t testDevId = getIntFromUserMinMax("Choose device ID (0-7): ", 0, 7);
+
     // fill buffer with data
-    for(i=0; i<(MAXSECTORS * 512); i++) {
-        pBuffer[i] = i;
+    int j;
+    for(j=0; j<(MAXSECTORS * 512); j++) {
+        pBuffer[j] = j;
     }
 
-    // write 403 x 127 kB = 50 MB
+    uint32_t writeMBs = getIntFromUserMinMax("How much MBs to write (1-1024): ", 1, 1024);
+    uint32_t writeBuffers = (writeMBs * 1024 * 1024) / (MAXSECTORS * 512);  // MBs to bytes, bytes to count of 127 kB buffers
+
+    uint32_t i;
     uint32_t start = 0;
-    for(i=0; i<403; i++) {
+    for(i=0; i<writeBuffers; i++) {
         if(i % 40 == 0) {   // every 5 MB
             (void) Cconws("\r\n");
-            int megs = i / 40;
-            showInt(megs, 2);
+            int megs = i / 8;
+            showInt(megs, 3);
+            (void) Cconws(" of ");
+            showInt(writeMBs, 3);
             (void) Cconws(" MB: ");
         }
 
-        uint8_t res = scsiWrite(start, MAXSECTORS, pBuffer);
+        uint8_t res = scsiWrite(testDevId, start, MAXSECTORS, pBuffer);
+        start += MAXSECTORS;    // advance start to next position
         if(res == 0) {
             (void) Cconws("*");
         } else {
@@ -898,13 +852,108 @@ void showInt(int value, int length)
 
         val = value / 10;
         mod = value % 10;
-
-        tmp[length - 1 - i] = mod + 48;     // store the current digit
-
+        tmp[length - 1 - i] = mod + 48;
         value = val;
     }
 
+    uint8_t foundNonZero = 0;
+    for(i=0; i<length; i++) {       // change first few zeros to spaces
+        if(i == (length - 1)) {     // last digit? always write that one, even if it's zero
+            foundNonZero = 1;
+        }
+
+        if(!foundNonZero) {         // not found non-zero yet
+            if(tmp[i] != '0') {     // found non-zero? mark it down
+                foundNonZero = 1;
+            } else {                // found zero? replace with space
+                tmp[i] = ' ';
+            }
+        }
+    }
+
     (void) Cconws(tmp);                     // write it out
+}
+
+int getIntFromUser(BYTE allowZero, BYTE maxDigits)
+{
+    int intValue    = 0;
+    int gotDigits   = 0;
+    
+    while(1) {
+        BYTE key = Cnecin();
+
+        if((key == 13 && gotDigits > 0) ||      // it's enter and got at least 1 digit, quit
+            gotDigits >= maxDigits) {           // if got maxDigits digits count, quit
+            
+            if(intValue > 0) {                  // if the entered number is greated than 0 (to avoid typing '000'), return it, otherwise ignore it
+                (void) Cconws("\r\n");
+                return intValue;
+            }
+        }
+        
+        if(key < '0' || key > '9') {            // out of char range? try again
+            continue;
+        }
+        
+        if(!allowZero && key == '0') {          // if zero is not allowed, and it's zero, try again
+            continue;
+        }
+
+        Cconout(key);                           // show the digit
+        int digit = key - '0';                  // get digit from char
+        
+        intValue = (intValue * 10) + digit;     // append new digit
+        gotDigits++;
+    }
+}
+
+char getHddInterfaceForTest(void)
+{
+    if(machineType == MACHINE_ST) {         // it's a ST? always ACSI
+        return 'a';
+    }
+
+    if(machineType == MACHINE_FALCON) {     // if it's Falcon, use Falcon's SCSI
+        return 'f';
+    }
+
+    // We're on TT, we need to ask user
+    (void) Cconws("Running on TT, choose HDD interface:\r\n");
+    
+    while(1) {
+        (void) Cconws("'A' - ACSI \r\n");
+        (void) Cconws("'S' - SCSI \r\n");
+
+        char key = Cnecin();
+        if(key >= 'A' && key <= 'Z') {
+            key += 32;
+        }
+        
+        if(key == 'a') {    // user selected ACSI
+            return 'a';
+        }
+
+        if(key == 's') {    // user selected SCSI, return 't' (means TT's SCSI)
+            return 't';
+        }
+    }
+}
+
+int getIntFromUserMinMax(const char* message, int minV, int maxV)
+{
+    (void) Cconws(message);
+
+    int val = 0;
+    while(1) {
+        val = getIntFromUser(1, 5);
+
+        if(val >= minV && val <= maxV) {
+            return val;
+        }
+        (void) Cconws("\r\n");
+    }
+
+    return 0;
 }
 
 //--------------------------------------------------

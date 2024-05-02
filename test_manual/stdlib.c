@@ -124,7 +124,7 @@ static void sleepInSupervisor(void)
 	}
 }
 
-DWORD getTicks(void)
+DWORD getTicksInSupervisor(void)
 {
 	DWORD now;
 	
@@ -132,3 +132,7 @@ DWORD getTicks(void)
 	return now;
 }
 
+DWORD getTicks(void)
+{
+	return Supexec(getTicksInSupervisor);
+}
