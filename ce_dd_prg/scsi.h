@@ -79,7 +79,8 @@
 
 #define MFP2            ((volatile BYTE *)  0xFFFFFA81)
 
-#define scltmout    201     // SCSI long-timeout  (>1000 ms)
+#define SCSI_TIMEOUT_SHORT  20      // SCSI short timeout (100 ms)
+#define SCSI_TIMEOUT_LONG   600     // SCSI long timeout  (3 s)
 
 // Falcon DMA controller
 #define falconDmaAddrHi     ((volatile BYTE *)  0xFFFF8609)

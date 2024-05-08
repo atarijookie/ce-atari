@@ -285,8 +285,8 @@ void Debug::cmdStart(uint8_t* cmd, const char* tag)
 
     if(!cmdEndCalled) {     // if cmdEnd() wasn't called, terminate the previous line
         fprintf(f, "\n");
-        cmdEndCalled = true;
     }
+    cmdEndCalled = false;   // mark that start was called, but end wasn't called yet
 
     switch(cmdLen) {
         case 6:     fprintf(f, "%08d - cmd( 6): %02x %02x %02x %02x %02x %02x                      - %-8s - ", cmdStartTime, cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], tag); break;

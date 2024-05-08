@@ -11,8 +11,8 @@
 #define MAXSECTORS	254         // Max # sectors for a DMA
 
 // Timing constants
-#define LTIMEOUT	600L        // long-timeout 3 sec
-#define STIMEOUT	20L         // short-timeout 100 msec
+#define ACSI_TIMEOUT_LONG	600L        // long-timeout 3 sec
+#define ACSI_TIMEOUT_SHORT	20L         // short-timeout 100 msec
 
 // ------------------------------------------
 

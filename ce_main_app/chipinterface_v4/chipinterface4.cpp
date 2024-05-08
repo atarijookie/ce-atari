@@ -37,7 +37,8 @@ ChipInterface4::ChipInterface4()
     conSpi = new CConSpi(0, 0, 0, 0);
 #endif
 
-    gpioAcsi = NULL;        // no iface yet
+    gpioAcsi = NULL;                    // no iface yet
+    maximumTransferSize = (254 * 512);  // maximum ACSI transfer size - 254 sectors
 
     ikbdReadFd = -1;
     ikbdWriteFd = -1;
@@ -352,6 +353,7 @@ void ChipInterface4::handleIfaceReport(uint8_t ifaceReport)
     if(ifaceReport == IFACE_ACSI) {         // it's ACSI
         Debug::out(LOG_DEBUG, "ChipInterface4::handleIfaceReport - ifaceReport=%02x - creating ACSI iface", ifaceReport);
         gpioAcsi = new GpioAcsi();
+        maximumTransferSize = (254 * 512);  // maximum ACSI transfer size - 254 sectors
         gpioAcsi->init(hansConfigWords.current.acsi >> 8, hansConfigWords.current.acsi);
     } else {                                // it's SCSI
         // TODO: implement SCSI
@@ -360,8 +362,8 @@ void ChipInterface4::handleIfaceReport(uint8_t ifaceReport)
 
 bool ChipInterface4::hdd_sendData_start(uint32_t totalDataCount, uint8_t scsiStatus, bool withStatus)
 {
-    if(totalDataCount > 0xffffff) {
-        Debug::out(LOG_ERROR, "ChipInterface4::hdd_sendData_start -- trying to send more than 16 MB, fail");
+    if(totalDataCount > maximumTransferSize) {
+        Debug::out(LOG_ERROR, "ChipInterface4::hdd_sendData_start -- totalDataCount: %d, trying to send more than %d bytes, fail", totalDataCount, maximumTransferSize);
         return false;
     }
 
@@ -376,8 +378,8 @@ bool ChipInterface4::hdd_sendData_transferBlock(uint8_t *pData, uint32_t dataCou
 
 bool ChipInterface4::hdd_recvData_start(uint8_t *recvBuffer, uint32_t totalDataCount)
 {
-    if(totalDataCount > 0xffffff) {
-        Debug::out(LOG_ERROR, "ChipInterface4::hdd_recvData_start() -- trying to send more than 16 MB, fail");
+    if(totalDataCount > maximumTransferSize) {
+        Debug::out(LOG_ERROR, "ChipInterface4::hdd_recvData_start() -- totalDataCount: %d, trying to send more than %d bytes, fail", totalDataCount, maximumTransferSize);
         return false;
     }
 

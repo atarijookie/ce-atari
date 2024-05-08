@@ -25,8 +25,9 @@ static BYTE selscsi(BYTE scsiId);
 static WORD dataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount, BYTE cmdLength);
 static void w4stat(void);
 static BYTE doack(void);
-       DWORD setscstmout(void);
-       BYTE  w4req(void);
+       void scsiSetLongTimeout(void);
+       BYTE w4req(void);
+       void scsiSetShortTimeout(void);
 
 BYTE PIO_read(void);
 void PIO_write(BYTE data);
@@ -91,7 +92,7 @@ void scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WOR
     //------------
     *FLOCK = 0xffff;                    // set FLOCK to disable FDC operations
 
-    _cmdTimeOut = setscstmout();        // set up a short timeout
+    scsiSetShortTimeout();              // short timeout for command
     BYTE res = scsi_select_and_cmd(readNotWrite, scsiId, cmd, cmdLength, buffer, sectorCount << 9);      // send command block
 
     if(res) {
@@ -101,6 +102,8 @@ void scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WOR
         hdIf.success = FALSE;
         return;
     }
+
+    scsiSetLongTimeout();               // long timeout for data
 
     if(sectorCount != 0) {
         DWORD byteCount = sectorCount << 9;
@@ -508,11 +511,18 @@ BYTE doack(void)
     return res;
 }
 
-// setscstmout - set up a timeout count for the SCSI for SCSTMOUT long
-DWORD setscstmout(void)
+// short timeout for command
+void scsiSetShortTimeout(void)
 {
     DWORD now = *HZ_200;
-    return (now + scltmout);
+    _cmdTimeOut = (now + SCSI_TIMEOUT_SHORT);
+}
+
+// long timeout for data
+void scsiSetLongTimeout(void)
+{
+    DWORD now = *HZ_200;
+    _cmdTimeOut = (now + SCSI_TIMEOUT_LONG);
 }
 
 void setDmaAddr_TT(DWORD addr)

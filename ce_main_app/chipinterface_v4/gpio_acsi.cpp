@@ -1,3 +1,5 @@
+#include <cstring>
+
 #include "../utils.h"
 #include "../debug.h"
 #include "gpio_acsi.h"
@@ -87,6 +89,7 @@ bool GpioAcsi::getCmd(uint8_t* cmd)
         return false;
     }
 
+    memset(cmd, 0, 13);                     // clear the command buffer
     resetCmd1st();                          // reset CMD1ST back to L
 
     // if CMD1ST is H, then 1st cmd byte is waiting
@@ -98,6 +101,7 @@ bool GpioAcsi::getCmd(uint8_t* cmd)
     //----------------------
     if(!(hddEnabledIDs & (1 << id))) {      // if this ID is not enabled, quit
         Debug::out(LOG_DEBUG, "GpioAcsi::getCmd - hddEnabledIDs: %02x -> id: %d not enabled, ignoring", hddEnabledIDs, id);
+        Debug::cmdStart(cmd, "DEV OFF");
         reset();
         return false;
     }
@@ -114,10 +118,11 @@ bool GpioAcsi::getCmd(uint8_t* cmd)
 
         if(isTimeout()) {                   // if something was wrong, quit, failed
             Debug::out(LOG_DEBUG, "GpioAcsi::getCmd - timeout on cmd byte %d", i);
+            Debug::cmdStart(cmd, "CMD T/O");
             reset();
             return false;
         }
-        
+
         if(i == 1) {                        // if we got also the 2nd byte, get actual cmd length
             cmdLen = Scsi::getCmdLengthFromCmdBytesAcsi(cmd);
             Debug::out(LOG_DEBUG, "GpioAcsi::getCmd - for cmd: %02x %02x -> cmdLen: %d", cmd[0], cmd[1], cmdLen);
@@ -147,26 +152,8 @@ void GpioAcsi::startTransfer(uint8_t sendNotRecv, uint32_t totalDataCount, uint8
     this->scsiStatus = scsiStatus;
     this->withStatus = withStatus;
 
-    #define BLOCK_SIZE  (127*1024)
-    uint32_t blocks = (totalDataCount / BLOCK_SIZE);    // how many 127 kB blocks we will transfer
-
-    if((totalDataCount % BLOCK_SIZE) != 0) {            // if transferring not exactly block size transfer, increment blocks count to account for the last incomplete block
-        blocks++;
-    }
-
-    uint32_t timeOutMs = blocks * 2000;                 // allow each 127 kB block to take up to 2 seconds
-
-    #define MAX_TIMEOUT_MS  15000
-    timeOutMs = MIN(timeOutMs, MAX_TIMEOUT_MS);     // cap the timeout time to the maximum
-
-    // Debug::out(LOG_DEBUG, "GpioAcsi::startTransfer - %d bytes -> %d blocks of 127 kB -> %d ms timeout", totalDataCount, blocks, timeOutMs);
-
-    // 127 kB will have 2 seconds timeout, 889 kB (7 blocks) will have 14 seconds timeout, 
-    // anything bigger than 7 blocks will be limited to 15 seconds timeout
-
-    // Due to linux writing data from cache to disk, I've seen 127 kB write to take 800 ms.
-
-    timeoutStart(timeOutMs);                        // start timeout derived from transfer size
+    // maximum ACSI transfer size is 127 kB, we should be able to transfer this within 3 seconds in case we're waiting due to iowait
+    timeoutStart(3000);
 }
 
 bool GpioAcsi::sendBlock(uint8_t *pData, uint32_t dataCount)

@@ -14,8 +14,6 @@ static void setDmaAddr_Falcon(DWORD addr);
 void  scsi_setReg_Falcon(int whichReg, DWORD value);
 DWORD scsi_getReg_Falcon(int whichReg);
 
-DWORD setscstmout(void);
-
 void clearCache030(void);
 void delay(void);
 
@@ -141,8 +139,11 @@ BYTE dmaDataTx_do_Falcon(BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount)
         *WDL = 0x100;               // DMA_WR, DMA enable
     }
 
-    BYTE res = wait_dma_cmpl(200);                             // wait for DMA completetion
-    if(res) {                                       // failed?
+    DWORD now = *HZ_200;
+    DWORD ticksRemaining = _cmdTimeOut - now;   // get how many ticks are remaining after previous operations
+
+    BYTE res = wait_dma_cmpl(ticksRemaining);   // wait for DMA completetion
+    if(res) {                                   // failed?
         stopDmaFalcon();
 
         logMsg(" dmaDataTansfer() failed - wait_dma_cmpl() timeout\r\n");

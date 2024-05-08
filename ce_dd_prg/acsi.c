@@ -132,12 +132,12 @@ void setdma(DWORD addr)
 //**************************************************************************
 BYTE qdone(void)
 {
-	return wait_dma_cmpl(STIMEOUT);
+	return wait_dma_cmpl(ACSI_TIMEOUT_SHORT);
 }
 //**************************************************************************
 BYTE fdone(void)
 {
-	return wait_dma_cmpl(LTIMEOUT);
+	return wait_dma_cmpl(ACSI_TIMEOUT_LONG);
 }
 //**************************************************************************
 BYTE wait_dma_cmpl(DWORD t_ticks)

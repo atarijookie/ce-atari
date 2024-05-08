@@ -68,6 +68,11 @@ void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, W
 #define MACHINE_FALCON  3
 
 BYTE machineType = MACHINE_ST;
+char hddIface;
+
+uint16_t tosVersion;
+uint8_t tosVersionMajor;
+
 //-------------------------------------------------- 
 void getMachineType(void)
 {
@@ -107,6 +112,14 @@ void getMachineType(void)
     // it's an ST
 }
 
+void getTOSversion(void)
+{
+    BYTE  *pSysBase = (BYTE *) 0x000004F2;
+    BYTE  *ppSysBase = (BYTE *)  ((DWORD )  *pSysBase);  // get pointer to TOS address
+    tosVersion = (WORD  ) *(( WORD *) (ppSysBase + 2));  // TOS +2: TOS version
+    tosVersionMajor = tosVersion >> 8;
+}
+
 //--------------------------------------------------
 int main(void)
 {
@@ -121,6 +134,13 @@ int main(void)
     #define SIZE_4MB        ( 4 * 1024 * 1024)
     #define SIZE_MAXSECTORS (MAXSECTORS * 512)
     
+    //-----------------------
+    // get TOS version
+    Supexec(getTOSversion);
+    (void) Cconws("TOS version (major): ");
+    showInt(tosVersionMajor, 1);
+    (void) Cconws("\r\n");
+
     // ---------------------- 
     // get what machine we're running on
     Supexec(getMachineType);
@@ -132,17 +152,18 @@ int main(void)
         case MACHINE_FALCON:    (void) Cconws("Falcon\r\n"); break;
         default:                (void) Cconws("???\r\n"); break;
     }
+
     //-----------------------
     // get which HDD interface to user
-    char hddIface = getHddInterfaceForTest();
+    hddIface = getHddInterfaceForTest();
 
     if(hddIface == 'a') {   // using ACSI? we need only 128 kB of RAM
         memSizeSectors = MAXSECTORS;
         memSizeBytes = SIZE_MAXSECTORS;
     } else {                // using SCSI? we can transfer megs, ask for allocation size
         uint32_t memInMBs = getIntFromUserMinMax("How much MBs of RAM to allocate (1-13): ", 1, 13);
-        memSizeBytes = memInMBs * (1024*1024);       // MBs to bytes
-        memSizeSectors = memSizeBytes / 512;  // bytes to sectors
+        memSizeBytes = (memInMBs * (1024*1024)) + 2;    // MBs to bytes
+        memSizeSectors = memSizeBytes / 512;            // bytes to sectors
     }
 
     (void) Cconws("Will try to alloc   : ");
@@ -719,6 +740,47 @@ void sequentialWrite(void)
     uint32_t writeMBs = getIntFromUserMinMax("How much MBs to write (1-1024): ", 1, 1024);
     uint32_t writeBuffers = (writeMBs * 1024 * 1024) / (MAXSECTORS * 512);  // MBs to bytes, bytes to count of 127 kB buffers
 
+    //---------------
+    // if we got at least TOS 2.00, we can also use DMAwrite(), for older use only our own routine
+    uint8_t ownRoutine = 0;
+
+    if(tosVersionMajor >= 2) {
+        (void) Cconws("Choose HDD access routine:\r\n");
+
+        while(1) {
+            (void) Cconws("\33pC\33q - custom routine\r\n");
+            (void) Cconws("\33pD\33q - DMAwrite() from TOS\r\n");
+
+            char key = Cnecin();
+            if(key >= 'A' && key <= 'Z') {
+                key += 32;
+            }
+            
+            if(key == 'c') {    // custom routine?
+                ownRoutine = 1;
+                break;
+            }
+
+            if(key == 'd') {    // tos routine?
+                ownRoutine = 0;
+                break;
+            }
+        }
+
+        if(!ownRoutine && hddIface != 'a') {    // if using TOS routine and using SCSI interface
+            testDevId += 8;                     // SCSI device ID for DMAwrite is 8-15 (ACSI device ID for DMAwrite is 0-7)
+        }
+    }
+
+    (void) Cconws("Using ");
+    if(ownRoutine) {
+        (void) Cconws("custom routine\r\n");
+    } else {
+        (void) Cconws("DMAwrite() from TOS\r\n");
+    }
+
+    //---------------
+    // write data to device in a loop
     uint32_t i;
     uint32_t start = 0;
     for(i=0; i<writeBuffers; i++) {
@@ -731,7 +793,14 @@ void sequentialWrite(void)
             (void) Cconws(" MB: ");
         }
 
-        uint8_t res = scsiWrite(testDevId, start, MAXSECTORS, pBuffer);
+        uint8_t res;
+        
+        if(ownRoutine) {
+            res = scsiWrite(testDevId, start, MAXSECTORS, pBuffer);             // returns status byte, 0 means success
+        } else {
+            res = (uint8_t) DMAwrite(start, MAXSECTORS, pBuffer, testDevId);    // returns 0 on success, negative value on fail
+        }
+
         start += MAXSECTORS;    // advance start to next position
         if(res == 0) {
             (void) Cconws("*");

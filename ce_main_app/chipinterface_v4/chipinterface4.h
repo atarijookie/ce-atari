@@ -83,6 +83,7 @@ private:
 
     GpioAcsi* gpioAcsi;
     CConSpi *conSpi;
+    uint32_t maximumTransferSize;
 
     int ikbdReadFd;     // fd used for IKBD read
     int ikbdWriteFd;    // fd used for IKDB write
