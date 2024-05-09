@@ -18,7 +18,7 @@
 #define ICR_REQ         (1 << 5)
 #define ICR_BUSY        (1 << 6)
 
-// TT BYTE regs for reading
+// TT uint8_t regs for reading
 #define REG_DB      0x1
 #define REG_ICR     0x3
 #define REG_MR      0x5
@@ -28,7 +28,7 @@
 #define REG_IDR     0xd
 #define REG_REI     0xf
 
-// TT BYTE regs for writing
+// TT uint8_t regs for writing
 #define REG_ODR     0x1
 #define REG_ISR     0x9
 #define REG_SDS     0xb
@@ -38,58 +38,58 @@
 #define REG_DMARES  0x10
 #define REG_DMACTL  0x11
 
-#define SDMARES		    ((volatile DWORD *)  0xFFFF8710)
-#define SDMACTL		    ((volatile WORD *)   0xFFFF8714)	// WORD
+#define SDMARES		    ((volatile uint32_t *)  0xFFFF8710)
+#define SDMACTL		    ((volatile uint16_t *)   0xFFFF8714)	// uint16_t
 
 // SCSI Interface (NCR 5380) for READ operations
-#define SCSIDB	        ((volatile BYTE *)  0xFFFF8781)	// current SCSI data bus
-#define SCSIICR	        ((volatile BYTE *)  0xFFFF8783)	// initiator command register
-#define SCSIMR	        ((volatile BYTE *)  0xFFFF8785)	// mode register
-#define SCSITCR	        ((volatile BYTE *)  0xFFFF8787)	// target command register
-#define SCSICR	        ((volatile BYTE *)  0xFFFF8789)	// current SCSI control register
-#define SCSIDSR	        ((volatile BYTE *)  0xFFFF878B)	// DMA status register
-#define SCSIIDR	        ((volatile BYTE *)  0xFFFF878D)	// input data register
-#define SCSIREI	        ((volatile BYTE *)  0xFFFF878F)	// reset error / interrupt
+#define SCSIDB	        ((volatile uint8_t *)  0xFFFF8781)	// current SCSI data bus
+#define SCSIICR	        ((volatile uint8_t *)  0xFFFF8783)	// initiator command register
+#define SCSIMR	        ((volatile uint8_t *)  0xFFFF8785)	// mode register
+#define SCSITCR	        ((volatile uint8_t *)  0xFFFF8787)	// target command register
+#define SCSICR	        ((volatile uint8_t *)  0xFFFF8789)	// current SCSI control register
+#define SCSIDSR	        ((volatile uint8_t *)  0xFFFF878B)	// DMA status register
+#define SCSIIDR	        ((volatile uint8_t *)  0xFFFF878D)	// input data register
+#define SCSIREI	        ((volatile uint8_t *)  0xFFFF878F)	// reset error / interrupt
 
 // SCSI Interface (NCR 5380) for WRITE operations
-#define SCSIODR	        ((volatile BYTE *)  0xFFFF8781)	// output data register
-#define SCSIISR	        ((volatile BYTE *)  0xFFFF8789)	// ID select register
-#define SCSIDS	        ((volatile BYTE *)  0xFFFF878B)	// start DMA send
-#define SCSIDTR	        ((volatile BYTE *)  0xFFFF878D)	// start DMA target receive
-#define SCSIDIR	        ((volatile BYTE *)  0xFFFF878F)	// start DMA initiator receive
+#define SCSIODR	        ((volatile uint8_t *)  0xFFFF8781)	// output data register
+#define SCSIISR	        ((volatile uint8_t *)  0xFFFF8789)	// ID select register
+#define SCSIDS	        ((volatile uint8_t *)  0xFFFF878B)	// start DMA send
+#define SCSIDTR	        ((volatile uint8_t *)  0xFFFF878D)	// start DMA target receive
+#define SCSIDIR	        ((volatile uint8_t *)  0xFFFF878F)	// start DMA initiator receive
 
 // TT SCSI DMA Controller
-#define bSDMAPTR_hi     ((volatile BYTE *)  0xFFFF8701)
-#define bSDMAPTR_mid_hi	((volatile BYTE *)  0xFFFF8703)
-#define bSDMAPTR_mid_lo	((volatile BYTE *)  0xFFFF8705)
-#define bSDMAPTR_lo     ((volatile BYTE *)  0xFFFF8707)
+#define bSDMAPTR_hi     ((volatile uint8_t *)  0xFFFF8701)
+#define bSDMAPTR_mid_hi	((volatile uint8_t *)  0xFFFF8703)
+#define bSDMAPTR_mid_lo	((volatile uint8_t *)  0xFFFF8705)
+#define bSDMAPTR_lo     ((volatile uint8_t *)  0xFFFF8707)
 
-#define bSDMACNT_hi	    ((volatile BYTE *)  0xFFFF8709)
-#define bSDMACNT_mid_hi	((volatile BYTE *)  0xFFFF870B)
-#define bSDMACNT_mid_lo	((volatile BYTE *)  0xFFFF870D)
-#define bSDMACNT_lo	    ((volatile BYTE *)  0xFFFF870F)
+#define bSDMACNT_hi	    ((volatile uint8_t *)  0xFFFF8709)
+#define bSDMACNT_mid_hi	((volatile uint8_t *)  0xFFFF870B)
+#define bSDMACNT_mid_lo	((volatile uint8_t *)  0xFFFF870D)
+#define bSDMACNT_lo	    ((volatile uint8_t *)  0xFFFF870F)
 
-#define SDMARES		    ((volatile DWORD *)  0xFFFF8710)
-#define SDMACTL		    ((volatile WORD *)   0xFFFF8714)	// WORD
+#define SDMARES		    ((volatile uint32_t *)  0xFFFF8710)
+#define SDMACTL		    ((volatile uint16_t *)   0xFFFF8714)	// uint16_t
 
 #define DMAIN   00
 #define DMAOUT  01
 #define DMAENA  02
 #define DMADIS  00
 
-#define MFP2            ((volatile BYTE *)  0xFFFFFA81)
+#define MFP2            ((volatile uint8_t *)  0xFFFFFA81)
 
 #define SCSI_TIMEOUT_SHORT  20      // SCSI short timeout (100 ms)
 #define SCSI_TIMEOUT_LONG   600     // SCSI long timeout  (3 s)
 
 // Falcon DMA controller
-#define falconDmaAddrHi     ((volatile BYTE *)  0xFFFF8609)
-#define falconDmaAddrMid    ((volatile BYTE *)  0xFFFF860B)
-#define falconDmaAddrLo     ((volatile BYTE *)  0xFFFF860D)
+#define falconDmaAddrHi     ((volatile uint8_t *)  0xFFFF8609)
+#define falconDmaAddrMid    ((volatile uint8_t *)  0xFFFF860B)
+#define falconDmaAddrLo     ((volatile uint8_t *)  0xFFFF860D)
 
-#define WDC                 ((volatile WORD *)  0xFFFF8604)
-#define WDL                 ((volatile WORD *)  0xFFFF8606)
-#define WDSR                ((volatile BYTE *)  0xFFFF860F)       // STATUS Register
+#define WDC                 ((volatile uint16_t *)  0xFFFF8604)
+#define WDL                 ((volatile uint16_t *)  0xFFFF8606)
+#define WDSR                ((volatile uint8_t *)  0xFFFF860F)       // STATUS Register
 
 // Falcon regs for READing
 #define SPCSD           0x88    // SPCSD      - R  Current SCSI Data

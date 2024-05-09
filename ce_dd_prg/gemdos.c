@@ -10,8 +10,8 @@
 
 #include "ce_dd_prg.h"
 #include "xbra.h"
-#include "acsi.h"
-#include "hdd_if.h"
+#include "../libacsiscsi/acsi.h"
+#include "../libacsiscsi/hdd_if.h"
 #include "translated.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"
@@ -35,21 +35,21 @@ extern int32_t (  *bios_table[256])( void* sp );
 // ------------------------------------------------------------------
 // CosmosEx and Gemdos part - Jookie
 
-static BYTE *dtaBufferValidForPDta;
+static uint8_t *dtaBufferValidForPDta;
 
-BYTE  getNextDTAsFromHost(void);
-DWORD copyNextDtaToAtari(void);
+uint8_t  getNextDTAsFromHost(void);
+uint32_t copyNextDtaToAtari(void);
 void  onFsnext_last(void);
 
 void sendStLog(const char *str);
 
 extern TFileBuffer fileBufs[MAX_FILES];
 
-BYTE fseek_cur(int32_t offset, BYTE ceHandle, TFileBuffer *fb);
-void fseek_invalSeekStore(int32_t offset, BYTE ceHandle, BYTE seekMode, TFileBuffer *fb);
-void fseek_hdif_command(int32_t offset, BYTE ceHandle, BYTE seekMode);
+uint8_t fseek_cur(int32_t offset, uint8_t ceHandle, TFileBuffer *fb);
+void fseek_invalSeekStore(int32_t offset, uint8_t ceHandle, uint8_t seekMode, TFileBuffer *fb);
+void fseek_hdif_command(int32_t offset, uint8_t ceHandle, uint8_t seekMode);
 
-void showWaitSymbol(BYTE showNotHide);
+void showWaitSymbol(uint8_t showNotHide);
 void msleepInSuper(int ms);
 
 // ------------------------------------------------------------------
@@ -62,7 +62,7 @@ int32_t custom_pexec_lowlevel(void *sp);
 
 int32_t custom_dgetdrv( void *sp )
 {
-	DWORD res;
+	uint32_t res;
 
 	if(!isOurDrive(currentDrive, 0)) {									// if the current drive is not our drive
 		CALL_OLD_GD_NORET(Dgetdrv);
@@ -75,17 +75,17 @@ int32_t custom_dgetdrv( void *sp )
 
 int32_t custom_dsetdrv( void *sp )
 {
-	static BYTE force = 1;	/* force the call to CE the 1st time */
+	static uint8_t force = 1;	/* force the call to CE the 1st time */
 	// get the drive # from stack
-	WORD drive = *((WORD *) sp);
-	if(force || ((BYTE)drive != currentDrive)) {
-		currentDrive = (BYTE)drive;												    // store the drive - GEMDOS seems to let you set even invalid drive
+	uint16_t drive = *((uint16_t *) sp);
+	if(force || ((uint8_t)drive != currentDrive)) {
+		currentDrive = (uint8_t)drive;												    // store the drive - GEMDOS seems to let you set even invalid drive
 
         useOldGDHandler = 1;
         Dsetdrv(drive);                                                         // let TOS know the current drive
 
         commandShort[4] = GEMDOS_Dsetdrv;										// store GEMDOS function number
-        commandShort[5] = (BYTE)drive;											// store drive number
+        commandShort[5] = (uint8_t)drive;											// store drive number
         (*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	// send command to host over ACSI
 		force = 0;
 	}
@@ -95,12 +95,12 @@ int32_t custom_dsetdrv( void *sp )
 
 int32_t custom_dfree( void *sp )
 {
-	DWORD res;
-	BYTE *params = (BYTE *) sp;
+	uint32_t res;
+	uint8_t *params = (uint8_t *) sp;
 
-	BYTE *pDiskInfo	= (BYTE *)	*((DWORD *) params);
+	uint8_t *pDiskInfo	= (uint8_t *)	*((uint32_t *) params);
 	params += 4;
-	WORD drive		= (WORD)	*((WORD *)  params);
+	uint16_t drive		= (uint16_t)	*((uint16_t *)  params);
 
 	if(!isOurDrive(drive, 1)) {										    // not our drive?
 		CALL_OLD_GD( Dfree, pDiskInfo, drive);
@@ -121,10 +121,10 @@ int32_t custom_dfree( void *sp )
 
 int32_t custom_dcreate( void *sp )
 {
-	DWORD res;
-    char *pPath	= (char *) *((DWORD *) sp);
+	uint32_t res;
+    char *pPath	= (char *) *((uint32_t *) sp);
 
-	WORD drive = getDriveFromPath(pPath);
+	uint16_t drive = getDriveFromPath(pPath);
 
 	if(!isOurDrive(drive, 0)) {											    // not our drive?
 		CALL_OLD_GD( Dcreate, pPath);
@@ -147,10 +147,10 @@ int32_t custom_dcreate( void *sp )
 
 int32_t custom_ddelete( void *sp )
 {
-	DWORD res;
-    char *pPath	= (char *) *((DWORD *) sp);
+	uint32_t res;
+    char *pPath	= (char *) *((uint32_t *) sp);
 
-	WORD drive = getDriveFromPath(pPath);
+	uint16_t drive = getDriveFromPath(pPath);
 
 	if(!isOurDrive(drive, 0)) {											    // not our drive?
 		CALL_OLD_GD( Ddelete, pPath);
@@ -173,10 +173,10 @@ int32_t custom_ddelete( void *sp )
 
 int32_t custom_fdelete( void *sp )
 {
-	DWORD res;
-    char *pPath	= (char *) *((DWORD *) sp);
+	uint32_t res;
+    char *pPath	= (char *) *((uint32_t *) sp);
 
-	WORD drive = getDriveFromPath(pPath);
+	uint16_t drive = getDriveFromPath(pPath);
 
 	if(!isOurDrive(drive, 0)) {											    // not our drive?
 		CALL_OLD_GD( Fdelete, pPath);
@@ -199,10 +199,10 @@ int32_t custom_fdelete( void *sp )
 
 int32_t custom_dsetpath( void *sp )
 {
-	DWORD res;
-    char *pPath	= (char *) *((DWORD *) sp);
+	uint32_t res;
+    char *pPath	= (char *) *((uint32_t *) sp);
 
-	WORD drive = getDriveFromPath(pPath);
+	uint16_t drive = getDriveFromPath(pPath);
 
 	if(!isOurDrive(drive, 0)) {											    // not our drive?
 		CALL_OLD_GD( Dsetpath, pPath);
@@ -238,12 +238,12 @@ int32_t custom_dsetpath( void *sp )
 
 int32_t custom_dgetpath( void *sp )
 {
-	DWORD res;
-	BYTE *params = (BYTE *) sp;
+	uint32_t res;
+	uint8_t *params = (uint8_t *) sp;
 
-    char *buffer	= (char *)	*((DWORD *) params);
+    char *buffer	= (char *)	*((uint32_t *) params);
 	params += 4;
-	WORD drive		= (WORD)	*((WORD *)  params);
+	uint16_t drive		= (uint16_t)	*((uint16_t *)  params);
 
 	if(!isOurDrive(drive, 1)) {											    // not our drive?
 		CALL_OLD_GD( Dgetpath, buffer, drive);
@@ -264,15 +264,15 @@ int32_t custom_dgetpath( void *sp )
 
 int32_t custom_frename( void *sp )
 {
-	DWORD res;
-	BYTE *params = (BYTE *) sp;
+	uint32_t res;
+	uint8_t *params = (uint8_t *) sp;
 
-	params += 2;														    // skip reserved WORD
-	char *oldName	= (char *)	*((DWORD *) params);
+	params += 2;														    // skip reserved uint16_t
+	char *oldName	= (char *)	*((uint32_t *) params);
 	params += 4;
-	char *newName	= (char *)	*((DWORD *) params);
+	char *newName	= (char *)	*((uint32_t *) params);
 
-	WORD drive = getDriveFromPath(oldName);
+	uint16_t drive = getDriveFromPath(oldName);
 
 	if(!isOurDrive(drive, 0)) {											    // not our drive?
 		CALL_OLD_GD( Frename, 0, oldName, newName);
@@ -300,16 +300,16 @@ int32_t custom_frename( void *sp )
 
 int32_t custom_fattrib( void *sp )
 {
-	DWORD res;
-	BYTE *params = (BYTE *) sp;
+	uint32_t res;
+	uint8_t *params = (uint8_t *) sp;
 
-	char *fileName	= (char *)	*((DWORD *) params);
+	char *fileName	= (char *)	*((uint32_t *) params);
 	params += 4;
-	WORD flag		= (WORD)	*((WORD *)  params);
+	uint16_t flag		= (uint16_t)	*((uint16_t *)  params);
 	params += 2;
-	WORD attr		= (WORD)	*((WORD *)  params);
+	uint16_t attr		= (uint16_t)	*((uint16_t *)  params);
 
-	WORD drive = getDriveFromPath(fileName);
+	uint16_t drive = getDriveFromPath(fileName);
 
 	if(!isOurDrive(drive, 0)) {											    // not our drive?
 		CALL_OLD_GD( Fattrib, fileName, flag, attr);
@@ -320,8 +320,8 @@ int32_t custom_fattrib( void *sp )
 
 	memset(pDmaBuffer, 0, DMA_BUFFER_SIZE);
 
-	pDmaBuffer[0] = (BYTE) flag;										    // store set / get flag
-	pDmaBuffer[1] = (BYTE) attr;										    // store attributes
+	pDmaBuffer[0] = (uint8_t) flag;										    // store set / get flag
+	pDmaBuffer[1] = (uint8_t) attr;										    // store attributes
 
 	strncpy(((char *) pDmaBuffer) + 2, fileName, DMA_BUFFER_SIZE -1 );	    // copy in the file name
 
@@ -339,7 +339,7 @@ int32_t custom_fattrib( void *sp )
 
 int32_t custom_fsetdta( void *sp )
 {
-    pDta = (BYTE *) *((DWORD *) sp);									// store the new DTA pointer
+    pDta = (uint8_t *) *((uint32_t *) sp);									// store the new DTA pointer
 
     useOldGDHandler = 1;
     Fsetdta( (_DTA *) pDta );
@@ -352,15 +352,15 @@ int32_t custom_fsetdta( void *sp )
 
 int32_t custom_fsfirst( void *sp )
 {
-	DWORD res;
-	BYTE *params = (BYTE *) sp;
+	uint32_t res;
+	uint8_t *params = (uint8_t *) sp;
 
 	// get params
-	char *fspec		= (char *)	*((DWORD *) params);
+	char *fspec		= (char *)	*((uint32_t *) params);
 	params += 4;
-	WORD attribs	= (WORD)	*((WORD *)  params);
+	uint16_t attribs	= (uint16_t)	*((uint16_t *)  params);
 
-	WORD drive = getDriveFromPath(fspec);
+	uint16_t drive = getDriveFromPath(fspec);
 
 	if(!isOurDrive(drive, 0)) {											// not our drive?
 		fsnextIsForUs = FALSE;
@@ -374,12 +374,12 @@ int32_t custom_fsfirst( void *sp )
     //------------
 	// initialize the reserved section of DTA, which will contain a pointer to the DTA address and index of the dir/file we returned last
 	useOldGDHandler = 1;
-    pDta = (BYTE *) Fgetdta();											// retrieve the current DTA pointer - this might have changed
+    pDta = (uint8_t *) Fgetdta();											// retrieve the current DTA pointer - this might have changed
 
-	pDta[0] = ((DWORD) pDta) >> 24;										// first store the pointer to this DTA (to enable continuing of Fsnext() in case this DTA buffer would be copied otherwise and then set with Fsetdta())
-	pDta[1] = ((DWORD) pDta) >> 16;
-	pDta[2] = ((DWORD) pDta) >>  8;
-	pDta[3] = ((DWORD) pDta)      ;
+	pDta[0] = ((uint32_t) pDta) >> 24;										// first store the pointer to this DTA (to enable continuing of Fsnext() in case this DTA buffer would be copied otherwise and then set with Fsetdta())
+	pDta[1] = ((uint32_t) pDta) >> 16;
+	pDta[2] = ((uint32_t) pDta) >>  8;
+	pDta[3] = ((uint32_t) pDta)      ;
 
     SET_WORD(pDta+4, 0);                                                // index of the dir/file we've returned so far
     SET_WORD(pDta+6, 0);                                                // current DTA index in currently buffered DTAs (0 .. 21)
@@ -397,7 +397,7 @@ int32_t custom_fsfirst( void *sp )
 		pDmaBuffer[i] = pDta[i];										// 1st 4 bytes will now be the pointer to DTA on which the Fsfirst() was called
 	}
 
-	pDmaBuffer[4] = (BYTE) attribs;										// store attributes
+	pDmaBuffer[4] = (uint8_t) attribs;										// store attributes
 	strncpy(((char *) pDmaBuffer) + 5, fspec, DMA_BUFFER_SIZE - 1);		// copy in the file specification
 
 	(*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1); // send command to host over ACSI
@@ -418,7 +418,7 @@ int32_t custom_fsfirst( void *sp )
 
 int32_t custom_fsnext( void *sp )
 {
-	DWORD res;
+	uint32_t res;
 
 	if(!fsnextIsForUs) {												// if we shouldn't handle this
 		CALL_OLD_GD( Fsnext);
@@ -427,7 +427,7 @@ int32_t custom_fsnext( void *sp )
 	//-----------------
 	// the following is here because of Fsfirst() / Fsnext() nesting
 	useOldGDHandler = 1;
-    pDta = (BYTE *) Fgetdta();											// retrieve the current DTA pointer - this might have changed
+    pDta = (uint8_t *) Fgetdta();											// retrieve the current DTA pointer - this might have changed
 
 	if(dtaBufferValidForPDta != pDta) {									// if DTA changed, we need to retrieve the search results again (the current search results are for a different dir)
 		res = getNextDTAsFromHost();									// now we need to get the buffer of DTAs from host
@@ -445,16 +445,16 @@ int32_t custom_fsnext( void *sp )
 	return res;
 }
 
-DWORD copyNextDtaToAtari(void)
+uint32_t copyNextDtaToAtari(void)
 {
-	DWORD res;
+	uint32_t res;
 
     //------------
     // retrieve the current DTA pointer - this might have changed
 	useOldGDHandler = 1;
-    pDta = (BYTE *) Fgetdta();
+    pDta = (uint8_t *) Fgetdta();
     //------------
-    WORD dtaCurrent, dtaTotal;
+    uint16_t dtaCurrent, dtaTotal;
     dtaCurrent  = GET_WORD(pDta + 6);                                   // restore variables from memory
     dtaTotal    = GET_WORD(pDta + 8);                                   // restore variables from memory
 
@@ -483,15 +483,15 @@ DWORD copyNextDtaToAtari(void)
         return extendByteToDword(ENMFIL);								// return that we're out of files
 	}
 
-	DWORD dtaOffset		= 2 + (23 * dtaCurrent);						// calculate the offset for the DTA in buffer
-	BYTE *pCurrentDta	= pDtaBuffer + dtaOffset;						// and now calculate the new pointer
+	uint32_t dtaOffset		= 2 + (23 * dtaCurrent);						// calculate the offset for the DTA in buffer
+	uint8_t *pCurrentDta	= pDtaBuffer + dtaOffset;						// and now calculate the new pointer
 
 	dtaCurrent++;														// move to the next DTA
 
     SET_WORD(pDta + 6, dtaCurrent);                                     // update current DTA index in currently buffered DTAs (0 .. 21)
 	//--------------
 	// update the item index in the reserved part of DTA
-	WORD itemIndex	= GET_WORD(pDta + 4);                               // get the current dir
+	uint16_t itemIndex	= GET_WORD(pDta + 4);                               // get the current dir
 	itemIndex++;
     SET_WORD(pDta + 4, itemIndex);                                      // update current itemIndex
 	//--------------
@@ -500,7 +500,7 @@ DWORD copyNextDtaToAtari(void)
 	return E_OK;														// everything went well
 }
 
-BYTE getNextDTAsFromHost(void)
+uint8_t getNextDTAsFromHost(void)
 {
 	// initialize the internal variables
     SET_WORD(pDta + 6, 0);                                                  // current DTA index in currently buffered DTAs (0 .. 21)
@@ -545,15 +545,15 @@ void onFsnext_last(void)
 
 int32_t custom_fcreate( void *sp )
 {
-	DWORD res;
-	BYTE *params = (BYTE *) sp;
+	uint32_t res;
+	uint8_t *params = (uint8_t *) sp;
 
 	// get params
-	char *fileName	= (char *)	*((DWORD *) params);
+	char *fileName	= (char *)	*((uint32_t *) params);
 	params += 4;
-	WORD attr		= (WORD)	*((WORD *)  params);
+	uint16_t attr		= (uint16_t)	*((uint16_t *)  params);
 
-	WORD drive = getDriveFromPath(fileName);
+	uint16_t drive = getDriveFromPath(fileName);
 
 	if(!isOurDrive(drive, 0)) {											    // not our drive?
 		CALL_OLD_GD( Fcreate, fileName, attr);
@@ -563,7 +563,7 @@ int32_t custom_fcreate( void *sp )
 	commandShort[4] = GEMDOS_Fcreate;									    // store GEMDOS function number
 	commandShort[5] = 0;
 
-	pDmaBuffer[0] = (BYTE) attr;										    // store attributes
+	pDmaBuffer[0] = (uint8_t) attr;										    // store attributes
 	strncpy(((char *) pDmaBuffer) + 1, fileName, DMA_BUFFER_SIZE - 1);	    // copy in the file name
 
 	(*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1); // send command to host over ACSI
@@ -576,7 +576,7 @@ int32_t custom_fcreate( void *sp )
         return extendByteToDword(hdIf.statusByte);									            // but append lots of FFs to make negative integer out of it
 	}
 
-    WORD ceHandle = hdIf.statusByte;                    // this is CE handle (0 - 40)
+    uint16_t ceHandle = hdIf.statusByte;                    // this is CE handle (0 - 40)
 
     if(ceHandle >= MAX_FILES) {                         // if it's out of range, internal error!
         return EINTRN;
@@ -585,19 +585,19 @@ int32_t custom_fcreate( void *sp )
     fileBufs[ceHandle].isOpen       = TRUE;             // it's now OPEN
     fileBufs[ceHandle].currentPos   = 0;                // current position - file start
 
-	WORD atariHandle = handleCEtoAtari(ceHandle);       // convert the CE handle (0 - 40) to Atari handle (80 - 120)
+	uint16_t atariHandle = handleCEtoAtari(ceHandle);       // convert the CE handle (0 - 40) to Atari handle (80 - 120)
 	return atariHandle;
 }
 
 int32_t custom_fopen( void *sp )
 {
-    DWORD res;
-	BYTE *params = (BYTE *) sp;
+    uint32_t res;
+	uint8_t *params = (uint8_t *) sp;
 
 	// get params
-	char *fileName	= (char *)	*((DWORD *) params);
+	char *fileName	= (char *)	*((uint32_t *) params);
 	params += 4;
-	WORD mode		= (WORD)	*((WORD *)  params);
+	uint16_t mode		= (uint16_t)	*((uint16_t *)  params);
 
 	// is this the call of the CE extension?
 	if(mode == TAG_CE && strncmp(fileName, "CEDD", 4) == 0) {	// mode matches CE, filename matches CEDD - respond with CEDD
@@ -610,7 +610,7 @@ int32_t custom_fopen( void *sp )
 		return RET_CEXT;
 	}
 
-	WORD drive = getDriveFromPath(fileName);
+	uint16_t drive = getDriveFromPath(fileName);
 
 	if(!isOurDrive(drive, 0)) {											// not our drive?
 		CALL_OLD_GD( Fopen, fileName, mode);
@@ -620,7 +620,7 @@ int32_t custom_fopen( void *sp )
 	commandShort[4] = GEMDOS_Fopen;											// store GEMDOS function number
 	commandShort[5] = 0;
 
-	pDmaBuffer[0] = (BYTE) mode;										// store attributes
+	pDmaBuffer[0] = (uint8_t) mode;										// store attributes
 	strncpy(((char *) pDmaBuffer) + 1, fileName, DMA_BUFFER_SIZE - 1);	// copy in the file name
 
 	(*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			// send command to host over ACSI
@@ -634,8 +634,8 @@ int32_t custom_fopen( void *sp )
 	}
 
     // if we got here, the result is the real ceHandle
-    WORD ceHandle       = (WORD) hdIf.statusByte;
-	WORD atariHandle    = handleCEtoAtari(ceHandle);                    // convert the CE handle (0 - 40) to Atari handle (80 - 120)
+    uint16_t ceHandle       = (uint16_t) hdIf.statusByte;
+	uint16_t atariHandle    = handleCEtoAtari(ceHandle);                    // convert the CE handle (0 - 40) to Atari handle (80 - 120)
 
     fileBufs[ceHandle].isOpen       = TRUE;                             // file is open!
     fileBufs[ceHandle].currentPos   = 0;                                // current position - file start
@@ -646,15 +646,15 @@ int32_t custom_fopen( void *sp )
 
 int32_t custom_fclose( void *sp )
 {
-    DWORD res;
-	WORD atariHandle	= (WORD) *((WORD *) sp);
+    uint32_t res;
+	uint16_t atariHandle	= (uint16_t) *((uint16_t *) sp);
 
 	// check if this handle should belong to cosmosEx
 	if(!handleIsFromCE(atariHandle)) {									// not called with handle belonging to CosmosEx?
 		CALL_OLD_GD(Fclose, atariHandle);
 	}
 
-	WORD ceHandle = handleAtariToCE(atariHandle);						// convert high atari handle to little CE handle
+	uint16_t ceHandle = handleAtariToCE(atariHandle);						// convert high atari handle to little CE handle
 
     if(!fileBufs[ceHandle].isOpen) {                                    // file not open? fail - INVALID HANDLE
         return extendByteToDword(EIHNDL);
@@ -665,7 +665,7 @@ int32_t custom_fclose( void *sp )
 
 	// set the params to buffer
 	commandShort[4] = GEMDOS_Fclose;										// store GEMDOS function number
-	commandShort[5] = (BYTE) ceHandle;
+	commandShort[5] = (uint8_t) ceHandle;
 
 	(*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1); // send command to host over ACSI
 
@@ -678,22 +678,22 @@ int32_t custom_fclose( void *sp )
 
 int32_t custom_fseek( void *sp )
 {
-	DWORD res = 0;
-	BYTE *params = (BYTE *) sp;
+	uint32_t res = 0;
+	uint8_t *params = (uint8_t *) sp;
 
 	// get params
-	DWORD offset		= (DWORD)	*((DWORD *) params);
+	uint32_t offset		= (uint32_t)	*((uint32_t *) params);
 	params += 4;
-	WORD atariHandle	= (WORD)	*((WORD *)  params);
+	uint16_t atariHandle	= (uint16_t)	*((uint16_t *)  params);
 	params += 2;
-	WORD seekMode		= (WORD)	*((WORD *)  params);
+	uint16_t seekMode		= (uint16_t)	*((uint16_t *)  params);
 
 	// check if this handle should belong to cosmosEx
 	if(!handleIsFromCE(atariHandle)) {									// not called with handle belonging to CosmosEx?
 		CALL_OLD_GD( Fseek, offset, atariHandle, seekMode);
 	}
 
-	WORD        ceHandle    = handleAtariToCE(atariHandle);             // convert high atari handle to little CE handle
+	uint16_t        ceHandle    = handleAtariToCE(atariHandle);             // convert high atari handle to little CE handle
 	TFileBuffer *fb         = &fileBufs[ceHandle];
 
     if(!fb->isOpen) {                                                   // file not open? fail - INVALID HANDLE
@@ -703,7 +703,7 @@ int32_t custom_fseek( void *sp )
 	commitChanges(ceHandle);											// flush write buffer if needed
 
     if(seekMode == SEEK_CUR) {                                          // SEEK_CUR -- try seek in local buffer, and it that's not enough, do real seek
-        BYTE doRealSeek = fseek_cur(offset, ceHandle, fb);
+        uint8_t doRealSeek = fseek_cur(offset, ceHandle, fb);
 
         if(doRealSeek) {                                                // if seek in local buffer didn't work, do real seek
             fseek_invalSeekStore(offset, ceHandle, seekMode, fb);
@@ -719,7 +719,7 @@ int32_t custom_fseek( void *sp )
 	return fb->currentPos;                                              // return the position in file
 }
 
-BYTE fseek_cur(int32_t offset, BYTE ceHandle, TFileBuffer *fb)
+uint8_t fseek_cur(int32_t offset, uint8_t ceHandle, TFileBuffer *fb)
 {
 	int32_t newPos = ((int32_t) fb->rStart) + offset;					// calculate the new position
 
@@ -735,7 +735,7 @@ BYTE fseek_cur(int32_t offset, BYTE ceHandle, TFileBuffer *fb)
 }
 
 // fseek - invalidate local buffer, then do real seek, then store current position
-void fseek_invalSeekStore(int32_t offset, BYTE ceHandle, BYTE seekMode, TFileBuffer *fb)
+void fseek_invalSeekStore(int32_t offset, uint8_t ceHandle, uint8_t seekMode, TFileBuffer *fb)
 {
     // invalidate local buffer - now we don't have any data left
     fb->rCount = 0;
@@ -757,41 +757,41 @@ void fseek_invalSeekStore(int32_t offset, BYTE ceHandle, BYTE seekMode, TFileBuf
     fb->bytesToEOFinvalid   = 0;                        // mark that the bytesToEOF is valid
 }
 
-void fseek_hdif_command(int32_t offset, BYTE ceHandle, BYTE seekMode)
+void fseek_hdif_command(int32_t offset, uint8_t ceHandle, uint8_t seekMode)
 {
     // set the params to buffer
 	commandLong[5] = GEMDOS_Fseek;											// store GEMDOS function number
 
 	// store params to command sequence
-	commandLong[6] = (BYTE) (offset >> 24);
-	commandLong[7] = (BYTE) (offset >> 16);
-	commandLong[8] = (BYTE) (offset >>  8);
-	commandLong[9] = (BYTE) (offset & 0xff);
+	commandLong[6] = (uint8_t) (offset >> 24);
+	commandLong[7] = (uint8_t) (offset >> 16);
+	commandLong[8] = (uint8_t) (offset >>  8);
+	commandLong[9] = (uint8_t) (offset & 0xff);
 
-	commandLong[10] = (BYTE) ceHandle;
-	commandLong[11] = (BYTE) seekMode;
+	commandLong[10] = (uint8_t) ceHandle;
+	commandLong[11] = (uint8_t) seekMode;
 
 	(*hdIf.cmd)(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDmaBuffer, 1);    // send command to host over ACSI
 }
 
 int32_t custom_fdatime( void *sp )
 {
-	DWORD res = 0;
-	BYTE *params = (BYTE *) sp;
+	uint32_t res = 0;
+	uint8_t *params = (uint8_t *) sp;
 
 	// get params
-	BYTE *pDatetime		= (BYTE *)		*((DWORD *) params);
+	uint8_t *pDatetime		= (uint8_t *)		*((uint32_t *) params);
 	params += 4;
-	WORD atariHandle	= (WORD)		*((WORD *)  params);
+	uint16_t atariHandle	= (uint16_t)		*((uint16_t *)  params);
 	params += 2;
-	WORD flag			= (WORD)		*((WORD *)  params);
+	uint16_t flag			= (uint16_t)		*((uint16_t *)  params);
 
 	// check if this handle should belong to cosmosEx
 	if(!handleIsFromCE(atariHandle)) {										// not called with handle belonging to CosmosEx?
 		CALL_OLD_GD( Fdatime, pDatetime, atariHandle, flag);
 	}
 
-	WORD ceHandle = handleAtariToCE(atariHandle);							// convert high atari handle to little CE handle
+	uint16_t ceHandle = handleAtariToCE(atariHandle);							// convert high atari handle to little CE handle
 
     if(!fileBufs[ceHandle].isOpen) {                                    // file not open? fail - INVALID HANDLE
         return extendByteToDword(EIHNDL);
@@ -802,10 +802,10 @@ int32_t custom_fdatime( void *sp )
 	commandLong[6]  = (flag << 7) | (ceHandle & 0x7f);						// flag on highest bit, the rest is handle
 
 	// store params to command sequence
-	commandLong[7]  = (BYTE) pDatetime[0];									// store the current date time value
-	commandLong[8]  = (BYTE) pDatetime[1];
-	commandLong[9]  = (BYTE) pDatetime[2];
-	commandLong[10] = (BYTE) pDatetime[3];
+	commandLong[7]  = (uint8_t) pDatetime[0];									// store the current date time value
+	commandLong[8]  = (uint8_t) pDatetime[1];
+	commandLong[9]  = (uint8_t) pDatetime[2];
+	commandLong[10] = (uint8_t) pDatetime[3];
 
 	(*hdIf.cmd)(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDmaBuffer, 1);	// send command to host over ACSI
 
@@ -836,7 +836,7 @@ void sendStLog(const char *str)
 
 // ------------------------------------------------------------------
 // helper functions
-WORD getDriveFromPath(const char *path)
+uint16_t getDriveFromPath(const char *path)
 {
 	if(strlen(path) < 3) {												// if the path is too short to be full path, e.g. 'C:\DIR', just return currentDrive
 		return currentDrive;
@@ -859,7 +859,7 @@ WORD getDriveFromPath(const char *path)
 	return currentDrive;												// other case? return currentDrive
 }
 
-BYTE isOurDrive(WORD drive, BYTE withCurrentDrive)
+uint8_t isOurDrive(uint16_t drive, uint8_t withCurrentDrive)
 {
 	if(withCurrentDrive) {												// if the 0 in drive doesn't mean 'A', but 'current drive', then we have to figure out what the drive is
 		if(drive == 0) {												// asking for current drive?
@@ -886,11 +886,11 @@ BYTE isOurDrive(WORD drive, BYTE withCurrentDrive)
 	return FALSE;
 }
 
-void showWaitSymbol(BYTE showNotHide)
+void showWaitSymbol(uint8_t showNotHide)
 {
-    static BYTE isShown = 0;
+    static uint8_t isShown = 0;
     static const char progChars[4] = {'|', '/', '-', '\\'};
-    static BYTE progress = 0;
+    static uint8_t progress = 0;
 
     if(showNotHide) {   // show wait symbol
         isShown = 1;

@@ -1,23 +1,15 @@
 #ifndef XBRA_H
 #define XBRA_H
 
-#ifndef WORD
-typedef short WORD;
-#endif
-#ifndef LONG
-typedef long LONG;
-#endif
-#ifndef VOID
-typedef void VOID;
-#endif
+#include <stdint.h>
 
 typedef struct xbra
 {
-	LONG xbra_id;
-	LONG app_id;
-	VOID (*oldvec)();
+	uint32_t xbra_id;
+	uint32_t app_id;
+	void (*oldvec)();
 } XBRA;
 
-LONG unhook_xbra( WORD vecnum, LONG app_id );
+uint32_t unhook_xbra( uint16_t vecnum, uint32_t app_id );
 
 #endif

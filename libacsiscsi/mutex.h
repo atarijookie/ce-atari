@@ -5,12 +5,12 @@ Poor mans mutex
 */
 #include "global.h"
 
-typedef volatile BYTE mutex;
+typedef volatile uint8_t mutex;
 
 //1 if lock could be aquired, 0 if it was already locked
 #define	mutex_trylock(arg1)	\
 __extension__							\
-({	register BYTE retv __asm__("d0");	\
+({	register uint8_t retv __asm__("d0");	\
 	__asm__ volatile					\
 	(									\
 		"movl	a0,-(a7)\n\t"				\

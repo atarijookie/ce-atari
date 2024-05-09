@@ -35,7 +35,7 @@ void aux_sendString(char *str)
     }
 }
 
-void aux_hexNibble(BYTE val)
+void aux_hexNibble(uint8_t val)
 {
     int nibble;
     char table[16] = {"0123456789ABCDEF"};
@@ -45,7 +45,7 @@ void aux_hexNibble(BYTE val)
     aux_sendChar(table[nibble]);
 }
 
-void aux_hexByte(BYTE val)
+void aux_hexByte(uint8_t val)
 {
     int hi, lo;
     char table[16] = {"0123456789ABCDEF"};
@@ -57,16 +57,16 @@ void aux_hexByte(BYTE val)
     aux_sendChar(table[lo]);
 }
 
-void aux_hexWord(WORD val)
+void aux_hexWord(uint16_t val)
 {
-    aux_hexByte((BYTE) (val >>  8));
-    aux_hexByte((BYTE)  val);
+    aux_hexByte((uint8_t) (val >>  8));
+    aux_hexByte((uint8_t)  val);
 }
 
-void aux_hexDword(DWORD val)
+void aux_hexDword(uint32_t val)
 {
-    aux_hexByte((BYTE) (val >> 24));
-    aux_hexByte((BYTE) (val >> 16));
-    aux_hexByte((BYTE) (val >>  8));
-    aux_hexByte((BYTE)  val);
+    aux_hexByte((uint8_t) (val >> 24));
+    aux_hexByte((uint8_t) (val >> 16));
+    aux_hexByte((uint8_t) (val >>  8));
+    aux_hexByte((uint8_t)  val);
 }

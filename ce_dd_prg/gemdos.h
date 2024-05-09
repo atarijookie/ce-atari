@@ -88,10 +88,10 @@ GEMDOS_Fdatime: 6 + 4    -- would be ACSI_READ only then
 // now the struct has 23 bytes total, so a buffer of 512 bytes should contain 22 of these + 6 spare bytes
 typedef struct
 {
-    BYTE    d_attrib;       // GEMDOS File Attributes
-    WORD    d_time;         // GEMDOS Time
-    WORD    d_date;         // GEMDOS Date
-    DWORD   d_length;       // File Length
+    uint8_t    d_attrib;       // GEMDOS File Attributes
+    uint16_t    d_time;         // GEMDOS Time
+    uint16_t    d_date;         // GEMDOS Date
+    uint32_t   d_length;       // File Length
     char    d_fname[14];    // Filename
 } DTAshort;
 
@@ -111,8 +111,8 @@ typedef struct
 
 void initFunctionTable(void);
 
-WORD getDriveFromPath(const char *path);
-BYTE isOurDrive(WORD drive, BYTE withCurrentDrive);
+uint16_t getDriveFromPath(const char *path);
+uint8_t isOurDrive(uint16_t drive, uint8_t withCurrentDrive);
 
 int32_t custom_fread ( void *sp );
 int32_t custom_fwrite( void *sp );
@@ -120,15 +120,15 @@ int32_t custom_pexec( void *sp );
 int32_t custom_pterm( void *sp );
 int32_t custom_pterm0( void *sp );
 
-BYTE commitChanges(WORD ceHandle);
-void initFileBuffer(WORD ceHandle);
+uint8_t commitChanges(uint16_t ceHandle);
+void initFileBuffer(uint16_t ceHandle);
 
-BYTE fillReadBuffer(WORD ceHandle);
-DWORD readData(WORD ceHandle, BYTE *bfr, DWORD cnt, BYTE seekOffset);
-void seekInFileBuffer(WORD ceHandle, int32_t offset, BYTE seekMode);
-void getBytesToEof(WORD ceHandle);
+uint8_t fillReadBuffer(uint16_t ceHandle);
+uint32_t readData(uint16_t ceHandle, uint8_t *bfr, uint32_t cnt, uint8_t seekOffset);
+void seekInFileBuffer(uint16_t ceHandle, int32_t offset, uint8_t seekMode);
+void getBytesToEof(uint16_t ceHandle);
 
-DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt);
+uint32_t writeData(uint8_t ceHandle, uint8_t *bfr, uint32_t cnt);
 
 #define CALL_OLD_GD( function, ... )	\
 		useOldGDHandler = 1;			\
@@ -143,22 +143,22 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt);
 		useOldGDHandler = 1;			\
 		function( __VA_ARGS__ );
 
-// if sign bit is set, extend the sign to whole DWORD
+// if sign bit is set, extend the sign to whole uint32_t
 //#define extendByteToDword(X)    ( ((X & 0x80)==0) ? X : (0xffffff00 | X) )
 #define extendByteToDword(B)    ((int32_t)((int8_t)(B)))
 
 // macros for getting data from buffer - defined for big and little endian
 // big endian (atari)
-#define getWord(POINTER)        ((WORD)  *((WORD  *) (POINTER)))
-#define getDword(POINTER)       ((DWORD) *((DWORD *) (POINTER)))
+#define getWord(POINTER)        ((uint16_t)  *((uint16_t  *) (POINTER)))
+#define getDword(POINTER)       ((uint32_t) *((uint32_t *) (POINTER)))
 
 // little endian (pc)
-//#define getWord(POINTER)        ( (((WORD) *POINTER)<<8) | ((WORD) *(POINTER+1)))
-//#define getDword(POINTER)       ( (((DWORD) *POINTER)<<24) | (((DWORD) *(POINTER+1))<<16) | (((DWORD) *(POINTER+2))<<8) | (((DWORD) *(POINTER+3))) )
+//#define getWord(POINTER)        ( (((uint16_t) *POINTER)<<8) | ((uint16_t) *(POINTER+1)))
+//#define getDword(POINTER)       ( (((uint32_t) *POINTER)<<24) | (((uint32_t) *(POINTER+1))<<16) | (((uint32_t) *(POINTER+2))<<8) | (((uint32_t) *(POINTER+3))) )
 
-#define GET_WORD(PTR)           (((WORD) (PTR)[0]) << 8) | ((WORD) (PTR)[1])
-#define SET_WORD(PTR,VALUE)     (PTR)[0] = (BYTE) (VALUE >>  8); (PTR)[1] = (BYTE) (VALUE      );
-#define SET_DWORD(PTR,VALUE)    (PTR)[0] = (BYTE) (VALUE >> 24); (PTR)[1] = (BYTE) (VALUE >> 16); (PTR)[2] = (BYTE) (VALUE >> 8); (PTR)[3] = (BYTE) VALUE;
+#define GET_WORD(PTR)           (((uint16_t) (PTR)[0]) << 8) | ((uint16_t) (PTR)[1])
+#define SET_WORD(PTR,VALUE)     (PTR)[0] = (uint8_t) (VALUE >>  8); (PTR)[1] = (uint8_t) (VALUE      );
+#define SET_DWORD(PTR,VALUE)    (PTR)[0] = (uint8_t) (VALUE >> 24); (PTR)[1] = (uint8_t) (VALUE >> 16); (PTR)[2] = (uint8_t) (VALUE >> 8); (PTR)[3] = (uint8_t) VALUE;
 
 // The following macros are used to convert atari handle numbers which are WORDs
 // to CosmosEx ex handle numbers, which are only BYTEs; and back.
@@ -178,18 +178,18 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt);
 
 typedef struct
 {
-    BYTE isOpen;                    // if non-zero, the file is open
+    uint8_t isOpen;                    // if non-zero, the file is open
 
-	WORD rCount;					// how much data is buffer (specifies where the next read data could go)
-	WORD rStart;					// starting index of where we should start reading the buffer
-	BYTE rBuf[RW_BUFFER_SIZE];
+	uint16_t rCount;					// how much data is buffer (specifies where the next read data could go)
+	uint16_t rStart;					// starting index of where we should start reading the buffer
+	uint8_t rBuf[RW_BUFFER_SIZE];
 
-    DWORD currentPos;               // current position in the stream, from the start of the file
-    DWORD bytesToEOF;               // count of bytes until the EOF
-    BYTE  bytesToEOFinvalid;        // flag that marks that before any READ operation you should
+    uint32_t currentPos;               // current position in the stream, from the start of the file
+    uint32_t bytesToEOF;               // count of bytes until the EOF
+    uint8_t  bytesToEOFinvalid;        // flag that marks that before any READ operation you should
 
-	WORD wCount;					// how much data we have in this buffer
-	BYTE wBuf[RW_BUFFER_SIZE];
+	uint16_t wCount;					// how much data we have in this buffer
+	uint8_t wBuf[RW_BUFFER_SIZE];
 
 } TFileBuffer;
 

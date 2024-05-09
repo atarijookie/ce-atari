@@ -3,97 +3,112 @@
 #include <mint/linea.h> 
 #include <stdio.h>
 
-#include "acsi.h"
+#include "../libacsiscsi/acsi.h"
+#include "../libacsiscsi/hdd_if.h"
+#include "../libacsiscsi/stdlib.h"
+#include "../libacsiscsi/find_ce.h"
+#include "../libacsiscsi/cookiejar.h"
 #include "translated.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"
 #include "VT52.h"
-#include "cookiejar.h"
 #include "version.h"
-#include "hdd_if.h"
-#include "stdlib.h"
+#include "main.h"
 
 //--------------------------------------------------
-
 void showConnectionErrorMessage(void);
 
 int getConfig(void); 
-int readHansTest (BYTE CEnotCS, DWORD byteCount, WORD xorVal );
-int writeHansTest(BYTE CEnotCS, DWORD byteCount, WORD xorVal );
+int readHansTest (uint8_t CEnotCS, uint32_t byteCount, uint16_t xorVal );
+int writeHansTest(uint8_t CEnotCS, uint32_t byteCount, uint16_t xorVal );
 void sleep(int seconds);
 
-void print_head(BYTE CEnotCS);
+void print_head(uint8_t CEnotCS);
 void print_status(void);
 
-void showHexByte(BYTE val);
-void showHexDword(DWORD val);
 void logMsg(char *logMsg);
 void deleteErrorLines(void);
-void speedTest(BYTE CEnotCS);
+void speedTest(uint8_t CEnotCS);
 void generateDataOnPartition(void);
-void doPartitionWriteOrVerify(BYTE writeNotVerify, BYTE testDrive, int testFileSizeMb, int testFileCount);
+void doPartitionWriteOrVerify(uint8_t writeNotVerify, uint8_t testDrive, int testFileSizeMb, int testFileCount);
 
 void scanBusForCE(void);
-void getSDcardErrorCounters(BYTE doReset);
+void getSDcardErrorCounters(uint8_t doReset);
 //--------------------------------------------------
-BYTE deviceID, sdCardId;
-BYTE isCEnotCS;
-BYTE sdCardPresent;
+uint8_t deviceID, sdCardId;
+uint8_t isCEnotCS;
+uint8_t sdCardPresent;
 
-BYTE ceFoundNotManual;
+uint8_t ceFoundNotManual;
 
-BYTE commandLong [CMD_LENGTH_LONG ] = {0x1f, 0xA0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0, 0, 0, 0, 0, 0, 0}; 
+uint8_t commandLong [CMD_LENGTH_LONG ] = {0x1f, 0xA0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0, 0, 0, 0, 0, 0, 0}; 
 
-BYTE readBuffer [256 * 512];
-BYTE writeBuffer[256 * 512];
-BYTE *rBuffer, *wBuffer;
+uint8_t readBuffer [256 * 512];
+uint8_t writeBuffer[256 * 512];
+uint8_t *rBuffer, *wBuffer;
 
-extern WORD sdErrorCountWrite;
-extern WORD sdErrorCountRead;
+extern uint16_t sdErrorCountWrite;
+extern uint16_t sdErrorCountRead;
 
-BYTE prevCommandFailed;
+uint8_t prevCommandFailed;
 
 #define ERROR_LINE_START        10
 
-BYTE ifUsed;
+uint8_t ifUsed;
 
 // Warning! Don't use VT52_Save_pos() and VT52_Load_pos(), because they don't work on Falcon! (They work fine on ST and TT.)
 
 int errorLine = 0;
-BYTE simpleNotDetailedErrReport = 1;
-
-void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
+uint8_t simpleNotDetailedErrReport = 1;
 
 typedef struct {
-    DWORD goodPlain;
-    DWORD goodWithRetry;
-    DWORD errorTimeout;
-    DWORD errorCrc;
-    DWORD errorOther;
+    uint32_t goodPlain;
+    uint32_t goodWithRetry;
+    uint32_t errorTimeout;
+    uint32_t errorCrc;
+    uint32_t errorOther;
 } Tresults;
 
 struct {
-    DWORD run;
-    DWORD singleOps;
+    uint32_t run;
+    uint32_t singleOps;
     
     Tresults read;
     Tresults write;
 } counts;
 
-void updateCounts(BYTE doingWriteNotRead, int res);
+void updateCounts(uint8_t doingWriteNotRead, int res);
 void printOpResult(int res);
 
-void testDataReliability(BYTE CEnotCS);
-void testContinousRead  (BYTE CEnotCS, BYTE testReadNotSDcard);
+void testDataReliability(uint8_t CEnotCS);
+void testContinousRead  (uint8_t CEnotCS, uint8_t testReadNotSDcard);
 
-void showTestName(char letter, BYTE doShow, const char *testTitle);
+void showTestName(char letter, uint8_t doShow, const char *testTitle);
 void getSDinfo(void);
+
+void scanBusForCE(void)
+{
+    // do bus scan for CE (or enter CS ID manually)
+    deviceID = findDevice(FIND_DEV_CE | FIND_DEV_CS);
+
+    if(deviceID == DEVICE_NOT_FOUND) {
+        return;
+    }
+
+    isCEnotCS = (deviceID & 0x80) ? FALSE : TRUE;     // store device type - CS has highest bit set, CE has it clear
+    deviceID = deviceID & 0x07;                       // store the BUS ID of device
+
+    //----------------------
+    // got the device, time to get more info from it
+    commandLong[0] = (deviceID << 5) | 0x1f;
+    getSDinfo();
+}
 
 //--------------------------------------------------
 int main(void)
 {
-    BYTE key;
-    DWORD toEven;
+    uint8_t key;
+    uint32_t toEven;
 
     //----------------------
     // read all the keys which are waiting, so we can ignore them
@@ -110,20 +125,20 @@ int main(void)
     
     // ---------------------- 
     // create buffer pointer to even address 
-    toEven = (DWORD) &readBuffer[0];
+    toEven = (uint32_t) &readBuffer[0];
   
     if(toEven & 0x0001)       // not even number? 
         toEven++;
   
-    rBuffer = (BYTE *) toEven; 
+    rBuffer = (uint8_t *) toEven; 
 
     //----------
-    toEven = (DWORD) &writeBuffer[0];
+    toEven = (uint32_t) &writeBuffer[0];
   
     if(toEven & 0x0001)       // not even number? 
         toEven++;
   
-    wBuffer = (BYTE *) toEven; 
+    wBuffer = (uint8_t *) toEven; 
 
     Clear_home();
 
@@ -156,8 +171,7 @@ int main(void)
     // do bus scan for CE (or enter CS ID manually)
     scanBusForCE();
 
-    if(deviceID == 0xff)
-    {
+    if(deviceID == DEVICE_NOT_FOUND) {
         (void) Cconws("Quit.");         
         return 0;
     }
@@ -230,7 +244,7 @@ int main(void)
 
         // this runs either when we have full CE, or when we have SD card (can't generate data without it)
         (void) Cconws("\33pOther tests\33q\r\n");
-        BYTE hasWritablePartition = isCEnotCS || sdCardPresent;
+        uint8_t hasWritablePartition = isCEnotCS || sdCardPresent;
         showTestName('G', hasWritablePartition, "generated data on GEMDOS partition");
 
         // this runs only when SD card is present
@@ -306,7 +320,7 @@ int main(void)
     return 0;
 }
 
-void showTestName(char letter, BYTE doShow, const char *testTitle)
+void showTestName(char letter, uint8_t doShow, const char *testTitle)
 {
     if(doShow) {
         (void) Cconws("[");
@@ -320,13 +334,13 @@ void showTestName(char letter, BYTE doShow, const char *testTitle)
     (void) Cconws("\r\n");
 }
 
-BYTE showQuestionGetBool(const char *question, BYTE trueKey, const char *trueWord, BYTE falseKey, const char *falseWord)
+uint8_t showQuestionGetBool(const char *question, uint8_t trueKey, const char *trueWord, uint8_t falseKey, const char *falseWord)
 {
     // show question
     (void) Cconws(question);
 
     while(1) {
-        BYTE key = Cnecin();
+        uint8_t key = Cnecin();
 
         if(key >= 'A' && key <= 'Z') {          // upper case letter? to lower case
             key += 32;
@@ -348,13 +362,13 @@ BYTE showQuestionGetBool(const char *question, BYTE trueKey, const char *trueWor
     }
 }
 
-int getIntFromUser(BYTE allowZero, BYTE maxDigits)
+int getIntFromUser(uint8_t allowZero, uint8_t maxDigits)
 {
     int intValue    = 0;
     int gotDigits   = 0;
     
     while(1) {
-        BYTE key = Cnecin();
+        uint8_t key = Cnecin();
 
         if((key == 13 && gotDigits > 0) ||      // it's enter and got at least 1 digit, quit
             gotDigits >= maxDigits) {           // if got maxDigits digits count, quit
@@ -389,7 +403,7 @@ void generateDataOnPartition(void)
     // show question
     (void) Cconws("Data write, read or both : W/R/B ");
 
-    BYTE testType;
+    uint8_t testType;
     while(1) {
         testType = Cnecin();
 
@@ -419,7 +433,7 @@ void generateDataOnPartition(void)
     
     //----------
     // choose drive for testing
-    WORD drives = Drvmap();
+    uint16_t drives = Drvmap();
     (void) Cconws("Choose drive               : ");
     int i;
     for(i=2; i<16; i++) {
@@ -429,9 +443,9 @@ void generateDataOnPartition(void)
     }
     Cconout(' ');
 
-    BYTE testDrive;
+    uint8_t testDrive;
     while(1) {
-        BYTE key = Cnecin();
+        uint8_t key = Cnecin();
 
         if(key >= 'a' && key <= 'z') {          // lower case letter? to upper case
             key -= 32;
@@ -459,13 +473,13 @@ void generateDataOnPartition(void)
     int testFileCount = getIntFromUser(1, 2);
 
     (void) Cconws("Enter data modifier key    : ");
-    BYTE dataModifier = Cconin();
+    uint8_t dataModifier = Cconin();
     (void) Cconws("\r\n");
 
     //----------
     // generate the data buffer
 
-    BYTE *pGenerated = wBuffer;
+    uint8_t *pGenerated = wBuffer;
     int j; 
     for(i=0; i<MAXSECTORS; i++) {       // for all the sectors
         for(j=0; j<512; j++) {          // for all bytes in sector
@@ -504,7 +518,7 @@ void generateDataOnPartition(void)
     Cnecin();
 }
 
-void doPartitionWriteOrVerify(BYTE writeNotVerify, BYTE testDrive, int testFileSizeMb, int testFileCount)
+void doPartitionWriteOrVerify(uint8_t writeNotVerify, uint8_t testDrive, int testFileSizeMb, int testFileCount)
 {
     int i, j;
     int fileSizeInBuffers = testFileSizeMb * 8;     // 8 write buffers per MB -> total buffers per whole file size
@@ -561,7 +575,7 @@ void doPartitionWriteOrVerify(BYTE writeNotVerify, BYTE testDrive, int testFileS
             }
 
             if(writeNotVerify) {                    // for write
-                DWORD before, after, diff;
+                uint32_t before, after, diff;
                 before = getTicksAsUser();
 
                 res = Fwrite(f, bufferSize, wBuffer);
@@ -585,7 +599,7 @@ void doPartitionWriteOrVerify(BYTE writeNotVerify, BYTE testDrive, int testFileS
                 res = Fread(f, bufferSize, rBuffer);
 
                 if(res == bufferSize) {             // read everything? check the content
-                    res = memcomp(rBuffer, wBuffer, bufferSize);
+                    res = memcmp(rBuffer, wBuffer, bufferSize);
 
                     if(res == 0) {                  // everything fine? 
                         (void) Cconws("*");
@@ -620,19 +634,19 @@ void doPartitionWriteOrVerify(BYTE writeNotVerify, BYTE testDrive, int testFileS
 
 void scsi_reset(void);
 
-void testContinousRead(BYTE CEnotCS, BYTE testReadNotSDcard)
+void testContinousRead(uint8_t CEnotCS, uint8_t testReadNotSDcard)
 {
     VT52_Clear_home();
     VT52_Wrap_on();
     (void) Cconws("Continous read without data checking\r\n");
 
-    BYTE pauseUntilKeypressAfterFail    = showQuestionGetBool("On fail - pause until key pressed? Y/N", 'y', "YES", 'n', "NO");
-    BYTE doScsiResetAfterFail           = showQuestionGetBool("On fail - do SCSI reset?           Y/N", 'y', "YES", 'n', "NO");
-    BYTE showGoodResultAsterisk         = showQuestionGetBool("Show asterisk after good result?   Y/N", 'y', "YES", 'n', "NO");
+    uint8_t pauseUntilKeypressAfterFail    = showQuestionGetBool("On fail - pause until key pressed? Y/N", 'y', "YES", 'n', "NO");
+    uint8_t doScsiResetAfterFail           = showQuestionGetBool("On fail - do SCSI reset?           Y/N", 'y', "YES", 'n', "NO");
+    uint8_t showGoodResultAsterisk         = showQuestionGetBool("Show asterisk after good result?   Y/N", 'y', "YES", 'n', "NO");
 
     hdIf.maxRetriesCount = 0;                           // disable retries
 
-    BYTE sdReadCmd[CMD_LENGTH_SHORT] = {0, 0, 0, 0, 0, 0};
+    uint8_t sdReadCmd[CMD_LENGTH_SHORT] = {0, 0, 0, 0, 0, 0};
 
     if(testReadNotSDcard) {                             // should do test on CE generated data?
         if(CEnotCS) {
@@ -641,7 +655,7 @@ void testContinousRead(BYTE CEnotCS, BYTE testReadNotSDcard)
             (void) Cconws("Data source: Hans\r\n");
         }
 
-        DWORD byteCount = ((DWORD) MAXSECTORS) << 9;    // convert sector count to byte count ( sc * 512 )
+        uint32_t byteCount = ((uint32_t) MAXSECTORS) << 9;    // convert sector count to byte count ( sc * 512 )
 
         if(CEnotCS) {
             commandLong[3] = 'E';   // for CE
@@ -683,7 +697,7 @@ void testContinousRead(BYTE CEnotCS, BYTE testReadNotSDcard)
     
     while(1) {
         if(Cconis() != 0) {                         // if some key is waiting
-            BYTE key = Cnecin();
+            uint8_t key = Cnecin();
 
             if(key == 'q' || key == 'Q') {
                 break;
@@ -698,10 +712,10 @@ void testContinousRead(BYTE CEnotCS, BYTE testReadNotSDcard)
         if(testReadNotSDcard) {     // should do test on CE generated data?
             hdIfCmdAsUser(ACSI_READ, commandLong, CMD_LENGTH_LONG, rBuffer, MAXSECTORS);    // issue the command and check the result
         } else {                    // should do test on SD card?
-            DWORD randomSectorNo = getTicksAsUser();
+            uint32_t randomSectorNo = getTicksAsUser();
 
-            sdReadCmd[2] = (BYTE) (randomSectorNo >> 8);    // sector # high
-            sdReadCmd[3] = (BYTE) (randomSectorNo     );    // sector # low
+            sdReadCmd[2] = (uint8_t) (randomSectorNo >> 8);    // sector # high
+            sdReadCmd[3] = (uint8_t) (randomSectorNo     );    // sector # low
 
             hdIfCmdAsUser(ACSI_READ, sdReadCmd, CMD_LENGTH_SHORT, rBuffer, MAXSECTORS);      // issue the command and check the result
         }
@@ -727,10 +741,10 @@ void testContinousRead(BYTE CEnotCS, BYTE testReadNotSDcard)
     }
 }
 
-void testDataReliability(BYTE CEnotCS)
+void testDataReliability(uint8_t CEnotCS)
 {
-    BYTE key;
-    WORD xorVal=0xC0DE;
+    uint8_t key;
+    uint16_t xorVal=0xC0DE;
     int charcnt=0;
     int linecnt=0;
 
@@ -749,7 +763,7 @@ void testDataReliability(BYTE CEnotCS)
     (void) Cconws("R:");
     x += 2;
     
-    BYTE doingWriteNotRead;
+    uint8_t doingWriteNotRead;
     
     while(1)
     {
@@ -789,7 +803,7 @@ void testDataReliability(BYTE CEnotCS)
         //--------------
         if(!simpleNotDetailedErrReport) {                           // if detailed error report with wait
             if(errorLine != ERROR_LINE_START) {                     // if some error happened, wait for key
-                BYTE quitIt = 0;
+                uint8_t quitIt = 0;
                 
                 logMsg("Shit happened, press 'C' to continue or 'Q' to quit.");    // show message
                 
@@ -840,7 +854,7 @@ void testDataReliability(BYTE CEnotCS)
     }    
 }
 
-void updateCounts(BYTE doingWriteNotRead, int res)
+void updateCounts(uint8_t doingWriteNotRead, int res)
 {
     counts.singleOps++;
 
@@ -898,7 +912,7 @@ void printOpResult(int res)
     }    
 }
 
-void print_head(BYTE CEnotCS)
+void print_head(uint8_t CEnotCS)
 {
     VT52_Goto_pos(0,0);
 
@@ -928,7 +942,7 @@ void print_status(void)
     (void) Cconws("  Data: ");
 
     // calculate and show transfered data capacity
-    DWORD kilobytes     = 127 * counts.singleOps;       // 127 kB per operation * operations count
+    uint32_t kilobytes     = 127 * counts.singleOps;       // 127 kB per operation * operations count
     int megsInteger     = kilobytes / 1024;             // get integer part of mega_bytes
     int megsFraction    = (kilobytes % 1024) / 100;     // get mega_bytes_after_decimal_point part
     
@@ -1014,7 +1028,7 @@ void showConnectionErrorMessage(void)
 
 //--------------------------------------------------
 
-int readHansTest(BYTE CEnotCS, DWORD byteCount, WORD xorVal)
+int readHansTest(uint8_t CEnotCS, uint32_t byteCount, uint16_t xorVal)
 {
     if(CEnotCS) {
         hdIf.maxRetriesCount = 16;                  // enable retries
@@ -1046,16 +1060,16 @@ int readHansTest(BYTE CEnotCS, DWORD byteCount, WORD xorVal)
     }
     
     // if we came here, then either there's no error, or there's error but we still want to compare the buffers
-    BYTE retVal;
+    uint8_t retVal;
     if(hdIf.success && hdIf.statusByte == OK) { // no error - at the end just return 0
         retVal = 0;
     } else {            // some error - at the end return -1
         retVal = -1;
     }
     
-    WORD counter = 0;
-    WORD data = 0;
-    DWORD i;
+    uint16_t counter = 0;
+    uint16_t data = 0;
+    uint32_t i;
     for(i=0; i<byteCount; i += 2) {
         data = counter ^ xorVal;       // create word
         if( !(rBuffer[i]==(data>>8) && rBuffer[i+1]==(data&0xFF)) ){
@@ -1065,7 +1079,7 @@ int readHansTest(BYTE CEnotCS, DWORD byteCount, WORD xorVal)
     }
 
     if(byteCount & 1) {                                 // odd number of bytes? add last byte
-        BYTE lastByte = (counter ^ xorVal) >> 8;
+        uint8_t lastByte = (counter ^ xorVal) >> 8;
         if( rBuffer[byteCount-1]!=lastByte ){
             return -2;
         }  
@@ -1080,9 +1094,9 @@ int readHansTest(BYTE CEnotCS, DWORD byteCount, WORD xorVal)
 
 //--------------------------------------------------
 
-int writeHansTest(BYTE CEnotCS, DWORD byteCount, WORD xorVal)
+int writeHansTest(uint8_t CEnotCS, uint32_t byteCount, uint16_t xorVal)
 {
-    static WORD prevXorVal = 0xffff;
+    static uint16_t prevXorVal = 0xffff;
     
     if(CEnotCS) {
         hdIf.maxRetriesCount = 16;                  // enable retries
@@ -1108,9 +1122,9 @@ int writeHansTest(BYTE CEnotCS, DWORD byteCount, WORD xorVal)
     if(prevXorVal != xorVal) {              // if xorVal changed since last call, generate buffer (otherwise skip that)
         prevXorVal = xorVal;
     
-        WORD counter = 0;
-        WORD data = 0;
-        DWORD i;
+        uint16_t counter = 0;
+        uint16_t data = 0;
+        uint32_t i;
         for(i=0; i<byteCount; i += 2) {
             data = counter ^ xorVal;       // create word
             wBuffer[i  ]    = (data >> 8);
@@ -1119,7 +1133,7 @@ int writeHansTest(BYTE CEnotCS, DWORD byteCount, WORD xorVal)
         }
 
         if(byteCount & 1) {                                 // odd number of bytes? add last byte
-            BYTE lastByte           = (counter ^ xorVal) >> 8;
+            uint8_t lastByte           = (counter ^ xorVal) >> 8;
             wBuffer[byteCount-1]    = lastByte;
         }
     }
@@ -1145,17 +1159,6 @@ showHexByte(hdIf.statusByte);
     return 0;
 }
 
-void logMsg(char *logMsg)
-{
-    if(simpleNotDetailedErrReport) {    // if simple, don't show these SCSI log messages
-        return;
-    }
-
-    VT52_Goto_pos(0, errorLine++);
-    
-    (void) Cconws(logMsg);
-}
-
 void deleteErrorLines(void)
 {
     int line;
@@ -1166,44 +1169,9 @@ void deleteErrorLines(void)
     }
 }
 
-void logMsgProgress(DWORD current, DWORD total)
+void speedTest(uint8_t CEnotCS)
 {
-    VT52_Goto_pos(0, errorLine++);
-    
-    (void) Cconws("Progress: ");
-    showHexDword(current);
-    (void) Cconws(" out of ");
-    showHexDword(total);
-    (void) Cconws("\n\r");
-}
-
-void showHexByte(BYTE val)
-{
-    int hi, lo;
-    char tmp[3];
-    char table[16] = {"0123456789ABCDEF"};
-    
-    hi = (val >> 4) & 0x0f;;
-    lo = (val     ) & 0x0f;
-
-    tmp[0] = table[hi];
-    tmp[1] = table[lo];
-    tmp[2] = 0;
-    
-    (void) Cconws(tmp);
-}
-
-void showHexDword(DWORD val)
-{
-    showHexByte((BYTE) (val >> 24));
-    showHexByte((BYTE) (val >> 16));
-    showHexByte((BYTE) (val >>  8));
-    showHexByte((BYTE)  val);
-}
-
-void speedTest(BYTE CEnotCS)
-{
-    DWORD byteCount = ((DWORD) MAXSECTORS) << 9;    // convert sector count to byte count ( sc * 512 )
+    uint32_t byteCount = ((uint32_t) MAXSECTORS) << 9;    // convert sector count to byte count ( sc * 512 )
 
     if(CEnotCS) {
         hdIf.maxRetriesCount = 16;                  // enable retries
@@ -1229,7 +1197,7 @@ void speedTest(BYTE CEnotCS)
     VT52_Goto_pos(0, 23);
     (void) Cconws("Read speed: ");
     
-    DWORD now, until, diff;
+    uint32_t now, until, diff;
     now = getTicksAsUser();
     
     int i;
@@ -1260,29 +1228,4 @@ void speedTest(BYTE CEnotCS)
     
     (void) Cconws("Press any key to continue...\n\r");
     (void) Cnecin();
-}
-
-//--------------------------------------------------
-// global variables, later used for calling hdIfCmdAsSuper
-BYTE __readNotWrite, __cmdLength;
-WORD __sectorCount;
-BYTE *__cmd, *__buffer;
-
-void hdIfCmdAsSuper(void)
-{
-    // this should be called through Supexec()
-    (*hdIf.cmd)(__readNotWrite, __cmd, __cmdLength, __buffer, __sectorCount);
-}
-
-void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
-{
-    // store params to global vars
-    __readNotWrite  = readNotWrite;
-    __cmd           = cmd;
-    __cmdLength     = cmdLength;
-    __buffer        = buffer;
-    __sectorCount   = sectorCount;    
-    
-    // call the function which does the real work, and uses those global vars
-    Supexec(hdIfCmdAsSuper);
 }

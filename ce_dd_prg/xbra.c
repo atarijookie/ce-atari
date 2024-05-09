@@ -2,13 +2,13 @@
 
 #include <mint/osbind.h>
 
-LONG
-unhook_xbra( WORD vecnum, LONG app_id )
+uint32_t
+unhook_xbra( uint16_t vecnum, uint32_t app_id )
 {
     XBRA *rx;
-    LONG vecadr, *stepadr, savessp, lret = 0L;
+    uint32_t vecadr, *stepadr, savessp, lret = 0L;
 
-    vecadr = (LONG)Setexc( vecnum, VEC_INQUIRE );
+    vecadr = (uint32_t)Setexc( vecnum, VEC_INQUIRE );
     rx = (XBRA *)(vecadr - sizeof( XBRA ));
 
     if( (vecadr >= 0x00E00000 && vecadr <= 0x00EFFFFF)
@@ -36,19 +36,19 @@ unhook_xbra( WORD vecnum, LONG app_id )
         return vecadr;
     }
 
-    stepadr = (LONG *)&rx->oldvec;
+    stepadr = (uint32_t *)&rx->oldvec;
 
-    rx = (XBRA *)((LONG)rx->oldvec - sizeof( XBRA ));
+    rx = (XBRA *)((uint32_t)rx->oldvec - sizeof( XBRA ));
     while( rx!=0 && rx->oldvec!=0 && rx->xbra_id == 'XBRA' )
     {
         if( rx->app_id == app_id )
         {
-            *stepadr = lret = (LONG)rx->oldvec;
+            *stepadr = lret = (uint32_t)rx->oldvec;
             break;
         }
 
-        stepadr = (LONG *)&rx->oldvec;
-        rx = (XBRA *)((LONG)rx->oldvec - sizeof( XBRA ));
+        stepadr = (uint32_t *)&rx->oldvec;
+        rx = (XBRA *)((uint32_t)rx->oldvec - sizeof( XBRA ));
     }
 
     Super( savessp );

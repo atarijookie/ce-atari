@@ -17,20 +17,20 @@
 // ------------------------------------------
 
 // mfp chip register
-#define mfpGpip			((volatile BYTE *) 0xFFFA01)
+#define mfpGpip			((volatile uint8_t *) 0xFFFA01)
 
 // DMA chip registers and flag
 #define IO_DINT     0x20        // DMA interrupt (FDC or HDC)
 
-#define dmaAddrSectCnt	((volatile WORD *) 0xFF8604)
-#define dmaAddrData		((volatile WORD *) 0xFF8604)
+#define dmaAddrSectCnt	((volatile uint16_t *) 0xFF8604)
+#define dmaAddrData		((volatile uint16_t *) 0xFF8604)
 
-#define dmaAddrMode		((volatile WORD *) 0xFF8606)
-#define dmaAddrStatus	((volatile WORD *) 0xFF8606)
+#define dmaAddrMode		((volatile uint16_t *) 0xFF8606)
+#define dmaAddrStatus	((volatile uint16_t *) 0xFF8606)
 
-#define dmaAddrHi		((volatile BYTE *) 0xFF8609)
-#define dmaAddrMid		((volatile BYTE *) 0xFF860B)
-#define dmaAddrLo		((volatile BYTE *) 0xFF860D)
+#define dmaAddrHi		((volatile uint8_t *) 0xFF8609)
+#define dmaAddrMid		((volatile uint8_t *) 0xFF860B)
+#define dmaAddrLo		((volatile uint8_t *) 0xFF860D)
 
 //---------------------------------------
 
@@ -50,33 +50,36 @@
 #define SC_NOT_0     0x0002     // Sector count register not zero
 #define DATA_REQ     0x0004     // DRQ line state
 
-#define FLOCK      ((volatile WORD  *) 0x043E) // Floppy lock variable
+#define FLOCK      ((volatile uint16_t  *) 0x043E) // Floppy lock variable
 
 #define ACSI_READ	1
 #define ACSI_WRITE	0
 
-#define SCSI_CMD_INQUIRY	0x12
+#define SCSI_CMD_INQUIRY	    0x12
+#define SCSI_CMD_READ6          0x08
+#define SCSI_CMD_REQUEST_SENSE  0x03
+#define SCSI_CMD_WRITE6         0x0a
 
 #define CMD_LENGTH_SHORT	6
 #define CMD_LENGTH_LONG		13
 //---------------------------------------
-BYTE wait_dma_cmpl(DWORD t_ticks);
-BYTE fdone(void);
-BYTE qdone(void);
-void setdma(DWORD addr);
-BYTE hdone(void);
-void endcmd(WORD mode);
+uint8_t wait_dma_cmpl(uint32_t t_ticks);
+uint8_t fdone(void);
+uint8_t qdone(void);
+void setdma(uint32_t addr);
+uint8_t hdone(void);
+void endcmd(uint16_t mode);
 
-void acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
+void acsi_cmd(uint8_t ReadNotWrite, uint8_t *cmd, uint8_t cmdLength, uint8_t *buffer, uint16_t sectorCount);
 //---------------------------------------
 #ifdef ONPC
 
 typedef struct
 {
-    BYTE ReadNotWrite;
-    BYTE cmd[14];
-    BYTE cmdLength;
-    BYTE sCountHi, sCountLo;
+    uint8_t ReadNotWrite;
+    uint8_t cmd[14];
+    uint8_t cmdLength;
+    uint8_t sCountHi, sCountLo;
 } __attribute__((packed)) AcsiStream;
 //---------------------------------------
 

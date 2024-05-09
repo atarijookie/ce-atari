@@ -15,49 +15,49 @@
 #include <stdio.h>
 
 void logMsg(char *logMsg);
-void logMsgProgress(DWORD current, DWORD total);
+void logMsgProgress(uint32_t current, uint32_t total);
 
 void scsi_reset(void);
 //-----------------
 // local function definitions
-static BYTE scsi_select_and_cmd(BYTE readNotWrite, BYTE scsiId, BYTE *cmd, BYTE cmdLength, BYTE *dataAddr, DWORD dataByteCount);
-static BYTE selscsi(BYTE scsiId);
-static WORD dataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount, BYTE cmdLength);
+static uint8_t scsi_select_and_cmd(uint8_t readNotWrite, uint8_t scsiId, uint8_t *cmd, uint8_t cmdLength, uint8_t *dataAddr, uint32_t dataByteCount);
+static uint8_t selscsi(uint8_t scsiId);
+static uint16_t dataTransfer(uint8_t readNotWrite, uint8_t *bfr, uint32_t byteCount, uint8_t cmdLength);
 static void w4stat(void);
-static BYTE doack(void);
+static uint8_t doack(void);
        void scsiSetLongTimeout(void);
-       BYTE w4req(void);
+       uint8_t w4req(void);
        void scsiSetShortTimeout(void);
 
-BYTE PIO_read(void);
-void PIO_write(BYTE data);
+uint8_t PIO_read(void);
+void PIO_write(uint8_t data);
 
 #define USE_DMA
 
 #ifdef USE_DMA
-BYTE   w4int(void);
-void   setDmaAddr_TT(DWORD addr);
-DWORD  getDmaAddr_TT(void);
-void   setDmaCnt_TT(DWORD dataCount);
+uint8_t   w4int(void);
+void   setDmaAddr_TT(uint32_t addr);
+uint32_t  getDmaAddr_TT(void);
+void   setDmaCnt_TT(uint32_t dataCount);
 #else
-WORD pioDataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount);
-WORD pioDataTransfer_read(BYTE *bfr, DWORD byteCount);
-WORD pioDataTransfer_write(BYTE *bfr, DWORD byteCount);
+uint16_t pioDataTransfer(uint8_t readNotWrite, uint8_t *bfr, uint32_t byteCount);
+uint16_t pioDataTransfer_read(uint8_t *bfr, uint32_t byteCount);
+uint16_t pioDataTransfer_write(uint8_t *bfr, uint32_t byteCount);
 #endif
 
-extern BYTE machine;
+extern uint8_t machine;
 
-DWORD scsi_getReg_TT(int whichReg);
-void  scsi_setReg_TT(int whichReg, DWORD value);
+uint32_t scsi_getReg_TT(int whichReg);
+void  scsi_setReg_TT(int whichReg, uint32_t value);
 
-BYTE dmaDataTx_prepare_TT (BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount);
-BYTE dmaDataTx_do_TT      (BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount);
+uint8_t dmaDataTx_prepare_TT (uint8_t readNotWrite, uint8_t *buffer, uint32_t dataByteCount);
+uint8_t dmaDataTx_do_TT      (uint8_t readNotWrite, uint8_t *buffer, uint32_t dataByteCount);
 //-----------------
 
 void clearCache030(void);
 
-DWORD _cmdTimeOut;                      // timeout time for scsi_cmd() from start to end
-void scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
+uint32_t _cmdTimeOut;                      // timeout time for scsi_cmd() from start to end
+void scsi_cmd_TT(uint8_t readNotWrite, uint8_t *cmd, uint8_t cmdLength, uint8_t *buffer, uint16_t sectorCount)
 {
     //--------
     // init result to fail codes
@@ -67,13 +67,13 @@ void scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WOR
 
     //-------------
     // create local copy of cmd[]
-    BYTE tmpCmd[32];
-    BYTE tmpCmdLen = (cmdLength < 32) ? cmdLength : 32;
+    uint8_t tmpCmd[32];
+    uint8_t tmpCmdLen = (cmdLength < 32) ? cmdLength : 32;
     memcpy(tmpCmd, cmd, tmpCmdLen);
 
     //------------
     // first we start by extracting ID and fixing the cmd[] array because there's different format of this for ACSI and SCSI
-    BYTE scsiId = (tmpCmd[0] >> 5);     // get only drive ID bits
+    uint8_t scsiId = (tmpCmd[0] >> 5);     // get only drive ID bits
 
     tmpCmd[0] = tmpCmd[0] & 0x1f;       // remove possible drive ID bits
 
@@ -93,7 +93,7 @@ void scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WOR
     *FLOCK = 0xffff;                    // set FLOCK to disable FDC operations
 
     scsiSetShortTimeout();              // short timeout for command
-    BYTE res = scsi_select_and_cmd(readNotWrite, scsiId, cmd, cmdLength, buffer, sectorCount << 9);      // send command block
+    uint8_t res = scsi_select_and_cmd(readNotWrite, scsiId, cmd, cmdLength, buffer, sectorCount << 9);      // send command block
 
     if(res) {
         logMsg("scsi_cmd_tt failed on scsi_select_and_cmd() \r\n");
@@ -106,8 +106,8 @@ void scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WOR
     scsiSetLongTimeout();               // long timeout for data
 
     if(sectorCount != 0) {
-        DWORD byteCount = sectorCount << 9;
-        WORD wres = dataTransfer(readNotWrite, buffer, byteCount, cmdLength);
+        uint32_t byteCount = sectorCount << 9;
+        uint16_t wres = dataTransfer(readNotWrite, buffer, byteCount, cmdLength);
 
         if(wres) {
             logMsg("scsi_cmd_tt failed on dataTransfer \r\n");
@@ -127,9 +127,9 @@ void scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WOR
     *FLOCK = 0;                         // clear FLOCK to enable FDC operations
 }
 
-WORD dataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount, BYTE cmdLength)
+uint16_t dataTransfer(uint8_t readNotWrite, uint8_t *bfr, uint32_t byteCount, uint8_t cmdLength)
 {
-    WORD res;
+    uint16_t res;
 
     if(readNotWrite) {                                  // read
         (*hdIf.pSetReg)(REG_ICR, 0);                         // deassert the data bus
@@ -152,9 +152,9 @@ WORD dataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount, BYTE cmdLength)
 
 #ifndef USE_DMA
 
-WORD pioDataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount)
+uint16_t pioDataTransfer(uint8_t readNotWrite, uint8_t *bfr, uint32_t byteCount)
 {
-    WORD res;
+    uint16_t res;
 
     if(byteCount >= 0x3500) {
         (void) Cconws("!!! pioDataTransfer() will probably fail when transferring too much data, use DMA instead !!!\n\r");
@@ -169,10 +169,10 @@ WORD pioDataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount)
     return res;                 // good
 }
 
-WORD pioDataTransfer_read(BYTE *bfr, DWORD byteCount)
+uint16_t pioDataTransfer_read(uint8_t *bfr, uint32_t byteCount)
 {
     int i;
-    BYTE data;
+    uint8_t data;
 
     hdIf.phaseChanged = FALSE;
 
@@ -197,7 +197,7 @@ WORD pioDataTransfer_read(BYTE *bfr, DWORD byteCount)
     return 0;                       // good
 }
 
-WORD pioDataTransfer_write(BYTE *bfr, DWORD byteCount)
+uint16_t pioDataTransfer_write(uint8_t *bfr, uint32_t byteCount)
 {
     int i;
 
@@ -223,9 +223,9 @@ WORD pioDataTransfer_write(BYTE *bfr, DWORD byteCount)
 #endif
 
 // scsi_select_and_cmd() - set DMA pointer and count and send command block
-BYTE scsi_select_and_cmd(BYTE readNotWrite, BYTE scsiId, BYTE *cmd, BYTE cmdLength, BYTE *dataAddr, DWORD dataByteCount)
+uint8_t scsi_select_and_cmd(uint8_t readNotWrite, uint8_t scsiId, uint8_t *cmd, uint8_t cmdLength, uint8_t *dataAddr, uint32_t dataByteCount)
 {
-    BYTE res;
+    uint8_t res;
 
     res = selscsi(scsiId);  // select required device
 
@@ -262,17 +262,17 @@ BYTE scsi_select_and_cmd(BYTE readNotWrite, BYTE scsiId, BYTE *cmd, BYTE cmdLeng
 }
 
 // Selects the SCSI device with specified SCSI ID
-BYTE selscsi(BYTE scsiId)
+uint8_t selscsi(uint8_t scsiId)
 {
-    BYTE res;
+    uint8_t res;
 
     while(1) {                                              // STILL busy from last time?
-        BYTE icr = (*hdIf.pGetReg)(REG_CR);
+        uint8_t icr = (*hdIf.pGetReg)(REG_CR);
         if((icr & ICR_BUSY) == 0) {                         // if not, it's available
             break;
         }
 
-        DWORD now = *HZ_200;
+        uint32_t now = *HZ_200;
         if(now >= _cmdTimeOut) {                            // if time out, fail
             return -1;
         }
@@ -282,7 +282,7 @@ BYTE selscsi(BYTE scsiId)
     (*hdIf.pSetReg)(REG_ISR, 0);                            // no interrupt from selection
     (*hdIf.pSetReg)(REG_ICR, ICR_BSY | ICR_SEL);            // assert BSY and SEL
 
-    BYTE selId  = (1 << scsiId);                            // convert number of device to bit
+    uint8_t selId  = (1 << scsiId);                            // convert number of device to bit
     (*hdIf.pSetReg)(REG_ODR, selId);                        // set dest SCSI IDs
 
     (*hdIf.pSetReg)(REG_ICR, ICR_BSY | ICR_SEL | ICR_DBUS); // assert BUSY, SEL and data bus
@@ -290,14 +290,14 @@ BYTE selscsi(BYTE scsiId)
     scsi_clrBit(REG_ICR, ICR_BSY);                          // clear BUSY
 
     while(1) {                          // wait for busy bit to appear
-        BYTE icr = (*hdIf.pGetReg)(REG_CR);
+        uint8_t icr = (*hdIf.pGetReg)(REG_CR);
 
         if(icr & ICR_BUSY) {            // if bit set, good
             res = 0;
             break;
         }
 
-        DWORD now = *HZ_200;
+        uint32_t now = *HZ_200;
         if(now >= _cmdTimeOut) {                            // if time out, fail
             res = -1;
             break;
@@ -314,7 +314,7 @@ void scsi_reset(void)
 
     _cmdTimeOut = *HZ_200 + 100;                            // wait 0.5 s
 
-    DWORD now;
+    uint32_t now;
     while(1) {
         now = *HZ_200;
 
@@ -340,9 +340,9 @@ void scsi_reset(void)
 // Comments:
 //	When 5380 is interrupted, it indicates a change of data to status phase (i.e., DMA is done), or ...
 //	When DMAC is interrupted, it indicates either DMA count is zero, or there is an internal bus error.
-BYTE w4int(void)
+uint8_t w4int(void)
 {
-    BYTE res;
+    uint8_t res;
 
     while(1) {
         res = *MFP2;
@@ -351,13 +351,13 @@ BYTE w4int(void)
         }
 
         if((res & GPIP2_DMA) == 0) {    // DMA interrupt?
-            WORD wres = (*hdIf.pGetReg)(REG_DMACTL);    // get the DMAC status
+            uint16_t wres = (*hdIf.pGetReg)(REG_DMACTL);    // get the DMAC status
             if(wres & 0x80) {           // check for bus err/ignore cntout ints
                 return -1;
             }
         }
 
-        DWORD now = *HZ_200;
+        uint32_t now = *HZ_200;
         if(now >= _cmdTimeOut) {            // time out? fail
             return -1;
         }
@@ -379,7 +379,7 @@ void w4stat(void)
 
     //-----------------
     // receive status byte
-    BYTE status = PIO_read();
+    uint8_t status = PIO_read();
 
     if(!hdIf.success) {                             // failed?
         logMsg("w4stat failed on reading status byte \r\n");
@@ -401,9 +401,9 @@ void w4stat(void)
     hdIf.statusByte     = status;                   // store status byte
 }
 
-BYTE PIO_read(void)
+uint8_t PIO_read(void)
 {
-    BYTE res;
+    uint8_t res;
     (*hdIf.pSetReg)(REG_ICR, 0);         // deassert data bus (disable data output)
 
     hdIf.phaseChanged   = FALSE;
@@ -423,7 +423,7 @@ BYTE PIO_read(void)
         return 0;
     }
 
-    BYTE data = (*hdIf.pGetReg)(REG_DB); // get the status byte
+    uint8_t data = (*hdIf.pGetReg)(REG_DB); // get the status byte
 
     res = doack();                      // signal that status byte is here
     if(res) {                           // if timed-out, fail
@@ -435,9 +435,9 @@ BYTE PIO_read(void)
     return data;
 }
 
-void PIO_write(BYTE data)
+void PIO_write(uint8_t data)
 {
-    BYTE res;
+    uint8_t res;
 
     hdIf.phaseChanged   = FALSE;
     hdIf.success        = FALSE;
@@ -469,15 +469,15 @@ void PIO_write(BYTE data)
 }
 
 // w4req() - wait for REQ to come during hand shake of non-data bytes
-BYTE w4req(void)
+uint8_t w4req(void)
 {
     while(1) {                      // wait for REQ
-        BYTE icr = (*hdIf.pGetReg)(REG_CR);
+        uint8_t icr = (*hdIf.pGetReg)(REG_CR);
         if(icr & ICR_REQ) {         // if REQ appeared, good
             return 0;
         }
 
-        DWORD now = *HZ_200;
+        uint32_t now = *HZ_200;
         if(now >= _cmdTimeOut) {    // if time out, fail
             break;
         }
@@ -487,20 +487,20 @@ BYTE w4req(void)
 }
 
 // doack() - assert ACK
-BYTE doack(void)
+uint8_t doack(void)
 {
     scsi_setBit(REG_ICR, ICR_ACK);   // assert ACK
 
-    BYTE res;
+    uint8_t res;
 
     while(1) {
-        BYTE icr = (*hdIf.pGetReg)(REG_ICR);
+        uint8_t icr = (*hdIf.pGetReg)(REG_ICR);
         if((icr & ICR_REQ) == 0) {      // if REQ gone, good
             res = 0;
             break;
         }
 
-        DWORD now = *HZ_200;
+        uint32_t now = *HZ_200;
         if(now >= _cmdTimeOut) {        // if time out, fail
             res = -1;
             break;
@@ -514,55 +514,55 @@ BYTE doack(void)
 // short timeout for command
 void scsiSetShortTimeout(void)
 {
-    DWORD now = *HZ_200;
+    uint32_t now = *HZ_200;
     _cmdTimeOut = (now + SCSI_TIMEOUT_SHORT);
 }
 
 // long timeout for data
 void scsiSetLongTimeout(void)
 {
-    DWORD now = *HZ_200;
+    uint32_t now = *HZ_200;
     _cmdTimeOut = (now + SCSI_TIMEOUT_LONG);
 }
 
-void setDmaAddr_TT(DWORD addr)
+void setDmaAddr_TT(uint32_t addr)
 {
-    *bSDMAPTR_lo        = (BYTE) (addr      );
-    *bSDMAPTR_mid_lo    = (BYTE) (addr >>  8);
-    *bSDMAPTR_mid_hi    = (BYTE) (addr >> 16);
-    *bSDMAPTR_hi        = (BYTE) (addr >> 24);
+    *bSDMAPTR_lo        = (uint8_t) (addr      );
+    *bSDMAPTR_mid_lo    = (uint8_t) (addr >>  8);
+    *bSDMAPTR_mid_hi    = (uint8_t) (addr >> 16);
+    *bSDMAPTR_hi        = (uint8_t) (addr >> 24);
 }
 
-DWORD getDmaAddr_TT(void)
+uint32_t getDmaAddr_TT(void)
 {
-    DWORD  dmaPtr;
+    uint32_t  dmaPtr;
     dmaPtr = ((*bSDMAPTR_hi) << 24) | ((*bSDMAPTR_mid_hi) << 16) | ((*bSDMAPTR_mid_lo) << 8) | (*bSDMAPTR_lo);
     return dmaPtr;
 }
 
-void setDmaCnt_TT(DWORD dataCount)
+void setDmaCnt_TT(uint32_t dataCount)
 {
-    *bSDMACNT_hi     = (BYTE) (dataCount >> 24);
-    *bSDMACNT_mid_hi = (BYTE) (dataCount >> 16);
-    *bSDMACNT_mid_lo = (BYTE) (dataCount >>  8);
-    *bSDMACNT_lo     = (BYTE) (dataCount      );
+    *bSDMACNT_hi     = (uint8_t) (dataCount >> 24);
+    *bSDMACNT_mid_hi = (uint8_t) (dataCount >> 16);
+    *bSDMACNT_mid_lo = (uint8_t) (dataCount >>  8);
+    *bSDMACNT_lo     = (uint8_t) (dataCount      );
 }
 //----------------------
 // functions for SETING SCSI register
-void scsi_setReg_TT(int whichReg, DWORD value)
+void scsi_setReg_TT(int whichReg, uint32_t value)
 {
     if(whichReg == REG_DMACTL) {
         *SDMACTL = value;
         return;
     }
 
-    volatile BYTE *pReg = (volatile BYTE *) (0xFFFF8780 + whichReg);
-    *pReg = (BYTE) value;
+    volatile uint8_t *pReg = (volatile uint8_t *) (0xFFFF8780 + whichReg);
+    *pReg = (uint8_t) value;
 }
 
 //----------------------
 // functions for GETTING SCSI register
-DWORD scsi_getReg_TT(int whichReg)
+uint32_t scsi_getReg_TT(int whichReg)
 {
     if(whichReg == REG_DMARES) {
         return *SDMARES;
@@ -572,35 +572,35 @@ DWORD scsi_getReg_TT(int whichReg)
         return *SDMACTL;
     }
 
-    volatile BYTE *pReg = (volatile BYTE *) (0xFFFF8780 + whichReg);
-    DWORD val = *pReg;
+    volatile uint8_t *pReg = (volatile uint8_t *) (0xFFFF8780 + whichReg);
+    uint32_t val = *pReg;
 
     return val;
 }
 
 //----------------------
-void scsi_setBit(int whichReg, DWORD bitMask)
+void scsi_setBit(int whichReg, uint32_t bitMask)
 {
-    DWORD val;
+    uint32_t val;
     val = (*hdIf.pGetReg)(whichReg);         // read
     val = val | bitMask;                    // modify (set bits)
     (*hdIf.pSetReg)(whichReg, val);              // write
 }
 
-void scsi_clrBit(int whichReg, DWORD bitMask)
+void scsi_clrBit(int whichReg, uint32_t bitMask)
 {
-    DWORD val;
-    DWORD invMask = ~bitMask;
+    uint32_t val;
+    uint32_t invMask = ~bitMask;
 
     val = (*hdIf.pGetReg)(whichReg);         // read
     val = val & invMask;                    // modify (clear bits)
     (*hdIf.pSetReg)(whichReg, val);              // write
 }
 //----------------------
-BYTE dmaDataTx_prepare_TT(BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount)
+uint8_t dmaDataTx_prepare_TT(uint8_t readNotWrite, uint8_t *buffer, uint32_t dataByteCount)
 {
     // set DMA pointer to buffer address
-    setDmaAddr_TT((DWORD) buffer);
+    setDmaAddr_TT((uint32_t) buffer);
 
     // set DMA count
     setDmaCnt_TT(dataByteCount);
@@ -608,7 +608,7 @@ BYTE dmaDataTx_prepare_TT(BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount)
     return 0;
 }
 //----------------------
-BYTE dmaDataTx_do_TT(BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount)
+uint8_t dmaDataTx_do_TT(uint8_t readNotWrite, uint8_t *buffer, uint32_t dataByteCount)
 {
     // Set up the DMAC for data transfer
     (*hdIf.pSetReg)(REG_MR, 2);                      // enable DMA mode
@@ -623,7 +623,7 @@ BYTE dmaDataTx_do_TT(BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount)
         (*hdIf.pSetReg)(REG_DMACTL, DMAOUT+DMAENA);  // turn on DMAC
     }
 
-    BYTE res;
+    uint8_t res;
     res = w4int();                                  // wait for int
     if(res) {
         logMsg(" dmaDataTansfer() failed - w4int() timeout\r\n");
@@ -639,7 +639,7 @@ BYTE dmaDataTx_do_TT(BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount)
 
 	clearCache030();
 
-    BYTE rest = *bSDMAPTR_lo;   // see if this was an odd transfer
+    uint8_t rest = *bSDMAPTR_lo;   // see if this was an odd transfer
     rest = rest & 0x03;         // get only 2 lowest bits
 
     if(rest == 0) {             // transfer size was multiple of 4? Great, finish.
@@ -648,17 +648,17 @@ BYTE dmaDataTx_do_TT(BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount)
 
     //----------------
     // the following code is only for case if the DMA read size (count) was not multiple of 4
-    DWORD dmaPtr;
-    BYTE *pData;
+    uint32_t dmaPtr;
+    uint8_t *pData;
     dmaPtr  = getDmaAddr_TT();
     dmaPtr  = dmaPtr & 0xfffffffc;  // where does data go to?
-    pData   = (BYTE *) dmaPtr;      // int to pointer
+    pData   = (uint8_t *) dmaPtr;      // int to pointer
 
-    DWORD residue = (*hdIf.pGetReg)(REG_DMARES);    // get the remaining bytes
+    uint32_t residue = (*hdIf.pGetReg)(REG_DMARES);    // get the remaining bytes
 
     int i;
     for(i=0; i<rest; i++) {
-        BYTE val;
+        uint8_t val;
         val     = residue >> 24;        // get highest byte
         residue = residue << 8;         // shift next byte to highest byte
 

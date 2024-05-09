@@ -6,9 +6,9 @@
 #include "stdlib.h"
 
 // --------------------------------------
-void acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
+void acsi_cmd(uint8_t ReadNotWrite, uint8_t *cmd, uint8_t cmdLength, uint8_t *buffer, uint16_t sectorCount)
 {
-	WORD i, wr1, wr2;
+	uint16_t i, wr1, wr2;
 
     //--------
     // init result to fail codes
@@ -21,9 +21,9 @@ void acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
         *FLOCK = -1;                                // disable FDC operations
     } else {                                        // should wait before acquiring FLOCK? wait...
         // try to acquire FLOCK if possible
-        DWORD end = getTicks() + 200;               // calculate the terminating tick count, where we should stop looking for unlocked FLOCK
+        uint32_t end = getTicks() + 200;               // calculate the terminating tick count, where we should stop looking for unlocked FLOCK
 
-        WORD locked;
+        uint16_t locked;
         while(1) {                                  // while not time out, try again
             locked = *FLOCK;                        // read current lock value
 
@@ -42,7 +42,7 @@ void acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
     //------------------
     // FLOCK acquired, continue with rest
 
-	setdma((DWORD) buffer);                     // setup DMA transfer address
+	setdma((uint32_t) buffer);                     // setup DMA transfer address
 
 	//*******************************
 	// transfer 0th cmd byte
@@ -93,9 +93,9 @@ void acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 }
 
 //**************************************************************************
-void endcmd(WORD mode)
+void endcmd(uint16_t mode)
 {
-	WORD val;
+	uint16_t val;
 
 	if (fdone() != OK) {                // wait for operation done ack
         hdIf.success = FALSE;           // failed?
@@ -112,9 +112,9 @@ void endcmd(WORD mode)
     hdIf.statusByte     = val;          // store status byte
 }
 //**************************************************************************
-BYTE hdone(void)
+uint8_t hdone(void)
 {
-	WORD val;
+	uint16_t val;
 
 	*dmaAddrMode = NO_DMA;              // restore DMA mode register
 	*FLOCK = 0;                         // FDC operations may get going again
@@ -123,27 +123,27 @@ BYTE hdone(void)
 	return val;                         // read and return DMA status register
 }
 //**************************************************************************
-void setdma(DWORD addr)
+void setdma(uint32_t addr)
 {
-	*dmaAddrLo	= (BYTE)(addr);
-	*dmaAddrMid	= (BYTE)(addr >> 8);
-	*dmaAddrHi	= (BYTE)(addr >> 16);
+	*dmaAddrLo	= (uint8_t)(addr);
+	*dmaAddrMid	= (uint8_t)(addr >> 8);
+	*dmaAddrHi	= (uint8_t)(addr >> 16);
 }
 //**************************************************************************
-BYTE qdone(void)
+uint8_t qdone(void)
 {
 	return wait_dma_cmpl(ACSI_TIMEOUT_SHORT);
 }
 //**************************************************************************
-BYTE fdone(void)
+uint8_t fdone(void)
 {
 	return wait_dma_cmpl(ACSI_TIMEOUT_LONG);
 }
 //**************************************************************************
-BYTE wait_dma_cmpl(DWORD t_ticks)
+uint8_t wait_dma_cmpl(uint32_t t_ticks)
 {
-	DWORD now, until;
-	BYTE gpip;
+	uint32_t now, until;
+	uint8_t gpip;
 
 	now = *HZ_200;
 	until = t_ticks + now;              // calc value timer must get to

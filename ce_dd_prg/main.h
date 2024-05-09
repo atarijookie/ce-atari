@@ -30,11 +30,11 @@
 __asm__ (".balign 4\n\t"
 		 ".comm _FastRAMBuffer,4096");
 
-#define _longframe      ((volatile WORD *) 0x59e)
+#define _longframe      ((volatile uint16_t *) 0x59e)
 
 typedef struct {
-    BYTE enabled;
-    BYTE take;
+    uint8_t enabled;
+    uint8_t take;
 } ScreenShots;
 
 #endif

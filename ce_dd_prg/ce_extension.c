@@ -8,12 +8,12 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "acsi.h"
+#include "../libacsiscsi/acsi.h"
 #include "global.h"
-#include "hdd_if.h"
+#include "../libacsiscsi/hdd_if.h"
 #include "ce_extension.h"
 
-extern BYTE deviceID;
+extern uint8_t deviceID;
 
 // call the CE extension based on supplied structure content
 void ceExtensionCall(CEXcall *cc)

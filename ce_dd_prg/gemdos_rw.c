@@ -10,8 +10,8 @@
 
 #include "ce_dd_prg.h"
 #include "xbra.h"
-#include "acsi.h"
-#include "hdd_if.h"
+#include "../libacsiscsi/acsi.h"
+#include "../libacsiscsi/hdd_if.h"
 #include "translated.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"
@@ -32,36 +32,36 @@ extern int32_t (  *bios_table[256])( void* sp );
 // ------------------------------------------------------------------
 // CosmosEx and Gemdos part - Jookie
 
-extern BYTE FastRAMBuffer[];
+extern uint8_t FastRAMBuffer[];
 
-BYTE getNextDTAsFromHost(void);
-DWORD copyNextDtaToAtari(void);
+uint8_t getNextDTAsFromHost(void);
+uint32_t copyNextDtaToAtari(void);
 
 TFileBuffer fileBufs[MAX_FILES];
 
-DWORD fread_small(WORD ceHandle, DWORD countNeeded, BYTE *buffer);
-DWORD fread_big(WORD ceHandle, DWORD countNeeded, BYTE *buffer);
+uint32_t fread_small(uint16_t ceHandle, uint32_t countNeeded, uint8_t *buffer);
+uint32_t fread_big(uint16_t ceHandle, uint32_t countNeeded, uint8_t *buffer);
 
-void invalidateFileBuffer(TFileBuffer *fb, WORD ceHandle, BYTE seekMode);
+void invalidateFileBuffer(TFileBuffer *fb, uint16_t ceHandle, uint8_t seekMode);
 
 // ------------------------------------------------------------------
 int32_t custom_fread( void *sp )
 {
 	int32_t res = 0;
-	BYTE *params = (BYTE *) sp;
+	uint8_t *params = (uint8_t *) sp;
 
-	WORD atariHandle	= (WORD)	*((WORD *) params);
+	uint16_t atariHandle	= (uint16_t)	*((uint16_t *) params);
 	params += 2;
-	DWORD count			= (DWORD)	*((DWORD *) params);
+	uint32_t count			= (uint32_t)	*((uint32_t *) params);
 	params += 4;
-	BYTE *buffer		= (BYTE *)	*((DWORD *) params);
+	uint8_t *buffer		= (uint8_t *)	*((uint32_t *) params);
 
 	// check if this handle should belong to cosmosEx
 	if(!handleIsFromCE(atariHandle)) {									// not called with handle belonging to CosmosEx?
 		CALL_OLD_GD(Fread, atariHandle, count, buffer);
 	}
 
-	WORD ceHandle = handleAtariToCE(atariHandle);						// convert high atari handle to little CE handle
+	uint16_t ceHandle = handleAtariToCE(atariHandle);						// convert high atari handle to little CE handle
 
 	if(!fileBufs[ceHandle].isOpen) {                                    // file not open? fail - INVALID HANDLE
         return extendByteToDword(EIHNDL);
@@ -85,10 +85,10 @@ int32_t custom_fread( void *sp )
 }
 
 // for small freads get the data through the FileBuffers
-DWORD fread_small(WORD ceHandle, DWORD countNeeded, BYTE *buffer)
+uint32_t fread_small(uint16_t ceHandle, uint32_t countNeeded, uint8_t *buffer)
 {
-    DWORD countDone = 0;
-    WORD dataLeft, copyCount;
+    uint32_t countDone = 0;
+    uint16_t dataLeft, copyCount;
 
 	TFileBuffer *fb = &fileBufs[ceHandle];								// to shorten the following operations use this pointer
     dataLeft        = fb->rCount - fb->rStart;	                        // see how many data we have buffered
@@ -120,15 +120,15 @@ DWORD fread_small(WORD ceHandle, DWORD countNeeded, BYTE *buffer)
 }
 
 // for big freads use buffered data, then do big data transfer (multiple sectors at once), then finish with buffered data
-DWORD fread_big(WORD ceHandle, DWORD countNeeded, BYTE *buffer)
+uint32_t fread_big(uint16_t ceHandle, uint32_t countNeeded, uint8_t *buffer)
 {
 	TFileBuffer *fb	    = &fileBufs[ceHandle];					        // to shorten the following operations use this pointer
-	WORD dataLeft	    = fb->rCount - fb->rStart;
+	uint16_t dataLeft	    = fb->rCount - fb->rStart;
 
-    DWORD countDone     = 0;
-    DWORD dwBuffer      = (DWORD) buffer;
-    BYTE bufferIsOdd	= dwBuffer	& 1;
-	BYTE dataLeftIsOdd;
+    uint32_t countDone     = 0;
+    uint32_t dwBuffer      = (uint32_t) buffer;
+    uint8_t bufferIsOdd	= dwBuffer	& 1;
+	uint8_t dataLeftIsOdd;
     char seekOffset     = 0;
 
     // First phase of BIG fread:
@@ -184,16 +184,16 @@ DWORD fread_big(WORD ceHandle, DWORD countNeeded, BYTE *buffer)
     }
 
     // Second phase of BIG fread: transfer data by blocks of size 512 bytes, buffer must be EVEN
-    BYTE  toFastRam = (((DWORD)buffer) >= 0x1000000) ? TRUE : FALSE;          // flag: are we reading to FAST RAM?
-    DWORD blockSize = toFastRam ? FASTRAM_BUFFER_SIZE : (MAXSECTORS * 512); // size of block, which we will read
+    uint8_t  toFastRam = (((uint32_t)buffer) >= 0x1000000) ? TRUE : FALSE;          // flag: are we reading to FAST RAM?
+    uint32_t blockSize = toFastRam ? FASTRAM_BUFFER_SIZE : (MAXSECTORS * 512); // size of block, which we will read
 
-    DWORD res;
+    uint32_t res;
 	while(countNeeded >= 512) {											// while we're not at the ending sector
         // To avoid corruption of data beyond the border of buffer, read LESS than what's needed - rounded to nearest lower sector count
-        DWORD countNeededRoundedDown = countNeeded & 0xfffffe00;        // round to multiple of 512 (sector size)
+        uint32_t countNeededRoundedDown = countNeeded & 0xfffffe00;        // round to multiple of 512 (sector size)
 
         // If the needed count is bigger that what we can fit in maximum transfer size, limit it to that maximum; otherwise just use it.
-        DWORD thisReadSizeBytes = (countNeededRoundedDown < blockSize) ? countNeededRoundedDown : blockSize;
+        uint32_t thisReadSizeBytes = (countNeededRoundedDown < blockSize) ? countNeededRoundedDown : blockSize;
 
         if(toFastRam) {     // if reading to FAST RAM, first read to fastRamBuffer, and then copy to the correct buffer
             res = readData(ceHandle, FastRAMBuffer, thisReadSizeBytes, seekOffset);
@@ -219,7 +219,7 @@ DWORD fread_big(WORD ceHandle, DWORD countNeeded, BYTE *buffer)
 	if(countNeeded != 0) {
 		fillReadBuffer(ceHandle);
 
-		DWORD rest = (countNeeded <= fb->rCount) ? countNeeded : fb->rCount;    // see if we have enough data to read the rest, and use which is lower - either what we want to read, or what we can read
+		uint32_t rest = (countNeeded <= fb->rCount) ? countNeeded : fb->rCount;    // see if we have enough data to read the rest, and use which is lower - either what we want to read, or what we can read
 
 		memcpy(buffer, &fb->rBuf[ fb->rStart ], rest);				    // copy the data that we have
 		fb->rStart	+= rest;										    // and move the pointer further in buffer
@@ -233,21 +233,21 @@ DWORD fread_big(WORD ceHandle, DWORD countNeeded, BYTE *buffer)
 
 int32_t custom_fwrite( void *sp )
 {
-	DWORD res = 0;
-	BYTE *params = (BYTE *) sp;
+	uint32_t res = 0;
+	uint8_t *params = (uint8_t *) sp;
 
-	WORD atariHandle	= (WORD)	*((WORD *) params);
+	uint16_t atariHandle	= (uint16_t)	*((uint16_t *) params);
 	params += 2;
-	DWORD count			= (DWORD)	*((DWORD *) params);
+	uint32_t count			= (uint32_t)	*((uint32_t *) params);
 	params += 4;
-	BYTE *buffer		= (BYTE *)	*((DWORD *) params);
+	uint8_t *buffer		= (uint8_t *)	*((uint32_t *) params);
 
 	// check if this handle should belong to cosmosEx
 	if(!handleIsFromCE(atariHandle)) {									// not called with handle belonging to CosmosEx?
 		CALL_OLD_GD(Fwrite, atariHandle, count, buffer);
 	}
 
-	WORD ceHandle = handleAtariToCE(atariHandle);						// convert high atari handle to little CE handle
+	uint16_t ceHandle = handleAtariToCE(atariHandle);						// convert high atari handle to little CE handle
 
 	if(!fileBufs[ceHandle].isOpen) {                                    // file not open? fail - INVALID HANDLE
         return extendByteToDword(EIHNDL);
@@ -256,7 +256,7 @@ int32_t custom_fwrite( void *sp )
     fileBufs[ceHandle].bytesToEOFinvalid = 1;                           // mark that after this write the bytes to EOF will be invalid
 
 	TFileBuffer *fb = &fileBufs[ceHandle];								// to shorten the following operations use this pointer
-	WORD spaceLeft = (RW_BUFFER_SIZE - fb->wCount);						// how much space we have in the buffer left?
+	uint16_t spaceLeft = (RW_BUFFER_SIZE - fb->wCount);						// how much space we have in the buffer left?
 
 	if(count <= RW_BUFFER_SIZE) {										// if writing less than size of our buffer
 		if(count <= spaceLeft) {										// the whole new data would fit in our buffer
@@ -265,8 +265,8 @@ int32_t custom_fwrite( void *sp )
 			fb->currentPos += count;
 			return count;
 		} else {														// the new data won't fit in the current (not empty) buffer
-			WORD firstPart	= spaceLeft;								// store to buffer what we could store to make it full
-			WORD rest		= count - firstPart;						// and calculate what will then stay after write in buffer as rest
+			uint16_t firstPart	= spaceLeft;								// store to buffer what we could store to make it full
+			uint16_t rest		= count - firstPart;						// and calculate what will then stay after write in buffer as rest
 
 			memcpy(&fb->wBuf[ fb->wCount ], buffer, firstPart);			// copy the 1st part to buffer, update data counter
 			fb->wCount += firstPart;
@@ -280,13 +280,13 @@ int32_t custom_fwrite( void *sp )
 			return count;
 		}
 	} else {															// if writing more than size of our buffer
-		DWORD dwBuffer = (DWORD) buffer;
+		uint32_t dwBuffer = (uint32_t) buffer;
 
-		BYTE  bufferIsOdd		= dwBuffer	& 1;
-		BYTE  spaceLeftIsOdd	= spaceLeft	& 1;
+		uint8_t  bufferIsOdd		= dwBuffer	& 1;
+		uint8_t  spaceLeftIsOdd	= spaceLeft	& 1;
 
-		DWORD bytesWritten = 0;
-        DWORD remCount = 0;
+		uint32_t bytesWritten = 0;
+        uint32_t remCount = 0;
 
 		// the code inside is needed only when: buffer contains some data || address is ODD! Otherwise should skip this.
 		if(fb->wCount != 0 || bufferIsOdd) {
@@ -336,12 +336,12 @@ int32_t custom_fwrite( void *sp )
 			return count;
 		} else {														// if the remaining data count is more that we can buffer
 			// transfer the remaining data in a loop
-            BYTE  toFastRam = (((int)buffer) >= 0x1000000) ? TRUE : FALSE;          // flag: are we reading to FAST RAM?
-            DWORD blockSize = toFastRam ? FASTRAM_BUFFER_SIZE : (MAXSECTORS * 512); // size of block, which we will read
+            uint8_t  toFastRam = (((int)buffer) >= 0x1000000) ? TRUE : FALSE;          // flag: are we reading to FAST RAM?
+            uint32_t blockSize = toFastRam ? FASTRAM_BUFFER_SIZE : (MAXSECTORS * 512); // size of block, which we will read
 
 			while(remCount > 0) {										// while there's something to send
 				// calculate how much data we should transfer in this loop - with respect to MAX SECTORS we can transfer at once
-                DWORD thisWriteSizeBytes = (remCount < blockSize) ? remCount : blockSize; // will the needed write size within the blockSize, or not?
+                uint32_t thisWriteSizeBytes = (remCount < blockSize) ? remCount : blockSize; // will the needed write size within the blockSize, or not?
 
                 if(toFastRam) {     // if writing from FAST RAM, first cop to fastRamBuffer, and then write using DMA
                     memcpy(FastRAMBuffer, buffer, thisWriteSizeBytes);
@@ -369,13 +369,13 @@ int32_t custom_fwrite( void *sp )
 	return EINTRN;
 }
 
-// BEWARE! BYTE *bfr must point to ST RAM, because DMA chip can't transfer data from/to FAST RAM!
-DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt)
+// BEWARE! uint8_t *bfr must point to ST RAM, because DMA chip can't transfer data from/to FAST RAM!
+uint32_t writeData(uint8_t ceHandle, uint8_t *bfr, uint32_t cnt)
 {
 	commandLong[5] = GEMDOS_Fwrite;										// store GEMDOS function number
 	commandLong[6] = ceHandle;											// store file handle
 
-    WORD sectorCount = (cnt + 511) >> 9;								// calculate how many sectors should we transfer
+    uint16_t sectorCount = (cnt + 511) >> 9;								// calculate how many sectors should we transfer
 
     commandLong[7] = cnt >> 16;											// store byte count
     commandLong[8] = cnt >>  8;
@@ -407,14 +407,14 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt)
         return 0;
     }
 
-    DWORD count = getDword(pDmaBuffer);						// read how much data was written
+    uint32_t count = getDword(pDmaBuffer);						// read how much data was written
 	return count;
 }
 
 // call this to fill the read buffer. Note that this destroys all the current data in buffer.
-BYTE fillReadBuffer(WORD ceHandle)
+uint8_t fillReadBuffer(uint16_t ceHandle)
 {
-	DWORD res;
+	uint32_t res;
 
 	if(ceHandle >= MAX_FILES) {											// would be out of index? quit - with error
 		return FALSE;
@@ -429,16 +429,16 @@ BYTE fillReadBuffer(WORD ceHandle)
 	return TRUE;
 }
 
-// BEWARE! BYTE *bfr must point to ST RAM, because DMA chip can't transfer data to FAST RAM!
-DWORD readData(WORD ceHandle, BYTE *bfr, DWORD cnt, BYTE seekOffset)
+// BEWARE! uint8_t *bfr must point to ST RAM, because DMA chip can't transfer data to FAST RAM!
+uint32_t readData(uint16_t ceHandle, uint8_t *bfr, uint32_t cnt, uint8_t seekOffset)
 {
 	commandLong[5] = GEMDOS_Fread;										// store GEMDOS function number
 	commandLong[6] = ceHandle;											// store file handle
 
 	commandLong[10] = seekOffset;										// seek offset before read
 
-	WORD sectorCount = (cnt + 511) >> 9;								// calculate how many sectors should we transfer
-	DWORD count=0;
+	uint16_t sectorCount = (cnt + 511) >> 9;								// calculate how many sectors should we transfer
+	uint32_t count=0;
 
     commandLong[7] = cnt >> 16;											// store byte count
     commandLong[8] = cnt >>  8;
@@ -475,9 +475,9 @@ DWORD readData(WORD ceHandle, BYTE *bfr, DWORD cnt, BYTE seekOffset)
 }
 
 // call this function on fclose, fseek to write the rest of write buffer to the file
-BYTE commitChanges(WORD ceHandle)
+uint8_t commitChanges(uint16_t ceHandle)
 {
-	DWORD res;
+	uint32_t res;
 
 	if(ceHandle >= MAX_FILES) {											// would be out of index? quit - with error
 		return FALSE;
@@ -501,7 +501,7 @@ BYTE commitChanges(WORD ceHandle)
 }
 
 // call this on start to init all, or on fclose / fopen / fcreate to init it
-void initFileBuffer(WORD ceHandle)
+void initFileBuffer(uint16_t ceHandle)
 {
 	if(ceHandle >= MAX_FILES) {											// would be out of index? quit
 		return;
@@ -516,7 +516,7 @@ void initFileBuffer(WORD ceHandle)
 	fileBufs[ceHandle].wCount               = 0;
 }
 
-void getBytesToEof(WORD ceHandle)
+void getBytesToEof(uint16_t ceHandle)
 {
 	commandShort[4] = GD_CUSTOM_getBytesToEOF;                                  // store function number
 	commandShort[5] = ceHandle;

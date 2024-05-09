@@ -9,33 +9,50 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "stdlib.h"
-#include "acsi.h"
-#include "hdd_if.h"
+#include "../libacsiscsi/stdlib.h"
+#include "../libacsiscsi/acsi.h"
+#include "../libacsiscsi/hdd_if.h"
+#include "../libacsiscsi/find_ce.h"
+#include "../libacsiscsi/global.h"
 #include "keys.h"
-#include "global.h"
-#include "find_ce.h"
 #include "vt52.h"
 
 //--------------------------------------------------
-void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
+#define HOSTMOD_CONFIG				1
+#define HOSTMOD_LINUX_TERMINAL		2
+#define HOSTMOD_TRANSLATED_DISK		3
+#define HOSTMOD_NETWORK_ADAPTER		4
+
+#define CFG_CMD_IDENTIFY			0
+#define CFG_CMD_KEYDOWN				1
+#define CFG_CMD_SET_RESOLUTION      2
+#define CFG_CMD_UPDATING_QUERY      3
+#define CFG_CMD_REFRESH             0xfe
+#define CFG_CMD_GO_HOME				0xff
+
+// two values of a last byte of LINUXCONSOLE stream - more data, or no more data
+#define LINUXCONSOLE_NO_MORE_DATA   0x00
+#define LINUXCONSOLE_GET_MORE_DATA  0xda
+
+#define CFG_CMD_GET_APP_NAMES       20
+#define CFG_CMD_SET_APP_INDEX       21
+//--------------------------------------------------
 
 void showHomeScreen(void);
-void sendKeyDown(BYTE key, BYTE keyDownCommand);
+void sendKeyDown(uint8_t key, uint8_t keyDownCommand);
 void refreshScreen(void);
-BYTE setResolution(void);
+uint8_t setResolution(void);
 void showConnectionErrorMessage(void);
 void showMoreStreamIfNeeded(void);
 int getAndShowAvailableApps(void);
 void connectToAppIndex(uint8_t newAppIndex);
 
-BYTE atariKeysToSingleByte(BYTE vkey, BYTE key, int, int);
-BYTE ce_identify(BYTE ACSI_id);
+uint8_t atariKeysToSingleByte(uint8_t vkey, uint8_t key, int, int);
 
-BYTE retrieveIsUpdating    (void);
+uint8_t retrieveIsUpdating(void);
 void retrieveIsUpdateScreen(char *stream);
-BYTE isUpdateScreen;
-BYTE ceIsUpdating;
+uint8_t isUpdateScreen;
+uint8_t ceIsUpdating;
 
 #define UPDATECOMPONENT_APP     0x01
 #define UPDATECOMPONENT_XILINX  0x02
@@ -43,31 +60,31 @@ BYTE ceIsUpdating;
 #define UPDATECOMPONENT_FRANZ   0x08
 #define UPDATECOMPONENT_ALL     0x0f
 
-BYTE updateComponents;
+uint8_t updateComponents;
 
-BYTE getKeyIfPossible(void);
+uint8_t getKeyIfPossible(void);
 void showFakeProgress(void);
 
 void cosmoSoloConfig(void);
 //--------------------------------------------------
-BYTE deviceID;                          // bus ID from 0 to 7
-BYTE cosmosExNotCosmoSolo;              // 0 means CosmoSolo, 1 means CosmosEx
+uint8_t deviceID;                          // bus ID from 0 to 7
+uint8_t cosmosExNotCosmoSolo;              // 0 means CosmoSolo, 1 means CosmosEx
 //--------------------------------------------------
 
 #define BUFFER_SECTORS      6
 #define BUFFER_SIZE         (BUFFER_SECTORS * 512 + 4)
-BYTE myBuffer[BUFFER_SIZE];
-BYTE *pBuffer;
+uint8_t myBuffer[BUFFER_SIZE];
+uint8_t *pBuffer;
 
-BYTE prevCommandFailed;
+uint8_t prevCommandFailed;
 
 //--------------------------------------------------
 int main(void)
 {
-    BYTE key, res;
-    DWORD toEven;
-    BYTE keyDownCommand = CFG_CMD_KEYDOWN;
-    DWORD lastUpdateCheckTime = 0;
+    uint8_t key, res;
+    uint32_t toEven;
+    uint8_t keyDownCommand = CFG_CMD_KEYDOWN;
+    uint32_t lastUpdateCheckTime = 0;
 
     ceIsUpdating        = FALSE;
     isUpdateScreen      = FALSE;
@@ -77,24 +94,27 @@ int main(void)
     
     // ---------------------- 
     // create buffer pointer to even address 
-    toEven = (DWORD) &myBuffer[0];
+    toEven = (uint32_t) &myBuffer[0];
   
     if(toEven & 0x0001)         // not even number? 
         toEven++;
   
-    pBuffer = (BYTE *) toEven; 
+    pBuffer = (uint8_t *) toEven; 
     
     // ---------------------- 
     // search for device on the ACSI / SCSI bus 
     deviceID = 0;
 
     Clear_home();
-    res = Supexec(findDevice);
+    res = findDevice(FIND_DEV_CE | FIND_DEV_CS);
 
-    if(res != TRUE) {
+    if(res == DEVICE_NOT_FOUND) {
         return 0;
     }
-    
+
+    deviceID = res & 0x07;                                  // store the BUS ID of device
+    cosmosExNotCosmoSolo = (res & 0x80) ? FALSE : TRUE;     // store device type - CS has highest bit set, CE has it clear
+
     //------------------
     // if the device is CosmoSolo, go this way
     if(cosmosExNotCosmoSolo == FALSE) {
@@ -113,11 +133,11 @@ int main(void)
     setResolution();                                                // send the current ST resolution for screen centering 
     showHomeScreen();                                               // get the home screen 
     
-    DWORD lastShowStreamTime = getTicksAsUser();                    // when was the last time when we got some config stream?
+    uint32_t lastShowStreamTime = getTicksAsUser();                    // when was the last time when we got some config stream?
     
     while(1) {
         if(isUpdateScreen) {
-            DWORD now = getTicksAsUser();
+            uint32_t now = getTicksAsUser();
             
             if(now >= (lastUpdateCheckTime + 200)) {                // if last check was at least a second ago, do new check
                 lastUpdateCheckTime = now;
@@ -133,8 +153,8 @@ int main(void)
         key = getKeyIfPossible();                                   // see if there's something waiting from keyboard 
 
         if(key == 0) {                                              // nothing waiting from keyboard? 
-            DWORD now   = getTicksAsUser();
-            DWORD diff  = now - lastShowStreamTime;
+            uint32_t now   = getTicksAsUser();
+            uint32_t diff  = now - lastShowStreamTime;
             
             if(diff > 25) {                  // last time the stream was 25/200 of a second ago? do refresh...
                 lastShowStreamTime = now;                           // we just shown the stream, no need for refresh
@@ -165,7 +185,7 @@ int main(void)
 void connectToAppIndex(uint8_t newAppIndex)
 {
     // send command to CE to tell it which app (with newAppIndex) we want to use
-    BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_SET_APP_INDEX, 0};
+    uint8_t cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_SET_APP_INDEX, 0};
     cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)
     cmd[5] = newAppIndex;
     memset(pBuffer, 0, 512);                        // clear the buffer
@@ -181,7 +201,7 @@ void connectToAppIndex(uint8_t newAppIndex)
 int getAndShowAvailableApps(void)
 {
     // send command to CE, fetch list of apps
-    BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_GET_APP_NAMES, 0};
+    uint8_t cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_GET_APP_NAMES, 0};
     cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)
     memset(pBuffer, 0, 512);                        // clear the buffer
 
@@ -208,7 +228,7 @@ int getAndShowAvailableApps(void)
 
     // wait for a valid key
     while(1) {
-        BYTE key = getKeyIfPossible();
+        uint8_t key = getKeyIfPossible();
 
         if(key >= KEY_F1 && key <= KEY_F9) {                // valid Fx key pressed
             int index = key - KEY_F1;                       // transform key to value 0-8
@@ -229,9 +249,9 @@ int getAndShowAvailableApps(void)
     return TRUE;
 }
 //--------------------------------------------------
-void sendKeyDown(BYTE key, BYTE keyDownCommand)
+void sendKeyDown(uint8_t key, uint8_t keyDownCommand)
 {
-    BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, keyDownCommand, 0};
+    uint8_t cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, keyDownCommand, 0};
 
     cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)   
     cmd[5] = key;                                   // store the pressed key to cmd[5] 
@@ -258,7 +278,7 @@ void sendKeyDown(BYTE key, BYTE keyDownCommand)
 //--------------------------------------------------
 void showHomeScreen(void)
 {
-    BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_GO_HOME, 0};
+    uint8_t cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_GO_HOME, 0};
     
     cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)   
     memset(pBuffer, 0, 512);                        // clear the buffer 
@@ -281,16 +301,16 @@ void showHomeScreen(void)
     (void) Cconws((char *) pBuffer);                // now display the buffer
 }
 
-BYTE showHomeScreenSimple(void)
+uint8_t showHomeScreenSimple(void)
 {
-    BYTE res = setResolution();                     // first try to set the new resolution
+    uint8_t res = setResolution();                     // first try to set the new resolution
     
     if(res == FALSE) {                              // failed to set resolution? fail
         return FALSE;
     }
 
     // if we got here, the previous command passed and this should work also
-    BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_GO_HOME, 0};
+    uint8_t cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_GO_HOME, 0};
     
     cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)   
     memset(pBuffer, 0, 512);                        // clear the buffer 
@@ -309,7 +329,7 @@ BYTE showHomeScreenSimple(void)
 //--------------------------------------------------
 void refreshScreen(void)                            
 {
-    BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_REFRESH, 0};
+    uint8_t cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_REFRESH, 0};
     
     cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)   
     memset(pBuffer, 0, 512);                        // clear the buffer 
@@ -325,9 +345,9 @@ void refreshScreen(void)
     (void) Cconws((char *) pBuffer);                // now display the buffer
 }
 //--------------------------------------------------
-BYTE setResolution(void)                            
+uint8_t setResolution(void)                            
 {
-    BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_SET_RESOLUTION, 0};
+    uint8_t cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_SET_RESOLUTION, 0};
     
     cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)   
     cmd[5] = Getrez();
@@ -349,9 +369,9 @@ void showConnectionErrorMessage(void)
     prevCommandFailed = 1;
 }
 //--------------------------------------------------
-BYTE atariKeysToSingleByte(BYTE vkey, BYTE key, int shift, int ctrl)
+uint8_t atariKeysToSingleByte(uint8_t vkey, uint8_t key, int shift, int ctrl)
 {
-    WORD vkeyKey;
+    uint16_t vkeyKey;
 
     if(key >= 32 && key < 127) {        // printable ASCII key? just return it 
         return key;
@@ -381,7 +401,7 @@ BYTE atariKeysToSingleByte(BYTE vkey, BYTE key, int shift, int ctrl)
         }
     }
     
-    vkeyKey = (((WORD) vkey) << 8) | ((WORD) key);      // create a WORD with vkey and key together 
+    vkeyKey = (((uint16_t) vkey) << 8) | ((uint16_t) key);      // create a uint16_t with vkey and key together 
     
     switch(vkeyKey) {                   // some other no-ASCII key, but check with vkey too 
         case 0x011b: return KEY_ESC;
@@ -395,12 +415,12 @@ BYTE atariKeysToSingleByte(BYTE vkey, BYTE key, int shift, int ctrl)
     return 0;                           // unknown key 
 }
 //--------------------------------------------------
-BYTE processUpdateComponentsFlags(BYTE inByteWithFlags)
+uint8_t processUpdateComponentsFlags(uint8_t inByteWithFlags)
 {
-    BYTE components     =  inByteWithFlags;     // get where the update components should be stored
-    BYTE validitySign   = (components & 0xf0);  // get upper nibble
+    uint8_t components     =  inByteWithFlags;     // get where the update components should be stored
+    uint8_t validitySign   = (components & 0xf0);  // get upper nibble
     
-    BYTE upComponents   = 0;
+    uint8_t upComponents   = 0;
     
     if(validitySign == 0xc0) {                  // if upper nible is 'C', then this valid update components thing
         upComponents = components & 0x0f;       // get only the bottom part of components byte
@@ -415,12 +435,12 @@ BYTE processUpdateComponentsFlags(BYTE inByteWithFlags)
     return upComponents;
 }
 //--------------------------------------------------
-BYTE retrieveIsUpdating(void)
+uint8_t retrieveIsUpdating(void)
 {
     ceIsUpdating = FALSE;                           // not updating yet
     
     // if we got here, the previous command passed and this should work also
-    BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_UPDATING_QUERY, 0};
+    uint8_t cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_UPDATING_QUERY, 0};
     
     cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)   
     memset(pBuffer, 0, 512);                        // clear the buffer 
@@ -438,7 +458,7 @@ BYTE retrieveIsUpdating(void)
 //--------------------------------------------------
 void retrieveIsUpdateScreen(char *stream)
 {
-    WORD i;
+    uint16_t i;
     
     for(i=0; i<BUFFER_SIZE; i++) {
         if(stream[i] == 0) {            // end of stream? good
@@ -467,11 +487,11 @@ void cosmoSoloConfig(void)
     (void) Cconws("\n\rPlease enter new device ID (0 - 7)\n\ror any other key to quit.");
     (void) Cconws("\n\rEnter new device ID : ");
     
-    BYTE key = Cnecin();
+    uint8_t key = Cnecin();
     
     if(key >= '0' && key <= '7') {
-        BYTE newId = key - '0';
-        BYTE cmd[] = {0, 'C', 'S', deviceID, newId, 0};
+        uint8_t newId = key - '0';
+        uint8_t cmd[] = {0, 'C', 'S', deviceID, newId, 0};
         
         cmd[0] = (deviceID << 5);                           // cmd[0] = ACSI_id + TEST UNIT READY (0)   
   
@@ -489,22 +509,6 @@ void cosmoSoloConfig(void)
     sleep(3);
 }
 //--------------------------------------------------
-void logMsg(char *logMsg)
-{
-//    if(showLogs) {
-//        (void) Cconws(logMsg);
-//    }
-}
-//--------------------------------------------------
-void logMsgProgress(DWORD current, DWORD total)
-{
-//    (void) Cconws("Progress: ");
-//    showHexDword(current);
-//    (void) Cconws(" out of ");
-//    showHexDword(total);
-//    (void) Cconws("\n\r");
-}
-//--------------------------------------------------
 void showFakeProgressOfItem(const char *title, int timeout)
 {
     (void) Cconws(title);               // show what we are updating
@@ -515,7 +519,7 @@ void showFakeProgressOfItem(const char *title, int timeout)
         (void) Cconws(" s");            // show time unit
 
         if(i >= 10 && (i % 5) == 0) {   // every 5 seconds, check if device is alive
-            BYTE res = setResolution(); // issue a simple command
+            uint8_t res = setResolution(); // issue a simple command
     
             if(res) {                   // if succeeded, we quit fake progress
                 break;
@@ -553,13 +557,13 @@ void showFakeProgress(void)
 
     int i;
     for(i=0; i<15; i++) {
-        BYTE res = showHomeScreenSimple();                  // try to reconnect and show home screen
+        uint8_t res = showHomeScreenSimple();                  // try to reconnect and show home screen
         
         if(res == TRUE) {                                   // if reconnect succeeded, quit
             break;
         }
         
-        BYTE key = getKeyIfPossible();
+        uint8_t key = getKeyIfPossible();
         
         if(key == KEY_F10 || key == 'q' || key == 'Q') {    // user requested quit by key press? quit
             break;
@@ -572,10 +576,10 @@ void showFakeProgress(void)
     hdIf.maxRetriesCount = 1;                               // enable retry, but just once
 }
 
-BYTE getKeyIfPossible(void)
+uint8_t getKeyIfPossible(void)
 {
-    DWORD scancode, special;
-    BYTE key, vkey, res;
+    uint32_t scancode, special;
+    uint8_t key, vkey, res;
 
     res = Cconis();                             // see if there's something waiting from keyboard 
 
@@ -589,31 +593,6 @@ BYTE getKeyIfPossible(void)
     vkey    = (scancode>>16)    & 0xff;
     key     =  scancode         & 0xff;
 
-    key     = atariKeysToSingleByte(vkey, key, special & 0x03, special & 0x04); // transform BYTE pair into single BYTE
+    key     = atariKeysToSingleByte(vkey, key, special & 0x03, special & 0x04); // transform uint8_t pair into single uint8_t
     return key;
 }
-//--------------------------------------------------
-// global variables, later used for calling hdIfCmdAsSuper
-BYTE __readNotWrite, __cmdLength;
-WORD __sectorCount;
-BYTE *__cmd, *__buffer;
-
-void hdIfCmdAsSuper(void)
-{
-    // this should be called through Supexec()
-    (*hdIf.cmd)(__readNotWrite, __cmd, __cmdLength, __buffer, __sectorCount);
-}
-
-void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
-{
-    // store params to global vars
-    __readNotWrite  = readNotWrite;
-    __cmd           = cmd;
-    __cmdLength     = cmdLength;
-    __buffer        = buffer;
-    __sectorCount   = sectorCount;    
-    
-    // call the function which does the real work, and uses those global vars
-    Supexec(hdIfCmdAsSuper);
-}
-

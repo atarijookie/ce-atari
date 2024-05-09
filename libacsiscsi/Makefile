@@ -1,18 +1,22 @@
-TARGET	= ce_conf.tos
+TARGET  = libacsiscsi.a
+SLIM    = yes
 
 # control verbosity. use make V=1 to show commands
 V = 0
 
-AS		= m68k-atari-mint-as
-CC		= m68k-atari-mint-gcc
-STRIP	= m68k-atari-mint-strip
-PRGFLAGS= m68k-atari-mint-flags
+AR       = m68k-atari-mint-ar
+AS       = m68k-atari-mint-as
+CC       = m68k-atari-mint-gcc
+STRIP    = m68k-atari-mint-strip
+PRGFLAGS = m68k-atari-mint-flags
 ASFLAGS     = -m68000
 ASFLAGS030  = -m68030
-CFLAGS		= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
-CFLAGS030	= -O2 -m68030 -fomit-frame-pointer -Wall -Wno-multichar
-LDFLAGS	= -Wl,--traditional-format
-LDLIBS	= -lgcc -L../libacsiscsi -l:libacsiscsi.a
+CFLAGSCOM   = -fomit-frame-pointer -Wall -Wno-multichar
+CFLAGSCOM   += -fno-common
+CFLAGS      = -O2 -m68000 $(CFLAGSCOM)
+CFLAGS030   = -O2 -m68030 $(CFLAGSCOM)
+LDFLAGS  = -Wl,--traditional-format
+LDLIBS   = -lgcc
 DEPFLAGS = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
 
 ACTUAL_CC := $(CC)
@@ -31,26 +35,28 @@ AT_0 := @
 AT_1 :=
 AT = $(AT_$(V))
 
-HDR		= ../libacsiscsi/acsi.h ../libacsiscsi/scsi.h
-HDR		+= ../libacsiscsi/hdd_if.h ../libacsiscsi/find_ce.h keys.h ../libacsiscsi/stdlib.h
-CSRC	= main.c
+HDR      = acsi.h cookiejar.h find_ce.h global.h hdd_if.h mutex.h scsi.h stdlib.h translated.h
+CSRC     = acsi.c cookiejar.c find_ce.c hdd_if.c scsi_falcon.c scsi_tt.c stdlib.c
+SSRC     = cache030.s 
 
-CFLAGS	+= -nostdlib
-STARTUP	= startup.s
+CFLAGS    += -nostdlib -DSLIM
+CSRC      += stdlib.c
+HDR       += stdlib.h
 
-DEPS = $(CSRC:.c=.d)
-OBJS = $(patsubst %.c,%.o,$(CSRC))
-OBJS030	= ../libacsiscsi/cache030.o
+DEPS    = $(CSRC:.c=.d)
+OBJS    = $(CSRC:.c=.o) $(SSRC:.s=.o)
+OBJS030 = cache030.o
 
-$(TARGET): $(STARTUP) $(OBJS) $(OBJS030)
-	$(CC_LINK) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS)
-	$(AT)$(STRIP) -s $@
-	$(AT)$(PRGFLAGS) $@ --mno-fastram --mno-fastalloc --mno-fastload
+$(TARGET): $(OBJS) $(OBJS030)
+	$(AR) rcs $(TARGET) $(OBJS) $(OBJS030)
+#   $(AT)$(STRIP) -s $@
 
 %030.o: %030.s
 	$(AS) $(ASFLAGS030) -c -o $@ $<
 
-%.o:	%.c %.d
+depend:	$(DEPS)
+
+%.o: %.c %.d
 
 %.d:	%.c
 	$(CC) $(CFLAGS) $(DEPFLAGS) -o $@ $<

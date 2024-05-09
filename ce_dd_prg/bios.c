@@ -9,8 +9,8 @@
 #include <string.h>
 
 #include "ce_dd_prg.h"
-#include "acsi.h"
-#include "hdd_if.h"
+#include "../libacsiscsi/acsi.h"
+#include "../libacsiscsi/hdd_if.h"
 #include "translated.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"
@@ -19,14 +19,14 @@
 
 extern int16_t useOldBiosHandler;
 #ifdef MANUAL_PEXEC /* else it is defined in harddrive_lowlevel.s */
-WORD ceDrives;
+uint16_t ceDrives;
 #endif
 
 int32_t custom_mediach( void *sp )
 {
-    DWORD res;
+    uint32_t res;
 
-    WORD drive = (WORD) *((WORD *) sp);
+    uint16_t drive = (uint16_t) *((uint16_t *) sp);
 
     updateCeDrives();                                                   // update the drives - once per 3 seconds
 
@@ -46,7 +46,7 @@ int32_t custom_mediach( void *sp )
 
 int32_t custom_drvmap( void *sp )
 {
-    DWORD res;
+    uint32_t res;
 
     updateCeDrives();           // update the drives - once per 3 seconds
 
@@ -58,9 +58,9 @@ int32_t custom_drvmap( void *sp )
 
 int32_t custom_getbpb( void *sp )
 {
-    DWORD res;
-    WORD drive = (WORD) *((WORD *) sp);
-    static WORD bpb[20/2];    // declare as WORD to have it aligned to even address
+    uint32_t res;
+    uint16_t drive = (uint16_t) *((uint16_t *) sp);
+    static uint16_t bpb[20/2];    // declare as uint16_t to have it aligned to even address
 
     updateCeDrives();                                                   // update the drives - once per 3 seconds
 
@@ -69,11 +69,11 @@ int32_t custom_getbpb( void *sp )
         return res;
     }
 
-    WORD driveMaskInv = ~(1 << drive);
+    uint16_t driveMaskInv = ~(1 << drive);
     ceMediach = ceMediach & driveMaskInv;                               // this drive is no longer in MEDIA CHANGED state
 
     commandShort[4] = BIOS_Getbpb;                                      // store BIOS function number
-    commandShort[5] = (BYTE) drive;
+    commandShort[5] = (uint8_t) drive;
 
     (*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);  // send command to host over ACSI
 
@@ -85,7 +85,7 @@ int32_t custom_getbpb( void *sp )
     ceMediach = ceMediach & (~(1 << drive));                            // remove this bit media changes
 
     memcpy(bpb, pDmaBuffer, 18);                                       // copy in the results
-    return (DWORD) bpb;
+    return (uint32_t) bpb;
 }
 
 /*
@@ -95,8 +95,8 @@ it will quit then sooner without updating (hoping that nothing changed within 3 
 */
 void updateCeDrives(void)
 {
-    static DWORD lastCeDrivesUpdate = 0;
-    DWORD now = *HZ_200;
+    static uint32_t lastCeDrivesUpdate = 0;
+    uint32_t now = *HZ_200;
 
     if((now - lastCeDrivesUpdate) < 600) {                                  // if the last update was less than 3 seconds ago, don't update
         return;
@@ -119,8 +119,8 @@ void updateCeDrives(void)
 
 void updateCeMediach(void)
 {
-    static DWORD lastMediachUpdate = 0;
-    DWORD now = *HZ_200;
+    static uint32_t lastMediachUpdate = 0;
+    uint32_t now = *HZ_200;
 
     if((now - lastMediachUpdate) < 600) {                                   // if the last update was less than 3 seconds ago, don't update
         return;

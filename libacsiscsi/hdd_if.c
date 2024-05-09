@@ -9,25 +9,24 @@
 
 #include "acsi.h"
 #include "hdd_if.h"
-#include "translated.h"
 #include "stdlib.h"
 #include "mutex.h"
 
 THDif hdIf;
-extern volatile mutex mtx;
-void hddIfCmd_withRetries_worker(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount, BYTE lock);
+volatile mutex mtx;
+void hddIfCmd_withRetries_worker(uint8_t readNotWrite, uint8_t *cmd, uint8_t cmdLength, uint8_t *buffer, uint16_t sectorCount, uint8_t lock);
 
-void hddIfCmd_withRetries_lock(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
+void hddIfCmd_withRetries_lock(uint8_t readNotWrite, uint8_t *cmd, uint8_t cmdLength, uint8_t *buffer, uint16_t sectorCount)
 {
 	hddIfCmd_withRetries_worker(readNotWrite, cmd, cmdLength, buffer, sectorCount, 1);
 }
 
-void hddIfCmd_withRetries_nolock(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
+void hddIfCmd_withRetries_nolock(uint8_t readNotWrite, uint8_t *cmd, uint8_t cmdLength, uint8_t *buffer, uint16_t sectorCount)
 {
 	hddIfCmd_withRetries_worker(readNotWrite, cmd, cmdLength, buffer, sectorCount, 0);
 }
 
-void hddIfCmd_withRetries_worker(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount, BYTE lock)
+void hddIfCmd_withRetries_worker(uint8_t readNotWrite, uint8_t *cmd, uint8_t cmdLength, uint8_t *buffer, uint16_t sectorCount, uint8_t lock)
 {
 	if( lock ){
 		while( mtx!=0 ){}
@@ -38,7 +37,7 @@ void hddIfCmd_withRetries_worker(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, B
 
     //--------------
     // first check if it's not the HOST ID, and if it is, just quit - it will never work :)
-    BYTE scsiId = (cmd[0] >> 5);            // get only drive ID bits
+    uint8_t scsiId = (cmd[0] >> 5);            // get only drive ID bits
 
     if(scsiId == hdIf.scsiHostId) {         // Trying to access reserved SCSI ID? Fail... (skip)
         hdIf.success = FALSE;
@@ -68,7 +67,7 @@ void hddIfCmd_withRetries_worker(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, B
 
     //--------------
     // if we got here, the original / normal command failed, so it's time to do the retries...
-    BYTE retryCmd[32];
+    uint8_t retryCmd[32];
     memcpy(retryCmd, cmd, cmdLength);       // make copy of the original command
 
     if(cmdLength == 6) {                    // short command?
@@ -142,3 +141,29 @@ void hdd_if_select(int ifType)
             break;
 	}
 }
+
+//--------------------------------------------------
+// global variables, later used for calling hdIfCmdAsSuper
+uint8_t __readNotWrite, __cmdLength;
+uint16_t __sectorCount;
+uint8_t *__cmd, *__buffer;
+
+void hdIfCmdAsSuper(void)
+{
+    // this should be called through Supexec()
+    (*hdIf.cmd)(__readNotWrite, __cmd, __cmdLength, __buffer, __sectorCount);
+}
+
+void hdIfCmdAsUser(uint8_t readNotWrite, uint8_t *cmd, uint8_t cmdLength, uint8_t *buffer, uint16_t sectorCount)
+{
+    // store params to global vars
+    __readNotWrite  = readNotWrite;
+    __cmd           = cmd;
+    __cmdLength     = cmdLength;
+    __buffer        = buffer;
+    __sectorCount   = sectorCount;    
+    
+    // call the function which does the real work, and uses those global vars
+    Supexec(hdIfCmdAsSuper);
+}
+//--------------------------------------------------

@@ -5,21 +5,21 @@
 void delay(void);
 void stopDmaFalcon(void);
 
-extern WORD pioDataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount);
+extern uint16_t pioDataTransfer(uint8_t readNotWrite, uint8_t *bfr, uint32_t byteCount);
 
 void logMsg(char *logMsg);
 
-static void setDmaAddr_Falcon(DWORD addr);
+static void setDmaAddr_Falcon(uint32_t addr);
 
-void  scsi_setReg_Falcon(int whichReg, DWORD value);
-DWORD scsi_getReg_Falcon(int whichReg);
+void  scsi_setReg_Falcon(int whichReg, uint32_t value);
+uint32_t scsi_getReg_Falcon(int whichReg);
 
 void clearCache030(void);
 void delay(void);
 
-extern DWORD _cmdTimeOut;                           // timeout time for scsi_cmd() from start to end
+extern uint32_t _cmdTimeOut;                           // timeout time for scsi_cmd() from start to end
 
-BYTE w4int(void);
+uint8_t w4int(void);
 
 void stopDmaFalcon(void)
 {
@@ -30,16 +30,16 @@ void stopDmaFalcon(void)
     clearCache030();
 }
 
-void setDmaAddr_Falcon(DWORD addr)
+void setDmaAddr_Falcon(uint32_t addr)
 {
-    *falconDmaAddrLo    = (BYTE) (addr      );
-    *falconDmaAddrMid   = (BYTE) (addr >>  8);
-    *falconDmaAddrHi    = (BYTE) (addr >> 16);
+    *falconDmaAddrLo    = (uint8_t) (addr      );
+    *falconDmaAddrMid   = (uint8_t) (addr >>  8);
+    *falconDmaAddrHi    = (uint8_t) (addr >> 16);
 }
 
-void scsi_setReg_Falcon(int whichReg, DWORD value)
+void scsi_setReg_Falcon(int whichReg, uint32_t value)
 {
-    BYTE which = 0;
+    uint8_t which = 0;
 
     switch(whichReg) {
         case REG_DB :   which = SPCSD; break;   // for REG_DB  and REG_ODR
@@ -57,9 +57,9 @@ void scsi_setReg_Falcon(int whichReg, DWORD value)
     *WDC    = value;    // write reg value by writing to WDC
 }
 
-DWORD scsi_getReg_Falcon(int whichReg)
+uint32_t scsi_getReg_Falcon(int whichReg)
 {
-    BYTE which = 0;
+    uint8_t which = 0;
 
     switch(whichReg) {
         case REG_DB :   which = SPCSD; break;   // for REG_DB  and REG_ODR
@@ -73,20 +73,20 @@ DWORD scsi_getReg_Falcon(int whichReg)
         default     :   logMsg("getReg - default!!!\n\r");  return 0;     // fail, not found
     }
 
-    BYTE val;
+    uint8_t val;
     *WDL    = which;    // select reg by writing to WDL
     val     = *WDC;     // read reg value by reading from WDC
 
     return val;
 }
 
-BYTE dmaDataTx_prepare_Falcon(BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount)
+uint8_t dmaDataTx_prepare_Falcon(uint8_t readNotWrite, uint8_t *buffer, uint32_t dataByteCount)
 {
 
     return 0;
 }
 
-BYTE dmaDataTx_do_Falcon(BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount)
+uint8_t dmaDataTx_do_Falcon(uint8_t readNotWrite, uint8_t *buffer, uint32_t dataByteCount)
 {
     // Set up the DMA for data transfer
     (*hdIf.pSetReg)(REG_MR, MR_DMA);                // enable DMA mode
@@ -96,9 +96,9 @@ BYTE dmaDataTx_do_Falcon(BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount)
     }
 
     // set DMA pointer to buffer address
-    setDmaAddr_Falcon((DWORD) buffer);
+    setDmaAddr_Falcon((uint32_t) buffer);
 
-    WORD wdl1, wdl2;
+    uint16_t wdl1, wdl2;
     if(readNotWrite) {                              // on read
         wdl1 = 0x190;
         wdl2 = 0x090;
@@ -116,12 +116,12 @@ BYTE dmaDataTx_do_Falcon(BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount)
     *WDC = (dataByteCount >> 9);                    // write sector count (not byte count)
 
     while(1) {                                      // wait till it's safe to access the DMA channel
-        BYTE sr = *WDSR;
+        uint8_t sr = *WDSR;
         if((sr & (1 << 3)) == 0) {         // ??? NEMAM TOTO OPACNE ???
             break;
         }
 
-        DWORD now = *HZ_200;
+        uint32_t now = *HZ_200;
         if(now >= _cmdTimeOut) {                    // if time out, fail
             return -1;
         }
@@ -139,10 +139,10 @@ BYTE dmaDataTx_do_Falcon(BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount)
         *WDL = 0x100;               // DMA_WR, DMA enable
     }
 
-    DWORD now = *HZ_200;
-    DWORD ticksRemaining = _cmdTimeOut - now;   // get how many ticks are remaining after previous operations
+    uint32_t now = *HZ_200;
+    uint32_t ticksRemaining = _cmdTimeOut - now;   // get how many ticks are remaining after previous operations
 
-    BYTE res = wait_dma_cmpl(ticksRemaining);   // wait for DMA completetion
+    uint8_t res = wait_dma_cmpl(ticksRemaining);   // wait for DMA completetion
     if(res) {                                   // failed?
         stopDmaFalcon();
 

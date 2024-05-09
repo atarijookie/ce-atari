@@ -10,6 +10,6 @@ void updateCeMediach(void);
 
 #define CALL_OLD_BIOS( function, ... )	\
 		useOldBiosHandler = 1;			\
-		res = (DWORD) function( __VA_ARGS__ );
+		res = (uint32_t) function( __VA_ARGS__ );
 
 #endif

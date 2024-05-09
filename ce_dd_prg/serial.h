@@ -8,9 +8,9 @@
 
 void aux_sendChar  (char    c);
 void aux_sendString(char *str);
-void aux_hexNibble (BYTE  val);
-void aux_hexByte   (BYTE  val);
-void aux_hexWord   (WORD  val);
-void aux_hexDword  (DWORD val);
+void aux_hexNibble (uint8_t  val);
+void aux_hexByte   (uint8_t  val);
+void aux_hexWord   (uint16_t  val);
+void aux_hexDword  (uint32_t val);
 
 #endif

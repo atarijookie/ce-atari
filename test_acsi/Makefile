@@ -1,18 +1,19 @@
 TARGET	= ce_tsthd.tos
 
 # control verbosity. use make V=1 to show commands
-V = 0
+V = 1
 
-CC	= m68k-atari-mint-gcc
-AS	= m68k-atari-mint-as
-STRIP	= m68k-atari-mint-strip
-PRGFLAGS= m68k-atari-mint-flags 
-ASFLAGS = -m68000
+CC			= m68k-atari-mint-gcc
+AS			= m68k-atari-mint-as
+STRIP		= m68k-atari-mint-strip
+PRGFLAGS	= m68k-atari-mint-flags 
+ASFLAGS		= -m68000
+ASFLAGS030	= -m68030
 CFLAGS		= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
 CFLAGS030	= -O2 -m68030 -fomit-frame-pointer -Wall -Wno-multichar
-LDFLAGS	= -Wl,--traditional-format
-LDLIBS  = -lgcc
-DEPFLAGS = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
+LDFLAGS		= -Wl,--traditional-format
+LDLIBS		= -lgcc -L../libacsiscsi -l:libacsiscsi.a
+DEPFLAGS	= -MM -MT $(patsubst %.d,%.o,$@) -MT $@
 
 ACTUAL_CC := $(CC)
 CC_0 = @echo "[$(if $(findstring .d,$@),Building dependencies for,Compiling $(if $(findstring 030,$@),030,68k) code)] $<"; $(ACTUAL_CC)
@@ -30,14 +31,14 @@ AT_0 := @
 AT_1 :=
 AT = $(AT_$(V))
 
-HDR	= $(wildcard *.h)
+HDR		= $(wildcard *.h)
 CSRC	= $(wildcard *.c) 
 SSRC	= cookie.s 
 STARTUP	= startup.s
 
 DEPS    = $(CSRC:.c=.d)
 OBJS    = $(CSRC:.c=.o) $(SSRC:.s=.o)
-OBJS030	= cache030.o
+OBJS030	= ../libacsiscsi/cache030.o
 
 CFLAGS	+= -nostdlib -DSLIM 
 

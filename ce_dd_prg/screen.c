@@ -1,17 +1,18 @@
 // vim: expandtab shiftwidth=4 tabstop=4
 #include <mint/osbind.h>
-#include "hdd_if.h"
+#include "../libacsiscsi/hdd_if.h"
+#include "../libacsiscsi/mutex.h"
+#include "../libacsiscsi/stdlib.h"
 #include "stdlib.h"
 #include "translated.h"
 
 #include "ce_dd_prg.h"
 #include "main.h"
 #include "screen.h"
-#include "mutex.h"
 
 extern volatile ScreenShots screenShots;    // screenshots config
 
-void writeScreen(BYTE command, BYTE screenmode, BYTE *bfr, DWORD cnt);
+void writeScreen(uint8_t command, uint8_t screenmode, uint8_t *bfr, uint32_t cnt);
 
 extern volatile mutex mtx;
 
@@ -59,11 +60,11 @@ void screenworker(void)
 void sendScreenShot(void)
 {
     #define ST_PALETTE_SIZE     (16 * 2)
-    static WORD prevPal[ST_PALETTE_SIZE/2] = { 0 };   // previous palette which was sent
-    WORD *pxPal      =    (WORD*)0xffff8240;
-    /*BYTE *pxScreen   =   (BYTE *) (*((DWORD*) 0x44e));*/
-    BYTE *pxScreen   = (BYTE *)(((DWORD)*((BYTE*)0xffff8203) << 8) | ((DWORD)*((BYTE*)0xffff8201) << 16));
-    BYTE  screenMode = (*((BYTE*)0xffff8260)) & 3;
+    static uint16_t prevPal[ST_PALETTE_SIZE/2] = { 0 };   // previous palette which was sent
+    uint16_t *pxPal      =    (uint16_t*)0xffff8240;
+    /*uint8_t *pxScreen   =   (uint8_t *) (*((uint32_t*) 0x44e));*/
+    uint8_t *pxScreen   = (uint8_t *)(((uint32_t)*((uint8_t*)0xffff8203) << 8) | ((uint32_t)*((uint8_t*)0xffff8201) << 16));
+    uint8_t  screenMode = (*((uint8_t*)0xffff8260)) & 3;
 
     //---------------------------
     // send 16 ST palette entries
@@ -80,7 +81,7 @@ void sendScreenShot(void)
     writeScreen(TRAN_CMD_SENDSCREENCAST, screenMode, pxScreen, 32000);
 }
 
-void writeScreen(BYTE command, BYTE screenmode, BYTE *bfr, DWORD cnt)
+void writeScreen(uint8_t command, uint8_t screenmode, uint8_t *bfr, uint32_t cnt)
 {
     commandLong[5] = command;
     commandLong[6] = screenmode;         // screenmode
@@ -89,7 +90,7 @@ void writeScreen(BYTE command, BYTE screenmode, BYTE *bfr, DWORD cnt)
     commandLong[8] = cnt >>  8;
     commandLong[9] = cnt  & 0xff;
 
-    WORD sectorCount = (cnt + 511) >> 9; // calculate how many sectors should we transfer
+    uint16_t sectorCount = (cnt + 511) >> 9; // calculate how many sectors should we transfer
 
     (*hdIf.cmd_nolock)(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, bfr, sectorCount);    // send command to host over ACSI
 }
