@@ -18,9 +18,10 @@
 
 //---------------------
 // ACSI / CosmosEx stuff
-#include "acsi.h"
+#include "../libacsiscsi/acsi.h"
+#include "../libacsiscsi/stdlib.h"
 #include "ce_commands.h"
-#include "stdlib.h"
+#include "stdlib2.h"
 
 //---------------------
 
@@ -42,9 +43,9 @@ int16 TCP_wait_state(int16 handle, int16 wantedState, int16 timeout)
     }
     int slot = network_handleToSlot(handle);
 
-    DWORD timeStart = getTicks();
-    DWORD timeout2 = timeout * 200;
-    DWORD nextConUpdate = getTicks() + 100;
+    uint32_t timeStart = getTicks();
+    uint32_t timeout2 = timeout * 200;
+    uint32_t nextConUpdate = getTicks() + 100;
 
     while(1) {
         // the connection info should be updated in VBL using update_con_info()
@@ -53,7 +54,7 @@ int16 TCP_wait_state(int16 handle, int16 wantedState, int16 timeout)
             nextConUpdate = getTicks() + 100;
         }
 
-        WORD currentState = conInfo[slot].tcpConnectionState;       // get the current state
+        uint16_t currentState = conInfo[slot].tcpConnectionState;       // get the current state
 
         // if the wanted state is CLOSED or CLOSING, and the current state is similar - success
         if(wantedState == TCLOSED || wantedState == TFIN_WAIT1 ||  wantedState == TFIN_WAIT2 ||  wantedState == TCLOSE_WAIT ||  wantedState == TCLOSING ||  wantedState == TLAST_ACK ||  wantedState == TTIME_WAIT) {
@@ -107,7 +108,7 @@ int16 TCP_info(int16 handle, TCPIB *tcp_info)
         return E_BADHANDLE;
     }
 
-    storeWord((BYTE *) tcp_info, conInfo[slot].tcpConnectionState); // return the connection state
+    storeWord((uint8_t *) tcp_info, conInfo[slot].tcpConnectionState); // return the connection state
     return E_NORMAL;
 }
 

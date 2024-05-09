@@ -13,9 +13,10 @@
 #include <stdio.h>
 
 #include "globdefs.h"
+#include "global.h"
+#include "stdlib2.h"
 #include "icmp.h"
 #include "con_man.h"
-#include "hdd_if.h"
 #include "vbl.h"
 
 #define  M_YEAR    16
@@ -37,33 +38,34 @@ uint16      icmp_id = 0;
 
 //---------------------
 // ACSI / CosmosEx stuff
-#include "acsi.h"
+#include "../libacsiscsi/hdd_if.h"
+#include "../libacsiscsi/acsi.h"
+#include "../libacsiscsi/stdlib.h"
 #include "ce_commands.h"
-#include "stdlib.h"
 
 //---------------------
 
 #define MAX_ICMP_HANDLERS   16
-DWORD icmpHandlers[MAX_ICMP_HANDLERS];
-BYTE  gotNullIcmpHandler;
+uint32_t icmpHandlers[MAX_ICMP_HANDLERS];
+uint8_t  gotNullIcmpHandler;
 
 int16 ICMP_send (uint32 dest, uint8 type, uint8 code, void *data, uint16 dat_length)
 {
     commandLong[5] = NET_CMD_ICMP_SEND_EVEN;                    // cmd[5]       = command code
 
-    commandLong[6] = (BYTE) (dest >> 24);                       // cmd[6 .. 9]  = destination address
-    commandLong[7] = (BYTE) (dest >> 16);
-    commandLong[8] = (BYTE) (dest >>  8);
-    commandLong[9] = (BYTE) (dest      );
+    commandLong[6] = (uint8_t) (dest >> 24);                       // cmd[6 .. 9]  = destination address
+    commandLong[7] = (uint8_t) (dest >> 16);
+    commandLong[8] = (uint8_t) (dest >>  8);
+    commandLong[9] = (uint8_t) (dest      );
 
-    commandLong[10] = (BYTE) ((type << 3) | (code & 0x07));     // cmd[10]      = pack type and code together -- highest 5 bits are type, lowest 3 bits are code
+    commandLong[10] = (uint8_t) ((type << 3) | (code & 0x07));     // cmd[10]      = pack type and code together -- highest 5 bits are type, lowest 3 bits are code
 
-    commandLong[11] = (BYTE) (dat_length >> 8);                 // cmd[11, 12]  = length
-    commandLong[12] = (BYTE) (dat_length     );
+    commandLong[11] = (uint8_t) (dat_length >> 8);                 // cmd[11, 12]  = length
+    commandLong[12] = (uint8_t) (dat_length     );
 
     // prepare the command for buffer sending
-    BYTE *pBfr  = (BYTE *) data;
-    DWORD dwBfr = (DWORD) data;
+    uint8_t *pBfr  = (uint8_t *) data;
+    uint32_t dwBfr = (uint32_t) data;
 
     if(dwBfr & 1) {                                 // buffer pointer is ODD
         commandLong[5] = NET_CMD_ICMP_SEND_ODD;     // cmd[5]       = command code -- sending from ODD address
@@ -73,7 +75,7 @@ int16 ICMP_send (uint32 dest, uint8 type, uint8 code, void *data, uint16 dat_len
     }
 
     // calculate sector count
-    WORD sectorCount = dat_length / 512;            // get number of sectors we need to send
+    uint16_t sectorCount = dat_length / 512;            // get number of sectors we need to send
 
     if((dat_length % 512) != 0) {                   // if the number of bytes is not multiple of 512, then we need to send one sector more
         sectorCount++;
@@ -103,9 +105,9 @@ int16 ICMP_handler (int16 (* handler) (IP_DGRAM *), int16 flag)
 
     //----------------
     // the following code is here just to pretend that having NULL handler is OK (Sting compatibility thing)
-    if(((DWORD) handler) == 0) {
+    if(((uint32_t) handler) == 0) {
         if(flag == HNDLR_SET || flag == HNDLR_FORCE) {
-            BYTE didSetIt = gotNullIcmpHandler ? 0 : 1;
+            uint8_t didSetIt = gotNullIcmpHandler ? 0 : 1;
             gotNullIcmpHandler = 1;
             return didSetIt;
         }
@@ -115,7 +117,7 @@ int16 ICMP_handler (int16 (* handler) (IP_DGRAM *), int16 flag)
         }
 
         if(flag == HNDLR_REMOVE) {
-            BYTE didRemoveIt = gotNullIcmpHandler ? 1 : 0;
+            uint8_t didRemoveIt = gotNullIcmpHandler ? 1 : 0;
             gotNullIcmpHandler = 0;
             return didRemoveIt;
         }
@@ -125,7 +127,7 @@ int16 ICMP_handler (int16 (* handler) (IP_DGRAM *), int16 flag)
     //----------------
 
     for(i=0; i<MAX_ICMP_HANDLERS; i++) {
-        if(icmpHandlers[i] == (DWORD) handler) {            // if we got that handler, store it's index
+        if(icmpHandlers[i] == (uint32_t) handler) {            // if we got that handler, store it's index
             existing = i;
         }
 
@@ -141,7 +143,7 @@ int16 ICMP_handler (int16 (* handler) (IP_DGRAM *), int16 flag)
                 return FALSE;
             }
 
-            icmpHandlers[empty] = (DWORD) handler;  // store handler
+            icmpHandlers[empty] = (uint32_t) handler;  // store handler
             // now that a ICMP handler is installed, we need to make sure VBL
             // is installed
             if(!vblInstalled) {
@@ -155,7 +157,7 @@ int16 ICMP_handler (int16 (* handler) (IP_DGRAM *), int16 flag)
                 return FALSE;
             }
 
-            icmpHandlers[existing] = (DWORD) NULL;  // clear handler
+            icmpHandlers[existing] = (uint32_t) NULL;  // clear handler
             return TRUE;
         //--------------------------------
 
@@ -180,14 +182,14 @@ void icmp_processData(uint32 bytesToReadIcmp)
 {
     bytesToReadIcmp = (bytesToReadIcmp <= DMA_BUFFER_SIZE) ? bytesToReadIcmp : DMA_BUFFER_SIZE;     // will the whole data fit in out DMA buffer? If not, make it shorter
 
-    DWORD sectors = bytesToReadIcmp / 512;                      // calculate how many sectors we need for the whole transfer
+    uint32_t sectors = bytesToReadIcmp / 512;                      // calculate how many sectors we need for the whole transfer
     if((bytesToReadIcmp % 512) != 0) {                          // if the byte count is not multiple of 512, add one more sector
         sectors++;
     }
 
     // first store command code
     commandShort[4] = NET_CMD_ICMP_GET_DGRAMS;                  // store function number
-    commandShort[5] = (BYTE) sectors;                           // and sector count
+    commandShort[5] = (uint8_t) sectors;                           // and sector count
 
     // send it to host
     hdIf.cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, sectors);
@@ -196,9 +198,9 @@ void icmp_processData(uint32 bytesToReadIcmp)
 		return;
 	}
 
-    BYTE *pBfr = pDmaBuffer;
+    uint8_t *pBfr = pDmaBuffer;
     while(1) {
-        WORD cnt = getWord(pBfr);                               // get how many data is in the next DGRAM
+        uint16_t cnt = getWord(pBfr);                               // get how many data is in the next DGRAM
 
         if(cnt == 0) {                                          // no data means end of sequence
             break;
@@ -207,7 +209,7 @@ void icmp_processData(uint32 bytesToReadIcmp)
         pBfr += 2;                                              // advance to block of data beyond the count
 
         // pBfr now points to the Dgram structure, but we won't access it as a structure because of different gcc vs Pure C packing
-        storeDword(pBfr + 26, (DWORD) (pBfr + 48));             // store data pointer - right after the header
+        storeDword(pBfr + 26, (uint32_t) (pBfr + 48));             // store data pointer - right after the header
         storeWord (pBfr + 30, (cnt > 48) ? (cnt - 48) : 0);     // got more data than just the header? calculate how many data we have, otherwise just return 0
         storeDword(pBfr + 44, 0);                               // store NEXT pointer - no next
 
@@ -229,7 +231,7 @@ void passDatagramToAllHandlers(IP_DGRAM *dgram)
             continue;
         }
 
-        hndlr   = (THandler) icmpHandlers[i];                   // cast DWORD to function pointer
+        hndlr   = (THandler) icmpHandlers[i];                   // cast uint32_t to function pointer
         res     = (*hndlr) (dgram);                             // call the function
 
         if(res == TRUE) {                                       // if the handler returns TRUE, then the DGRAM is processed and no other handler should process it

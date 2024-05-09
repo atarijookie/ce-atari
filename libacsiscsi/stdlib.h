@@ -15,6 +15,7 @@ char *  strcat  ( char * destination, const char * source);
 char *	strncpy ( char * destination, const char * source, int num );
 char *  strcpy  ( char * destination, const char * source);
 int		strncmp ( const char * str1, const char * str2, int num );
+int     strcmp  ( const char * str1, const char * str2);
 void	sleep   ( int seconds );
 void    msleep  ( int ms );
 void    msleepInSuper(int ms);

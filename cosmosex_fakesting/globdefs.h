@@ -516,7 +516,7 @@ Error return values:
 
 /*--------------------------------------------------------------------------*/
 
-// if sign bit is set, extend the sign to whole WORD
+// if sign bit is set, extend the sign to whole uint16_t
 #define extendByteToWord(X)    ( ((X & 0x80)==0) ? X : (0xff00 | X) )
 
 #define NET_HANDLES_COUNT       32
@@ -530,26 +530,26 @@ Error return values:
 
 /*--------------------------------------------------------------------------*/
 
-#ifndef BYTE
+#ifndef uint8_t
     #include <stdint.h>
 
-    #define BYTE  	unsigned char
-    #define WORD  	uint16_t
-    #define DWORD 	uint32_t
+    #define uint8_t  	unsigned char
+    #define uint16_t  	uint16_t
+    #define uint32_t 	uint32_t
 #endif
 
 #define READ_BUFFER_SIZE    512
 
 typedef struct {
     CIB     cib;                            // connection information block
-    DWORD   bytesToRead;                    // how many bytes we can read from this connection
-    BYTE    tcpConnectionState;             // TCP connection states -- TCLOSED, TLISTEN, ...
-    DWORD   buff_size;                      // send buffer size, valid only for TCP
-    BYTE    activeNotPassive;               // zero for passive (incomming) connection, non-zero for active (outgoing) connection
+    uint32_t   bytesToRead;                    // how many bytes we can read from this connection
+    uint8_t    tcpConnectionState;             // TCP connection states -- TCLOSED, TLISTEN, ...
+    uint32_t   buff_size;                      // send buffer size, valid only for TCP
+    uint8_t    activeNotPassive;               // zero for passive (incomming) connection, non-zero for active (outgoing) connection
 
-    BYTE charsUsed;                         // how many chars from this buffer was used by CNget_char()
-    BYTE charsGot;                          // how many chars we have
-    BYTE chars[READ_BUFFER_SIZE];
+    uint8_t charsUsed;                         // how many chars from this buffer was used by CNget_char()
+    uint8_t charsGot;                          // how many chars we have
+    uint8_t chars[READ_BUFFER_SIZE];
 } TConInfo;
 
 /*--------------------------------------------------------------------------*/
@@ -573,15 +573,16 @@ __asm__ (".balign 4\n\t"
 
 /*--------------------------------------------------------------------------*/
 // for retrieving real params from stack, as gcc calling convention doesn't match the Pure C cdecl calling convention
-#define getDwordFromSP()  ({ DWORD a = (DWORD)  *((DWORD *) sp);    sp += 4;    a; })
-#define getWordFromSP()   ({  WORD a = (WORD)   *(( WORD *) sp);    sp += 2;    a; })
-#define getByteFromSP()   ({  BYTE a = (BYTE)   *(( BYTE *) sp);    sp += 2;    a; })
-#define getVoidPFromSP()  ({ void *p = (void *) *((DWORD *) sp);    sp += 4;    p; })
+#define getDwordFromSP()  ({ uint32_t a = (uint32_t)  *((uint32_t *) sp);    sp += 4;    a; })
+#define getWordFromSP()   ({  uint16_t a = (uint16_t)   *(( uint16_t *) sp);    sp += 2;    a; })
+#define getByteFromSP()   ({  uint8_t a = (uint8_t)   *(( uint8_t *) sp);    sp += 2;    a; })
+#define getVoidPFromSP()  ({ void *p = (void *) *((uint32_t *) sp);    sp += 4;    p; })
 
 /*--------------------------------------------------------------------------*/
 #define extendByteToDword(X)    ( ((X &   0x80)==0) ? X : (0xffffff00 | X) )
 #define extendWordToDword(X)    ( ((X & 0x8000)==0) ? X : (0xffff0000 | X) )
 
+#define REQUIRED_NETADAPTER_VERSION     0x0100
 
 #endif
 

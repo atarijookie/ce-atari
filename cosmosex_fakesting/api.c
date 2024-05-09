@@ -12,8 +12,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "../libacsiscsi/stdlib.h"
 #include "globdefs.h"
-#include "stdlib.h"
 #include "api.h"
 #include "tcp.h"
 #include "icmp.h"

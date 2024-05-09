@@ -27,7 +27,7 @@ void   house_keep(void);
 int16  set_flag (int16 flag);
 void   clear_flag (int16 flag);
 
-DWORD jumptable[40];
+uint32_t jumptable[40];
 
 void initJumpTable(void)
 {
@@ -38,46 +38,46 @@ void initJumpTable(void)
     }
 
     i=0;
-    jumptable[i++] = (DWORD) KRmalloc_mid;
-    jumptable[i++] = (DWORD) KRfree_mid;
-    jumptable[i++] = (DWORD) KRgetfree_mid;
-    jumptable[i++] = (DWORD) KRrealloc_mid;
-    jumptable[i++] = (DWORD) get_error_text_mid;
-    jumptable[i++] = (DWORD) getvstr_mid;
-    jumptable[i++] = (DWORD) carrier_detect_mid;
-    jumptable[i++] = (DWORD) TCP_open_mid;
-    jumptable[i++] = (DWORD) TCP_close_mid;
-    jumptable[i++] = (DWORD) TCP_send_mid;
-    jumptable[i++] = (DWORD) TCP_wait_state_mid;
-    jumptable[i++] = (DWORD) TCP_ack_wait_mid;
-    jumptable[i++] = (DWORD) UDP_open_mid;
-    jumptable[i++] = (DWORD) UDP_close_mid;
-    jumptable[i++] = (DWORD) UDP_send_mid;
-    jumptable[i++] = (DWORD) CNkick_mid;
-    jumptable[i++] = (DWORD) CNbyte_count_mid;
-    jumptable[i++] = (DWORD) CNget_char_mid;
-    jumptable[i++] = (DWORD) CNget_NDB_mid;
-    jumptable[i++] = (DWORD) CNget_block_mid;
-    jumptable[i++] = (DWORD) housekeep_mid;
-    jumptable[i++] = (DWORD) resolve_mid;
-    jumptable[i++] = (DWORD) serial_dummy_mid;
-    jumptable[i++] = (DWORD) serial_dummy_mid;
-    jumptable[i++] = (DWORD) set_flag_mid;
-    jumptable[i++] = (DWORD) clear_flag_mid;
-    jumptable[i++] = (DWORD) CNgetinfo_mid;
-    jumptable[i++] = (DWORD) on_port_mid;
-    jumptable[i++] = (DWORD) off_port_mid;
-    jumptable[i++] = (DWORD) setvstr_mid;
-    jumptable[i++] = (DWORD) query_port_mid;
-    jumptable[i++] = (DWORD) CNgets_mid;
-    jumptable[i++] = (DWORD) ICMP_send_mid;
-    jumptable[i++] = (DWORD) ICMP_handler_mid;
-    jumptable[i++] = (DWORD) ICMP_discard_mid;
-    jumptable[i++] = (DWORD) TCP_info_mid;
-    jumptable[i++] = (DWORD) cntrl_port_mid;
+    jumptable[i++] = (uint32_t) KRmalloc_mid;
+    jumptable[i++] = (uint32_t) KRfree_mid;
+    jumptable[i++] = (uint32_t) KRgetfree_mid;
+    jumptable[i++] = (uint32_t) KRrealloc_mid;
+    jumptable[i++] = (uint32_t) get_error_text_mid;
+    jumptable[i++] = (uint32_t) getvstr_mid;
+    jumptable[i++] = (uint32_t) carrier_detect_mid;
+    jumptable[i++] = (uint32_t) TCP_open_mid;
+    jumptable[i++] = (uint32_t) TCP_close_mid;
+    jumptable[i++] = (uint32_t) TCP_send_mid;
+    jumptable[i++] = (uint32_t) TCP_wait_state_mid;
+    jumptable[i++] = (uint32_t) TCP_ack_wait_mid;
+    jumptable[i++] = (uint32_t) UDP_open_mid;
+    jumptable[i++] = (uint32_t) UDP_close_mid;
+    jumptable[i++] = (uint32_t) UDP_send_mid;
+    jumptable[i++] = (uint32_t) CNkick_mid;
+    jumptable[i++] = (uint32_t) CNbyte_count_mid;
+    jumptable[i++] = (uint32_t) CNget_char_mid;
+    jumptable[i++] = (uint32_t) CNget_NDB_mid;
+    jumptable[i++] = (uint32_t) CNget_block_mid;
+    jumptable[i++] = (uint32_t) housekeep_mid;
+    jumptable[i++] = (uint32_t) resolve_mid;
+    jumptable[i++] = (uint32_t) serial_dummy_mid;
+    jumptable[i++] = (uint32_t) serial_dummy_mid;
+    jumptable[i++] = (uint32_t) set_flag_mid;
+    jumptable[i++] = (uint32_t) clear_flag_mid;
+    jumptable[i++] = (uint32_t) CNgetinfo_mid;
+    jumptable[i++] = (uint32_t) on_port_mid;
+    jumptable[i++] = (uint32_t) off_port_mid;
+    jumptable[i++] = (uint32_t) setvstr_mid;
+    jumptable[i++] = (uint32_t) query_port_mid;
+    jumptable[i++] = (uint32_t) CNgets_mid;
+    jumptable[i++] = (uint32_t) ICMP_send_mid;
+    jumptable[i++] = (uint32_t) ICMP_handler_mid;
+    jumptable[i++] = (uint32_t) ICMP_discard_mid;
+    jumptable[i++] = (uint32_t) TCP_info_mid;
+    jumptable[i++] = (uint32_t) cntrl_port_mid;
 }
 
-void *KRmalloc_mid(BYTE *sp)
+void *KRmalloc_mid(uint8_t *sp)
 {
     int32 size = getDwordFromSP();
 
@@ -90,7 +90,7 @@ void *KRmalloc_mid(BYTE *sp)
     return res;
 }
 
-void KRfree_mid(BYTE *sp)
+void KRfree_mid(uint8_t *sp)
 {
     void *mem_block = getVoidPFromSP();
 
@@ -101,7 +101,7 @@ void KRfree_mid(BYTE *sp)
     KRfree_internal(mem_block);
 }
 
-int32 KRgetfree_mid(BYTE *sp)
+int32 KRgetfree_mid(uint8_t *sp)
 {
     int16 block_flag = getWordFromSP();
 
@@ -115,7 +115,7 @@ int32 KRgetfree_mid(BYTE *sp)
     return res;
 }
 
-void *KRrealloc_mid(BYTE *sp)
+void *KRrealloc_mid(uint8_t *sp)
 {
     void  *mem_block   = getVoidPFromSP();
     int32  new_size    = getDwordFromSP();
@@ -129,7 +129,7 @@ void *KRrealloc_mid(BYTE *sp)
     return res;
 }
 
-char *get_error_text_mid(BYTE *sp)
+char *get_error_text_mid(uint8_t *sp)
 {
     int16 error_code = getWordFromSP();
 
@@ -142,7 +142,7 @@ char *get_error_text_mid(BYTE *sp)
     return res;
 }
 
-char *getvstr_mid(BYTE *sp)
+char *getvstr_mid(uint8_t *sp)
 {
     char *name = getVoidPFromSP();
 
@@ -155,18 +155,18 @@ char *getvstr_mid(BYTE *sp)
     return res;
 }
 
-void serial_dummy_mid(BYTE *sp)
+void serial_dummy_mid(uint8_t *sp)
 {
     // Do really nothing - obsolete
 }
 
-int16 carrier_detect_mid(BYTE *sp)
+int16 carrier_detect_mid(uint8_t *sp)
 {
     // Do really nothing - obsolete
     return 1;
 }
 
-int16 TCP_open_mid(BYTE *sp)
+int16 TCP_open_mid(uint8_t *sp)
 {
     uint32 rem_host     = getDwordFromSP();
     uint16 rem_port     = getWordFromSP();
@@ -186,14 +186,14 @@ int16 TCP_open_mid(BYTE *sp)
     vblEnabled = 1;
 
     #ifdef DEBUG_STRING
-    showHexWord((WORD) res);
+    showHexWord((uint16_t) res);
     logStr("\n");
     #endif
 
     return res;
 }
 
-int16 TCP_close_mid(BYTE *sp)
+int16 TCP_close_mid(uint8_t *sp)
 {
     int16 handle      = getWordFromSP();
     int16 timeout     = getWordFromSP();
@@ -209,14 +209,14 @@ int16 TCP_close_mid(BYTE *sp)
     vblEnabled = 1;
 
     #ifdef DEBUG_STRING
-    showHexWord((WORD) res);
+    showHexWord((uint16_t) res);
     logStr("\n");
     #endif
 
     return res;
 }
 
-int16 TCP_send_mid(BYTE *sp)
+int16 TCP_send_mid(uint8_t *sp)
 {
     int16 handle      = getWordFromSP();
     void *buffer      = getVoidPFromSP();
@@ -226,7 +226,7 @@ int16 TCP_send_mid(BYTE *sp)
     logStr("TCP_send -- handle: ");
     showHexWord(handle);
     logStr(", buffer: ");
-    showHexDword((DWORD) buffer);
+    showHexDword((uint32_t) buffer);
     logStr(", length: ");
     showHexWord(length);
     logStr("\n");
@@ -239,7 +239,7 @@ int16 TCP_send_mid(BYTE *sp)
     return res;
 }
 
-int16 TCP_wait_state_mid(BYTE *sp)
+int16 TCP_wait_state_mid(uint8_t *sp)
 {
     int16 handle      = getWordFromSP();
     int16 wantedState = getWordFromSP();
@@ -260,7 +260,7 @@ int16 TCP_wait_state_mid(BYTE *sp)
     return res;
 }
 
-int16 TCP_ack_wait_mid(BYTE *sp)
+int16 TCP_ack_wait_mid(uint8_t *sp)
 {
     int16 handle      = getWordFromSP();
     int16 timeout     = getWordFromSP();
@@ -276,7 +276,7 @@ int16 TCP_ack_wait_mid(BYTE *sp)
     return res;
 }
 
-int16 TCP_info_mid(BYTE *sp)
+int16 TCP_info_mid(uint8_t *sp)
 {
     int16 handle    = getWordFromSP();
     TCPIB *tcp_info = getVoidPFromSP();
@@ -292,7 +292,7 @@ int16 TCP_info_mid(BYTE *sp)
     return res;
 }
 
-int16 UDP_open_mid (BYTE *sp)
+int16 UDP_open_mid (uint8_t *sp)
 {
     uint32 rem_host    = getDwordFromSP();
     uint16 rem_port    = getWordFromSP();
@@ -308,7 +308,7 @@ int16 UDP_open_mid (BYTE *sp)
     return res;
 }
 
-int16 UDP_close_mid(BYTE *sp)
+int16 UDP_close_mid(uint8_t *sp)
 {
     int16 handle = getWordFromSP();
 
@@ -323,7 +323,7 @@ int16 UDP_close_mid(BYTE *sp)
     return res;
 }
 
-int16 UDP_send_mid(BYTE *sp)
+int16 UDP_send_mid(uint8_t *sp)
 {
     int16 handle = getWordFromSP();
     void *buffer = getVoidPFromSP();
@@ -340,7 +340,7 @@ int16 UDP_send_mid(BYTE *sp)
     return res;
 }
 
-int16 CNkick_mid(BYTE *sp)
+int16 CNkick_mid(uint8_t *sp)
 {
     int16 handle = getWordFromSP();
 
@@ -355,13 +355,13 @@ int16 CNkick_mid(BYTE *sp)
     return res;
 }
 
-int16 CNbyte_count_mid(BYTE *sp)
+int16 CNbyte_count_mid(uint8_t *sp)
 {
     int16 handle = getWordFromSP();
 
     #ifdef DEBUG_STRING
     logStr("CNbyte_count - handle: ");
-    showHexByte((BYTE) handle);
+    showHexByte((uint8_t) handle);
     logStr(", res: ");
     #endif
 
@@ -370,14 +370,14 @@ int16 CNbyte_count_mid(BYTE *sp)
     vblEnabled = 1;
 
     #ifdef DEBUG_STRING
-    showHexWord((DWORD) res);
+    showHexWord((uint32_t) res);
     logStr("\n");
     #endif
 
     return res;
 }
 
-int16 CNget_char_mid(BYTE *sp)
+int16 CNget_char_mid(uint8_t *sp)
 {
     int16 handle = getWordFromSP();
 
@@ -390,7 +390,7 @@ int16 CNget_char_mid(BYTE *sp)
     vblEnabled = 1;
 
     #ifdef DEBUG_STRING
-    showHexWord((DWORD) res);
+    showHexWord((uint32_t) res);
 
     if(res >= 0 && res <= 255) {
         char tmp[2];
@@ -408,7 +408,7 @@ int16 CNget_char_mid(BYTE *sp)
     return res;
 }
 
-NDB *CNget_NDB_mid(BYTE *sp)
+NDB *CNget_NDB_mid(uint8_t *sp)
 {
     int16 handle = getWordFromSP();
 
@@ -423,7 +423,7 @@ NDB *CNget_NDB_mid(BYTE *sp)
     return res;
 }
 
-int16 CNget_block_mid(BYTE *sp)
+int16 CNget_block_mid(uint8_t *sp)
 {
     int16 handle  = getWordFromSP();
     void *buffer  = getVoidPFromSP();
@@ -433,7 +433,7 @@ int16 CNget_block_mid(BYTE *sp)
     logStr("CNget_block - handle: ");
     showHexByte(handle);
     logStr(", buffer: ");
-    showHexDword((DWORD) buffer);
+    showHexDword((uint32_t) buffer);
     logStr(", length: ");
     showHexWord(length);
     logStr(", res: ");
@@ -448,7 +448,7 @@ int16 CNget_block_mid(BYTE *sp)
     logStr("\n");
 
     // show last 4 bytes
-    BYTE *p = (BYTE *) buffer;
+    uint8_t *p = (uint8_t *) buffer;
 
     logStr("last 4 bytes: ");
     if(res >= 4) { showHexByte(p[res - 4]); logStr(" "); }
@@ -461,12 +461,12 @@ int16 CNget_block_mid(BYTE *sp)
     return res;
 }
 
-void housekeep_mid(BYTE *sp)
+void housekeep_mid(uint8_t *sp)
 {
     house_keep();
 }
 
-int16 resolve_mid(BYTE *sp)
+int16 resolve_mid(uint8_t *sp)
 {
     char *   domain      = getVoidPFromSP();
     char **  real_domain = getVoidPFromSP();
@@ -484,7 +484,7 @@ int16 resolve_mid(BYTE *sp)
     return res;
 }
 
-int16 set_flag_mid(BYTE *sp)
+int16 set_flag_mid(uint8_t *sp)
 {
     int16 flag = getWordFromSP();
 
@@ -497,7 +497,7 @@ int16 set_flag_mid(BYTE *sp)
     return res;
 }
 
-void clear_flag_mid(BYTE *sp)
+void clear_flag_mid(uint8_t *sp)
 {
     int16 flag = getWordFromSP();
 
@@ -508,7 +508,7 @@ void clear_flag_mid(BYTE *sp)
     clear_flag(flag);
 }
 
-CIB *CNgetinfo_mid(BYTE *sp)
+CIB *CNgetinfo_mid(uint8_t *sp)
 {
     int16 handle = getWordFromSP();
 
@@ -523,14 +523,14 @@ CIB *CNgetinfo_mid(BYTE *sp)
     vblEnabled = 1;
 
     #ifdef DEBUG_STRING
-    showHexDword((DWORD) res);
+    showHexDword((uint32_t) res);
     logStr("\n");
     #endif
 
     return res;
 }
 
-int16 setvstr_mid(BYTE *sp)
+int16 setvstr_mid(uint8_t *sp)
 {
     char *name    = getVoidPFromSP();
     char *value   = getVoidPFromSP();
@@ -544,7 +544,7 @@ int16 setvstr_mid(BYTE *sp)
     return res;
 }
 
-int16 CNgets_mid(BYTE *sp)
+int16 CNgets_mid(uint8_t *sp)
 {
     int16  handle      = getWordFromSP();
     char * buffer      = getVoidPFromSP();
@@ -562,7 +562,7 @@ int16 CNgets_mid(BYTE *sp)
     return res;
 }
 
-int16 ICMP_send_mid(BYTE *sp)
+int16 ICMP_send_mid(uint8_t *sp)
 {
     uint32  dest        = getDwordFromSP();
     uint8   type        = getByteFromSP();
@@ -581,7 +581,7 @@ int16 ICMP_send_mid(BYTE *sp)
     return res;
 }
 
-int16 ICMP_handler_mid(BYTE *sp)
+int16 ICMP_handler_mid(uint8_t *sp)
 {
     int16 (*handler)(IP_DGRAM *)    = getVoidPFromSP();
     int16 flag                      = getWordFromSP();
@@ -597,7 +597,7 @@ int16 ICMP_handler_mid(BYTE *sp)
     return res;
 }
 
-void ICMP_discard_mid(BYTE *sp)
+void ICMP_discard_mid(uint8_t *sp)
 {
     IP_DGRAM *dgram = getVoidPFromSP();
 
@@ -610,7 +610,7 @@ void ICMP_discard_mid(BYTE *sp)
     vblEnabled = 1;
 }
 
-int16 on_port_mid(BYTE *sp)
+int16 on_port_mid(uint8_t *sp)
 {
     char *port_name = getVoidPFromSP();
 
@@ -623,7 +623,7 @@ int16 on_port_mid(BYTE *sp)
     return res;
 }
 
-void off_port_mid(BYTE *sp)
+void off_port_mid(uint8_t *sp)
 {
     char *port_name = getVoidPFromSP();
 
@@ -634,7 +634,7 @@ void off_port_mid(BYTE *sp)
     off_port(port_name);
 }
 
-int16 query_port_mid(BYTE *sp)
+int16 query_port_mid(uint8_t *sp)
 {
     char *port_name = getVoidPFromSP();
 
@@ -647,7 +647,7 @@ int16 query_port_mid(BYTE *sp)
     return res;
 }
 
-int16 cntrl_port_mid(BYTE *sp)
+int16 cntrl_port_mid(uint8_t *sp)
 {
     char   *port_name   = getVoidPFromSP();
     uint32  argument    = getDwordFromSP();

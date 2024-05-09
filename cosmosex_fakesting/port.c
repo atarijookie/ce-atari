@@ -13,7 +13,8 @@
 #include <stdio.h>
 
 #include "globdefs.h"
-#include "stdlib.h"
+#include "../libacsiscsi/stdlib.h"
+#include "stdlib2.h"
 #include "port.h"
 
 #define  M_YEAR    16
@@ -108,7 +109,7 @@ int16 cntrl_port(char *port_name, uint32 argument, int16 code)
    if (port_name == NULL) {
         switch (code) {
             case CTL_KERN_FIRST_PORT :
-                setDwordByByteOffset((void *) argument, PO_opaque, (DWORD) conf.ports);
+                setDwordByByteOffset((void *) argument, PO_opaque, (uint32_t) conf.ports);
 
                 pPName      = getVoidpByByteOffset((void *) argument, PO_port_name);    // get pointer to name in PTNA
 

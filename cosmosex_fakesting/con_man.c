@@ -8,7 +8,7 @@
 #include <stdio.h>
 
 #include "globdefs.h"
-#include "hdd_if.h"
+#include "global.h"
 #include "con_man.h"
 #include "icmp.h"
 #include "setup.h"
@@ -16,29 +16,32 @@
 
 //---------------------
 // ACSI / CosmosEx stuff
-#include "acsi.h"
+#include "../libacsiscsi/acsi.h"
+#include "../libacsiscsi/acsi.h"
+#include "../libacsiscsi/stdlib.h"
+#include "../libacsiscsi/hdd_if.h"
+#include "stdlib2.h"
 #include "ce_commands.h"
-#include "stdlib.h"
 
 //--------------------------------------
 // The following variable should be used to force update_con_info() when there was some reading / writing to socket.
 // Functions used for determining connection state / byte count should use it to force update_con_info() when possibly needed.
 // Functions used for sending / receiving stuff should SET it to true to force update before next socket info retrieval.
-BYTE forceNextUpdateConInfo;
+uint8_t forceNextUpdateConInfo;
 
 //--------------------------------------
 
 extern  uint32  localIP;
-extern  BYTE    FastRAMBuffer[];
+extern  uint8_t    FastRAMBuffer[];
 
 TConInfo conInfo[NET_HANDLES_COUNT];        // this holds info about each connection
 
-static void connection_send_block(BYTE netCmd, BYTE handle, WORD length, BYTE *buffer);
+static void connection_send_block(uint8_t netCmd, uint8_t handle, uint16_t length, uint8_t *buffer);
 //--------------------------------------
 #define NO_CHANGE_W     0xfffe
 #define NO_CHANGE_DW    0xfffffffe
 
-void setCIB(BYTE *cib, WORD protocol, WORD lPort, WORD rPort, DWORD rHost, DWORD lHost, WORD status);
+void setCIB(uint8_t *cib, uint16_t protocol, uint16_t lPort, uint16_t rPort, uint32_t rHost, uint32_t lHost, uint16_t status);
 
 #define CIB_PROTO   0
 #define CIB_LPORT   1
@@ -47,7 +50,7 @@ void setCIB(BYTE *cib, WORD protocol, WORD lPort, WORD rPort, DWORD rHost, DWORD
 #define CIB_LHOST   4
 #define CIB_STATUS  5
 
-DWORD getCIBitem(BYTE *cib, BYTE item);
+uint32_t getCIBitem(uint8_t *cib, uint8_t item);
 //--------------------------------------
 static void initConInfoStruct(int i);
 
@@ -195,16 +198,16 @@ NDB *CNget_NDB(int16 handle)
 
     // get size of NDB
     int  nexdNdbSizeBytes   = getDword(pDmaBuffer);
-    BYTE nextNdbSizeSectors = pDmaBuffer[4];
+    uint8_t nextNdbSizeSectors = pDmaBuffer[4];
 
     //-----------------
     // then try to allocate the RAM for NDB
-    DWORD readCount, freeSize;
+    uint32_t readCount, freeSize;
     freeSize    = KRgetfree_internal(TRUE);                                     // get size of largest free block
     readCount   = (nexdNdbSizeBytes < freeSize) ? nexdNdbSizeBytes : freeSize;  // Do we have less data to read, then what we can KRmalloc()? If yes, read all, otherwise read just what we can KRmalloc()
 
     // allocate buffer for structure and the data
-    BYTE *bfr = KRmalloc_internal(readCount);                               // try to malloc() RAM for data
+    uint8_t *bfr = KRmalloc_internal(readCount);                               // try to malloc() RAM for data
 
     if(bfr == NULL) {                                                       // malloc() failed, return NULL
         return (NDB *) NULL;
@@ -219,10 +222,10 @@ NDB *CNget_NDB(int16 handle)
 
     //-----------------
     // setup the NDB structure - but using direct access, as calling code uses different packing than gcc
-    storeDword(((BYTE *)pNdb) +  0, (DWORD) bfr);           // pointer to allocated data - for free()
-    storeDword(((BYTE *)pNdb) +  4, (DWORD) bfr);           // pointer to data
-    storeWord (((BYTE *)pNdb) +  8, (WORD)  readCount);     // length of data in buffer
-    storeDword(((BYTE *)pNdb) + 10, (DWORD) 0);             // pointer to next NDB
+    storeDword(((uint8_t *)pNdb) +  0, (uint32_t) bfr);           // pointer to allocated data - for free()
+    storeDword(((uint8_t *)pNdb) +  4, (uint32_t) bfr);           // pointer to data
+    storeWord (((uint8_t *)pNdb) +  8, (uint16_t)  readCount);     // length of data in buffer
+    storeDword(((uint8_t *)pNdb) + 10, (uint32_t) 0);             // pointer to next NDB
 
     //-----------------
     // get the NDB data from host
@@ -245,7 +248,7 @@ NDB *CNget_NDB(int16 handle)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static BYTE getBlockSingle(TConInfo *ci, BYTE handle, BYTE *buffer, WORD byteCount, WORD sectorCount)
+static uint8_t getBlockSingle(TConInfo *ci, uint8_t handle, uint8_t *buffer, uint16_t byteCount, uint16_t sectorCount)
 {
     // no more used chars and got chars
     int charsUsed   = ci->charsUsed;
@@ -255,8 +258,8 @@ static BYTE getBlockSingle(TConInfo *ci, BYTE handle, BYTE *buffer, WORD byteCou
     //----------------------------------------
     commandLong[ 5] = NET_CMD_CNGET_BLOCK;  // store function number
     commandLong[ 6] = handle;                // store file handle
-    commandLong[ 7] = (BYTE) (byteCount >> 8);
-    commandLong[ 8] = (BYTE) (byteCount     );
+    commandLong[ 7] = (uint8_t) (byteCount >> 8);
+    commandLong[ 8] = (uint8_t) (byteCount     );
     commandLong[10] = charsUsed;            // how many chars were used
 
     hdIf.cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, buffer, sectorCount);
@@ -268,12 +271,12 @@ static BYTE getBlockSingle(TConInfo *ci, BYTE handle, BYTE *buffer, WORD byteCou
     return TRUE;
 }
 
-static BYTE getBlockLong(TConInfo *ci, BYTE handle, BYTE *buffer, WORD byteCount, WORD sectorCount)
+static uint8_t getBlockLong(TConInfo *ci, uint8_t handle, uint8_t *buffer, uint16_t byteCount, uint16_t sectorCount)
 {
-    BYTE res;
-    BYTE toFastRam = (((DWORD)buffer) >= 0x1000000) ? TRUE : FALSE;       // flag: are we reading to FAST RAM?
+    uint8_t res;
+    uint8_t toFastRam = (((uint32_t)buffer) >= 0x1000000) ? TRUE : FALSE;       // flag: are we reading to FAST RAM?
 
-    if((((DWORD) buffer) & 1) != 0) {                                   // buffer address is odd? act like if reading to FAST RAM
+    if((((uint32_t) buffer) & 1) != 0) {                                   // buffer address is odd? act like if reading to FAST RAM
         toFastRam = TRUE;
     }
 
@@ -286,8 +289,8 @@ static BYTE getBlockLong(TConInfo *ci, BYTE handle, BYTE *buffer, WORD byteCount
 
     while(byteCount > 0) {
         // If the needed count is bigger that what we can fit in maximum transfer size, limit it to that maximum; otherwise just use it.
-        WORD thisGetSizeBytes   = (byteCount < FASTRAM_BUFFER_SIZE) ? byteCount : FASTRAM_BUFFER_SIZE;
-        WORD thisGetSizeSectors = (thisGetSizeBytes >> 9) + (((thisGetSizeBytes & 0x1ff) == 0) ? 0 : 1);
+        uint16_t thisGetSizeBytes   = (byteCount < FASTRAM_BUFFER_SIZE) ? byteCount : FASTRAM_BUFFER_SIZE;
+        uint16_t thisGetSizeSectors = (thisGetSizeBytes >> 9) + (((thisGetSizeBytes & 0x1ff) == 0) ? 0 : 1);
 
         res = getBlockSingle(ci, handle, FastRAMBuffer, thisGetSizeBytes, thisGetSizeSectors);  // make transfer to middle buffer
         memcpy(buffer, FastRAMBuffer, thisGetSizeBytes);                                    // copy to the final buffer
@@ -331,7 +334,7 @@ int16 CNget_block(int16 handle, void *buffer, int16 length)
 
     //----------------------------------------
     // first do the long transfer
-    BYTE res;
+    uint8_t res;
 
     if(lenLongSectors > 0) {                    // if we should do the long transfer (something to transfer?)
         res = getBlockLong(ci, handle, buffer, lenLongBytes, lenLongSectors);
@@ -389,8 +392,8 @@ int16 CNgets(int16 handle, char *buffer, int16 length, char delimiter)
     // issue the command
       commandLong[ 5] = NET_CMD_CNGETS;       // store function number
     commandLong[ 6] = handle;                // store file handle
-    commandLong[ 7] = (BYTE) (length >> 8); // store max length
-    commandLong[ 8] = (BYTE) (length     );
+    commandLong[ 7] = (uint8_t) (length >> 8); // store max length
+    commandLong[ 8] = (uint8_t) (length     );
     commandLong[ 9] = delimiter;            // store delimiter
     commandLong[10] = ci->charsUsed;        // how many chars were used
 
@@ -426,7 +429,7 @@ int handle_valid(int16 handle)
     }
 
     int slot    = network_handleToSlot(handle);
-    WORD proto  = getCIBitem((BYTE *) &conInfo[slot].cib, CIB_PROTO);
+    uint16_t proto  = getCIBitem((uint8_t *) &conInfo[slot].cib, CIB_PROTO);
 
     if(proto == 0) {                // if connection not used
         return FALSE;
@@ -435,10 +438,10 @@ int handle_valid(int16 handle)
     return TRUE;
 }
 
-void update_con_info(BYTE forceUpdate)
+void update_con_info(uint8_t forceUpdate)
 {
-    static DWORD lastUpdate = 0;
-    DWORD now = getTicks();
+    static uint32_t lastUpdate = 0;
+    uint32_t now = getTicks();
 
     if(!forceUpdate) {                                                      // if shouldn't force update, check last update time, and possibly ignore update
         if((now - lastUpdate) < 20) {                                        // if the last update was less than 100 ms ago, don't update
@@ -471,31 +474,31 @@ void update_con_info(BYTE forceUpdate)
 
     // now update our data from received data
     int i;
-    DWORD   *pBytesToRead       = (DWORD *)  pDmaBuffer;                        // offset   0: 32 * 4 bytes - bytes to read for each connection
-    BYTE    *pConnStatus        = (BYTE  *) (pDmaBuffer + 128);                 // offset 128: 32 * 1 bytes - connection status
-    WORD    *pLPort             = (WORD  *) (pDmaBuffer + 160);                 // offset 160: 32 * 2 bytes - local port
-    DWORD   *pRHost             = (DWORD *) (pDmaBuffer + 224);                 // offset 224: 32 * 4 bytes - remote host
-    WORD    *pRPort             = (WORD  *) (pDmaBuffer + 352);                 // offset 352: 32 * 2 bytes - remote port
-    DWORD   *pBytesToReadIcmp   = (DWORD *) (pDmaBuffer + 416);                 // offset 416:  1 * 1 DWORD - bytes that can be read from ICMP socket(s)
+    uint32_t   *pBytesToRead       = (uint32_t *)  pDmaBuffer;                        // offset   0: 32 * 4 bytes - bytes to read for each connection
+    uint8_t    *pConnStatus        = (uint8_t  *) (pDmaBuffer + 128);                 // offset 128: 32 * 1 bytes - connection status
+    uint16_t    *pLPort             = (uint16_t  *) (pDmaBuffer + 160);                 // offset 160: 32 * 2 bytes - local port
+    uint32_t   *pRHost             = (uint32_t *) (pDmaBuffer + 224);                 // offset 224: 32 * 4 bytes - remote host
+    uint16_t    *pRPort             = (uint16_t  *) (pDmaBuffer + 352);                 // offset 352: 32 * 2 bytes - remote port
+    uint32_t   *pBytesToReadIcmp   = (uint32_t *) (pDmaBuffer + 416);                 // offset 416:  1 * 1 uint32_t - bytes that can be read from ICMP socket(s)
 
     for(i=0; i<MAX_HANDLE; i++) {                                               // retrieve all the data and fill the variables
         // retrieve and update internal vars
         TConInfo *ci = &conInfo[i];
 
-        ci->bytesToRead         = (DWORD)   pBytesToRead[i];
-        ci->tcpConnectionState  = (BYTE)    pConnStatus[i];
+        ci->bytesToRead         = (uint32_t)   pBytesToRead[i];
+        ci->tcpConnectionState  = (uint8_t)    pConnStatus[i];
 
-        WORD  lPort = (WORD )   pLPort[i];
-        DWORD rHost = (DWORD)   pRHost[i];
-        WORD  rPort = (WORD)    pRPort[i];
+        uint16_t  lPort = (uint16_t )   pLPort[i];
+        uint32_t rHost = (uint32_t)   pRHost[i];
+        uint16_t  rPort = (uint16_t)    pRPort[i];
 
         // CIB update through helper functions because of Pure C vs gcc packing of structs
         // Update      : local port, remote port, remote host, status
         // Don't update: protocol, local host
-        setCIB((BYTE *) &ci->cib, NO_CHANGE_W, lPort, rPort, rHost, NO_CHANGE_DW, /* pConnStatus[i] */ 0);
+        setCIB((uint8_t *) &ci->cib, NO_CHANGE_W, lPort, rPort, rHost, NO_CHANGE_DW, /* pConnStatus[i] */ 0);
     }
 
-    DWORD bytesToReadIcmp = (DWORD) *pBytesToReadIcmp;                          // get how many bytes we can read from ICMP socket(s)
+    uint32_t bytesToReadIcmp = (uint32_t) *pBytesToReadIcmp;                          // get how many bytes we can read from ICMP socket(s)
 
     if(bytesToReadIcmp > 0) {                                                   // if we have something for ICMP to process?
         icmp_processData(bytesToReadIcmp);
@@ -515,12 +518,12 @@ int16 connection_open(int tcpNotUdp, uint32 rem_host, uint16 rem_port, uint16 to
 
     commandShort[5] = 0;
 
-    WORD  lPort = 0;
-    DWORD lHost = 0;
+    uint16_t  lPort = 0;
+    uint32_t lHost = 0;
 
     //--------------------------
     // find out if it's active or passive connection
-    BYTE activeNotPassive = TRUE;       // active by default
+    uint8_t activeNotPassive = TRUE;       // active by default
 
     if(tcpNotUdp) {                     // for TCP
         if(rem_host == 0 || rem_port == TCP_PASSIVE) {      // if no remote host specified, or specified TCP_PASSIVE, it's passive connection
@@ -531,7 +534,7 @@ int16 connection_open(int tcpNotUdp, uint32 rem_host, uint16 rem_port, uint16 to
 
     if(rem_port == TCP_ACTIVE || rem_port == TCP_PASSIVE) {     // if the remote port is special flag (passive or active), then remote host contains pointer to CAB structure
         if(rem_host != 0) {                                     // it's not a NULL pointer
-            BYTE *pCAB = (BYTE *) rem_host;                     // convert int to pointer and retrieve struct values
+            uint8_t *pCAB = (uint8_t *) rem_host;                     // convert int to pointer and retrieve struct values
 
             lPort       = getWord (pCAB + 0);
             rem_port    = getWord (pCAB + 2);
@@ -541,7 +544,7 @@ int16 connection_open(int tcpNotUdp, uint32 rem_host, uint16 rem_port, uint16 to
     }
 
     // then store the params in buffer
-    BYTE *pBfr = pDmaBuffer;
+    uint8_t *pBfr = pDmaBuffer;
     pBfr = storeDword   (pBfr, rem_host);       //  0 ..  3
     pBfr = storeWord    (pBfr, rem_port);       //  4 ..  5
     pBfr = storeWord    (pBfr, tos);            //  6 ..  7
@@ -568,7 +571,7 @@ int16 connection_open(int tcpNotUdp, uint32 rem_host, uint16 rem_port, uint16 to
             proto = UDP;
         }
 
-        DWORD local_host;
+        uint32_t local_host;
         if(activeNotPassive) {      // active connection - trying to connect now, local host is local IP
             status      = TSYN_SENT;
             local_host  = localIP;
@@ -578,7 +581,7 @@ int16 connection_open(int tcpNotUdp, uint32 rem_host, uint16 rem_port, uint16 to
         }
 
         // local port to 0 - we currently don't know that (yet)
-        setCIB((BYTE *) &ci->cib, proto, lPort, rem_port, rem_host, local_host, status);
+        setCIB((uint8_t *) &ci->cib, proto, lPort, rem_port, rem_host, local_host, status);
         update_con_info(TRUE);                      // let's FORCE update connection info - CIB should be updated with real local port after this (e.g. aFTP relies on the info when using active ftp connection)
 
         ci->buff_size           = buff_size;        // store the maximu buffer size fot TCP
@@ -588,7 +591,7 @@ int16 connection_open(int tcpNotUdp, uint32 rem_host, uint16 rem_port, uint16 to
     }
 
     // it's not a CE handle
-    return extendByteToWord(hdIf.statusByte);       // extend the BYTE error code to WORD
+    return extendByteToWord(hdIf.statusByte);       // extend the uint8_t error code to uint16_t
 }
 
 //-------------------------------------------------------------------------------
@@ -610,7 +613,7 @@ int16 connection_close(int tcpNotUdp, int16 handle, int16 timeout)
     commandShort[5] = 0;
 
     // then store the params in buffer
-    BYTE *pBfr = pDmaBuffer;
+    uint8_t *pBfr = pDmaBuffer;
     pBfr = storeWord    (pBfr, handle);
     pBfr = storeWord    (pBfr, timeout);
 
@@ -619,7 +622,7 @@ int16 connection_close(int tcpNotUdp, int16 handle, int16 timeout)
 
     // don't handle failures, just pretend it's always closed just fine
 
-    setCIB((BYTE *) &conInfo[slot].cib, 0, 0, 0, 0, 0, 0);     // clear the CIB structure
+    setCIB((uint8_t *) &conInfo[slot].cib, 0, 0, 0, 0, 0, 0);     // clear the CIB structure
     return E_NORMAL;
 }
 
@@ -639,7 +642,7 @@ int16 connection_send(int tcpNotUdp, int16 handle, void *buffer, int16 length)
     }
 
     // first store command code
-    BYTE netCmd;
+    uint8_t netCmd;
     if(tcpNotUdp) {                         // for TCP
         netCmd = NET_CMD_TCP_SEND;
     } else {                                // for UDP
@@ -647,12 +650,12 @@ int16 connection_send(int tcpNotUdp, int16 handle, void *buffer, int16 length)
     }
 
     // transfer the remaining data in a loop
-    BYTE  toFastRam = (((DWORD)buffer) >= 0x1000000) ? TRUE : FALSE;          // flag: are we reading to FAST RAM?
-    DWORD blockSize = toFastRam ? FASTRAM_BUFFER_SIZE : (MAXSECTORS * 512); // size of block, which we will read
+    uint8_t  toFastRam = (((uint32_t)buffer) >= 0x1000000) ? TRUE : FALSE;          // flag: are we reading to FAST RAM?
+    uint32_t blockSize = toFastRam ? FASTRAM_BUFFER_SIZE : (MAXSECTORS * 512); // size of block, which we will read
 
     while(length > 0) {                                            // while there's something to send
         // calculate how much data we should transfer in this loop - with respect to MAX SECTORS we can transfer at once
-        DWORD thisWriteSizeBytes = (length < blockSize) ? length : blockSize; // will the needed write size within the blockSize, or not?
+        uint32_t thisWriteSizeBytes = (length < blockSize) ? length : blockSize; // will the needed write size within the blockSize, or not?
 
         if(toFastRam) {     // if writing from FAST RAM, first cop to fastRamBuffer, and then write using DMA
             memcpy(FastRAMBuffer, buffer, thisWriteSizeBytes);
@@ -675,17 +678,17 @@ int16 connection_send(int tcpNotUdp, int16 handle, void *buffer, int16 length)
     return extendByteToWord(hdIf.statusByte);           // return the status, possibly extended to int16
 }
 
-void connection_send_block(BYTE netCmd, BYTE handle, WORD length, BYTE *buffer)
+void connection_send_block(uint8_t netCmd, uint8_t handle, uint16_t length, uint8_t *buffer)
 {
     commandLong[5] = netCmd;                        // store command code
     commandLong[6] = handle;                        // store handle
 
-    commandLong[7] = (BYTE) (length >> 8);          // cmd[7 .. 8]  = length
-    commandLong[8] = (BYTE) (length     );
+    commandLong[7] = (uint8_t) (length >> 8);          // cmd[7 .. 8]  = length
+    commandLong[8] = (uint8_t) (length     );
 
     // prepare the command for buffer sending - add flag 'buffer address is odd' and possible byte #0, in case the buffer address was odd
-    BYTE *pBfr  = (BYTE *) buffer;
-    DWORD dwBfr = (DWORD)  buffer;
+    uint8_t *pBfr  = (uint8_t *) buffer;
+    uint32_t dwBfr = (uint32_t)  buffer;
 
     if(dwBfr & 1) {                                 // buffer pointer is ODD
         commandLong[9]  = TRUE;                     // buffer is odd
@@ -697,7 +700,7 @@ void connection_send_block(BYTE netCmd, BYTE handle, WORD length, BYTE *buffer)
     }
 
     // calculate sector count
-    WORD sectorCount = length >> 9;                 // get number of sectors we need to send
+    uint16_t sectorCount = length >> 9;                 // get number of sectors we need to send
 
     if((length & 0x1ff) != 0) {                     // if the number of bytes is not multiple of 512, then we need to send one sector more
         sectorCount++;
@@ -731,17 +734,17 @@ int16 resolve (char *domain, char **real_domain, uint32 *ip_list, int16 ip_num)
         return E_CANTRESOLVE;
     }
 
-    BYTE resolverHandle = hdIf.statusByte;                              // this is the new handle for resolver
+    uint8_t resolverHandle = hdIf.statusByte;                              // this is the new handle for resolver
 
     // now receive the response
     memset(pDmaBuffer, 0, 512);
     commandShort[4] = NET_CMD_RESOLVE_GET_RESPONSE;
     commandShort[5] = resolverHandle;
 
-    DWORD end = getTicks() + 10 * 200;                                  // 10 second timeout
+    uint32_t end = getTicks() + 10 * 200;                                  // 10 second timeout
 
     while(1) {                                                          // repeat this command few times, as it might reply with 'I didn't finish yet'
-        sleepMs(250);                                               // wait 250 ms before trying again
+        msleep(250);                                                    // wait 250 ms before trying again
         if(getTicks() >= end) {                                         // if timeout
             return E_CANTRESOLVE;
         }
@@ -798,7 +801,7 @@ static void initConInfoStruct(int i)
     ci->tcpConnectionState   = TCLOSED;
     ci->charsUsed            = 0;
     ci->charsGot             = 0;
-    setCIB((BYTE *) &ci->cib, 0, 0, 0, 0, 0, 0);    // clear the CIB structure
+    setCIB((uint8_t *) &ci->cib, 0, 0, 0, 0, 0, 0);    // clear the CIB structure
     memset(ci->chars, 0, READ_BUFFER_SIZE);
 }
 //-------------------------------------------------------------------------------
@@ -811,15 +814,15 @@ void init_con_info(void)
     }
 }
 //-------------------------------------------------------------------------------
-void setCIB(BYTE *cib, WORD protocol, WORD lPort, WORD rPort, DWORD rHost, DWORD lHost, WORD status)
+void setCIB(uint8_t *cib, uint16_t protocol, uint16_t lPort, uint16_t rPort, uint32_t rHost, uint32_t lHost, uint16_t status)
 {
     // first create pointers to the right addresses
-    WORD  *pProto   = (WORD  *) (cib +  0);
-    WORD  *plPort   = (WORD  *) (cib +  2);
-    WORD  *prPort   = (WORD  *) (cib +  4);
-    DWORD *prHost   = (DWORD *) (cib +  6);
-    DWORD *plHost   = (DWORD *) (cib + 10);
-    WORD  *pStatus  = (WORD  *) (cib + 14);
+    uint16_t  *pProto   = (uint16_t  *) (cib +  0);
+    uint16_t  *plPort   = (uint16_t  *) (cib +  2);
+    uint16_t  *prPort   = (uint16_t  *) (cib +  4);
+    uint32_t *prHost   = (uint32_t *) (cib +  6);
+    uint32_t *plHost   = (uint32_t *) (cib + 10);
+    uint16_t  *pStatus  = (uint16_t  *) (cib + 14);
 
     // now if we should set the new value, set it
     if(protocol != NO_CHANGE_W)     *pProto     = protocol;
@@ -830,15 +833,15 @@ void setCIB(BYTE *cib, WORD protocol, WORD lPort, WORD rPort, DWORD rHost, DWORD
     if(status   != NO_CHANGE_W)     *pStatus    = status;
 }
 //-------------------------------------------------------------------------------
-DWORD getCIBitem(BYTE *cib, BYTE item)
+uint32_t getCIBitem(uint8_t *cib, uint8_t item)
 {
     // first create pointers to the right addresses
-    WORD  *pProto   = (WORD  *) (cib +  0);
-    WORD  *plPort   = (WORD  *) (cib +  2);
-    WORD  *prPort   = (WORD  *) (cib +  4);
-    DWORD *prHost   = (DWORD *) (cib +  6);
-    DWORD *plHost   = (DWORD *) (cib + 10);
-    WORD  *pStatus  = (WORD  *) (cib + 14);
+    uint16_t  *pProto   = (uint16_t  *) (cib +  0);
+    uint16_t  *plPort   = (uint16_t  *) (cib +  2);
+    uint16_t  *prPort   = (uint16_t  *) (cib +  4);
+    uint32_t *prHost   = (uint32_t *) (cib +  6);
+    uint32_t *plHost   = (uint32_t *) (cib + 10);
+    uint16_t  *pStatus  = (uint16_t  *) (cib + 14);
 
     switch(item) {
         case CIB_PROTO:     return *pProto;

@@ -14,13 +14,13 @@
 #include <stdio.h>
 #include <ctype.h>
 
+#include "../libacsiscsi/acsi.h"
+#include "../libacsiscsi/find_ce.h"
+#include "../libacsiscsi/stdlib.h"
 #include "globdefs.h"
-#include "acsi.h"
 #include "ce_commands.h"
 #include "con_man.h"
-#include "stdlib.h"
 #include "setup.h"
-#include "find_ce.h"
 #include "vbl.h"
 
 void showAppVersion(void);
@@ -47,22 +47,22 @@ char *configvar_values[CONFIGVAR_COUNT]	= {"100000", "TRUE", "50", "60", "-60", 
 
 //---------------------------------------
 // ACSI and CosmosEx stuff
-BYTE deviceID;
-BYTE commandShort[CMD_LENGTH_SHORT]	= {      0x00, 'C', 'E', HOSTMOD_NETWORK_ADAPTER, 0, 0};
-BYTE commandLong[CMD_LENGTH_LONG]	= {0x1f, 0xA0, 'C', 'E', HOSTMOD_NETWORK_ADAPTER, 0, 0, 0, 0, 0, 0, 0, 0};
+uint8_t deviceID;
+uint8_t commandShort[CMD_LENGTH_SHORT]	= {      0x00, 'C', 'E', HOSTMOD_NETWORK_ADAPTER, 0, 0};
+uint8_t commandLong[CMD_LENGTH_LONG]	= {0x1f, 0xA0, 'C', 'E', HOSTMOD_NETWORK_ADAPTER, 0, 0, 0, 0, 0, 0, 0, 0};
 
-BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];
-BYTE *pDmaBuffer;
+uint8_t dmaBuffer[DMA_BUFFER_SIZE + 2];
+uint8_t *pDmaBuffer;
 
 //---------------------------------------
 
-DWORD localIP;
-WORD  requiredVersion;
+uint32_t localIP;
+uint16_t  requiredVersion;
 
 void initJumpTable(void);
 
 //---------------------------------------
-extern BYTE showHex_toLogNotScreen;
+extern uint8_t showHex_toLogNotScreen;
 
 int main(void)
 {
@@ -80,14 +80,16 @@ int main(void)
 
    	// create buffer pointer to even address
 	pDmaBuffer = &dmaBuffer[2];
-	pDmaBuffer = (BYTE *) (((DWORD) pDmaBuffer) & 0xfffffffe);  // remove odd bit if the address was odd
+	pDmaBuffer = (uint8_t *) (((uint32_t) pDmaBuffer) & 0xfffffffe);  // remove odd bit if the address was odd
 
-	BYTE found = Supexec(findDevice);                           // try to find the CosmosEx device on ACSI bus
+    uint8_t res = findDevice(FIND_DEV_CE);
 
-    if(!found) {								                // not found? quit
+    if(res == DEVICE_NOT_FOUND) {
         sleep(3);
         return 0;
     }
+
+    deviceID = res & 0x07;                                  // store the BUS ID of device
 
     if(requiredVersion != REQUIRED_NETADAPTER_VERSION) {
         (void) Cconws("\r\n\33pProtocol version mismatch !\33q\r\n" );
@@ -217,44 +219,3 @@ int getIntFromStr(const char *str, int len)
 
     return val;
 }
-
-void showInt(int value, int length)
-{
-    char tmp[10];
-    memset(tmp, 0, 10);
-
-    int i;
-    for(i=0; i<length; i++) {               // go through the int lenght and get the digits
-        int val, mod;
-
-        val = value / 10;
-        mod = value % 10;
-
-        tmp[length - 1 - i] = mod + 48;     // store the current digit
-
-        value = val;
-    }
-
-    (void) Cconws(tmp);                     // write it out
-}
-
-void logMsg(char *logMsg)
-{
-//    if(showLogs) {
-//        (void) Cconws(logMsg);
-//    }
-}
-
-void logMsgProgress(DWORD current, DWORD total)
-{
-//    if(!showLogs) {
-//        return;
-//    }
-
-//    (void) Cconws("Progress: ");
-//    showHexDword(current);
-//    (void) Cconws(" out of ");
-//    showHexDword(total);
-//    (void) Cconws("\n\r");
-}
-

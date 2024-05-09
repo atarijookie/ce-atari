@@ -78,6 +78,18 @@ char *strcpy ( char * destination, const char * source)
     return strncpy (destination, source, len);
 }
 
+int strcmp(const char * str1, const char * str2)
+{
+    int len1 = strlen(str1);
+    int len2 = strlen(str2);
+
+    if(len1 != len2) {  // length is different, strings are different
+        return 1;
+    }
+
+    return strncmp(str1, str2, len1);
+}
+
 int strncmp ( const char * str1, const char * str2, int num )
 {
 	int i;

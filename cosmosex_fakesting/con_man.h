@@ -22,7 +22,7 @@ int16 resolve (char *domain, char **real_domain, uint32 *ip_list, int16 ip_num);
 //-------------------------------------
 // helper functions
 void init_con_info(void);
-void update_con_info(BYTE forceUpdate);
+void update_con_info(uint8_t forceUpdate);
 
 void structs_init(void);
 int  handle_valid(int16 h);
@@ -31,10 +31,10 @@ int16 connection_open   (int tcpNotUdp, uint32 rem_host, uint16 rem_port, uint16
 int16 connection_close  (int tcpNotUdp, int16 handle, int16 timeout);
 int16 connection_send   (int tcpNotUdp, int16 handle, void *buffer, int16 length);
 
-BYTE  fillReadBuffer(int16 handle);
-DWORD readData(int16 handle, BYTE *bfr, DWORD cnt, BYTE seekOffset);
-DWORD read_small(int16 handle, DWORD countNeeded, BYTE *buffer);
-DWORD read_big(int16 handle, DWORD countNeeded, BYTE *buffer);
+uint8_t  fillReadBuffer(int16 handle);
+uint32_t readData(int16 handle, uint8_t *bfr, uint32_t cnt, uint8_t seekOffset);
+uint32_t read_small(int16 handle, uint32_t countNeeded, uint8_t *buffer);
+uint32_t read_big(int16 handle, uint32_t countNeeded, uint8_t *buffer);
 //-------------------------------------
 
 #endif
