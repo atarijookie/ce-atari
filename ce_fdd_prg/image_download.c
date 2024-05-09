@@ -2,43 +2,43 @@
 #include <gem.h>
 #include <mt_gem.h>
 
-#include "acsi.h"
+#include "../libacsiscsi/acsi.h"
+#include "../libacsiscsi/stdlib.h"
 #include "main.h"
 #include "hostmoddefs.h"
 #include "keys.h"
 #include "defs.h"
-#include "stdlib.h"
 #include "aes.h"
 #include "CE_FDD.H"
 
 // ------------------------------------------------------------------
-extern BYTE deviceID;
-extern BYTE commandShort[CMD_LENGTH_SHORT];
-extern BYTE commandLong [CMD_LENGTH_LONG];
+extern uint8_t deviceID;
+extern uint8_t commandShort[CMD_LENGTH_SHORT];
+extern uint8_t commandLong [CMD_LENGTH_LONG];
 
-extern BYTE *p64kBlock;
-extern BYTE sectorCount;
+extern uint8_t *p64kBlock;
+extern uint8_t sectorCount;
 
-extern BYTE *pBfr;
+extern uint8_t *pBfr;
 
-extern BYTE kbshift;
+extern uint8_t kbshift;
 
-BYTE searchInit(void);
+uint8_t searchInit(void);
 
-BYTE loopForDownload(void);
-BYTE handleWriteSearch(BYTE key);
+uint8_t loopForDownload(void);
+uint8_t handleWriteSearch(uint8_t key);
 void showSearchString(void);
 void showPageNumber(void);
 void imageSearch(void);
 void getResultsAndUpdatePageObjects(int page);
 void showResults(void);
 void selectDestinationDir(void);
-BYTE refreshImageList(void);
+uint8_t refreshImageList(void);
 
-void getStatus(BYTE alsoShow);
+void getStatus(uint8_t alsoShow);
 
-BYTE searchContent[2 * 512];        // currently shown content
-BYTE prevSearchContent[2 * 512];    // previously shown content
+uint8_t searchContent[2 * 512];        // currently shown content
+uint8_t prevSearchContent[2 * 512];    // previously shown content
 
 #define MAX_SEARCHTEXT_LEN      12
 struct {
@@ -53,7 +53,7 @@ Status status;
 
 #define ROW_LENGTH  68
 
-BYTE scrRez;
+uint8_t scrRez;
 
 // ------------------------------------------------------------------
 
@@ -64,15 +64,15 @@ BYTE scrRez;
 
 #define SHOWMENU_ALL            0xff
 
-void insertPageRowIntoSlot(WORD page, BYTE row, BYTE slot);
-void downloadPageRowToStorage(WORD page, BYTE row);
+void insertPageRowIntoSlot(uint16_t page, uint8_t row, uint8_t slot);
+void downloadPageRowToStorage(uint16_t page, uint8_t row);
 
 // ------------------------------------------------------------------
 
-DWORD lastKeyPressTime;     // last time the key was pressed
-BYTE searchNotApplied;      // set to TRUE when (after passing some time after last key press) should retrieve search results
+uint32_t lastKeyPressTime;     // last time the key was pressed
+uint8_t searchNotApplied;      // set to TRUE when (after passing some time after last key press) should retrieve search results
 
-DWORD lastStatusUpdate;     // last time when we checked and showed status
+uint32_t lastStatusUpdate;     // last time when we checked and showed status
 
 // ------------------------------------------------------------------
 Dialog dialogDownload;              // dialog with image download content
@@ -251,7 +251,7 @@ void showSearchString(void)
     setObjectString(otherObjs[SEARCH], tmp);
 }
 
-BYTE unselectOldSelectNewImage(int newRow, int slot)
+uint8_t unselectOldSelectNewImage(int newRow, int slot)
 {
     const int16_t *btnsInsert;
 
@@ -289,7 +289,7 @@ void downloadHandleKeyPress(int16_t key)
     }
 
     if((key >= 'a' && key <='z') || key == ' ' || (key >= 0 && key <= 9) || key == KEY_ESC || key == KEY_BACKSP) {
-        BYTE changed = handleWriteSearch(key);
+        uint8_t changed = handleWriteSearch(key);
 
         if(changed) {                               // if the search string changed, search for images after some while
             lastKeyPressTime = getTicksAsUser();    // last time the key was pressed
@@ -321,7 +321,7 @@ int16_t downloadHandleMouseButton(int16_t ev_mmbutton, int16_t ev_mmox, int16_t 
     return exitobj;
 }
 
-BYTE gem_imageDownload(void)
+uint8_t gem_imageDownload(void)
 {
     search.len = 0;                                                 // clear search string
     memset(search.text, 0, MAX_SEARCHTEXT_LEN + 1);
@@ -346,7 +346,7 @@ BYTE gem_imageDownload(void)
         otherObjs = otherObjsWide;
     }
 
-    BYTE res = searchInit();                                        // try to initialize
+    uint8_t res = searchInit();                                        // try to initialize
 
     if(res == 0) {                                                  // failed to initialize? return to floppy config screen
         return KEY_F9;
@@ -362,7 +362,7 @@ BYTE gem_imageDownload(void)
     imageSearch();          // get first results, fill it to dialog, drawing of dialog
     getStatus(TRUE);
 
-    BYTE retVal = KEY_F10;
+    uint8_t retVal = KEY_F10;
 
     int16_t btnWaitFor = WAITFOR_PRESSED;
 
@@ -386,11 +386,11 @@ BYTE gem_imageDownload(void)
         }
 
         if (event_type & MU_TIMER) {    // on timer, get status from device and show it
-            DWORD now = getTicksAsUser();
+            uint32_t now = getTicksAsUser();
 
             if((now - lastStatusUpdate) >= 200) {       // if typical period passed since the last status check, do it
                 lastStatusUpdate = now;                 // we're getting status now
-                BYTE refreshDataAndRedraw = FALSE;
+                uint8_t refreshDataAndRedraw = FALSE;
 
                 getStatus(TRUE);                        // talk to CE to see the status
 
@@ -409,7 +409,7 @@ BYTE gem_imageDownload(void)
         }
 
         if(searchNotApplied) {                      // if we need to apply the search
-            DWORD now = getTicksAsUser();           // get current time
+            uint32_t now = getTicksAsUser();           // get current time
             if((now - lastKeyPressTime) >= 100) {   // if enough time passed since the last key press, handle it
                 searchNotApplied = FALSE;           // we're just handling this search
                 imageSearch();
@@ -456,7 +456,7 @@ BYTE gem_imageDownload(void)
         getInsertButtonRowAndSlot(exitobj, &row, &slot);    // was this insert button press?
 
         if(row != -1) {             // handle insert press
-            BYTE selectionChanged = unselectOldSelectNewImage(row, slot);
+            uint8_t selectionChanged = unselectOldSelectNewImage(row, slot);
 
             if(selectionChanged) {  // insert only if selection changed
                 insertPageRowIntoSlot(search.pageCurrent, row, slot - 1);
@@ -470,14 +470,14 @@ BYTE gem_imageDownload(void)
 }
 // ------------------------------------------------------------------
 
-BYTE refreshImageList(void)
+uint8_t refreshImageList(void)
 {
     commandShort[4] = FDD_CMD_SEARCH_REFRESHLIST;                   // tell the host that it should refresh image list
     commandShort[5] = 0;
 
     sectorCount = 1;                                                // read 1 sector
 
-    BYTE res = Supexec(ce_acsiReadCommand);
+    uint8_t res = Supexec(ce_acsiReadCommand);
 
     if(res != FDD_OK) {
         showComErrorDialog();
@@ -488,7 +488,7 @@ BYTE refreshImageList(void)
     return res;
 }
 
-void insertPageRowIntoSlot(WORD page, BYTE row, BYTE slot)
+void insertPageRowIntoSlot(uint16_t page, uint8_t row, uint8_t slot)
 {
     if(!status.doWeHaveStorage) {                               // no storage? do nothing
         return;
@@ -499,21 +499,21 @@ void insertPageRowIntoSlot(WORD page, BYTE row, BYTE slot)
 
     p64kBlock = pBfr;       // use this buffer for writing
     pBfr[0] = ITEM_ROWS;            // items per page
-    pBfr[1] = (BYTE) (page >> 8);   // store page # high
-    pBfr[2] = (BYTE) (page     );   // store page # low
+    pBfr[1] = (uint8_t) (page >> 8);   // store page # high
+    pBfr[2] = (uint8_t) (page     );   // store page # low
     pBfr[3] = row;                  // store item #
     pBfr[4] = slot;                 // store slot #
 
     sectorCount = 1;                                            // write just one sector
 
-    BYTE res = Supexec(ce_acsiWriteBlockCommand);
+    uint8_t res = Supexec(ce_acsiWriteBlockCommand);
 
     if(res != FDD_OK) {                                         // bad? just be silent, CE_FDD.PRG doesn't know if this image is downloaded, so don't show warning
         return;
     }
 }
 
-void downloadPageRowToStorage(WORD page, BYTE row)
+void downloadPageRowToStorage(uint16_t page, uint8_t row)
 {
     if(!status.doWeHaveStorage) {                               // no storage? do nothing
         return;
@@ -524,13 +524,13 @@ void downloadPageRowToStorage(WORD page, BYTE row)
 
     p64kBlock = pBfr;                                           // use this buffer for writing
     pBfr[0] = ITEM_ROWS;            // items per page
-    pBfr[1] = (BYTE) (page >> 8);   // store page # high
-    pBfr[2] = (BYTE) (page     );   // store page # low
+    pBfr[1] = (uint8_t) (page >> 8);   // store page # high
+    pBfr[2] = (uint8_t) (page     );   // store page # low
     pBfr[3] = row;                  // store item #
 
     sectorCount = 1;                                            // write just one sector
 
-    BYTE res = Supexec(ce_acsiWriteBlockCommand);
+    uint8_t res = Supexec(ce_acsiWriteBlockCommand);
 
     if(res != FDD_OK) {                                         // bad? write error
         showErrorDialog("Failed to start download to storage.\r\n");
@@ -551,7 +551,7 @@ void imageSearch(void)
 
     sectorCount = 1;                                            // write just one sector
 
-    BYTE res = Supexec(ce_acsiWriteBlockCommand);
+    uint8_t res = Supexec(ce_acsiWriteBlockCommand);
 
 	if(res != FDD_OK) {                                         // bad? write error
         showComErrorDialog();
@@ -561,17 +561,19 @@ void imageSearch(void)
     getResultsAndUpdatePageObjects(0);
 }
 
-BYTE ce_acsiReadCommandLong(void);
+uint8_t ce_acsiReadCommandLong(void);
+
+#define BYTES_TO_INT(HI,LO)    ( (((int) HI) << 8) | ((int) LO) )
 
 void getResultsPage(int page)
 {
     commandLong[5] = FDD_CMD_SEARCH_RESULTS;
     commandLong[6] = ITEM_ROWS;             // items per page
-    commandLong[7] = (BYTE) (page >> 8);    // page high
-    commandLong[8] = (BYTE) (page     );    // page low
+    commandLong[7] = (uint8_t) (page >> 8);    // page high
+    commandLong[8] = (uint8_t) (page     );    // page low
 
     sectorCount = 2;                            // read 2 sectors
-    BYTE res = Supexec(ce_acsiReadCommandLong);
+    uint8_t res = Supexec(ce_acsiReadCommandLong);
 
     if(res != FDD_OK) {                         // bad? write error
         showComErrorDialog();
@@ -599,7 +601,7 @@ void getResultsAndUpdatePageObjects(int page)
     redrawDialog();                 // redraw dialog
 }
 
-BYTE handleWriteSearch(BYTE key)
+uint8_t handleWriteSearch(uint8_t key)
 {
     if(key == KEY_ESC) {                                                // esc - delete whole string
         search.len = 0;                                                 // clear search string
@@ -642,7 +644,7 @@ void showResults(void)
 
 void showPageNumber(void)
 {
-    BYTE pagesUiVisible = FALSE;    // assume that we don't have any results
+    uint8_t pagesUiVisible = FALSE;    // assume that we don't have any results
 
     if(search.pagesCount != 0) {    // if got some results
         pagesUiVisible = TRUE;
@@ -662,13 +664,13 @@ void showPageNumber(void)
     setVisible(otherObjs[PAGE_NEXT], pagesUiVisible);
 }
 
-BYTE searchInit(void)
+uint8_t searchInit(void)
 {
     commandShort[4] = FDD_CMD_SEARCH_INIT;
     commandShort[5] = scrRez;                   // screen resolution
 
     sectorCount = 1;                            // read 1 sector
-    BYTE res;
+    uint8_t res;
 
     res = Supexec(ce_acsiReadCommand);
 
@@ -686,14 +688,14 @@ BYTE searchInit(void)
     return FALSE;
 }
 
-void getStatus(BYTE alsoShow)
+void getStatus(uint8_t alsoShow)
 {
     commandShort[4] = FDD_CMD_GET_IMAGE_ENCODING_RUNNING;
     commandShort[5] = 0;
 
     sectorCount = 1;                            // read 1 sector
 
-    BYTE res = Supexec(ce_acsiReadCommand);
+    uint8_t res = Supexec(ce_acsiReadCommand);
 
     if(res != FDD_OK) {                         // fail? just quit
         return;

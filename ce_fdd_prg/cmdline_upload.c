@@ -4,34 +4,34 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "acsi.h"
+#include "../libacsiscsi/acsi.h"
+#include "../libacsiscsi/stdlib.h"
+#include "../libacsiscsi/hdd_if.h"
+#include "../libacsiscsi/find_ce.h"
 #include "main.h"
 #include "hostmoddefs.h"
 #include "defs.h"
-#include "hdd_if.h"
-#include "find_ce.h"
 #include "vt52.h"
-#include "stdlib.h"
 
 // ------------------------------------------------------------------ 
 
-extern BYTE deviceID;
-extern BYTE commandShort[CMD_LENGTH_SHORT];
-extern BYTE commandLong [CMD_LENGTH_LONG];
+extern uint8_t deviceID;
+extern uint8_t commandShort[CMD_LENGTH_SHORT];
+extern uint8_t commandLong [CMD_LENGTH_LONG];
 
 void showComErrorDialog(void);
 
-extern BYTE sectorCount;
-extern BYTE *pBfr, *pBfrCnt;
+extern uint8_t sectorCount;
+extern uint8_t *pBfr, *pBfrCnt;
 
-BYTE getCurrentSlot(void);
-BYTE setCurrentSlot(BYTE newSlot);
-BYTE currentSlot;
+uint8_t getCurrentSlot(void);
+uint8_t setCurrentSlot(uint8_t newSlot);
+uint8_t currentSlot;
 
-BYTE uploadImage(int index, char *customPath);
+uint8_t uploadImage(int index, char *customPath);
 char *findFirstImageInFolder(void);
 
-BYTE getIsImageBeingEncoded(void);
+uint8_t getIsImageBeingEncoded(void);
 #define ENCODING_DONE       0
 #define ENCODING_RUNNING    1
 #define ENCODING_FAIL       2
@@ -43,7 +43,7 @@ void waitBeforeReset(void);
 // ------------------------------------------------------------------ 
 void handleCmdlineUpload(char *path, int paramsLength)
 {
-    BYTE found;
+    uint8_t found;
 
     // write some header out
     (void) Clear_home();
@@ -93,7 +93,7 @@ void handleCmdlineUpload(char *path, int paramsLength)
     commandShort[0] = (deviceID << 5);              // cmd[0] = ACSI_id + TEST UNIT READY (0)
     commandLong[0]  = (deviceID << 5) | 0x1f;       // cmd[0] = ACSI_id + ICD command marker (0x1f)
 
-    BYTE res = getCurrentSlot();                    // get the current slot
+    uint8_t res = getCurrentSlot();                    // get the current slot
     
     if(!res) {
         return;
@@ -110,7 +110,7 @@ void handleCmdlineUpload(char *path, int paramsLength)
 
     while(slotChangeTime >= 0) {
         int i;
-        BYTE key = getKeyIfPossible();                  // get key if one is waiting or just return 0 if no key is waiting
+        uint8_t key = getKeyIfPossible();                  // get key if one is waiting or just return 0 if no key is waiting
 
         if(key == '1' || key == '2' || key == '3') {    // valid key? good
             currentSlot = key - '1';
@@ -191,7 +191,7 @@ void waitBeforeReset(void)
 
     while(cancelTime >= 0) {
         int i;
-        BYTE key = getKeyIfPossible();              // get key if one is waiting or just return 0 if no key is waiting
+        uint8_t key = getKeyIfPossible();              // get key if one is waiting or just return 0 if no key is waiting
 
         if(key != 0) {                              // valid key? don't reset ST and quit
             (void) Cconws("\33q\n\rReset canceled by user.\r\nTerminating and returning to desktop.\r\n");
@@ -243,13 +243,13 @@ char *findFirstImageInFolder(void)
     return NULL;                // nothing found
 }
 
-BYTE getCurrentSlot(void)
+uint8_t getCurrentSlot(void)
 {
     commandShort[4] = FDD_CMD_GET_CURRENT_SLOT;
 
     sectorCount = 1;                            // read 1 sector
 
-    BYTE res = Supexec(ce_acsiReadCommand); 
+    uint8_t res = Supexec(ce_acsiReadCommand); 
         
     if(res == FDD_OK) {                         // good? copy in the results
         currentSlot = pBfr[0];
@@ -261,14 +261,14 @@ BYTE getCurrentSlot(void)
     return 0;
 }
 
-BYTE setCurrentSlot(BYTE newSlot)
+uint8_t setCurrentSlot(uint8_t newSlot)
 {
     commandShort[4] = FDD_CMD_SET_CURRENT_SLOT;
     commandShort[5] = newSlot;
     
     sectorCount = 1;                            // read 1 sector
 
-    BYTE res = Supexec(ce_acsiReadCommand); 
+    uint8_t res = Supexec(ce_acsiReadCommand); 
         
     if(res == FDD_OK) {                         // good? copy in the results
         return 1;
@@ -279,17 +279,17 @@ BYTE setCurrentSlot(BYTE newSlot)
     return 0;
 }
 
-BYTE getIsImageBeingEncoded(void)
+uint8_t getIsImageBeingEncoded(void)
 {
     commandShort[4] = FDD_CMD_GET_IMAGE_ENCODING_RUNNING;
     commandShort[5] = currentSlot;
 
     sectorCount = 1;                            // read 1 sector
 
-    BYTE res = Supexec(ce_acsiReadCommand); 
+    uint8_t res = Supexec(ce_acsiReadCommand); 
         
     if(res == FDD_OK) {                         // good? copy in the results
-        BYTE isRunning = pBfr[0];               // isRunning - 1: is running, 0: is not running
+        uint8_t isRunning = pBfr[0];               // isRunning - 1: is running, 0: is not running
         return isRunning;
     } 
     

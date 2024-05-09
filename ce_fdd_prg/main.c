@@ -10,38 +10,36 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "acsi.h"
+#include "../libacsiscsi/acsi.h"
+#include "../libacsiscsi/find_ce.h"
+#include "../libacsiscsi/hdd_if.h"
 #include "main.h"
 #include "hostmoddefs.h"
 #include "keys.h"
 #include "defs.h"
-#include "find_ce.h"
-#include "hdd_if.h"
 #include "CE_FDD.H"
 #include "aes.h"
 
 // ------------------------------------------------------------------
-BYTE deviceID;
-BYTE commandShort[CMD_LENGTH_SHORT] = {         0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0};
-BYTE commandLong [CMD_LENGTH_LONG]  = {0x1f, 0xA0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0, 0, 0, 0, 0, 0, 0};
+uint8_t deviceID;
+uint8_t commandShort[CMD_LENGTH_SHORT] = {         0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0};
+uint8_t commandLong [CMD_LENGTH_LONG]  = {0x1f, 0xA0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0, 0, 0, 0, 0, 0, 0};
 
 void createFullPath(char *fullPath, char *filePath, char *fileName);
 
 char filePath[256], fileName[256];
 
-BYTE *p64kBlock;
-BYTE sectorCount;
+uint8_t *p64kBlock;
+uint8_t sectorCount;
 
-BYTE *pBfrOrig;
-BYTE *pBfr, *pBfrCnt;
-BYTE *pDmaBuffer;
+uint8_t *pBfrOrig;
+uint8_t *pBfr, *pBfrCnt;
+uint8_t *pDmaBuffer;
 
-BYTE atariKeysToSingleByte(BYTE vkey, BYTE key);
+uint8_t loopForDownload(void);
 
-BYTE loopForDownload(void);
-
-BYTE gem_floppySetup(void);
-BYTE gem_imageDownload(void);
+uint8_t gem_floppySetup(void);
+uint8_t gem_imageDownload(void);
 
 void handleCmdlineUpload(char *path, int paramsLength);
 
@@ -54,7 +52,7 @@ OBJECT *getScanDialogTree(void);
 int main(int argc, char** argv)
 {
     Goto_pos(0,0);
-    pBfrOrig = (BYTE *) Malloc(SIZE64K + 4);
+    pBfrOrig = (uint8_t *) Malloc(SIZE64K + 4);
 
     if(pBfrOrig == NULL) {
         (void) Cconws("Malloc failed!\r\n");
@@ -62,9 +60,9 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    DWORD val = (DWORD) pBfrOrig;
-    pBfr      = (BYTE *) ((val + 4) & 0xfffffffe);  // create even pointer
-    pBfrCnt   = pBfr - 2;           // this is previous pointer - size of WORD
+    uint32_t val = (uint32_t) pBfrOrig;
+    pBfr      = (uint8_t *) ((val + 4) & 0xfffffffe);  // create even pointer
+    pBfrCnt   = pBfr - 2;           // this is previous pointer - size of uint16_t
 
     pDmaBuffer = pBfr;
 
@@ -72,7 +70,7 @@ int main(int argc, char** argv)
     strcpy(filePath, "C:\\*.*");
     memset(fileName, 0, 256);
 
-    BYTE drive = getLowestDrive();  // get the lowest HDD letter and use it in the file selector
+    uint8_t drive = getLowestDrive();  // get the lowest HDD letter and use it in the file selector
     filePath[0] = drive;
 
 #ifdef OUTPUT_TTP
@@ -87,7 +85,7 @@ int main(int argc, char** argv)
 #endif
 
     // if compiled without OUTPUT_TTP, this app will work with GEM UI - as the PRG
-    BYTE res = gem_init();          // initialize GEM stuff
+    uint8_t res = gem_init();          // initialize GEM stuff
 
     if(!res) {                      // gem init failed? quit then
         Mfree(pBfrOrig);
@@ -108,15 +106,19 @@ int main(int argc, char** argv)
 */
 
     // search for CosmosEx on ACSI & SCSI bus
-    BYTE found = Supexec(findDevice);
+	// search for CosmosEx on ACSI & SCSI bus
+    res = findDevice(FIND_DEV_CE | FIND_DEV_CS);
 
-//  showDialog(FALSE);                          // hide GEM dialog
-
-    if(!found) {                    // not found? quit
+    if(res == DEVICE_NOT_FOUND) {
         gem_deinit();               // deinit GEM
         Mfree(pBfrOrig);
         return 0;
     }
+
+    deviceID = res & 0x07;                                  // store the BUS ID of device
+
+//  showDialog(FALSE);                          // hide GEM dialog
+
 #endif
 
     // now set up the acsi command bytes so we don't have to deal with this one anymore
@@ -180,7 +182,7 @@ void removeLastPartUntilBackslash(char *str)
 }
 
 // make single ACSI read command by the params set in the commandLong buffer
-BYTE ce_acsiReadCommandLong(void)
+uint8_t ce_acsiReadCommandLong(void)
 {
     memset(pBfr, 0, 512);               // clear the buffer
 
@@ -198,7 +200,7 @@ BYTE ce_acsiReadCommandLong(void)
 }
 
 // make single ACSI read command by the params set in the commandShort buffer
-BYTE ce_acsiReadCommand(void)
+uint8_t ce_acsiReadCommand(void)
 {
     memset(pBfr, 0, 512);                                                       // clear the buffer
 
@@ -215,7 +217,7 @@ BYTE ce_acsiReadCommand(void)
     return hdIf.statusByte;
 }
 
-BYTE ce_acsiWriteBlockCommand(void)
+uint8_t ce_acsiWriteBlockCommand(void)
 {
 #ifdef NODEVICE
     return 0;
@@ -230,11 +232,11 @@ BYTE ce_acsiWriteBlockCommand(void)
     return hdIf.statusByte;
 }
 
-BYTE getLowestDrive(void)
+uint8_t getLowestDrive(void)
 {
-    BYTE i;
-    DWORD drvs = Drvmap();
-    DWORD mask;
+    uint8_t i;
+    uint32_t drvs = Drvmap();
+    uint32_t mask;
 
     for(i=2; i<16; i++) {                                                       // go through the available drives
         mask = (1 << i);

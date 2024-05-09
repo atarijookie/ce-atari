@@ -201,38 +201,3 @@ uint8_t cs_inquiry(uint8_t id, uint8_t hddIf)
 	return TRUE;
 }
 //--------------------------------------------------
-uint8_t getMachineType(void)
-{
-    uint32_t *cookieJarAddr    = (uint32_t *) 0x05A0;
-    uint32_t *cookieJar        = (uint32_t *) *cookieJarAddr;     // get address of cookie jar
-
-    if(cookieJar == 0) {                        // no cookie jar? it's an old ST
-        return MACHINE_ST;
-    }
-
-    uint32_t cookieKey, cookieValue;
-
-    int i;
-    for(i=0; i<64; i++) {                       // go through the list of cookies
-        cookieKey   = *cookieJar++;
-        cookieValue = *cookieJar++;
-
-        if(cookieKey == 0) {                    // end of cookie list? then cookie not found, it's an ST
-            break;
-        }
-
-        if(cookieKey == 0x5f4d4348) {           // is it _MCH key?
-            uint16_t machine = cookieValue >> 16;
-
-            switch(machine) {                   // depending on machine, either it's TT or FALCON
-                case 2: return MACHINE_TT;
-                case 3: return MACHINE_FALCON;
-            }
-
-            break;                              // or it's ST
-        }
-    }
-
-    return MACHINE_ST;                          // it's an ST
-}
-//--------------------------------------------------

@@ -8,15 +8,15 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "stdlib.h"
-#include "acsi.h"
-#include "scsi.h"
-#include "global.h"
+#include "../libacsiscsi/acsi.h"
+#include "../libacsiscsi/scsi.h"
+#include "../libacsiscsi/hdd_if.h"
+#include "../libacsiscsi/stdlib.h"
+#include "../libacsiscsi/global.h"
+#include "../libacsiscsi/find_ce.h"
 #include "translated.h"
 #include "gemdos.h"
 
-#include "hdd_if.h"
-#include "mutex.h"
 
 #define SCSI_C_READ10       0x28
 
@@ -25,106 +25,55 @@
 #define E_OK                0           // 00        = No error
 #define E_CRC               0xfc        // -4 = 0xfc = CRC error
 
-BYTE deviceID;                          // bus ID from 0 to 7
-volatile mutex mtx;
+uint8_t deviceID;                          // bus ID from 0 to 7
 
-void showHexByte (BYTE val);
-void showHexWord (WORD val);
-void showHexDword(DWORD val);
+void showHexByte (uint8_t val);
+void showHexWord (uint16_t val);
+void showHexDword(uint32_t val);
 
 void scsi_reset(void);
 
-void cs_inquiry(BYTE id, BYTE verbose);
-void CEread(BYTE verbose);
-void findDevice(void);
+void CEread(uint8_t verbose);
 void sequentialWrite(void);
 
 void CEwrite(void);
-int  writeHansTest(int byteCount, WORD xorVal);
+int  writeHansTest(int byteCount, uint16_t xorVal);
 void showInt(int value, int length);
-int getIntFromUser(BYTE allowZero, BYTE maxDigits);
+int getIntFromUser(uint8_t allowZero, uint8_t maxDigits);
 int getIntFromUserMinMax(const char* message, int minV, int maxV);
 char getHddInterfaceForTest(void);
 void largeRead(void);
 void SDread(void);
 
-BYTE showLogs = 1;
+uint8_t showLogs = 1;
 void showMenu(void);
-
-void logMsg(char *logMsg);
 
 #define RW_TEST_SIZE    MAXSECTORS
 
-BYTE  *pBufferOrig;
-BYTE  *pBuffer;
-DWORD memSizeBytes;
-DWORD memSizeSectors;
+uint8_t  *pBufferOrig;
+uint8_t  *pBuffer;
+uint32_t memSizeBytes;
+uint32_t memSizeSectors;
 
-void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
+void hdIfCmdAsUser(uint8_t readNotWrite, uint8_t *cmd, uint8_t cmdLength, uint8_t *buffer, uint16_t sectorCount);
 
 //-------------------------------------------------- 
 #define MACHINE_ST      0
 #define MACHINE_TT      2
 #define MACHINE_FALCON  3
 
-BYTE machineType = MACHINE_ST;
+uint8_t machineType = MACHINE_ST;
 char hddIface;
 
 uint16_t tosVersion;
 uint8_t tosVersionMajor;
-
-//-------------------------------------------------- 
-void getMachineType(void)
-{
-    DWORD *cookieJarAddr    = (DWORD *) 0x05A0;
-    DWORD *cookieJar        = (DWORD *) *cookieJarAddr;     // get address of cookie jar
-
-    // by default - it's and ST
-    machineType = MACHINE_ST;
-
-    if(cookieJar == 0) {                        // no cookie jar? it's an old ST
-        return;
-    }
-
-    DWORD cookieKey, cookieValue;
-
-    int i;
-    for(i=0; i<64; i++) {                       // go through the list of cookies, up to 64 cookies
-        cookieKey   = *cookieJar++;
-        cookieValue = *cookieJar++;
-
-        if(cookieKey == 0) {                    // end of cookie list? then cookie not found, it's an ST
-            break;
-        }
-
-        if(cookieKey == 0x5f4d4348) {           // is it _MCH key?
-            WORD machine = cookieValue >> 16;
-
-            switch(machine) {                   // depending on machine, either it's TT or FALCON
-                case 2: machineType = MACHINE_TT;       return;
-                case 3: machineType = MACHINE_FALCON;   return;
-            }
-
-            break;                              // or it's ST
-        }
-    }
-
-    // it's an ST
-}
-
-void getTOSversion(void)
-{
-    BYTE  *pSysBase = (BYTE *) 0x000004F2;
-    BYTE  *ppSysBase = (BYTE *)  ((DWORD )  *pSysBase);  // get pointer to TOS address
-    tosVersion = (WORD  ) *(( WORD *) (ppSysBase + 2));  // TOS +2: TOS version
-    tosVersionMajor = tosVersion >> 8;
-}
+uint8_t hddIf;
 
 //--------------------------------------------------
 int main(void)
 {
-    DWORD scancode;
-    DWORD toEven;
+    uint32_t scancode;
+    uint32_t toEven;
 
     Clear_home();
     //                |                                        |             
@@ -136,14 +85,16 @@ int main(void)
     
     //-----------------------
     // get TOS version
-    Supexec(getTOSversion);
+    tosVersion = getTOSversion();
+    tosVersionMajor = tosVersion >> 8;
+
     (void) Cconws("TOS version (major): ");
     showInt(tosVersionMajor, 1);
     (void) Cconws("\r\n");
 
     // ---------------------- 
     // get what machine we're running on
-    Supexec(getMachineType);
+    machineType = Supexec(getMachineType);
 
     (void) Cconws("Running on: ");
     switch(machineType) {
@@ -171,9 +122,9 @@ int main(void)
     (void) Cconws("\r\n");
 
     if(machineType == MACHINE_ST) {     // use Malloc() on ST
-        pBufferOrig = (BYTE *) Malloc(memSizeBytes);
+        pBufferOrig = (uint8_t *) Malloc(memSizeBytes);
     } else {                            // use Mxalloc on TT/Falcon, force to ST RAM
-        pBufferOrig = (BYTE *) Mxalloc(memSizeBytes, 0);
+        pBufferOrig = (uint8_t *) Mxalloc(memSizeBytes, 0);
     }
 
     if(pBufferOrig == NULL) {
@@ -186,40 +137,40 @@ int main(void)
     
     // ---------------------- 
     // create buffer pointer to even address 
-    toEven = (DWORD) &pBufferOrig[0];
+    toEven = (uint32_t) &pBufferOrig[0];
 
     if(toEven & 0x0001) {       // not even number? 
         toEven++;
         memSizeBytes--;
     }
 
-    pBuffer = (BYTE *) toEven; 
+    pBuffer = (uint8_t *) toEven; 
 
     // ---------------------- 
     // search for device on the ACSI / SCSI bus 
     deviceID = 0;
     
-    //initialize lock
-    mutex_unlock(&mtx);
-
     (void) Cconws("HDD Interface       : ");
     
     switch(hddIface) {
         case 'a':   
             (void) Cconws("\33pACSI\33q");
             hdd_if_select(IF_ACSI);
+            hddIf = IF_ACSI;
             deviceID = 0;           // ACSI ID 0
             break;
 
         case 't':
             (void) Cconws("\33pTT SCSI\33q");
             hdd_if_select(IF_SCSI_TT);
+            hddIf = IF_SCSI_TT;
             deviceID = 0;           // SCSI ID 0
             break;
 
         case 'f':
             (void) Cconws("\33pFalcon SCSI\33q");
             hdd_if_select(IF_SCSI_FALCON);
+            hddIf = IF_SCSI_FALCON;
             deviceID = 1;           // SCSI ID 1
             
             break;
@@ -227,7 +178,14 @@ int main(void)
     (void) Cconws("\r\n");
 
     showLogs = 0;                   // turn off logs - there will be errors on findDevice when device doesn't exist 
-    Supexec(findDevice);
+    uint8_t res = findDevice(FIND_DEV_CE | FIND_DEV_CS);
+
+    if(res == DEVICE_NOT_FOUND) {
+		sleep(3);
+        return 0;
+    }
+
+    deviceID = res & 0x07;                                  // store the BUS ID of device
     showLogs = 1;                   // turn on logs
             
     showMenu();
@@ -252,17 +210,17 @@ int main(void)
         }
 
         if(key == 'i') {            // INQUIRY command
-            cs_inquiry(deviceID, 1);
+            cs_inquiry(deviceID, hddIf);
             continue;
         }
 
         if(key == 'I') {
             int i;
-            DWORD start, end, diff;
+            uint32_t start, end, diff;
 
             start = getTicks();
             for(i=0; i<10; i++) {
-                cs_inquiry(deviceID, 0);
+                cs_inquiry(deviceID, hddIf);
             }
             end = getTicks();
             diff = end - start;
@@ -287,7 +245,7 @@ int main(void)
 
         if(key == 'R') {
             int i;
-            DWORD start, end, diff;
+            uint32_t start, end, diff;
 
             start = getTicks();
             for(i=0; i<10; i++) {
@@ -364,15 +322,15 @@ void showMenu(void)
     (void) Cconws("Q - quit\r\n\r\n");
 }
 
-BYTE commandLong[CMD_LENGTH_LONG] = {0x1f,	0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0, 0, 0, 0, 0, 0, 0}; 
-int readHansTest(int byteCount, WORD xorVal, BYTE verbose);
+uint8_t commandLong[CMD_LENGTH_LONG] = {0x1f,	0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0, 0, 0, 0, 0, 0, 0}; 
+int readHansTest(int byteCount, uint16_t xorVal, uint8_t verbose);
 
-void CEread(BYTE verbose)
+void CEread(uint8_t verbose)
 {
   	commandLong[0] = (deviceID << 5) | 0x1f;			// cmd[0] = ACSI_id + ICD command marker (0x1f)	
 	commandLong[1] = 0xA0;								// cmd[1] = command length group (5 << 5) + TEST UNIT READY (0)  	
 
-    WORD xorVal=0xC0DE;
+    uint16_t xorVal=0xC0DE;
     
     int res = readHansTest(RW_TEST_SIZE * 512, xorVal, verbose);
     
@@ -387,8 +345,8 @@ void CEread(BYTE verbose)
 
 void largeRead(void)
 {
-    DWORD mbCount       = (memSizeSectors      >> 11);   // sectors to mega bytes
-    DWORD timeoutSecs   = mbCount * 3;                          // mega bytes to seconds
+    uint32_t mbCount       = (memSizeSectors      >> 11);   // sectors to mega bytes
+    uint32_t timeoutSecs   = mbCount * 3;                          // mega bytes to seconds
     
     (void) Cconws("READ(10) - dev: ");
     showInt(deviceID, 1);
@@ -403,8 +361,8 @@ void largeRead(void)
     commandLong[0] = (deviceID << 5) | 0x1f;
     commandLong[1] = SCSI_C_READ10;
     
-    commandLong[8] = (BYTE) (memSizeSectors >> 8);
-    commandLong[9] = (BYTE) (memSizeSectors     );
+    commandLong[8] = (uint8_t) (memSizeSectors >> 8);
+    commandLong[9] = (uint8_t) (memSizeSectors     );
     
     hdIfCmdAsUser(1, commandLong, 11, pBuffer, memSizeSectors);
 
@@ -417,7 +375,7 @@ void largeRead(void)
     (void) Cconws("\r\n");
 }
 
-int readHansTest(int byteCount, WORD xorVal, BYTE verbose)
+int readHansTest(int byteCount, uint16_t xorVal, uint8_t verbose)
 {
 	commandLong[4+1] = TEST_READ;
 
@@ -445,8 +403,8 @@ int readHansTest(int byteCount, WORD xorVal, BYTE verbose)
     }
     
     int i;
-    WORD counter = 0;
-    WORD data = 0;
+    uint16_t counter = 0;
+    uint16_t data = 0;
     for(i=0; i<byteCount; i += 2) {
         data = counter ^ xorVal;       // create word
         if( !(pBuffer[i]==(data>>8) && pBuffer[i+1]==(data&0xFF)) ){
@@ -456,7 +414,7 @@ int readHansTest(int byteCount, WORD xorVal, BYTE verbose)
     }
 
     if(byteCount & 1) {                                 // odd number of bytes? add last byte
-        BYTE lastByte = (counter ^ xorVal) >> 8;
+        uint8_t lastByte = (counter ^ xorVal) >> 8;
         if( pBuffer[byteCount-1]!=lastByte ){
           return -2;
         }  
@@ -467,7 +425,7 @@ int readHansTest(int byteCount, WORD xorVal, BYTE verbose)
 
 void SDread(void)
 {
-    BYTE cmd[6];
+    uint8_t cmd[6];
     
     memset(cmd, 0, 6);
     cmd[0] = (deviceID << 5) | SCSI_CMD_READ6;
@@ -513,126 +471,10 @@ void SDread(void)
     }
 }
 
-void cs_inquiry(BYTE id, BYTE verbose)
-{
-	int i;
-    BYTE cmd[6];
-    
-    memset(cmd, 0, 6);
-    cmd[0] = (id << 5) | (SCSI_CMD_INQUIRY & 0x1f);
-    cmd[4] = 32;                                // count of bytes we want from inquiry command to be returned
-
-    if(verbose) {
-        (void) Cconws("SCSI Inquiry: ");
-    }    
-    
-    // issue the inquiry command and check the result 
-    hdIfCmdAsUser(1, cmd, 6, pBuffer, 1);
-
-    if(!hdIf.success || verbose) {  // if fail or verbose, show result
-        (void) Cconws("SCSI result : ");
-        showHexByte(hdIf.statusByte);
-        (void) Cconws("\r\n");
-    }
-    
-    if(!hdIf.success) {             // if failed, don't dump anything, it would be just garbage
-        return;
-    }
-    
-    if(!verbose) {                  // not verbose? quit, because the rest is just being verbose...
-        return;
-    }    
-    //----------------------------
-    // hex dump of data
-    (void) Cconws("INQUIRY HEXA: ");
-
-    for(i=0; i<32; i++) {
-        showHexByte(pBuffer[i]);
-        (void) Cconout(' ');
-    }
-    (void) Cconws("\r\n");
-    
-    //----------------------------
-    // char dump of data
-    (void) Cconws("INQUIRY CHAR: ");
-    for(i=0; i<32; i++) {
-        if(pBuffer[i] >= 32) {
-            Cconout(pBuffer[i]);
-        } else {
-            Cconout(' ');
-        }
-
-        Cconout(' ');
-        Cconout(' ');
-    }
-    
-    (void) Cconws("\r\n");
-}
-//--------------------------------------------------
-void showHexByte(BYTE val)
-{
-    int hi, lo;
-    char tmp[3];
-    char table[16] = {"0123456789ABCDEF"};
-    
-    hi = (val >> 4) & 0x0f;;
-    lo = (val     ) & 0x0f;
-
-    tmp[0] = table[hi];
-    tmp[1] = table[lo];
-    tmp[2] = 0;
-    
-    (void) Cconws(tmp);
-}
-
-void showHexWord(WORD val)
-{
-    BYTE a,b;
-    a = val >>  8;
-    b = val;
-    
-    showHexByte(a);
-    showHexByte(b);
-}
-
-void showHexDword(DWORD val)
-{
-    BYTE a,b,c,d;
-    a = val >> 24;
-    b = val >> 16;
-    c = val >>  8;
-    d = val;
-    
-    showHexByte(a);
-    showHexByte(b);
-    showHexByte(c);
-    showHexByte(d);
-}
-
-BYTE ce_identify(BYTE bus_id)
-{
-    BYTE cmd[] = {0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, TRAN_CMD_IDENTIFY, 0};
-
-    cmd[0] = (bus_id << 5);                   // cmd[0] = ACSI_id + TEST UNIT READY (0)	
-    memset(pBuffer, 0, 512);                  // clear the buffer 
-
-    hdIfCmdAsUser(1, cmd, 6, pBuffer, 1);       // issue the identify command and check the result 
-
-    if(!hdIf.success) {                       // if failed, return FALSE 
-        return 0;
-    }
-
-    if(strncmp((char *) pBuffer, "CosmosEx translated disk", 24) != 0) {		// the identity string doesn't match? 
-        return 0;
-    }
-
-    return 1;                             // success 
-}
-
 //--------------------------------------------
-BYTE cs_inquiry2(BYTE id)
+uint8_t cs_inquiry2(uint8_t id)
 {
-    BYTE cmd[CMD_LENGTH_SHORT];
+    uint8_t cmd[CMD_LENGTH_SHORT];
     
     memset(cmd, 0, 6);
     cmd[0] = (id << 5) | (SCSI_CMD_INQUIRY & 0x1f);
@@ -648,67 +490,9 @@ BYTE cs_inquiry2(BYTE id)
 }
 
 //--------------------------------------------
-void findDevice(void)
-{
-    BYTE i;
-    BYTE res;
-
-    //            |                    |
-    (void) Cconws("Looking for CosmosEx: ");
-
-    deviceID = 0;
-    BYTE good;
-    uint8_t firstId = 0xff;
-
-    for(i=0; i<8; i++) {
-        res     = cs_inquiry2(i);                                   // try to read the IDENTITY string
-        good    = FALSE;
-        uint8_t isCE = FALSE;
-
-        if(res) {
-            if(memcmp(pBuffer + 16, "CosmosEx", 8) == 0) {          // inquiry string contains 'CosmosEx'
-                isCE = TRUE;
-
-                if(firstId == 0xff) {
-                    firstId = i;
-                }
-
-                if(memcmp(pBuffer + 27, "SD", 2) == 0) {            // it's CosmosEx SD card
-                    good = TRUE;
-                } else {                                            // it's CosmosEx, but not SD card
-                    good = FALSE;
-                }
-            } else if(memcmp(pBuffer + 16, "CosmoSolo", 9) == 0) {  // it's CosmoSolo, that's SD card
-                good = TRUE;
-            }
-        }
-
-        if(isCE) {          // good
-            (void) Cconws("\33p");
-            Cconout('0' + i);
-            (void) Cconws("\33q");
-
-            deviceID = i;
-        } else {            // bad
-            Cconout('0' + i);
-        }
-    }
-
-    (void) Cconws("\n\r");
-
-    if(good) {  // found CE with SD card or CosmoSolo? quit
-        return;
-    }
-
-    if(firstId != 0xff) {   // found CE without SD card, use it
-        deviceID = firstId;
-    }
-}
-
-//--------------------------------------------
 uint8_t scsiWrite(uint8_t devId, uint32_t sectorStart, uint8_t sectorCount, uint8_t* data)
 {
-    BYTE cmd[6];
+    uint8_t cmd[6];
     cmd[0] = (devId << 5) | SCSI_CMD_WRITE6;
     cmd[1] = (sectorStart >> 16);
     cmd[2] = (sectorStart >>  8);
@@ -819,7 +603,7 @@ void CEwrite(void)
     commandLong[0] = (deviceID << 5) | 0x1f;			// cmd[0] = ACSI_id + ICD command marker (0x1f)	
     commandLong[1] = 0xA0;								// cmd[1] = command length group (5 << 5) + TEST UNIT READY (0)  	
 
-    WORD xorVal=0xC0DE;
+    uint16_t xorVal=0xC0DE;
     
     int res = writeHansTest(RW_TEST_SIZE * 512, xorVal);
     
@@ -832,7 +616,7 @@ void CEwrite(void)
     }
 }
         
-int writeHansTest(int byteCount, WORD xorVal)
+int writeHansTest(int byteCount, uint16_t xorVal)
 {
     commandLong[4+1] = TEST_WRITE;
 
@@ -846,8 +630,8 @@ int writeHansTest(int byteCount, WORD xorVal)
     commandLong[9+1] = (xorVal     ) & 0xFF;
 
     int i;
-    WORD counter = 0;
-    WORD data = 0;
+    uint16_t counter = 0;
+    uint16_t data = 0;
     for(i=0; i<byteCount; i += 2) {
         data = counter ^ xorVal;       // create word
         pBuffer[i] = (data>>8);
@@ -856,7 +640,7 @@ int writeHansTest(int byteCount, WORD xorVal)
     }
 
     if(byteCount & 1) {                                 // odd number of bytes? add last byte
-        BYTE lastByte = (counter ^ xorVal) >> 8;
+        uint8_t lastByte = (counter ^ xorVal) >> 8;
         pBuffer[byteCount-1]=lastByte;
     }
 
@@ -873,83 +657,13 @@ int writeHansTest(int byteCount, WORD xorVal)
     return 0;
 }
 
-void logMsg(char *logMsg)
-{
-    if(showLogs) {
-        (void) Cconws(logMsg);
-    }
-}
-
-void logMsgProgress(DWORD current, DWORD total)
-{
-    if(!showLogs) {
-        return;
-    }
-
-    (void) Cconws("Progress: ");
-    showHexDword(current);
-    (void) Cconws(" out of ");
-    showHexDword(total);
-    (void) Cconws("\n\r");
-}
-
-void showInt(int value, int length)
-{
-    char tmp[10];
-    memset(tmp, 0, 10);
-
-    if(length == -1) {                      // determine length?
-        int i, div = 10;
-
-        for(i=1; i<6; i++) {                // try from 10 to 1000000
-            if((value / div) == 0) {        // after division the result is zero? we got the length
-                length = i;
-                break;
-            }
-
-            div = div * 10;                 // increase the divisor by 10
-        }
-
-        if(length == -1) {                  // length undetermined? use length 6
-            length = 6;
-        }
-    }
-
-    int i;
-    for(i=0; i<length; i++) {               // go through the int lenght and get the digits
-        int val, mod;
-
-        val = value / 10;
-        mod = value % 10;
-        tmp[length - 1 - i] = mod + 48;
-        value = val;
-    }
-
-    uint8_t foundNonZero = 0;
-    for(i=0; i<length; i++) {       // change first few zeros to spaces
-        if(i == (length - 1)) {     // last digit? always write that one, even if it's zero
-            foundNonZero = 1;
-        }
-
-        if(!foundNonZero) {         // not found non-zero yet
-            if(tmp[i] != '0') {     // found non-zero? mark it down
-                foundNonZero = 1;
-            } else {                // found zero? replace with space
-                tmp[i] = ' ';
-            }
-        }
-    }
-
-    (void) Cconws(tmp);                     // write it out
-}
-
-int getIntFromUser(BYTE allowZero, BYTE maxDigits)
+int getIntFromUser(uint8_t allowZero, uint8_t maxDigits)
 {
     int intValue    = 0;
     int gotDigits   = 0;
     
     while(1) {
-        BYTE key = Cnecin();
+        uint8_t key = Cnecin();
 
         if((key == 13 && gotDigits > 0) ||      // it's enter and got at least 1 digit, quit
             gotDigits >= maxDigits) {           // if got maxDigits digits count, quit
@@ -1024,29 +738,3 @@ int getIntFromUserMinMax(const char* message, int minV, int maxV)
 
     return 0;
 }
-
-//--------------------------------------------------
-// global variables, later used for calling hdIfCmdAsSuper
-BYTE __readNotWrite, __cmdLength;
-WORD __sectorCount;
-BYTE *__cmd, *__buffer;
-
-void hdIfCmdAsSuper(void)
-{
-    // this should be called through Supexec()
-    (*hdIf.cmd)(__readNotWrite, __cmd, __cmdLength, __buffer, __sectorCount);
-}
-
-void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
-{
-    // store params to global vars
-    __readNotWrite  = readNotWrite;
-    __cmd           = cmd;
-    __cmdLength     = cmdLength;
-    __buffer        = buffer;
-    __sectorCount   = sectorCount;    
-    
-    // call the function which does the real work, and uses those global vars
-    Supexec(hdIfCmdAsSuper);
-}
-

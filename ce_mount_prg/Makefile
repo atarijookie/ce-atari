@@ -10,6 +10,7 @@ PRGFLAGS  = m68k-atari-mint-flags
 CFLAGS    = -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
 CFLAGS030 = -O2 -m68030 -fomit-frame-pointer -Wall -Wno-multichar
 LDFLAGS   = -Wl,--traditional-format
+LDLIBS    = -L../libacsiscsi -lacsiscsi -lgcc
 DEPFLAGS  = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
 
 ACTUAL_CC := $(CC)
@@ -36,7 +37,7 @@ STARTUP	 = startup.s
 
 DEPS = $(CSRC:.c=.d)
 OBJS = $(patsubst %.c,%.o,$(CSRC))
-OBJS030 = cache030.o
+OBJS030 = ../libacsiscsi/cache030.o
 
 $(TARGET): $(STARTUP) $(OBJS) $(OBJS030)
 	$(CC_LINK) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS)

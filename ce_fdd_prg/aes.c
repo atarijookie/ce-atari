@@ -8,8 +8,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "stdlib.h"
-#include "acsi.h"
+#include "../libacsiscsi/acsi.h"
+#include "../libacsiscsi/stdlib.h"
 #include "main.h"
 #include "hostmoddefs.h"
 #include "keys.h"
@@ -50,14 +50,14 @@ void redrawDialog(void)
     objc_draw(cd->tree, ROOT, MAX_DEPTH, cd->xdial, cd->ydial, cd->wdial, cd->hdial);
 }
 
-void setVisible(int objId, BYTE visible)
+void setVisible(int objId, uint8_t visible)
 {
     if(objId < 0 || objId > cd->tree->ob_tail) {    // index too small or too big? quit
         return;
     }
 
     // object was visible, if the flag HIDETREE is zero
-    BYTE wasVisible = (cd->tree[ objId ].ob_flags & OF_HIDETREE) == 0;
+    uint8_t wasVisible = (cd->tree[ objId ].ob_flags & OF_HIDETREE) == 0;
 
     if(visible) {   // show? remove flag
         cd->tree[ objId ].ob_flags &= (~OF_HIDETREE);
@@ -70,7 +70,7 @@ void setVisible(int objId, BYTE visible)
     }
 }
 
-BYTE isSelected(int objIdx)
+uint8_t isSelected(int objIdx)
 {
     if(objIdx < 0 || objIdx > cd->tree->ob_tail) {    // index too small or too big? quit
         return FALSE;
@@ -80,7 +80,7 @@ BYTE isSelected(int objIdx)
     return (obj->ob_state & OS_SELECTED) != 0;  // is selected if selected bit not zero
 }
 
-void selectButton(int btnIdx, BYTE select)
+void selectButton(int btnIdx, uint8_t select)
 {
     if(btnIdx < 0 || btnIdx > cd->tree->ob_tail) {    // index too small or too big? quit
         return;
@@ -97,7 +97,7 @@ void selectButton(int btnIdx, BYTE select)
     redrawObject(btnIdx);
 }
 
-void enableButton(int btnIdx, BYTE enabled)
+void enableButton(int btnIdx, uint8_t enabled)
 {
     if(btnIdx < 0 || btnIdx > cd->tree->ob_tail) {    // index too small or too big? quit
         return;
@@ -146,7 +146,7 @@ void setObjectString(int16_t objId, const char *newString)
     redrawObject(objId);                    // redraw it
 }
 
-void showDialog(BYTE show)
+void showDialog(uint8_t show)
 {
     if(!cd || !cd->tree) {  // if current dialog not set or tree not set, quit
         return;
@@ -188,7 +188,7 @@ void showComErrorDialog(void)
     showErrorDialog("Error in CosmosEx communication!");
 }
 
-BYTE gem_init(void)
+uint8_t gem_init(void)
 {
     int16_t work_in[11], i, work_out[64];
     gl_apid = appl_init();

@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "acsi.h"
+#include "../libacsiscsi/acsi.h"
 #include "main.h"
 #include "hostmoddefs.h"
 #include "keys.h"
@@ -19,19 +19,19 @@
 #include "aes.h"
 
 // ------------------------------------------------------------------
-extern BYTE deviceID;
-extern BYTE commandShort[CMD_LENGTH_SHORT];
+extern uint8_t deviceID;
+extern uint8_t commandShort[CMD_LENGTH_SHORT];
 
-extern BYTE *p64kBlock;
-extern BYTE sectorCount;
+extern uint8_t *p64kBlock;
+extern uint8_t sectorCount;
 
-extern BYTE *pBfr, *pBfrCnt;
+extern uint8_t *pBfr, *pBfrCnt;
 
 extern char filePath[256], fileName[256];
 
-BYTE siloContent[512];
+uint8_t siloContent[512];
 
-BYTE uploadImage(int index, char *customPath);
+uint8_t uploadImage(int index, char *customPath);
 void swapImage(int index);
 void removeImage(int index);
 
@@ -44,12 +44,12 @@ void showMenu(char fullNotPartial);
 void showImage(int index);
 void getSiloContent(void);
 
-void getStatus(BYTE alsoShow);
+void getStatus(uint8_t alsoShow);
 extern Status status;
 
 Dialog dialogConfig;        // dialog with floppy image config
 
-BYTE getSelectedSlotNo(void)
+uint8_t getSelectedSlotNo(void)
 {
     OBJECT *o1 = (OBJECT *) &dialogConfig.tree[RADIO_SLOT1];
     OBJECT *o2 = (OBJECT *) &dialogConfig.tree[RADIO_SLOT2];
@@ -146,7 +146,7 @@ void getAndShowSiloContent(void)
     }
 }
 
-BYTE gem_floppySetup(void)
+uint8_t gem_floppySetup(void)
 {
     rsrc_gaddr(R_TREE, FDD, &dialogConfig.tree); // get address of dialog tree
     cd = &dialogConfig;             // set pointer to current dialog, so all helper functions will work with that dialog
@@ -158,7 +158,7 @@ BYTE gem_floppySetup(void)
     showProgress(-1);      // hide progress bar
     showFilename(NULL);    // hide load/save filename
 
-    BYTE retVal = KEY_F10;
+    uint8_t retVal = KEY_F10;
 
     while(1) {
         int16_t exitobj = form_do(dialogConfig.tree, 0) & 0x7FFF;
@@ -182,7 +182,7 @@ BYTE gem_floppySetup(void)
             }
         }
 
-        BYTE slotNo = getSelectedSlotNo();
+        uint8_t slotNo = getSelectedSlotNo();
 
         if(!slotNo) {               // failed to get slot number? try once again
             continue;
@@ -234,7 +234,7 @@ void showImage(int index)
     // offset 320: filename 3
     // offset 400: content  3
 
-    BYTE *filename  = &siloContent[(index * 160)];
+    uint8_t *filename  = &siloContent[(index * 160)];
     showImageFileName(index, (const char *) filename);
 }
 
@@ -249,7 +249,7 @@ void newImage(int index)
 
     sectorCount = 1;                                        // read 1 sector
 
-    BYTE res = Supexec(ce_acsiReadCommand);
+    uint8_t res = Supexec(ce_acsiReadCommand);
 
 	if(res != FDD_OK) {                                     // bad? write error
         showComErrorDialog();
@@ -268,7 +268,7 @@ void downloadImage(int index)
 
     sectorCount = 1;                                        // read 1 sector
 
-    BYTE res = Supexec(ce_acsiReadCommand);
+    uint8_t res = Supexec(ce_acsiReadCommand);
 
     if(res == FDD_OK) {                                     // good? copy in the results
         strcpy(fileName, (char *) pBfr);                    // pBfr should contain original file name
@@ -335,7 +335,7 @@ void downloadImage(int index)
 
     // do the transfer
     int32_t blockNo, len, ires;
-    BYTE failed = 0;
+    uint8_t failed = 0;
     int progress = 0;
 
     for(blockNo=0; blockNo<64; blockNo++) {                 // try to get all blocks
@@ -356,7 +356,7 @@ void downloadImage(int index)
             break;
         }
 
-        len = (((WORD) pBfr[0]) << 8) | ((WORD) pBfr[1]);   // retrieve count of data in buffer
+        len = (((uint16_t) pBfr[0]) << 8) | ((uint16_t) pBfr[1]);   // retrieve count of data in buffer
 
         if(len > 0) {                                       // something to write?
             ires = Fwrite(fh, len, pBfr + 2);
@@ -399,7 +399,7 @@ void getSiloContent(void)
 
     sectorCount = 1;                            // read 1 sector
 
-    BYTE res = Supexec(ce_acsiReadCommand);
+    uint8_t res = Supexec(ce_acsiReadCommand);
 
 	if(res == FDD_OK) {                         // good? copy in the results
         memcpy(siloContent, pBfr, 512);
@@ -419,7 +419,7 @@ void swapImage(int index)
 
     sectorCount = 1;                            // read 1 sector
 
-    BYTE res = Supexec(ce_acsiReadCommand);
+    uint8_t res = Supexec(ce_acsiReadCommand);
 
     if(res != FDD_OK) {                         // bad? write error
         showComErrorDialog();
@@ -437,14 +437,14 @@ void removeImage(int index)
 
     sectorCount = 1;                            // read 1 sector
 
-    BYTE res = Supexec(ce_acsiReadCommand);
+    uint8_t res = Supexec(ce_acsiReadCommand);
 
     if(res != FDD_OK) {                         // bad? write error
         showComErrorDialog();
     }
 }
 
-BYTE uploadImage(int index, char *customPath)
+uint8_t uploadImage(int index, char *customPath)
 {
     if(index < 0 || index > 2) {
         return FALSE;
@@ -499,7 +499,7 @@ BYTE uploadImage(int index, char *customPath)
 
     sectorCount     = 1;                                        // write just one sector
 
-    BYTE res;
+    uint8_t res;
     res = Supexec(ce_acsiWriteBlockCommand);
 
     if(res == FDD_RES_ONDEVICECOPY) {                           // if the device returned this code, it means that it could do the image upload / copy on device, no need to upload it from ST!
@@ -515,8 +515,8 @@ BYTE uploadImage(int index, char *customPath)
     }
     //---------------
     // upload the image by 64kB blocks
-    BYTE good = 1;
-    BYTE blockNo = 0;
+    uint8_t good = 1;
+    uint8_t blockNo = 0;
 
     sectorCount = 128;                                          // write 128 sectors (64 kB)
     int progress = 0;

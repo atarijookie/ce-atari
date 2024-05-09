@@ -2,6 +2,7 @@
 #include <mint/osbind.h>
 
 #include "stdlib.h"
+#include "keys.h"
 
 void *memcpy ( void * destination, const void * source, int num )
 {
@@ -69,6 +70,12 @@ char *strncpy ( char * destination, const char * source, int num )
 	}
 
 	return destination;
+}
+
+char *strcpy ( char * destination, const char * source)
+{
+    int len = strlen(source);
+    return strncpy (destination, source, len);
 }
 
 int strncmp ( const char * str1, const char * str2, int num )
@@ -291,4 +298,131 @@ void logMsgProgress(uint32_t current, uint32_t total)
 //    (void) Cconws(" out of ");
 //    showHexDword(total);
 //    (void) Cconws("\n\r");
+}
+
+uint8_t getMachineType(void)
+{
+    uint32_t *cookieJarAddr    = (uint32_t *) 0x05A0;
+    uint32_t *cookieJar        = (uint32_t *) *cookieJarAddr;     // get address of cookie jar
+
+    if(cookieJar == 0) {                        // no cookie jar? it's an old ST
+        return MACHINE_ST;
+    }
+
+    uint32_t cookieKey, cookieValue;
+
+    int i;
+    for(i=0; i<64; i++) {                       // go through the list of cookies
+        cookieKey   = *cookieJar++;
+        cookieValue = *cookieJar++;
+
+        if(cookieKey == 0) {                    // end of cookie list? then cookie not found, it's an ST
+            break;
+        }
+
+        if(cookieKey == 0x5f4d4348) {           // is it _MCH key?
+            uint16_t machine = cookieValue >> 16;
+
+            switch(machine) {                   // depending on machine, either it's TT or FALCON
+                case 2: return MACHINE_TT;
+                case 3: return MACHINE_FALCON;
+            }
+
+            break;                              // or it's ST
+        }
+    }
+
+    return MACHINE_ST;                          // it's an ST
+}
+//--------------------------------------------------
+char *strcat( char * destination, const char * source)
+{
+    int len = strlen(destination);
+    strcpy(destination + len, source);
+    return destination;
+}
+
+uint8_t getKey(void)
+{
+    uint32_t scancode;
+    uint8_t key, vkey;
+
+    scancode = Cnecin();                    /* get char form keyboard, no echo on screen */
+
+    vkey    = (scancode >> 16)  & 0xff;
+    key     =  scancode         & 0xff;
+
+    key     = atariKeysToSingleByte(vkey, key); /* transform uint8_t pair into single uint8_t */
+    
+    return key;
+}
+
+uint8_t getKeyIfPossible(void)
+{
+    uint32_t scancode;
+    uint8_t key, vkey, res;
+
+    res = Cconis();                             // see if there's something waiting from keyboard 
+
+    if(res == 0) {                              // nothing waiting from keyboard?
+        return 0;
+    }
+    
+    scancode = Cnecin();                        // get char form keyboard, no echo on screen 
+
+    vkey = (scancode>>16) & 0xff;
+    key  =  scancode      & 0xff;
+
+    key = atariKeysToSingleByte(vkey, key);     // transform uint8_t pair into single uint8_t
+    return key;
+}
+
+uint8_t atariKeysToSingleByte(uint8_t vkey, uint8_t key)
+{
+    uint16_t vkeyKey;
+    vkeyKey = (((uint16_t) vkey) << 8) | ((uint16_t) key);      /* create a uint16_t with vkey and key together */
+
+    switch(vkeyKey) {
+        case 0x5032: return KEY_PAGEDOWN;
+        case 0x4838: return KEY_PAGEUP;
+    }
+
+    if(key >= 32 && key < 127) {        /* printable ASCII key? just return it */
+        return key;
+    }
+
+    if(key == 0) {                      /* will this be some non-ASCII key? convert it */
+        switch(vkey) {
+            case 0x48: return KEY_UP;
+            case 0x50: return KEY_DOWN;
+            case 0x4b: return KEY_LEFT;
+            case 0x4d: return KEY_RIGHT;
+            case 0x52: return KEY_INSERT;
+            case 0x47: return KEY_HOME;
+            case 0x62: return KEY_HELP;
+            case 0x61: return KEY_UNDO;
+            case 0x3b: return KEY_F1;
+            case 0x3c: return KEY_F2;
+            case 0x3d: return KEY_F3;
+            case 0x3e: return KEY_F4;
+            case 0x3f: return KEY_F5;
+            case 0x40: return KEY_F6;
+            case 0x41: return KEY_F7;
+            case 0x42: return KEY_F8;
+            case 0x43: return KEY_F9;
+            case 0x44: return KEY_F10;
+            default: return 0;          /* unknown key */
+        }
+    }
+
+    switch(vkeyKey) {                   /* some other no-ASCII key, but check with vkey too */
+        case 0x011b: return KEY_ESC;
+        case 0x537f: return KEY_DELETE;
+        case 0x0e08: return KEY_BACKSP;
+        case 0x0f09: return KEY_TAB;
+        case 0x1c0d: return KEY_ENTER;
+        case 0x720d: return KEY_ENTER;
+    }
+
+    return 0;                           /* unknown key */
 }

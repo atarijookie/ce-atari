@@ -6,10 +6,10 @@
 
 #include <stdint.h>
 
-    #ifndef BYTE
-        #define BYTE  	unsigned char
-        #define WORD  	uint16_t
-        #define DWORD 	uint32_t
+    #ifndef uint8_t
+        #define uint8_t  	unsigned char
+        #define uint16_t  	uint16_t
+        #define uint32_t 	uint32_t
     #endif
 
     #ifndef FALSE
@@ -17,6 +17,6 @@
         #define TRUE		1
     #endif
 
-#define HZ_200     ((volatile DWORD *) 0x04BA) /* 200 Hz system clock */ 
+#define HZ_200     ((volatile uint32_t *) 0x04BA) /* 200 Hz system clock */ 
 
 #endif

@@ -18,7 +18,7 @@ CFLAGSCOM   += -fno-common
 CFLAGS      = -O2 -m68000 $(CFLAGSCOM)
 CFLAGS030   = -O2 -m68030 $(CFLAGSCOM)
 LDFLAGS  = -Wl,--traditional-format
-LDLIBS   = -lgcc -L../libacsiscsi -l:libacsiscsi.a
+LDLIBS   = -lgcc -L../libacsiscsi -lacsiscsi
 DEPFLAGS = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
 
 ACTUAL_CC := $(CC)
