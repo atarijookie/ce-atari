@@ -8,24 +8,24 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "acsi.h"
+#include "../libacsiscsi/acsi.h"
 #include "main.h"
 #include "hostmoddefs.h"
 #include "keys.h"
 #include "defs.h"
 
 // ------------------------------------------------------------------ 
-extern BYTE deviceID;
-extern BYTE commandShort[CMD_LENGTH_SHORT];
+extern uint8_t deviceID;
+extern uint8_t commandShort[CMD_LENGTH_SHORT];
 
-extern BYTE *p64kBlock;
-extern BYTE sectorCount;
+extern uint8_t *p64kBlock;
+extern uint8_t sectorCount;
 
-extern BYTE *pBfr, *pBfrCnt;
+extern uint8_t *pBfr, *pBfrCnt;
 
 // ------------------------------------------------------------------ 
 
-BYTE uploadImage(int index, char *path)
+uint8_t uploadImage(int index, char *path)
 {
     if(index < 0 || index > 2) {
         return 0;
@@ -55,7 +55,7 @@ BYTE uploadImage(int index, char *path)
     
     sectorCount     = 1;                                        // write just one sector
     
-    BYTE res;
+    uint8_t res;
     res = Supexec(ce_acsiWriteBlockCommand); 
 
     if(res == FDD_RES_ONDEVICECOPY) {                           // if the device returned this code, it means that it could do the image upload / copy on device, no need to upload it from ST!
@@ -74,8 +74,8 @@ BYTE uploadImage(int index, char *path)
 
     (void) Cconws("Uploading  : ");
 
-    BYTE good = 1;
-    BYTE blockNo = 0;
+    uint8_t good = 1;
+    uint8_t blockNo = 0;
 
     sectorCount = 128;                                          // write 128 sectors (64 kB)
 

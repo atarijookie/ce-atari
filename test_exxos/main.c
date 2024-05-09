@@ -4,38 +4,35 @@
 #include <mint/linea.h> 
 #include <stdio.h>
 
-#include "acsi.h"
+#include "../libacsiscsi/hdd_if.h"
+#include "../libacsiscsi/stdlib.h"
+#include "../libacsiscsi/acsi.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"
 #include "VT52.h"
 #include "version.h"
-#include "hdd_if.h"
-#include "stdlib.h"
 
 //--------------------------------------------------
 
 void sleep(int seconds);
 
-void showHexByte(BYTE val);
-void showHexDword(DWORD val);
-
 //--------------------------------------------------
-BYTE deviceID;
+uint8_t deviceID;
 
-BYTE readBuffer [254 * 512 + 4];
-BYTE writeBuffer[254 * 512 + 4];
-BYTE *rBuffer, *wBuffer;
+uint8_t readBuffer [254 * 512 + 4];
+uint8_t writeBuffer[254 * 512 + 4];
+uint8_t *rBuffer, *wBuffer;
 uint16_t* pZeroInTos;
 uint8_t readZerosWhileWait;
 
-void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
+void hdIfCmdAsUser(uint8_t readNotWrite, uint8_t *cmd, uint8_t cmdLength, uint8_t *buffer, uint16_t sectorCount);
 int  getIntFromUser(void);
 
 #define SCSI_C_WRITE6                           0x0a
 #define SCSI_C_READ6                            0x08
 
-void writeReadAbove100MB(BYTE acsiId);
-void justWriteKnownData256sectors(BYTE acsiId);
+void writeReadAbove100MB(uint8_t acsiId);
+void justWriteKnownData256sectors(uint8_t acsiId);
 
 static long get_tos_header(void)
 {
@@ -86,8 +83,8 @@ void findAddressToZeroInTos(void)
 //--------------------------------------------------
 int main(void)
 {
-    BYTE key;
-    DWORD toEven;
+    uint8_t key;
+    uint32_t toEven;
 
     //----------------------
     // read all the keys which are waiting, so we can ignore them
@@ -105,20 +102,20 @@ int main(void)
 
     // ---------------------- 
     // create buffer pointer to even address 
-    toEven = (DWORD) &readBuffer[0];
+    toEven = (uint32_t) &readBuffer[0];
 
     if(toEven & 0x0001)       // not even number? 
         toEven++;
 
-    rBuffer = (BYTE *) toEven; 
+    rBuffer = (uint8_t *) toEven; 
 
     //----------
-    toEven = (DWORD) &writeBuffer[0];
+    toEven = (uint32_t) &writeBuffer[0];
 
     if(toEven & 0x0001)       // not even number? 
         toEven++;
 
-    wBuffer = (BYTE *) toEven; 
+    wBuffer = (uint8_t *) toEven; 
 
     Clear_home();
     VT52_Wrap_on();
@@ -146,7 +143,7 @@ int main(void)
     //-------------
 
     (void) Cconws("Enter ACSI ID of device          : ");
-    BYTE acsiId = getIntFromUser();
+    uint8_t acsiId = getIntFromUser();
     (void) Cconws("\r\n");
 
     //-------------
@@ -186,7 +183,7 @@ int main(void)
     return 0;
 }
 
-void justWriteKnownData256sectors(BYTE acsiId)
+void justWriteKnownData256sectors(uint8_t acsiId)
 {
     //-------------
     // fill write buffer
@@ -195,8 +192,8 @@ void justWriteKnownData256sectors(BYTE acsiId)
         wBuffer[i] = i;
     }
 
-    BYTE  cmd[6];
-    DWORD sector;
+    uint8_t  cmd[6];
+    uint32_t sector;
 
     for(sector=0; sector<256; sector++) {
         cmd[0] = (acsiId << 5) | SCSI_C_WRITE6;         // WRITE
@@ -226,7 +223,7 @@ void justWriteKnownData256sectors(BYTE acsiId)
     Cnecin();
 }
 
-void writeReadAbove100MB(BYTE acsiId)
+void writeReadAbove100MB(uint8_t acsiId)
 {
     int sectorCount;
     while(1) {
@@ -248,11 +245,11 @@ void writeReadAbove100MB(BYTE acsiId)
         wBuffer[i] = i;
     }
 
-    DWORD sectorStart   = 0x032000;     // starting sector: at 100 MB
-    DWORD sectorEnd     = 0x1FFFFF;     // ending   sector: at   1 GB
+    uint32_t sectorStart   = 0x032000;     // starting sector: at 100 MB
+    uint32_t sectorEnd     = 0x1FFFFF;     // ending   sector: at   1 GB
 
-    DWORD sector        = sectorStart;
-    BYTE cmd[6];
+    uint32_t sector        = sectorStart;
+    uint8_t cmd[6];
 
     while(1) {
         if(sector >= sectorEnd) {       // if doing last sector
@@ -298,7 +295,7 @@ void writeReadAbove100MB(BYTE acsiId)
 
         //-----------------------
         // VERIFY DATA
-        BYTE res = memcomp(wBuffer, rBuffer, byteCount);// check data
+        uint8_t res = memcmp(wBuffer, rBuffer, byteCount);  // check data
 
         if(res == 0) {                                  // data OK?
             Cconout('*');
@@ -308,13 +305,13 @@ void writeReadAbove100MB(BYTE acsiId)
     }
 }
 
-BYTE showQuestionGetBool(const char *question, BYTE trueKey, const char *trueWord, BYTE falseKey, const char *falseWord)
+uint8_t showQuestionGetBool(const char *question, uint8_t trueKey, const char *trueWord, uint8_t falseKey, const char *falseWord)
 {
     // show question
     (void) Cconws(question);
 
     while(1) {
-        BYTE key = Cnecin();
+        uint8_t key = Cnecin();
 
         if(key >= 'A' && key <= 'Z') {          // upper case letter? to lower case
             key += 32;
@@ -340,7 +337,7 @@ int getIntFromUser(void)
 {
     int value = 0;
 
-    BYTE key;
+    uint8_t key;
     
     while(1) {
         key = Cnecin();
@@ -360,53 +357,4 @@ int getIntFromUser(void)
     }
     
     return value;
-}
-
-void showHexByte(BYTE val)
-{
-    int hi, lo;
-    char tmp[3];
-    char table[16] = {"0123456789ABCDEF"};
-    
-    hi = (val >> 4) & 0x0f;;
-    lo = (val     ) & 0x0f;
-
-    tmp[0] = table[hi];
-    tmp[1] = table[lo];
-    tmp[2] = 0;
-    
-    (void) Cconws(tmp);
-}
-
-void showHexDword(DWORD val)
-{
-    showHexByte((BYTE) (val >> 24));
-    showHexByte((BYTE) (val >> 16));
-    showHexByte((BYTE) (val >>  8));
-    showHexByte((BYTE)  val);
-}
-
-//--------------------------------------------------
-// global variables, later used for calling hdIfCmdAsSuper
-BYTE __readNotWrite, __cmdLength;
-WORD __sectorCount;
-BYTE *__cmd, *__buffer;
-
-void hdIfCmdAsSuper(void)
-{
-    // this should be called through Supexec()
-    (*hdIf.cmd)(__readNotWrite, __cmd, __cmdLength, __buffer, __sectorCount);
-}
-
-void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
-{
-    // store params to global vars
-    __readNotWrite  = readNotWrite;
-    __cmd           = cmd;
-    __cmdLength     = cmdLength;
-    __buffer        = buffer;
-    __sectorCount   = sectorCount;    
-    
-    // call the function which does the real work, and uses those global vars
-    Supexec(hdIfCmdAsSuper);
 }

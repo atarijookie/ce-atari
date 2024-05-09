@@ -1,7 +1,7 @@
 #ifndef _COMMANDS_H_
 #define _COMMANDS_H_
 
-#include "../global.h"
+#include "../../libacsiscsi/global.h"
 
 void ikbd_reset(void);
 

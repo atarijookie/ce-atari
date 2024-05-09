@@ -90,10 +90,10 @@ GEMDOS_Fdatime: 6 + 4    -- would be ACSI_READ only then
 // now the struct has 23 bytes total, so a buffer of 512 bytes should contain 22 of these + 6 spare bytes
 typedef struct
 {
-    BYTE    d_attrib;       // GEMDOS File Attributes
-    WORD    d_time;         // GEMDOS Time
-    WORD    d_date;         // GEMDOS Date
-    DWORD   d_length;       // File Length
+    uint8_t    d_attrib;       // GEMDOS File Attributes
+    uint16_t    d_time;         // GEMDOS Time
+    uint16_t    d_date;         // GEMDOS Date
+    uint32_t   d_length;       // File Length
     char    d_fname[14];    // Filename
 } DTAshort;
 
@@ -113,8 +113,8 @@ typedef struct
 
 void initFunctionTable(void);
 
-WORD getDriveFromPath(char *path);
-BYTE isOurDrive(WORD drive, BYTE withCurrentDrive);
+uint16_t getDriveFromPath(char *path);
+uint8_t isOurDrive(uint16_t drive, uint8_t withCurrentDrive);
 void updateCeDrives(void);
 
 int32_t custom_fread ( void *sp );
@@ -123,14 +123,14 @@ int32_t custom_pexec( void *sp );
 int32_t custom_pterm( void *sp );
 int32_t custom_pterm0( void *sp );
 
-BYTE commitChanges(WORD ceHandle);
-void initFileBuffer(WORD ceHandle);
+uint8_t commitChanges(uint16_t ceHandle);
+void initFileBuffer(uint16_t ceHandle);
 
-BYTE fillReadBuffer(WORD ceHandle);
-DWORD readData(WORD ceHandle, BYTE *bfr, DWORD cnt, BYTE seekOffset);
-void seekInFileBuffer(WORD ceHandle, int32_t offset, BYTE seekMode);
+uint8_t fillReadBuffer(uint16_t ceHandle);
+uint32_t readData(uint16_t ceHandle, uint8_t *bfr, uint32_t cnt, uint8_t seekOffset);
+void seekInFileBuffer(uint16_t ceHandle, int32_t offset, uint8_t seekMode);
 
-DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt);
+uint32_t writeData(uint8_t ceHandle, uint8_t *bfr, uint32_t cnt);
 
 #define CALL_OLD_GD( function, ... )	\
 		useOldGDHandler = 1;			\
@@ -145,21 +145,21 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt);
 		useOldGDHandler = 1;			\
 		function( __VA_ARGS__ );
 		
-// if sign bit is set, extend the sign to whole DWORD
-#define extendByteToDword(X)    ( ((X & 0x80)==0) ? X : (0xffffff00 | X) )
+// if sign bit is set, extend the sign to whole uint32_t
+#define extendByteTouint32_t(X)    ( ((X & 0x80)==0) ? X : (0xffffff00 | X) )
 
 // macros for getting data from buffer - defined for big and little endian
 // big endian (atari)
-#define getWord(POINTER)        ((WORD)  *((WORD  *) POINTER))
-#define getDword(POINTER)       ((DWORD) *((DWORD *) POINTER))
+#define getuint16_t(POINTER)        ((uint16_t)  *((uint16_t  *) POINTER))
+#define getuint32_t(POINTER)       ((uint32_t) *((uint32_t *) POINTER))
 
 // little endian (pc)
-//#define getWord(POINTER)        ( (((WORD) *POINTER)<<8) | ((WORD) *(POINTER+1)))
-//#define getDword(POINTER)       ( (((DWORD) *POINTER)<<24) | (((DWORD) *(POINTER+1))<<16) | (((DWORD) *(POINTER+2))<<8) | (((DWORD) *(POINTER+3))) )
+//#define getuint16_t(POINTER)        ( (((uint16_t) *POINTER)<<8) | ((uint16_t) *(POINTER+1)))
+//#define getuint32_t(POINTER)       ( (((uint32_t) *POINTER)<<24) | (((uint32_t) *(POINTER+1))<<16) | (((uint32_t) *(POINTER+2))<<8) | (((uint32_t) *(POINTER+3))) )
 
 
 		
-// The following macros are used to convert atari handle numbers which are WORDs
+// The following macros are used to convert atari handle numbers which are uint16_ts
 // to CosmosEx ex handle numbers, which are only BYTEs; and back.
 // To mark the difference between normal Atari handle and handle which came 
 // from CosmosEx I've added some offset to CosmosEx handles.

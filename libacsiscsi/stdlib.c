@@ -426,3 +426,12 @@ uint8_t atariKeysToSingleByte(uint8_t vkey, uint8_t key)
 
     return 0;                           /* unknown key */
 }
+
+void showHexBytes(uint8_t *bfr, int cnt)
+{
+    int i;
+    for(i=0; i<cnt; i++) {
+        showHexByte(bfr[i]);
+    }
+}
+

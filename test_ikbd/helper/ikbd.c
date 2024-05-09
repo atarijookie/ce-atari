@@ -1,30 +1,30 @@
 #include "ikbd.h"
 #include <mint/osbind.h> 
-#include "../global.h"
-#include "../stdlib.h"
+#include "../../libacsiscsi/global.h"
+#include "../../libacsiscsi/stdlib.h"
 
 extern void ikbdwc( void );
 extern void ikbdget( void );
 extern void ikbdtxready( void );
-extern BYTE ikbdtxdata;
-extern BYTE ikbdrxdata;
-extern volatile BYTE ikbdtimeoutflag;
+extern uint8_t ikbdtxdata;
+extern uint8_t ikbdrxdata;
+extern volatile uint8_t ikbdtimeoutflag;
 
-volatile BYTE *pIkbdCtrl = (BYTE *) 0xfffffc00;
-volatile BYTE *pIkbdData = (BYTE *) 0xfffffc02;
+volatile uint8_t *pIkbdCtrl = (uint8_t *) 0xfffffc00;
+volatile uint8_t *pIkbdData = (uint8_t *) 0xfffffc02;
 
-volatile BYTE *pMfpMaskB = (volatile BYTE *) 0xfffffa15;
+volatile uint8_t *pMfpMaskB = (volatile uint8_t *) 0xfffffa15;
 
-BYTE ikbd_putc(BYTE  val);
-BYTE ikbd_getc(BYTE *val);
+uint8_t ikbd_putc(uint8_t  val);
+uint8_t ikbd_getc(uint8_t *val);
 
 /*
  Transfer a stream of bytes to IKBD 
  @todo:check if it's recieved. Currently ikbdwc() only checks TX being ready. Is this the same? E.g. if CE is down and doesn't relay?
  */
-BYTE ikbd_puts( const BYTE* ikbdData, int len ){
+uint8_t ikbd_puts( const uint8_t* ikbdData, int len ){
 	int  i;
-    BYTE res = FALSE;
+    uint8_t res = FALSE;
     
 	for(i=0; i<len; i++) {
         res = ikbd_putc(ikbdData[i]);   // put out a byte
@@ -37,7 +37,7 @@ BYTE ikbd_puts( const BYTE* ikbdData, int len ){
 	return res;                         // return true / false
 }
 
-BYTE ikbd_put(const BYTE data){
+uint8_t ikbd_put(const uint8_t data){
 	ikbdtxdata=data;
 	ikbdwc();
 	if(ikbdtimeoutflag!=0 ){
@@ -46,7 +46,7 @@ BYTE ikbd_put(const BYTE data){
 	return TRUE;
 }
 
-BYTE ikbd_get(BYTE* retval){
+uint8_t ikbd_get(uint8_t* retval){
 	ikbdget();
 	if(ikbdtimeoutflag!=0 ){
 		return FALSE;
@@ -55,9 +55,9 @@ BYTE ikbd_get(BYTE* retval){
 	return TRUE;
 }
 
-BYTE ikbd_gets(BYTE *outString, int len) {
+uint8_t ikbd_gets(uint8_t *outString, int len) {
     int i;
-    BYTE res = FALSE;
+    uint8_t res = FALSE;
     
     for(i=0; i<len; i++) {
         res = ikbd_getc(&outString[i]); // get one byte
@@ -70,9 +70,9 @@ BYTE ikbd_gets(BYTE *outString, int len) {
     return res;                         // return true / false
 }
 
-BYTE ikbd_txready(void){
+uint8_t ikbd_txready(void){
 	ikbdtxready();
-	if((BYTE)ikbdtimeoutflag==(BYTE)0 ){
+	if((uint8_t)ikbdtimeoutflag==(uint8_t)0 ){
 		return TRUE;
 	}
 	return FALSE;
@@ -88,17 +88,17 @@ void ikbd_enable_irq(void)
 	*pMfpMaskB |= (1 << 6);         // add bit 6 (keyboard / midi)
 }
 
-BYTE ikbd_putc(BYTE val)
+uint8_t ikbd_putc(uint8_t val)
 {
-    DWORD to = getTicks() + 200;    // 1 second time out
+    uint32_t to = getTicks() + 200;    // 1 second time out
     
     while(1) {
-        DWORD now = getTicks();
+        uint32_t now = getTicks();
         if(now >= to) {             // if time out, fail
             return FALSE;
         }
         
-        BYTE ctrl = *pIkbdCtrl;
+        uint8_t ctrl = *pIkbdCtrl;
         if(ctrl & 0x02) {           // TXE bit set? quit waiting, send
             break;
         }
@@ -108,17 +108,17 @@ BYTE ikbd_putc(BYTE val)
     return TRUE;
 }
 
-BYTE ikbd_getc(BYTE *val)
+uint8_t ikbd_getc(uint8_t *val)
 {
-    DWORD to = getTicks() + 200;    // 1 second time out
+    uint32_t to = getTicks() + 200;    // 1 second time out
     
     while(1) {
-        DWORD now = getTicks();
+        uint32_t now = getTicks();
         if(now >= to) {             // if time out, fail
             return FALSE;
         }
         
-        BYTE ctrl = *pIkbdCtrl;
+        uint8_t ctrl = *pIkbdCtrl;
         if(ctrl & 0x01) {           // RXF bit set? quit waiting, receive
             break;
         }

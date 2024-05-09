@@ -9,31 +9,29 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "acsi.h"
+#include "../libacsiscsi/acsi.h"
+#include "../libacsiscsi/hdd_if.h"
+#include "../libacsiscsi/find_ce.h"
 #include "main.h"
 #include "hostmoddefs.h"
 #include "keys.h"
 #include "defs.h"
-#include "hdd_if.h"
-#include "find_ce.h"
-       
-BYTE getKey(void);
-BYTE atariKeysToSingleByte(BYTE vkey, BYTE key);
+
+uint8_t getKey(void);
+uint8_t atariKeysToSingleByte(uint8_t vkey, uint8_t key);
 
 // ------------------------------------------------------------------ 
 
-BYTE deviceID;
-BYTE commandShort[CMD_LENGTH_SHORT]	= {	0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_SET_CFGVALUE, 0};
+uint8_t deviceID;
+uint8_t commandShort[CMD_LENGTH_SHORT]	= {	0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_SET_CFGVALUE, 0};
 
-WORD buffer[512/2];
+uint16_t buffer[512/2];
 
 void showComError(void);
-
 
 // ------------------------------------------------------------------ 
 int main( int argc, char* argv[] )
 {
-	BYTE found;
     int i;
 
 	// write some header out
@@ -57,12 +55,14 @@ int main( int argc, char* argv[] )
     (void) Cconws("\r\n");
     
 	// search for CosmosEx on ACSI bus
-	found = Supexec(findDevice);
+    uint8_t res = findDevice(FIND_DEV_CE);
 
-	if(!found) {								            // not found? quit
-		sleep(3);
-		return 0;
-	}
+    if(res == DEVICE_NOT_FOUND) {
+        sleep(3);
+        return 0;
+    }
+
+    deviceID = res & 0x07;                                  // store the BUS ID of device
  
 	// now set up the acsi command bytes so we don't have to deal with this one anymore 
 	commandShort[0] = (deviceID << 5); 					            // cmd[0] = ACSI_id + TEST UNIT READY (0)	
@@ -76,7 +76,7 @@ int main( int argc, char* argv[] )
     cbuffer[i++] = strlen(path) + 1;
     memcpy(cbuffer + i, path, strlen(path) + 1);
 
-    BYTE ret = Supexec(ce_acsiWriteBlockCommand);
+    uint8_t ret = Supexec(ce_acsiWriteBlockCommand);
 
     if(ret != 0) {
         (void)Cconws("\r\n***FAILED***\r\n");
@@ -111,21 +111,6 @@ void intToStr(int val, char *str)
 }
 #endif
 
-BYTE getKey(void)
-{
-	DWORD scancode;
-	BYTE key, vkey;
-
-    scancode = Cnecin();					/* get char form keyboard, no echo on screen */
-
-	vkey	= (scancode >> 16)  & 0xff;
-    key		=  scancode         & 0xff;
-
-    key		= atariKeysToSingleByte(vkey, key);	/* transform BYTE pair into single BYTE */
-    
-    return key;
-}
-
 void removeLastPartUntilBackslash(char *str)
 {
 	int i, len;
@@ -141,11 +126,11 @@ void removeLastPartUntilBackslash(char *str)
 	}
 }
 
-BYTE ce_acsiWriteBlockCommand(void)
+uint8_t ce_acsiWriteBlockCommand(void)
 {
 	commandShort[0] = (deviceID << 5); 											// cmd[0] = ACSI_id + TEST UNIT READY (0)	
   
-	(*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, (BYTE *)buffer, 1);	// issue the command and check the result 
+	(*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, (uint8_t *)buffer, 1);	// issue the command and check the result 
 
     if(!hdIf.success) {
         return 0xff;
@@ -174,62 +159,4 @@ void createFullPath(char *fullPath, char *filePath, char *fileName)
 	}
 	
     strcat(fullPath, fileName);							// add the filename
-}
-
-BYTE atariKeysToSingleByte(BYTE vkey, BYTE key)
-{
-	WORD vkeyKey;
-	vkeyKey = (((WORD) vkey) << 8) | ((WORD) key);		/* create a WORD with vkey and key together */
-
-    switch(vkeyKey) {
-        case 0x5032: return KEY_PAGEDOWN;
-        case 0x4838: return KEY_PAGEUP;
-    }
-
-	if(key >= 32 && key < 127) {		/* printable ASCII key? just return it */
-		return key;
-	}
-	
-	if(key == 0) {						/* will this be some non-ASCII key? convert it */
-		switch(vkey) {
-			case 0x48: return KEY_UP;
-			case 0x50: return KEY_DOWN;
-			case 0x4b: return KEY_LEFT;
-			case 0x4d: return KEY_RIGHT;
-			case 0x52: return KEY_INSERT;
-			case 0x47: return KEY_HOME;
-			case 0x62: return KEY_HELP;
-			case 0x61: return KEY_UNDO;
-			case 0x3b: return KEY_F1;
-			case 0x3c: return KEY_F2;
-			case 0x3d: return KEY_F3;
-			case 0x3e: return KEY_F4;
-			case 0x3f: return KEY_F5;
-			case 0x40: return KEY_F6;
-			case 0x41: return KEY_F7;
-			case 0x42: return KEY_F8;
-			case 0x43: return KEY_F9;
-			case 0x44: return KEY_F10;
-			default: return 0;			/* unknown key */
-		}
-	}
-	
-	switch(vkeyKey) {					/* some other no-ASCII key, but check with vkey too */
-		case 0x011b: return KEY_ESC;
-		case 0x537f: return KEY_DELETE;
-		case 0x0e08: return KEY_BACKSP;
-		case 0x0f09: return KEY_TAB;
-		case 0x1c0d: return KEY_ENTER;
-		case 0x720d: return KEY_ENTER;
-	}
-
-	return 0;							/* unknown key */
-}
-
-void logMsg(char *logMsg)
-{
-}
-
-void logMsgProgress(DWORD current, DWORD total)
-{
 }

@@ -5,14 +5,14 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "acsi.h"
+#include "../libacsiscsi/acsi.h"
+#include "../libacsiscsi/hdd_if.h"
+// #include "Cookiejar.h"
 #include "translated.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"
 #include "VT52.h"
-#include "Cookiejar.h"
 #include "version.h"
-#include "hdd_if.h"
 #include "tests/test.h"
 #include "tests/ikbd_txready.h"
 #include "tests/ikbd_send.h"
@@ -23,32 +23,32 @@
 //--------------------------------------------------
 
 void showConnectionErrorMessage(void);
-BYTE findDevice(void);
+uint8_t findDevice(void);
 int getConfig(void); 
-int readHansTest (DWORD byteCount, WORD xorVal );
-int writeHansTest(DWORD byteCount, WORD xorVal );
+int readHansTest (uint32_t byteCount, uint16_t xorVal );
+int writeHansTest(uint32_t byteCount, uint16_t xorVal );
 void sleep(int seconds);
 
 void print_head(void);
 void print_status(void);
 
-void showHexByte(BYTE val);
-void showHexDword(DWORD val);
+void showHexByte(uint8_t val);
+void showHexuint32_t(uint32_t val);
 void logMsg(char *logMsg);
 void deleteErrorLines(void);
 void speedTest(void);
 
-BYTE ce_identify(BYTE ACSI_id);
+uint8_t ce_identify(uint8_t ACSI_id);
 //--------------------------------------------------
-BYTE deviceID;
+uint8_t deviceID;
 
-BYTE commandLong [CMD_LENGTH_LONG ] = {0x1f, 0xA0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0, 0, 0, 0, 0, 0, 0}; 
+uint8_t commandLong [CMD_LENGTH_LONG ] = {0x1f, 0xA0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0, 0, 0, 0, 0, 0, 0}; 
 
-BYTE readBuffer [256 * 512];
-BYTE writeBuffer[256 * 512];
-BYTE *rBuffer, *wBuffer;
+uint8_t readBuffer [256 * 512];
+uint8_t writeBuffer[256 * 512];
+uint8_t *rBuffer, *wBuffer;
 
-BYTE prevCommandFailed;
+uint8_t prevCommandFailed;
 
 #define HOSTMOD_CONFIG				1
 #define HOSTMOD_LINUX_TERMINAL		2
@@ -69,30 +69,30 @@ BYTE prevCommandFailed;
 
 #define SKIP_CEDETECTION
 
-BYTE ifUsed;
+uint8_t ifUsed;
 
 // Warning! Don't use VT52_Save_pos() and VT52_Load_pos(), because they don't work on Falcon! (They work fine on ST and TT.)
 
 int errorLine = 0;
-BYTE simpleNotDetailedErrReport = 1;
+uint8_t simpleNotDetailedErrReport = 1;
 
 typedef struct {
-    DWORD goodPlain;
-    DWORD goodWithRetry;
-    DWORD errorTimeout;
-    DWORD errorCrc;
-    DWORD errorOther;
+    uint32_t goodPlain;
+    uint32_t goodWithRetry;
+    uint32_t errorTimeout;
+    uint32_t errorCrc;
+    uint32_t errorOther;
 } Tresults;
 
 struct {
-    DWORD run;
-    DWORD singleOps;
+    uint32_t run;
+    uint32_t singleOps;
     
     Tresults read;
     Tresults write;
 } counts;
 
-void updateCounts(BYTE doingWriteNotRead, int res);
+void updateCounts(uint8_t doingWriteNotRead, int res);
 void printOpResult(int res);
 
 //============================================================================
@@ -117,7 +117,7 @@ int testLine;
 void runTests(void)
 {
     int testid=0;
-    BYTE success=FALSE;
+    uint8_t success=FALSE;
     
     ikbd_disable_irq();                     // disable ikbd irqs, because we're reading the data through polling
     
@@ -154,18 +154,14 @@ void runTests(void)
     }
     
     ikbd_enable_irq();                      // enable ikbd irqs again
-    ikbd_puts((const BYTE []) {0x08}, 1);   // set relative mouse reporting
+    ikbd_puts((const uint8_t []) {0x08}, 1);   // set relative mouse reporting
 }
 
 //--------------------------------------------------
 int main(void)
 {
-    BYTE key;
-	DWORD toEven;
+	uint32_t toEven;
 	void *OldSP;
-	WORD xorVal=0xC0DE;
-	int charcnt=0;
-	int linecnt=0;
 
     //----------------------
     // read all the keys which are waiting, so we can ignore them
@@ -183,20 +179,20 @@ int main(void)
 	
 	// ---------------------- 
 	// create buffer pointer to even address 
-	toEven = (DWORD) &readBuffer[0];
+	toEven = (uint32_t) &readBuffer[0];
   
 	if(toEven & 0x0001)       // not even number? 
 		toEven++;
   
-	rBuffer = (BYTE *) toEven; 
+	rBuffer = (uint8_t *) toEven; 
 
     //----------
-  	toEven = (DWORD) &writeBuffer[0];
+  	toEven = (uint32_t) &writeBuffer[0];
   
 	if(toEven & 0x0001)       // not even number? 
 		toEven++;
   
-	wBuffer = (BYTE *) toEven; 
+	wBuffer = (uint8_t *) toEven; 
 
 	Clear_home();
 
@@ -208,57 +204,18 @@ int main(void)
     (void) Cconws("\r\n");
 
     #ifndef SKIP_CEDETECTION 
-    //----------------------
-    // detect TOS version and try to automatically choose the interface
-    BYTE  *pSysBase     = (BYTE *) 0x000004F2;
-    BYTE  *ppSysBase    = (BYTE *)  ((DWORD )  *pSysBase);                      // get pointer to TOS address
-    WORD  tosVersion    = (WORD  ) *(( WORD *) (ppSysBase + 2));                // TOS +2: TOS version
-    BYTE  tosMajor      = tosVersion >> 8;
-    
-    if(tosMajor == 1 || tosMajor == 2) {                // TOS 1.xx or TOS 2.xx -- running on ST
-        (void) Cconws("Running on ST, choosing ACSI interface.");
-    
-        hdd_if_select(IF_ACSI);
-        ifUsed      = IF_ACSI;
-    } else if(tosMajor == 4) {                          // TOS 4.xx -- running on Falcon
-        (void) Cconws("Running on Falcon, choosing SCSI interface.");
-    
-        hdd_if_select(IF_SCSI_FALCON);
-        ifUsed      = IF_SCSI_FALCON;
-    } else {                                            // TOS 3.xx -- running on TT
-        (void) Cconws("Running on TT, plase choose [A]CSI or [S]CSI:");
-        
-        while(1) {
-            key = Cnecin();
-            
-            if(key == 'a' || key == 'A') {      // A pressed, choosing ACSI
-                (void) Cconws("\n\rACSI selected.\n\r");
-                hdd_if_select(IF_ACSI);
-                ifUsed      = IF_ACSI;
-                break;
-            }
-            
-            if(key == 's' || key == 'S') {      // S pressed, choosing SCSI
-                (void) Cconws("\n\rSCSI selected.\n\r");
-                hdd_if_select(IF_SCSI_TT);
-                ifUsed      = IF_SCSI_TT;
-                break;
-            }
-        }
-    }
 
-	// ---------------------- 
-	// search for device on the ACSI bus 
-	deviceID = findDevice();
+    uint8_t res = findDevice(FIND_DEV_CE);
 
-	if( deviceID == 0xff )
-	{
-    	(void) Cconws("Quit."); 		
-
+    if(res == DEVICE_NOT_FOUND) {
       	linea9();   
 	    Super((void *)OldSP);  			      // user mode 
-		return 0;
-	}
+        sleep(3);
+        return 0;
+    }
+
+    deviceID = res & 0x07;                                  // store the BUS ID of device
+
     #endif
 
 	// ----------------- 
@@ -276,7 +233,7 @@ int main(void)
 	return 0;
 }
 
-void updateCounts(BYTE doingWriteNotRead, int res)
+void updateCounts(uint8_t doingWriteNotRead, int res)
 {
     counts.singleOps++;
 
@@ -359,7 +316,7 @@ void print_status(void)
     (void) Cconws("  Data: ");
 
     // calculate and show transfered data capacity
-    DWORD kilobytes     = 127 * counts.singleOps;       // 127 kB per operation * operations count
+    uint32_t kilobytes     = 127 * counts.singleOps;       // 127 kB per operation * operations count
     int megsInteger     = kilobytes / 1024;             // get integer part of mega_bytes
     int megsFraction    = (kilobytes % 1024) / 100;     // get mega_bytes_after_decimal_point part
     
@@ -435,9 +392,9 @@ void print_status(void)
 }
 
 //--------------------------------------------------
-BYTE ce_identify(BYTE ACSI_id)
+uint8_t ce_identify(uint8_t ACSI_id)
 {
-  BYTE cmd[CMD_LENGTH_SHORT] = {0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, TRAN_CMD_IDENTIFY, 0};
+  uint8_t cmd[CMD_LENGTH_SHORT] = {0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, TRAN_CMD_IDENTIFY, 0};
   
   cmd[0] = (ACSI_id << 5); 					// cmd[0] = ACSI_id + TEST UNIT READY (0)	
   memset(rBuffer, 0, 512);              	// clear the buffer 
@@ -463,11 +420,11 @@ void showConnectionErrorMessage(void)
 	prevCommandFailed = 1;
 }
 //--------------------------------------------------
-BYTE findDevice(void)
+uint8_t findDevice(void)
 {
-	BYTE i;
-	BYTE key, res;
-	BYTE id = 0xff;
+	uint8_t i;
+	uint8_t key, res;
+	uint8_t id = 0xff;
 	char bfr[2];
 
     hdIf.maxRetriesCount = 0;           // disable retries - we are expecting that the devices won't answer on every ID
@@ -519,7 +476,7 @@ BYTE findDevice(void)
 
 //--------------------------------------------------
 
-int readHansTest(DWORD byteCount, WORD xorVal )
+int readHansTest(uint32_t byteCount, uint16_t xorVal )
 {
 	commandLong[4+1] = TEST_READ;
 
@@ -528,7 +485,7 @@ int readHansTest(DWORD byteCount, WORD xorVal )
 	commandLong[6+1] = (byteCount >>  8) & 0xFF;
 	commandLong[7+1] = (byteCount      ) & 0xFF;
 
-    // Word to XOR with data on CE side
+    // uint16_t to XOR with data on CE side
 	commandLong[8+1] = (xorVal >> 8) & 0xFF;
 	commandLong[9+1] = (xorVal     ) & 0xFF;
 
@@ -541,18 +498,18 @@ int readHansTest(DWORD byteCount, WORD xorVal )
     }
     
     // if we came here, then either there's no error, or there's error but we still want to compare the buffers
-    BYTE retVal;
+    uint8_t retVal;
     if(hdIf.success && hdIf.statusByte == OK) { // no error - at the end just return 0
         retVal = 0;
     } else {            // some error - at the end return -1
         retVal = -1;
     }
     
-    WORD counter = 0;
-    WORD data = 0;
-    DWORD i;
+    uint16_t counter = 0;
+    uint16_t data = 0;
+    uint32_t i;
     for(i=0; i<byteCount; i += 2) {
-        data = counter ^ xorVal;       // create word
+        data = counter ^ xorVal;       // create uint16_t
         if( !(rBuffer[i]==(data>>8) && rBuffer[i+1]==(data&0xFF)) ){
             return -2;
         }  
@@ -560,7 +517,7 @@ int readHansTest(DWORD byteCount, WORD xorVal )
     }
 
     if(byteCount & 1) {                                 // odd number of bytes? add last byte
-        BYTE lastByte = (counter ^ xorVal) >> 8;
+        uint8_t lastByte = (counter ^ xorVal) >> 8;
         if( rBuffer[byteCount-1]!=lastByte ){
             return -2;
         }  
@@ -575,9 +532,9 @@ int readHansTest(DWORD byteCount, WORD xorVal )
 
 //--------------------------------------------------
 
-int writeHansTest(DWORD byteCount, WORD xorVal)
+int writeHansTest(uint32_t byteCount, uint16_t xorVal)
 {
-    static WORD prevXorVal = 0xffff;
+    static uint16_t prevXorVal = 0xffff;
     
 	commandLong[4+1] = TEST_WRITE;
 
@@ -586,25 +543,25 @@ int writeHansTest(DWORD byteCount, WORD xorVal)
 	commandLong[6+1] = (byteCount >> 8 ) & 0xFF;
 	commandLong[7+1] = (byteCount      ) & 0xFF;
 
-  //Word to XOR with data on CE side
+  //uint16_t to XOR with data on CE side
 	commandLong[8+1] = (xorVal >> 8) & 0xFF;
 	commandLong[9+1] = (xorVal     ) & 0xFF;
 
     if(prevXorVal != xorVal) {              // if xorVal changed since last call, generate buffer (otherwise skip that)
         prevXorVal = xorVal;
     
-        WORD counter = 0;
-        WORD data = 0;
-        DWORD i;
+        uint16_t counter = 0;
+        uint16_t data = 0;
+        uint32_t i;
         for(i=0; i<byteCount; i += 2) {
-            data = counter ^ xorVal;       // create word
+            data = counter ^ xorVal;       // create uint16_t
             wBuffer[i  ]    = (data >> 8);
             wBuffer[i+1]    = (data &  0xFF);
             counter++;
         }
 
         if(byteCount & 1) {                                 // odd number of bytes? add last byte
-            BYTE lastByte           = (counter ^ xorVal) >> 8;
+            uint8_t lastByte        = (counter ^ xorVal) >> 8;
             wBuffer[byteCount-1]    = lastByte;
         }
     }
@@ -630,17 +587,6 @@ showHexByte(hdIf.statusByte);
 	return 0;
 }
 
-void logMsg(char *logMsg)
-{
-    if(simpleNotDetailedErrReport) {    // if simple, don't show these SCSI log messages
-        return;
-    }
-
-    VT52_Goto_pos(0, errorLine++);
-    
-    (void) Cconws(logMsg);
-}
-
 void deleteErrorLines(void)
 {
     int line;
@@ -651,58 +597,9 @@ void deleteErrorLines(void)
     }
 }
 
-void logMsgProgress(DWORD current, DWORD total)
-{
-    VT52_Goto_pos(0, errorLine++);
-    
-    (void) Cconws("Progress: ");
-    showHexDword(current);
-    (void) Cconws(" out of ");
-    showHexDword(total);
-    (void) Cconws("\n\r");
-}
-
-void showHexByte(BYTE val)
-{
-    int hi, lo;
-    char tmp[3];
-    char table[16] = {"0123456789ABCDEF"};
-    
-    hi = (val >> 4) & 0x0f;;
-    lo = (val     ) & 0x0f;
-
-    tmp[0] = table[hi];
-    tmp[1] = table[lo];
-    tmp[2] = 0;
-    
-    (void) Cconws(tmp);
-}
-
-void showHexWord(WORD val)
-{
-    showHexByte((BYTE) (val >>  8));
-    showHexByte((BYTE)  val);
-}
-
-void showHexDword(DWORD val)
-{
-    showHexByte((BYTE) (val >> 24));
-    showHexByte((BYTE) (val >> 16));
-    showHexByte((BYTE) (val >>  8));
-    showHexByte((BYTE)  val);
-}
-
-void showHexBytes(BYTE *bfr, int cnt)
-{
-    int i;
-    for(i=0; i<cnt; i++) {
-        showHexByte(bfr[i]);
-    }
-}
-
 void speedTest(void)
 {
-    DWORD byteCount = ((DWORD) MAXSECTORS) << 9;     // convert sector count to byte count ( sc * 512 )
+    uint32_t byteCount = ((uint32_t) MAXSECTORS) << 9;     // convert sector count to byte count ( sc * 512 )
 
 	commandLong[4+1] = TEST_READ;
 
@@ -711,14 +608,14 @@ void speedTest(void)
 	commandLong[6+1] = (byteCount >>  8) & 0xFF;
 	commandLong[7+1] = (byteCount      ) & 0xFF;
 
-    // Word to XOR with data on CE side
+    // uint16_t to XOR with data on CE side
 	commandLong[8+1] = 0;
 	commandLong[9+1] = 0;
 
   	VT52_Goto_pos(0, 23);
     (void) Cconws("Read speed: ");
     
-  	DWORD now, until, diff;
+  	uint32_t now, until, diff;
 	now = *HZ_200;
     
     int i;

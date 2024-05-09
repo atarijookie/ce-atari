@@ -8,6 +8,7 @@
 #define HOSTMOD_NETWORK_ADAPTER		4
 #define HOSTMOD_FDD_SETUP           5
 
-#include "../ce_main_app/config/config_commands.h"
+#define CFGVALUE_TYPE_ST_PATH       4
+#define CFG_CMD_SET_CFGVALUE        5
 
 #endif

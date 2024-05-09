@@ -11,7 +11,7 @@ ASFLAGS = -m68000
 CFLAGS		= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
 CFLAGS030	= -O2 -m68030 -fomit-frame-pointer -Wall -Wno-multichar
 LDFLAGS	= -Wl,--traditional-format
-LDLIBS  = -lgcc
+LDLIBS   = -L../libacsiscsi -lacsiscsi -lgcc
 DEPFLAGS = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
 
 ACTUAL_CC := $(CC)

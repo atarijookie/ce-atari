@@ -4,39 +4,39 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "acsi.h"
+#include "../libacsiscsi/acsi.h"
+#include "../libacsiscsi/hdd_if.h"
+#include "../libacsiscsi/find_ce.h"
+#include "../libacsiscsi/stdlib.h"
 #include "main.h"
 #include "hostmoddefs.h"
 #include "defs.h"
-#include "hdd_if.h"
-#include "find_ce.h"
 #include "vt52.h"
-#include "stdlib.h"
 
 // ------------------------------------------------------------------ 
 
-BYTE deviceID;
-BYTE commandShort[CMD_LENGTH_SHORT] = { 0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0};
+uint8_t deviceID;
+uint8_t commandShort[CMD_LENGTH_SHORT] = { 0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0};
 
 void showComError(void);
 
-BYTE *p64kBlock;
-BYTE sectorCount;
+uint8_t *p64kBlock;
+uint8_t sectorCount;
 
-BYTE *pBfrOrig;
-BYTE *pBfr, *pBfrCnt;
-BYTE *pDmaBuffer;
+uint8_t *pBfrOrig;
+uint8_t *pBfr, *pBfrCnt;
+uint8_t *pDmaBuffer;
 
-BYTE atariKeysToSingleByte(BYTE vkey, BYTE key);
+uint8_t atariKeysToSingleByte(uint8_t vkey, uint8_t key);
 
-BYTE getCurrentSlot(void);
-BYTE setCurrentSlot(BYTE newSlot);
-BYTE currentSlot;
+uint8_t getCurrentSlot(void);
+uint8_t setCurrentSlot(uint8_t newSlot);
+uint8_t currentSlot;
 
-BYTE uploadImage(int index, char *path);
+uint8_t uploadImage(int index, char *path);
 char *findFirstImageInFolder(void);
 
-BYTE getIsImageBeingEncoded(void);
+uint8_t getIsImageBeingEncoded(void);
 #define ENCODING_DONE       0
 #define ENCODING_RUNNING    1
 #define ENCODING_FAIL       2
@@ -48,8 +48,6 @@ void waitBeforeReset(void);
 // ------------------------------------------------------------------ 
 int main( int argc, char* argv[] )
 {
-    BYTE found;
-
     // write some header out
     (void) Clear_home();
     (void) Cconws("\33f");      // cursor off
@@ -88,7 +86,7 @@ int main( int argc, char* argv[] )
 
     path[paramsLength]  = 0;                        // terminate path
     
-    pBfrOrig = (BYTE *) Malloc(SIZE64K + 4);
+    pBfrOrig = (uint8_t *) Malloc(SIZE64K + 4);
 
     if(pBfrOrig == NULL) {
         (void) Cconws("\r\nMalloc failed!\r\n");
@@ -96,25 +94,27 @@ int main( int argc, char* argv[] )
         return 0;
     }
 
-    DWORD val = (DWORD) pBfrOrig;
-    pBfr      = (BYTE *) ((val + 4) & 0xfffffffe);  // create even pointer
-    pBfrCnt   = pBfr - 2;                           // this is previous pointer - size of WORD 
+    uint32_t val = (uint32_t) pBfrOrig;
+    pBfr      = (uint8_t *) ((val + 4) & 0xfffffffe);  // create even pointer
+    pBfrCnt   = pBfr - 2;                           // this is previous pointer - size of uint16_t 
 
     pDmaBuffer = pBfr;
 
     // search for CosmosEx on ACSI bus
-    found = Supexec(findDevice);
+    uint8_t res = findDevice(FIND_DEV_CE);
 
-    if(!found) {                                    // not found? quit
+    if(res == DEVICE_NOT_FOUND) {
         sleep(3);
         return 0;
     }
 
+    deviceID = res & 0x07;                                  // store the BUS ID of device
+
     // now set up the acsi command bytes so we don't have to deal with this one anymore 
     commandShort[0] = (deviceID << 5);              // cmd[0] = ACSI_id + TEST UNIT READY (0)   
 
-    BYTE res = getCurrentSlot();                    // get the current slot
-    
+    res = getCurrentSlot();                         // get the current slot
+
     if(!res) {
         Mfree(pBfrOrig);
         return 0;
@@ -131,7 +131,7 @@ int main( int argc, char* argv[] )
 
     while(slotChangeTime >= 0) {
         int i;
-        BYTE key = getKeyIfPossible();                  // get key if one is waiting or just return 0 if no key is waiting
+        uint8_t key = getKeyIfPossible();                  // get key if one is waiting or just return 0 if no key is waiting
 
         if(key == '1' || key == '2' || key == '3') {    // valid key? good
             currentSlot = key - '1';
@@ -214,7 +214,7 @@ void waitBeforeReset(void)
 
     while(cancelTime >= 0) {
         int i;
-        BYTE key = getKeyIfPossible();              // get key if one is waiting or just return 0 if no key is waiting
+        uint8_t key = getKeyIfPossible();              // get key if one is waiting or just return 0 if no key is waiting
 
         if(key != 0) {                              // valid key? don't reset ST and quit
             (void) Cconws("\33q\n\rReset canceled by user.\r\nTerminating and returning to desktop.\r\n");
@@ -288,21 +288,6 @@ char *findFirstImageInFolder(void)
     return NULL;                // nothing found
 }
 
-BYTE getKey(void)
-{
-    DWORD scancode;
-    BYTE key, vkey;
-
-    scancode = Cnecin();                    /* get char form keyboard, no echo on screen */
-
-    vkey    = (scancode >> 16)  & 0xff;
-    key     =  scancode         & 0xff;
-
-    key     = atariKeysToSingleByte(vkey, key); /* transform BYTE pair into single BYTE */
-    
-    return key;
-}
-
 void removeLastPartUntilBackslash(char *str)
 {
     int i, len;
@@ -319,7 +304,7 @@ void removeLastPartUntilBackslash(char *str)
 }
 
 // make single ACSI read command by the params set in the commandShort buffer
-BYTE ce_acsiReadCommand(void)
+uint8_t ce_acsiReadCommand(void)
 {
     commandShort[0] = (deviceID << 5);                                          // cmd[0] = ACSI_id + TEST UNIT READY (0)   
   
@@ -334,7 +319,7 @@ BYTE ce_acsiReadCommand(void)
     return hdIf.statusByte;
 }
 
-BYTE ce_acsiWriteBlockCommand(void)
+uint8_t ce_acsiWriteBlockCommand(void)
 {
     commandShort[0] = (deviceID << 5);                                          // cmd[0] = ACSI_id + TEST UNIT READY (0)   
   
@@ -347,11 +332,11 @@ BYTE ce_acsiWriteBlockCommand(void)
     return hdIf.statusByte;
 }
 
-BYTE getLowestDrive(void)
+uint8_t getLowestDrive(void)
 {
-    BYTE i;
-    DWORD drvs = Drvmap();
-    DWORD mask;
+    uint8_t i;
+    uint32_t drvs = Drvmap();
+    uint32_t mask;
     
     for(i=2; i<16; i++) {                                                       // go through the available drives
         mask = (1 << i);
@@ -386,13 +371,13 @@ void createFullPath(char *fullPath, char *filePath, char *fileName)
     strcat(fullPath, fileName);                         // add the filename
 }
 
-BYTE getCurrentSlot(void)
+uint8_t getCurrentSlot(void)
 {
     commandShort[4] = FDD_CMD_GET_CURRENT_SLOT;
 
     sectorCount = 1;                            // read 1 sector
 
-    BYTE res = Supexec(ce_acsiReadCommand); 
+    uint8_t res = Supexec(ce_acsiReadCommand); 
         
     if(res == FDD_OK) {                         // good? copy in the results
         currentSlot = pBfr[0];
@@ -404,14 +389,14 @@ BYTE getCurrentSlot(void)
     return 0;
 }
 
-BYTE setCurrentSlot(BYTE newSlot)
+uint8_t setCurrentSlot(uint8_t newSlot)
 {
     commandShort[4] = FDD_CMD_SET_CURRENT_SLOT;
     commandShort[5] = newSlot;
     
     sectorCount = 1;                            // read 1 sector
 
-    BYTE res = Supexec(ce_acsiReadCommand); 
+    uint8_t res = Supexec(ce_acsiReadCommand); 
         
     if(res == FDD_OK) {                         // good? copy in the results
         return 1;
@@ -422,17 +407,17 @@ BYTE setCurrentSlot(BYTE newSlot)
     return 0;
 }
 
-BYTE getIsImageBeingEncoded(void)
+uint8_t getIsImageBeingEncoded(void)
 {
     commandShort[4] = FDD_CMD_GET_IMAGE_ENCODING_RUNNING;
     commandShort[5] = currentSlot;
 
     sectorCount = 1;                            // read 1 sector
 
-    BYTE res = Supexec(ce_acsiReadCommand); 
+    uint8_t res = Supexec(ce_acsiReadCommand); 
         
     if(res == FDD_OK) {                         // good? copy in the results
-        BYTE isRunning = pBfr[0];               // isRunning - 1: is running, 0: is not running
+        uint8_t isRunning = pBfr[0];               // isRunning - 1: is running, 0: is not running
         return isRunning;
     } 
     
@@ -440,24 +425,3 @@ BYTE getIsImageBeingEncoded(void)
     showComError();                             // show error
     return ENCODING_FAIL;
 }
-
-void logMsg(char *logMsg)
-{
-//    if(showLogs) {
-//        (void) Cconws(logMsg);
-//    }
-}
-
-void logMsgProgress(DWORD current, DWORD total)
-{
-//    if(!showLogs) {
-//        return;
-//    }
-
-//    (void) Cconws("Progress: ");
-//    showHexDword(current);
-//    (void) Cconws(" out of ");
-//    showHexDword(total);
-//    (void) Cconws("\n\r");
-}
-

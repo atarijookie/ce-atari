@@ -26,6 +26,7 @@ uint32_t getTicksAsUser(void);
 uint16_t getTOSversion(void);
 uint8_t getMachineType(void);
 
+void showHexBytes(uint8_t *bfr, int cnt);
 void showHexByte(uint8_t val);
 void showHexWord(uint16_t val);
 void showHexDword(uint32_t val);
