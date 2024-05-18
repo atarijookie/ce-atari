@@ -62,6 +62,7 @@
 #define CHIPIF_V1_V2    1       // Hans + CPLD, Franz, via SPI
 #define CHIPIF_V3       3       // Hosts via SPI
 #define CHIPIF_V4       4       // Franz via SPI, ACSI via GPIO
+#define CHIPIF_RASCSI   8
 #define CHIPIF_NETWORK  9
 
 //////////////////////////////////////////////////////

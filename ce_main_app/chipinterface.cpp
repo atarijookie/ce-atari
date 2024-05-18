@@ -69,6 +69,12 @@ void ChipInterface::convertXilinxInfo(uint8_t xilinxInfo)
                     break;
 
         // GOOD
+        case 0x82:  hwConfig.version        = 8;                        // RaSCSI
+                    hwConfig.hddIface       = HDD_IF_SCSI;              // HDD int: SCSI
+                    hwConfig.fwMismatch     = false;
+                    break;
+
+        // GOOD
         case 0x11:  // use this for v.1
         default:    // and also for all other cases
                     hwConfig.version        = 1;

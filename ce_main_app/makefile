@@ -67,10 +67,11 @@ SUBDIR12 = display
 SUBDIR13 = chipinterface_v1_v2
 SUBDIR14 = chipinterface_v3
 SUBDIR15 = chipinterface_v4
-SUBDIR16 = chipinterface_dummy
-SUBDIR17 = chipinterface_network
-SUBDIR18 = misc
-SUBDIR19 = extension
+SUBDIR16 = chipinterface_rascsi
+SUBDIR17 = chipinterface_dummy
+SUBDIR18 = chipinterface_network
+SUBDIR19 = misc
+SUBDIR20 = extension
 
 SRCS  = $(wildcard *.cpp) 
 SRCS += $(wildcard $(SUBDIR1)/*.cpp) 
@@ -89,6 +90,7 @@ SRCS += $(wildcard $(SUBDIR16)/*.cpp)
 SRCS += $(wildcard $(SUBDIR17)/*.cpp)
 SRCS += $(wildcard $(SUBDIR18)/*.cpp)
 SRCS += $(wildcard $(SUBDIR19)/*.cpp)
+SRCS += $(wildcard $(SUBDIR20)/*.cpp)
 
 HDRS  = $(wildcard *.h)
 HDRS += $(wildcard $(SUBDIR1)/*.h)
@@ -107,6 +109,7 @@ HDRS += $(wildcard $(SUBDIR16)/*.h)
 HDRS += $(wildcard $(SUBDIR17)/*.h)
 HDRS += $(wildcard $(SUBDIR18)/*.h)
 HDRS += $(wildcard $(SUBDIR19)/*.h)
+HDRS += $(wildcard $(SUBDIR20)/*.h)
 HDRS += ../libdospath/libdospath.h
 
 OBJS = $(addprefix $(OBJDIR)/, $(patsubst %.cpp,%.o,$(SRCS:.c=.o)))

@@ -73,6 +73,7 @@ public:
 
     static bool isICDcommand(uint8_t cmd0);
     static uint8_t getCmdLengthFromCmdBytesAcsi(uint8_t* cmd);
+    static uint8_t getCmdLengthFromCmdBytesScsi(uint8_t* cmd);
 
 private:
     AcsiDataTrans   *dataTrans;

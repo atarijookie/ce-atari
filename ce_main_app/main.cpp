@@ -26,6 +26,7 @@
 #include "chipinterface_v1_v2/chipinterface12.h"
 #include "chipinterface_v3/chipinterface3.h"
 #include "chipinterface_v4/chipinterface4.h"
+#include "chipinterface_rascsi/chipinterface_rascsi.h"
 #include "chipinterface_network/chipinterfacenetwork.h"
 #include "chipinterface_dummy/chipinterfacedummy.h"
 #include "../libdospath/libdospath.h"
@@ -118,6 +119,10 @@ int main(int argc, char *argv[])
     } else if(flags.chipInterface == CHIPIF_V4) {
         Debug::out(LOG_INFO, "ChipInterface: v4");
         chipInterface = new ChipInterface4();                   // create chip interface v4
+        hwConfig.version = 2;
+    } else if(flags.chipInterface == CHIPIF_RASCSI) {
+        Debug::out(LOG_INFO, "ChipInterface: RaSCSI");
+        chipInterface = new ChipInterfaceRaSCSI();
         hwConfig.version = 2;
     } else if(flags.chipInterface == CHIPIF_DUMMY) {
         Debug::out(LOG_INFO, "ChipInterface: opening DUMMY chip interface");
@@ -418,6 +423,7 @@ void parseCmdLineArguments(int argc, char *argv[])
                     case 4: flags.chipInterface = CHIPIF_V4;        break;  // 4 stands for Franz via SPI and ACSI via GPIO
 
                     case 0: flags.chipInterface = CHIPIF_DUMMY;     break;  // 0 for dummy interface
+                    case 8: flags.chipInterface = CHIPIF_RASCSI;    break;  // 8 for RaSCSI
                     case 9: flags.chipInterface = CHIPIF_NETWORK;   break;  // 9 for network server
                 }
             }
@@ -500,7 +506,7 @@ void printfPossibleCmdLineArgs(void)
     printf("reset    - reset Hans and Franz, release lines, quit\n");
     printf("noreset  - when starting, don't reset Hans and Franz\n");
     printf("llx      - set log level to x (default is 1, max is 4)\n");
-    printf("cix      - set chip interface type to x (1 & 2 for old SPI, 3 for new SPI, 9 for network server, 0 for dummy)\n");
+    printf("cix      - set chip interface type to x (1 & 2 for old SPI, 3 for new SPI, 4 for HDD via logic chips + old SPI, 8 for RaSCSI, 9 for network server, 0 for dummy)\n");
     printf("test     - some default config for device testing\n");
     printf("ce_conf  - use this app as ce_conf on RPi (the app must be running normally, too)\n");
     printf("hwinfo   - get HW version and HDD interface type\n");

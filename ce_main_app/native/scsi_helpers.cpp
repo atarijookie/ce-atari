@@ -40,6 +40,24 @@ uint8_t Scsi::getCmdLengthFromCmdBytesAcsi(uint8_t* cmd)
 }
 
 //----------------------------------------------
+uint8_t Scsi::getCmdLengthFromCmdBytesScsi(uint8_t* cmd)
+{
+    uint8_t cmdLen = 6;
+
+    switch((cmd[0] & 0xe0) >> 5)    // get the length of the command
+    {
+        case  0: cmdLen =  6; break;
+        case  1: cmdLen = 10; break;
+        case  2: cmdLen = 10; break;
+        case  4: cmdLen = 16; break;
+        case  5: cmdLen = 12; break;
+        default: cmdLen =  6; break;
+    }
+
+    return cmdLen;
+}
+
+//----------------------------------------------
 void Scsi::storeSenseAndSendStatus(uint8_t status, uint8_t senseKey, uint8_t additionalSenseCode, uint8_t ascq)
 {
     // store sense for REQUEST SENSE command
