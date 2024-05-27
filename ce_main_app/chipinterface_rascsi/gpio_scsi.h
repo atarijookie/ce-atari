@@ -25,6 +25,7 @@ public:
     ~GpioScsi();
 
     void init(uint8_t hddEnabledIDs, uint8_t sdCardId);     // init all pins
+    void initPins(void);
     void setConfig(uint8_t hddEnabledIDs, uint8_t sdCardId);    // store config needed for this to work
     uint8_t getXilinxByte(void);
 
@@ -50,10 +51,12 @@ private:
     void setBsy(bool bsy);
     void setPhaseBits(uint8_t sendNotRecv, bool cmdNotData, bool MSG);
     void setDataDirection(uint8_t sendNotRecv);
+    bool waitForPinLevel(int pin, int level);
     bool waitForAckLevel(int level);
     uint8_t recvByte(void);
     bool sendByte(uint8_t data);
     void setPhase(int phase);
+    const char* getPhaseStr(int phase);
 
     uint8_t dataIn(void);
     void dataOut(uint8_t data);

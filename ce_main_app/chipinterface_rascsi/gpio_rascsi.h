@@ -38,6 +38,9 @@
 #define DATA7       RPI_V2_GPIO_P1_11
 #define DATAP       RPI_V2_GPIO_P1_12
 
+#define PIN_SDA     RPI_V2_GPIO_P1_03
+#define PIN_SCL     RPI_V2_GPIO_P1_05
+
 #endif      // end of ONPC
 
 bool gpiorascsi_open(void);

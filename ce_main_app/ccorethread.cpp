@@ -416,6 +416,10 @@ void CCoreThread::displayStatusToConsole(uint32_t now)
     int chipIfType = chipInterface->chipInterfaceType();
     if(chipIfType == CHIP_IF_V1_V2) {       // v1 v2 - with Hans and Franz
         printf("\033[2K  [ %c ]  Hans: %s, Franz: %s\033[A\n", progChars[lastFwInfoTime.progress], hansAlive ? "LIVE" : "DEAD", franzAlive ? "LIVE" : "DEAD");
+    } else if(chipIfType == CHIP_IF_V4) {   // v4 has only Franz
+        printf("\033[2K  [ %c ]  Franz: %s\033[A\n", progChars[lastFwInfoTime.progress], franzAlive ? "LIVE" : "DEAD");
+    } else {
+        printf("\033[2K  [ %c ]  CE core is running\033[A\n", progChars[lastFwInfoTime.progress]);
     }
 
     lastFwInfoTime.progress = (lastFwInfoTime.progress + 1) % 4;
@@ -427,7 +431,7 @@ void CCoreThread::displayStatusToConsole(uint32_t now)
         chipInterface->resetHDD();
     }
 
-    if(!franzAlive && !flags.noReset && (now - lastFwInfoTime.franzResetTime) >= 3000) {
+    if(!flags.noFranz && !franzAlive && !flags.noReset && (now - lastFwInfoTime.franzResetTime) >= 3000) {
         printf("\033[2KFranz not alive, resetting Franz.\n");
         Debug::out(LOG_INFO, "Franz not alive, resetting Franz.");
         lastFwInfoTime.franzResetTime = now;

@@ -75,8 +75,13 @@ bool ChipInterfaceRaSCSI::ciOpen(void)
 #ifndef ONPC
     serialSetup();          // open and configure UART for IKBD
     bool ok = gpiorascsi_open(); // open GPIO and SPI
-
     Debug::out(LOG_DEBUG, "ChipInterfaceRaSCSI::ciOpen - ok=%d", (int) ok);
+
+    if(!ok) {               // if open failed
+        return false;
+    }
+
+    gpioScsi->initPins();   // init the pins
 
     flags.noFranz = true;   // after initialization - set that we don't have Franz in RaSCSI
     return ok;
@@ -274,29 +279,20 @@ void ChipInterfaceRaSCSI::handleBeeperCommand(int beeperCommand, bool floppySoun
 // returns true if should handle i2c display from RPi
 bool ChipInterfaceRaSCSI::handlesDisplay(void)
 {
-    return false;        // v4 does NOT handle display localy
+    return true;        // RaSCSI does handle display locally
 }
 
-// Send this display buffer data to remote display... once it asks for it.
-// Just copy the data at the time of call.
 void ChipInterfaceRaSCSI::displayBuffer(uint8_t *bfr, uint16_t size)
 {
-    uint16_t copySize = MIN(DISPLAY_DATA_SIZE - 4, size);       // pick smaller and don't overflow
-
-    Utils::storeWord(displayData, 0xd1da);          // starting tag - DIsplay DAta
-    Utils::storeWord(displayData + 2, copySize);    // how much data is there
-
-    displayDataSize = copySize + 4;                 // how much data should be transfered
-    memcpy(displayData + 4, bfr, copySize);         // copy in the data
+    // do nothing on RaSCSI
 }
 
 // Get on which GPIO pins the i2c display is. Pins valid for ChipInterface v4.
 void ChipInterfaceRaSCSI::getDisplayGpioSignals(uint32_t& gpioScl, uint32_t& gpioSda)
 {
 #ifndef ONPC
-    // TODO: figure this out from PCB of RaSCSI
-    gpioScl = RPI_V2_GPIO_P1_05;
-    gpioSda = RPI_V2_GPIO_P1_13;
+    gpioScl = PIN_SCL;
+    gpioSda = PIN_SDA;
 #else
     gpioScl = 0;
     gpioSda = 0;

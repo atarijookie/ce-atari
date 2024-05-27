@@ -36,9 +36,9 @@ bool gpiorascsi_open(void)
     }
 
     // configure those as outputs
-    int outputs[10] = {PIN_ACT, PIN_ENB, PIN_IO, PIN_REQ, PIN_CD, PIN_MSG, PIN_TAD, PIN_IND, PIN_DTD, PIN_BSY};
-    int outVals[10] = {LOW,     LOW,     HIGH,   HIGH,    HIGH,   HIGH,    LOW,     LOW,     HIGH,    HIGH};
-    for(int i=0; i<10; i++) {
+    int outputs[12] = {PIN_ACT, PIN_ENB, PIN_IO, PIN_REQ, PIN_CD, PIN_MSG, PIN_TAD, PIN_IND, PIN_DTD, PIN_BSY, PIN_SDA, PIN_SCL};
+    int outVals[12] = {LOW,     LOW,     HIGH,   HIGH,    HIGH,   HIGH,    LOW,     LOW,     HIGH,    HIGH,    HIGH,    HIGH};
+    for(int i=0; i<12; i++) {
         bcm2835_gpio_fsel(outputs[i],  BCM2835_GPIO_FSEL_OUTP);
         bcm2835_gpio_write(outputs[i], outVals[i]);
     }

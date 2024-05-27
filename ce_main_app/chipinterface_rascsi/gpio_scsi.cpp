@@ -15,11 +15,6 @@ GpioScsi::GpioScsi()
     sdCardId = 0xff;        // SD card not enabled
 
     generateParityTable();
-    bcm2835_gpio_write(PIN_IND, LOW);   // PIN_IND always LOW, because SEL, RES, ACK, ATN will always come from initiator and we want just to read them
-    bcm2835_gpio_write(PIN_BSY, HIGH);  // start with BSY high
-    bcm2835_gpio_write(PIN_TAD, LOW);   // TAD low - phase signals are not driven by this device (yet)
-    bcm2835_gpio_write(PIN_ACT, LOW);   // ACT low - activity led not on
-    setPhase(SCSI_PHASE_BUSFREE);
 }
 
 GpioScsi::~GpioScsi()
@@ -52,6 +47,15 @@ void GpioScsi::init(uint8_t hddEnabledIDs, uint8_t sdCardId)
     setPhase(SCSI_PHASE_BUSFREE);
 }
 
+void GpioScsi::initPins(void)
+{
+    bcm2835_gpio_write(PIN_IND, LOW);   // PIN_IND always LOW, because SEL, RES, ACK, ATN will always come from initiator and we want just to read them
+    bcm2835_gpio_write(PIN_BSY, HIGH);  // start with BSY high
+    bcm2835_gpio_write(PIN_TAD, LOW);   // TAD low - phase signals are not driven by this device (yet)
+    bcm2835_gpio_write(PIN_ACT, LOW);   // ACT low - activity led not on
+    setPhase(SCSI_PHASE_BUSFREE);
+}
+
 void GpioScsi::setConfig(uint8_t hddEnabledIDs, uint8_t sdCardId)
 {
     Debug::out(LOG_DEBUG, "GpioScsi::setConfig - setting hddEnabledIDs: %02x, sdCardId: %d", hddEnabledIDs, sdCardId);
@@ -70,10 +74,11 @@ bool GpioScsi::getCmd(uint8_t* cmd)
 
 #ifndef ONPC
     // check for selection
-    if(bcm2835_gpio_lev(PIN_SEL) == HIGH) {   // SEL not L? Selection not happening
+    if(bcm2835_gpio_lev(PIN_RST) == LOW || bcm2835_gpio_lev(PIN_SEL) == HIGH) {   // SCSI RESET L or SEL not L? Selection not happening
         return false;
     }
 
+    timeoutStart(1000);
     setPhase(SCSI_PHASE_SELECTION);
 
     // get data - it will contain initiator and target bits set
@@ -92,7 +97,18 @@ bool GpioScsi::getCmd(uint8_t* cmd)
         Debug::out(LOG_DEBUG, "GpioScsi::getCmd - hddEnabledIDs: %02x, ids: %02x, requested ID not enabled, ignoring", hddEnabledIDs, ids);
         Debug::cmdStart(cmd, "DEV OFF");
         setPhase(SCSI_PHASE_BUSFREE);
+
+        waitForPinLevel(PIN_SEL, HIGH); // wait here until selection ends
         return false;
+    }
+
+    uint8_t i;
+    uint8_t id = 0xff;
+    for(i=0; i<8; i++) {
+        if((ids & (1 << i)) != 0) {         // if bit is one, this ID is selected 
+            id = i;                         // store this ID and quit loop
+            break;
+        }
     }
 
     Debug::cmdMarkStartTime();
@@ -107,11 +123,11 @@ bool GpioScsi::getCmd(uint8_t* cmd)
         Debug::out(LOG_DEBUG, "GpioScsi::getCmd - received MSGOUT byte: %02x", msg);
     }
 
-    setPhase(SCSI_PHASE_COMMAND);       // enable output of phase bits, sets BSY to L
+    setPhase(SCSI_PHASE_COMMAND);           // enable output of phase bits, sets BSY to L
 
     uint8_t cmdLen = 6;                     // maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
 
-    for(uint8_t i=0; i<cmdLen; i++) {       // receive the next command bytes
+    for(i=0; i<cmdLen; i++) {               // receive the next command bytes
         cmd[i] = recvByte();
 
         if(isTimeout()) {                   // if something was wrong, quit, failed
@@ -126,6 +142,21 @@ bool GpioScsi::getCmd(uint8_t* cmd)
             Debug::out(LOG_DEBUG, "GpioScsi::getCmd - for cmd: %02x -> cmdLen: %d", cmd[0], cmdLen);
         }             
     }
+
+    // For the scsi commands to work with the rest of the acsi handling code,
+    // alter the scsi command if the length is more than 6 bytes for it to look like ICD command
+    // and also add fake ID to the command
+    if(cmdLen > 6) {
+        for(i=17; i>0; i--) {                       // move the cmd one byte further (to make cmd[0] unused)
+            cmd[i] = cmd[i - 1];
+        }
+        cmd[0] = 0x1f;                              // store ICD command marker
+
+        cmdLen++;                                   // now the command is one byte longer
+    }
+
+    // for all commands add fake ACSI ID on top of the 0th byte
+    cmd[0] = cmd[0] | (id << 5);                    // add ID on the top 3 bits
 
     if(cmdLen > 6) {
         Debug::out(LOG_DEBUG, "GpioScsi::getCmd - got cmd: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x", 
@@ -176,7 +207,7 @@ bool GpioScsi::sendBlock(uint8_t *pData, uint32_t dataCount)
     for(uint32_t i=0; i<dataCount; i++) {
         bool ok = sendByte(pData[i]);
 
-        if(ok) {        // failed to send?
+        if(!ok) {        // failed to send?
             Debug::out(LOG_WARNING, "GpioScsi::sendBlock failed on byte %d out of %d.", i, dataCount);
             setPhase(SCSI_PHASE_BUSFREE);
             return false;
@@ -237,6 +268,11 @@ uint8_t GpioScsi::recvByte(void)
     data = dataIn();                        // read data after ACK is L
 
     bcm2835_gpio_write(PIN_REQ, HIGH);      // REQ back to H
+
+    if(!waitForAckLevel(HIGH)) {            // wait for ACK being H, return 0 if didn't come
+        return 0;
+    }
+
 #endif
 
     return data;
@@ -250,10 +286,17 @@ bool GpioScsi::sendByte(uint8_t data)
     bcm2835_gpio_write(PIN_REQ, LOW);       // REQ to L
 
     if(!waitForAckLevel(LOW)) {             // wait for ACK being L, return false if didn't come
+        Debug::out(LOG_WARNING, "GpioScsi::sendByte - failed to wait for ACK=L");
         return false;
     }
 
     bcm2835_gpio_write(PIN_REQ, HIGH);      // REQ back to H
+
+    if(!waitForAckLevel(HIGH)) {            // wait for ACK being H, return 0 if didn't come
+        Debug::out(LOG_WARNING, "GpioScsi::sendByte - failed to wait for ACK=H");
+        return false;
+    }
+
 #endif
 
     return true;
@@ -281,11 +324,11 @@ bool GpioScsi::sendStatus(uint8_t scsiStatus)
     return ok;
 }
 
-bool GpioScsi::waitForAckLevel(int level)
+bool GpioScsi::waitForPinLevel(int pin, int level)
 {
     while(true) {
 #ifndef ONPC
-        if(bcm2835_gpio_lev(PIN_ACK) == level) {     // ACK has expected level? success
+        if(bcm2835_gpio_lev(pin) == level) {     // pin has expected level? success
             return true;
         }
 #endif
@@ -294,6 +337,11 @@ bool GpioScsi::waitForAckLevel(int level)
             return false;
         }
     }
+}
+
+bool GpioScsi::waitForAckLevel(int level)
+{
+    return waitForPinLevel(PIN_ACK, level);
 }
 
 void GpioScsi::setDataDirection(uint8_t sendNotRecv)
@@ -337,6 +385,7 @@ uint8_t GpioScsi::dataIn(void)
     volatile uint32_t* paddr = bcm2835_gpio + BCM2835_GPLEV0/4;
     uint32_t value = bcm2835_peri_read(paddr);
     uint8_t data = (uint8_t) (value >> 10);
+    data = ~data;                               // invert incomming data
 #else
     uint8_t data = 0;
 #endif
@@ -351,6 +400,7 @@ void GpioScsi::dataOut(uint8_t data)
     // DP D7 D6 D5 D4 D3 D2 D1 D0
     // 18 17 16 15 14 13 12 11 10
 
+    data = ~data;                                   // invert outgoing data
     uint32_t data32 = (uint32_t) data;
     data32 = data32 << 10;                          // shift data on their position
 
@@ -402,6 +452,7 @@ void GpioScsi::setBsy(bool bsy)
     int bsyLev = bsy ? LOW : HIGH;                  // if BSY asserted, set it to L, otherwise release to H
     int actTadLev = bsy ? HIGH : LOW;               // if BSY asserted, ACT and TAD need to be H, so we can output phase signals and bsy to bus
 
+    // Debug::out(LOG_DEBUG, "setBsy - PIN_BSY: %d, PIN_TAD: %d, PIN_ACT: %d", bsyLev, actTadLev, actTadLev);
     bcm2835_gpio_write(PIN_BSY, bsyLev);
     bcm2835_gpio_write(PIN_TAD, actTadLev);
     bcm2835_gpio_write(PIN_ACT, actTadLev);
@@ -430,6 +481,21 @@ bool GpioScsi::isTimeout(void)
     return lastIsTimeout;           // return this fresh value of isTimeout
 }
 
+const char* GpioScsi::getPhaseStr(int phase)
+{
+    switch(phase) {
+        case SCSI_PHASE_BUSFREE:    return "BUSFREE";
+        case SCSI_PHASE_SELECTION:  return "SELECTION";
+        case SCSI_PHASE_COMMAND:    return "COMMAND";
+        case SCSI_PHASE_DATAIN:     return "DATAIN";
+        case SCSI_PHASE_DATAOUT:    return "DATAOU";
+        case SCSI_PHASE_STATUS:     return "STATUS";
+        case SCSI_PHASE_MSGIN:      return "MSGIN";
+        case SCSI_PHASE_MSGOUT:     return "MSGOUT";
+        default:                    return "???";
+    }
+}
+
 void GpioScsi::setPhase(int phase) {
     static int prevPhase = -1;
 
@@ -437,6 +503,7 @@ void GpioScsi::setPhase(int phase) {
         return;
     }
     prevPhase = phase;                      // store this phase for next call
+    // Debug::out(LOG_DEBUG, "GpioScsi::setPhase -> %d -> %s", phase, getPhaseStr(phase));
 
     switch(phase) {
         case SCSI_PHASE_BUSFREE:
@@ -458,6 +525,7 @@ void GpioScsi::setPhase(int phase) {
             break;
 
         case SCSI_PHASE_MSGOUT:             // from initiator to device
+            setBsy(true);                   // we're busy now!
             setPhaseBits(DIR_RECV, true, true);
             setDataDirection(DIR_RECV);
             break;

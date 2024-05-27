@@ -120,7 +120,7 @@ int main(int argc, char *argv[])
         Debug::out(LOG_INFO, "ChipInterface: v4");
         chipInterface = new ChipInterface4();                   // create chip interface v4
         hwConfig.version = 2;
-    } else if(flags.chipInterface == CHIPIF_RASCSI) {
+    } else if(flags.chipInterface == CHIPIF_RASCSI) {           // this is RaSCSI interface
         Debug::out(LOG_INFO, "ChipInterface: RaSCSI");
         chipInterface = new ChipInterfaceRaSCSI();
         hwConfig.version = 2;
