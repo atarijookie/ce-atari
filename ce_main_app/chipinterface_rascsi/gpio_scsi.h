@@ -51,6 +51,8 @@ private:
     void setBsy(bool bsy);
     void setPhaseBits(uint8_t sendNotRecv, bool cmdNotData, bool MSG);
     void setDataDirection(uint8_t sendNotRecv);
+
+    bool waitForTwoPinLevels(int pin1, int level1, int pin2, int level2);
     bool waitForPinLevel(int pin, int level);
     bool waitForAckLevel(int level);
     uint8_t recvByte(void);

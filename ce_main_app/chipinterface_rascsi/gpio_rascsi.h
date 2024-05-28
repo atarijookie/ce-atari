@@ -29,7 +29,7 @@
 #define PIN_ACK     RPI_V2_GPIO_P1_40
 
 #define DATA0       RPI_V2_GPIO_P1_19
-#define DATA1       RPI_V2_GPIO_P1_13
+#define DATA1       RPI_V2_GPIO_P1_23
 #define DATA2       RPI_V2_GPIO_P1_32
 #define DATA3       RPI_V2_GPIO_P1_33
 #define DATA4       RPI_V2_GPIO_P1_08

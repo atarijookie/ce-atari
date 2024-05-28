@@ -81,15 +81,13 @@ bool GpioScsi::getCmd(uint8_t* cmd)
     timeoutStart(1000);
     setPhase(SCSI_PHASE_SELECTION);
 
+    if(!waitForTwoPinLevels(PIN_SEL, LOW, PIN_BSY, HIGH)) {
+        Debug::out(LOG_DEBUG, "GpioScsi::getCmd - failed to wait for selection with BSY released");
+        return false;
+    }
+
     // get data - it will contain initiator and target bits set
     uint8_t ids = dataIn();
-
-    // on SCSI bus, remove ID bits if they are used for SCSI Initiator on that machine (ID 7 on TT, ID 0 on Falcon)
-    if(hwConfig.scsiMachine == SCSI_MACHINE_TT) {   // TT? remove bit 7
-        ids &= 0x7F;
-    } else {                                        // Falcon? Remove bit 0
-        ids &= 0xFE;
-    }
 
     memset(cmd, 0, 16);                 // clear the command buffer
 
@@ -98,7 +96,7 @@ bool GpioScsi::getCmd(uint8_t* cmd)
         Debug::cmdStart(cmd, "DEV OFF");
         setPhase(SCSI_PHASE_BUSFREE);
 
-        waitForPinLevel(PIN_SEL, HIGH); // wait here until selection ends
+        waitForTwoPinLevels(PIN_SEL, HIGH, PIN_BSY, HIGH);  // wait for selection to end
         return false;
     }
 
@@ -218,7 +216,7 @@ bool GpioScsi::sendBlock(uint8_t *pData, uint32_t dataCount)
         bool ok = sendStatus(scsiStatus);
 
         if(!ok) {
-            Debug::out(LOG_WARNING, "GpioScsi::sendBlock failed on sendStatus");
+            Debug::out(LOG_WARNING, "GpioScsi::sendBlock failed on sendStatus (dataCount: %d)", dataCount);
         }
 
         return ok;
@@ -245,7 +243,7 @@ bool GpioScsi::recvBlock(uint8_t *pData, uint32_t dataCount)
         bool ok = sendStatus(scsiStatus);
 
         if(!ok) {
-            Debug::out(LOG_WARNING, "GpioScsi::recvBlock failed on sendStatus.");
+            Debug::out(LOG_WARNING, "GpioScsi::recvBlock failed on sendStatus (dataCount: %d)", dataCount);
         }
 
         return ok;
@@ -312,6 +310,7 @@ bool GpioScsi::sendStatus(uint8_t scsiStatus)
 
     if(!ok) {
         setPhase(SCSI_PHASE_BUSFREE);
+        Debug::out(LOG_WARNING, "GpioScsi::sendStatus failed on sending STATUS byte");
         return false;
     }
 
@@ -319,9 +318,28 @@ bool GpioScsi::sendStatus(uint8_t scsiStatus)
     setPhase(SCSI_PHASE_MSGIN);
     ok = sendByte(0);
 
+    if(!ok) {
+        Debug::out(LOG_WARNING, "GpioScsi::sendStatus failed on sending MSGIN byte");
+    }
+
     // release bus, return ok/fail
     setPhase(SCSI_PHASE_BUSFREE);
     return ok;
+}
+
+bool GpioScsi::waitForTwoPinLevels(int pin1, int level1, int pin2, int level2)
+{
+    while(true) {
+#ifndef ONPC
+        if(bcm2835_gpio_lev(pin1) == level1 && bcm2835_gpio_lev(pin2) == level2) {     // pins have expected level? success
+            return true;
+        }
+#endif
+
+        if(isTimeout()) {   // timeout? fail
+            return false;
+        }
+    }
 }
 
 bool GpioScsi::waitForPinLevel(int pin, int level)
