@@ -293,11 +293,22 @@ void showHexDword(uint32_t val)
     showHexByte(d);
 }
 
+void logMsgHexByte(uint8_t val)
+{
+    if(!hdIf.showLogs) {
+        return;
+    }
+
+    showHexByte(val);
+}
+
 void logMsg(char* logMsg)
 {
-   if(hdIf.showLogs) {
-       (void) Cconws(logMsg);
-   }
+    if(!hdIf.showLogs) {
+        return;
+    }
+
+    (void) Cconws(logMsg);
 }
 
 void logMsgProgress(uint32_t current, uint32_t total)

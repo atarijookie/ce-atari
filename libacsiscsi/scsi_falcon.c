@@ -11,15 +11,15 @@ void logMsg(char *logMsg);
 
 static void setDmaAddr_Falcon(uint32_t addr);
 
-void  scsi_setReg_Falcon(int whichReg, uint32_t value);
-uint32_t scsi_getReg_Falcon(int whichReg);
+void  scsiSetRegFalcon(int whichReg, uint32_t value);
+uint32_t scsiGetRegFalcon(int whichReg);
 
 void clearCache030(void);
 void delay(void);
 
 extern uint32_t _cmdTimeOut;                           // timeout time for scsi_cmd() from start to end
 
-uint8_t w4int(void);
+uint8_t scsiWaitForInt(void);
 
 void stopDmaFalcon(void)
 {
@@ -37,19 +37,19 @@ void setDmaAddr_Falcon(uint32_t addr)
     *falconDmaAddrHi    = (uint8_t) (addr >> 16);
 }
 
-void scsi_setReg_Falcon(int whichReg, uint32_t value)
+void scsiSetRegFalcon(int whichReg, uint32_t value)
 {
     uint8_t which = 0;
 
     switch(whichReg) {
-        case REG_CurrentScsiData :   which = SPCSD; break;   // for REG_CurrentScsiData  and REG_OutputData
-        case REG_InitiatorCommand:   which = SPICR; break;
-        case REG_Mode :   which = SPMR2; break;
-        case REG_TargetCommand:   which = SPTCR; break;
-        case REG_CurrentScsiBusStatus :   which = SPCSB; break;   // for REG_CurrentScsiBusStatus  and REG_SelectEnable
-        case REG_StartDmaSend:   which = SPBSR; break;   // for REG_BusAndStatus and REG_DS
-        case REG_StartDmaTargetReceive:   which = SPIDR; break;   // for REG_StartDmaTargetReceive and REG_InputData
-        case REG_StartDmaInitiatorReceive:   which = SPRPI; break;   // for REG_StartDmaInitiatorReceive and REG_ResetParityInterrupts
+        case REG_CurrentScsiData :          which = SPCSD; break;   // for REG_CurrentScsiData  and REG_OutputData
+        case REG_InitiatorCommand:          which = SPICR; break;
+        case REG_Mode :                     which = SPMR2; break;
+        case REG_TargetCommand:             which = SPTCR; break;
+        case REG_CurrentScsiBusStatus :     which = SPCSB; break;   // for REG_CurrentScsiBusStatus  and REG_SelectEnable
+        case REG_StartDmaSend:              which = SPBSR; break;   // for REG_BusAndStatus and REG_DS
+        case REG_StartDmaTargetReceive:     which = SPIDR; break;   // for REG_StartDmaTargetReceive and REG_InputData
+        case REG_StartDmaInitiatorReceive:  which = SPRPI; break;   // for REG_StartDmaInitiatorReceive and REG_ResetParityInterrupts
         default     :   logMsg("setReg - default!!!\n\r");  return;     // fail, not found
     }
 
@@ -57,19 +57,19 @@ void scsi_setReg_Falcon(int whichReg, uint32_t value)
     *WDC    = value;    // write reg value by writing to WDC
 }
 
-uint32_t scsi_getReg_Falcon(int whichReg)
+uint32_t scsiGetRegFalcon(int whichReg)
 {
     uint8_t which = 0;
 
     switch(whichReg) {
-        case REG_CurrentScsiData :   which = SPCSD; break;   // for REG_CurrentScsiData  and REG_OutputData
-        case REG_InitiatorCommand:   which = SPICR; break;
-        case REG_Mode :   which = SPMR2; break;
-        case REG_TargetCommand:   which = SPTCR; break;
-        case REG_CurrentScsiBusStatus :   which = SPCSB; break;   // for REG_CurrentScsiBusStatus  and REG_SelectEnable
-        case REG_StartDmaSend:   which = SPBSR; break;   // for REG_BusAndStatus and REG_DS
-        case REG_StartDmaTargetReceive:   which = SPIDR; break;   // for REG_StartDmaTargetReceive and REG_InputData
-        case REG_StartDmaInitiatorReceive:   which = SPRPI; break;   // for REG_StartDmaInitiatorReceive and REG_ResetParityInterrupts
+        case REG_CurrentScsiData :          which = SPCSD; break;   // for REG_CurrentScsiData  and REG_OutputData
+        case REG_InitiatorCommand:          which = SPICR; break;
+        case REG_Mode :                     which = SPMR2; break;
+        case REG_TargetCommand:             which = SPTCR; break;
+        case REG_CurrentScsiBusStatus :     which = SPCSB; break;   // for REG_CurrentScsiBusStatus  and REG_SelectEnable
+        case REG_StartDmaSend:              which = SPBSR; break;   // for REG_BusAndStatus and REG_DS
+        case REG_StartDmaTargetReceive:     which = SPIDR; break;   // for REG_StartDmaTargetReceive and REG_InputData
+        case REG_StartDmaInitiatorReceive:  which = SPRPI; break;   // for REG_StartDmaInitiatorReceive and REG_ResetParityInterrupts
         default     :   logMsg("getReg - default!!!\n\r");  return 0;     // fail, not found
     }
 

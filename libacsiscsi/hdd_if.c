@@ -49,7 +49,7 @@ void hddIfCmd_withRetries_worker(uint8_t readNotWrite, uint8_t *cmd, uint8_t cmd
 
     //--------------
     // now do the normal command
-    (*hdIf.cmd_intern)(readNotWrite, cmd, cmdLength, buffer, sectorCount);      // try the correct command for the first time
+    (*hdIf.cmdIntern)(readNotWrite, cmd, cmdLength, buffer, sectorCount);      // try the correct command for the first time
 
     if(hdIf.success) {                      // if succeeded on the 1st time, quit
 		if( lock ){
@@ -86,7 +86,7 @@ void hddIfCmd_withRetries_worker(uint8_t readNotWrite, uint8_t *cmd, uint8_t cmd
 
         hdIf.retriesDoneCount++;            // increment the count of retries we have done
 
-        (*hdIf.cmd_intern)(readNotWrite, retryCmd, cmdLength, buffer, sectorCount);      // try the retry command until we succeed
+        (*hdIf.cmdIntern)(readNotWrite, retryCmd, cmdLength, buffer, sectorCount);      // try the retry command until we succeed
 
         if(hdIf.success) {                  // if succeeded, quit
 			if( lock ){
@@ -104,7 +104,7 @@ void hdd_if_select(int ifType)
 
     switch(ifType) {
         case IF_ACSI:           // for ACSI
-            hdIf.cmd_intern         = (THddIfCmd) acsi_cmd;
+            hdIf.cmdIntern          = (THddIfCmd) acsi_cmd;
             hdIf.pSetReg            = NULL;
             hdIf.pGetReg            = NULL;
             hdIf.pDmaDataTx_prepare = NULL;
@@ -114,9 +114,9 @@ void hdd_if_select(int ifType)
             break;
 
         case IF_SCSI_TT:        // for TT SCSI
-            hdIf.cmd_intern         = (THddIfCmd)           scsi_cmd_TT;
-            hdIf.pSetReg            = (TsetReg)             scsi_setReg_TT;
-            hdIf.pGetReg            = (TgetReg)             scsi_getReg_TT;
+            hdIf.cmdIntern          = (THddIfCmd)           scsiCmdTT;
+            hdIf.pSetReg            = (TsetReg)             scsiSetRegTT;
+            hdIf.pGetReg            = (TgetReg)             scsiGetRegTT;
             hdIf.pDmaDataTx_prepare = (TdmaDataTx_prepare)  dmaDataTx_prepare_TT;
             hdIf.pDmaDataTx_do      = (TdmaDataTx_do)       dmaDataTx_do_TT;
 
@@ -125,10 +125,10 @@ void hdd_if_select(int ifType)
             break;
 
         case IF_SCSI_FALCON:    // for Falcon SCSI
-            hdIf.cmd_intern         = (THddIfCmd) scsi_cmd_TT;
+            hdIf.cmdIntern          = (THddIfCmd)           scsiCmdTT;
 
-            hdIf.pSetReg            = (TsetReg)             scsi_setReg_Falcon;
-            hdIf.pGetReg            = (TgetReg)             scsi_getReg_Falcon;
+            hdIf.pSetReg            = (TsetReg)             scsiSetRegFalcon;
+            hdIf.pGetReg            = (TgetReg)             scsiGetRegFalcon;
             hdIf.pDmaDataTx_prepare = (TdmaDataTx_prepare)  dmaDataTx_prepare_Falcon;
             hdIf.pDmaDataTx_do      = (TdmaDataTx_do)       dmaDataTx_do_Falcon;
 
@@ -137,7 +137,7 @@ void hdd_if_select(int ifType)
             break;
 
         default:
-            hdIf.cmd_intern = NULL;
+            hdIf.cmdIntern  = NULL;
             hdIf.pSetReg    = NULL;
             hdIf.pGetReg    = NULL;
             hdIf.scsiHostId = 0xff;

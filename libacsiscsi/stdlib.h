@@ -32,6 +32,7 @@ void showHexByte(uint8_t val);
 void showHexWord(uint16_t val);
 void showHexDword(uint32_t val);
 
+void logMsgHexByte(uint8_t val);
 void logMsg(char* logMsg);
 void logMsgProgress(uint32_t current, uint32_t total);
 

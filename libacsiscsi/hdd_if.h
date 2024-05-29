@@ -3,7 +3,7 @@
 
 #include "global.h"
 
-void scsi_cmd_TT           (uint8_t readNotWrite, uint8_t *cmd, uint8_t cmdLength, uint8_t *buffer, uint16_t sectorCount);
+void scsiCmdTT           (uint8_t readNotWrite, uint8_t *cmd, uint8_t cmdLength, uint8_t *buffer, uint16_t sectorCount);
 void scsi_cmd_Falcon       (uint8_t readNotWrite, uint8_t *cmd, uint8_t cmdLength, uint8_t *buffer, uint16_t sectorCount);
 
 typedef void  (*THddIfCmd) (uint8_t readNotWrite, uint8_t *cmd, uint8_t cmdLength, uint8_t *buffer, uint16_t sectorCount);
@@ -13,11 +13,11 @@ typedef uint32_t (*TgetReg)   (int whichReg);
 typedef uint8_t  (*TdmaDataTx_prepare) (uint8_t readNotWrite, uint8_t *buffer, uint32_t dataByteCount);
 typedef uint8_t  (*TdmaDataTx_do)      (uint8_t readNotWrite, uint8_t *buffer, uint32_t dataByteCount);
 
-uint32_t scsi_getReg_TT(int whichReg);
-void  scsi_setReg_TT(int whichReg, uint32_t value);
+uint32_t scsiGetRegTT(int whichReg);
+void  scsiSetRegTT(int whichReg, uint32_t value);
 
-uint32_t scsi_getReg_Falcon(int whichReg);
-void  scsi_setReg_Falcon(int whichReg, uint32_t value);
+uint32_t scsiGetRegFalcon(int whichReg);
+void  scsiSetRegFalcon(int whichReg, uint32_t value);
 
 void  scsi_clrBit(int whichReg, uint32_t bitMask);
 void  scsi_setBit(int whichReg, uint32_t bitMask);
@@ -31,7 +31,7 @@ uint8_t dmaDataTx_do_Falcon        (uint8_t readNotWrite, uint8_t *buffer, uint3
 typedef struct {
     THddIfCmd   cmd;
     THddIfCmd   cmd_nolock;
-    THddIfCmd   cmd_intern;
+    THddIfCmd   cmdIntern;
 
     uint8_t     success;
     uint8_t     statusByte;

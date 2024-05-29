@@ -141,13 +141,6 @@
 #define ICR_AIP         (1 << 6)
 #define ICR_RST         (1 << 7)
 
-#define SCSI_PHASE_MSG_IN       0
-#define SCSI_PHASE_MSG_OUT      1
-#define SCSI_PHASE_STATUS       4
-#define SCSI_PHASE_COMMAND      5
-#define SCSI_PHASE_DATA_IN      6
-#define SCSI_PHASE_DATA_OUT     7
-
 #define TCR_PHASE_DATA_OUT      0
 #define TCR_PHASE_DATA_IN       1
 #define TCR_PHASE_CMD           2

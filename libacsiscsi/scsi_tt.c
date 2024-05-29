@@ -20,13 +20,13 @@ void logMsgProgress(uint32_t current, uint32_t total);
 void scsi_reset(void);
 //-----------------
 // local function definitions
-static uint8_t scsi_select_and_cmd(uint8_t readNotWrite, uint8_t scsiId, uint8_t *cmd, uint8_t cmdLength, uint8_t *dataAddr, uint32_t dataByteCount);
-static uint8_t selscsi(uint8_t scsiId);
+static uint8_t scsiSelectAndSendCmd(uint8_t readNotWrite, uint8_t scsiId, uint8_t *cmd, uint8_t cmdLength, uint8_t *dataAddr, uint32_t dataByteCount);
+static uint8_t scsiSelection(uint8_t scsiId);
 static uint16_t dataTransfer(uint8_t readNotWrite, uint8_t *bfr, uint32_t byteCount, uint8_t cmdLength);
-static void w4stat(void);
-static uint8_t doack(void);
+static void scsiGetStatusAndMsgIn(void);
+static uint8_t scsiAck(void);
        void scsiSetLongTimeout(void);
-       uint8_t w4req(void);
+       uint8_t scsiWaitForReq(void);
        void scsiSetShortTimeout(void);
 
 uint8_t PIO_read(void);
@@ -35,10 +35,10 @@ void PIO_write(uint8_t data);
 #define USE_DMA
 
 #ifdef USE_DMA
-uint8_t   w4int(void);
-void   setDmaAddr_TT(uint32_t addr);
-uint32_t  getDmaAddr_TT(void);
-void   setDmaCnt_TT(uint32_t dataCount);
+uint8_t  scsiWaitForInt(void);
+void     setDmaAddr_TT(uint32_t addr);
+uint32_t getDmaAddr_TT(void);
+void     setDmaCnt_TT(uint32_t dataCount);
 #else
 uint16_t pioDataTransfer(uint8_t readNotWrite, uint8_t *bfr, uint32_t byteCount);
 uint16_t pioDataTransfer_read(uint8_t *bfr, uint32_t byteCount);
@@ -47,8 +47,8 @@ uint16_t pioDataTransfer_write(uint8_t *bfr, uint32_t byteCount);
 
 extern uint8_t machine;
 
-uint32_t scsi_getReg_TT(int whichReg);
-void  scsi_setReg_TT(int whichReg, uint32_t value);
+uint32_t scsiGetRegTT(int whichReg);
+void  scsiSetRegTT(int whichReg, uint32_t value);
 
 uint8_t dmaDataTx_prepare_TT (uint8_t readNotWrite, uint8_t *buffer, uint32_t dataByteCount);
 uint8_t dmaDataTx_do_TT      (uint8_t readNotWrite, uint8_t *buffer, uint32_t dataByteCount);
@@ -57,7 +57,7 @@ uint8_t dmaDataTx_do_TT      (uint8_t readNotWrite, uint8_t *buffer, uint32_t da
 void clearCache030(void);
 
 uint32_t _cmdTimeOut;                      // timeout time for scsi_cmd() from start to end
-void scsi_cmd_TT(uint8_t readNotWrite, uint8_t *cmd, uint8_t cmdLength, uint8_t *buffer, uint16_t sectorCount)
+void scsiCmdTT(uint8_t readNotWrite, uint8_t *cmd, uint8_t cmdLength, uint8_t *buffer, uint16_t sectorCount)
 {
     //--------
     // init result to fail codes
@@ -93,10 +93,10 @@ void scsi_cmd_TT(uint8_t readNotWrite, uint8_t *cmd, uint8_t cmdLength, uint8_t 
     *FLOCK = 0xffff;                    // set FLOCK to disable FDC operations
 
     scsiSetShortTimeout();              // short timeout for command
-    uint8_t res = scsi_select_and_cmd(readNotWrite, scsiId, cmd, cmdLength, buffer, sectorCount << 9);      // send command block
+    uint8_t res = scsiSelectAndSendCmd(readNotWrite, scsiId, cmd, cmdLength, buffer, sectorCount << 9);      // send command block
 
     if(res) {
-        logMsg("scsi_cmd_tt failed on scsi_select_and_cmd() \r\n");
+        logMsg("scsiCmdTT failed on scsiSelectAndSendCmd() \r\n");
         *FLOCK = 0;                     // clear FLOCK to enable FDC operations
 
         hdIf.success = FALSE;
@@ -110,7 +110,7 @@ void scsi_cmd_TT(uint8_t readNotWrite, uint8_t *cmd, uint8_t cmdLength, uint8_t 
         uint16_t wres = dataTransfer(readNotWrite, buffer, byteCount, cmdLength);
 
         if(wres) {
-            logMsg("scsi_cmd_tt failed on dataTransfer \r\n");
+            logMsg("scsiCmdTT failed on dataTransfer \r\n");
             *FLOCK = 0;                 // clear FLOCK to enable FDC operations
 
             hdIf.success = FALSE;
@@ -118,10 +118,10 @@ void scsi_cmd_TT(uint8_t readNotWrite, uint8_t *cmd, uint8_t cmdLength, uint8_t 
         }
     }
 
-    w4stat();                           // wait for status byte
+    scsiGetStatusAndMsgIn();                           // wait for status byte
 
     if(!hdIf.success) {
-        logMsg("scsi_cmd_tt failed on w4stat \r\n");
+        logMsg("scsiCmdTT failed on scsiGetStatusAndMsgIn \r\n");
     }
 
     *FLOCK = 0;                         // clear FLOCK to enable FDC operations
@@ -222,15 +222,15 @@ uint16_t pioDataTransfer_write(uint8_t *bfr, uint32_t byteCount)
 
 #endif
 
-// scsi_select_and_cmd() - set DMA pointer and count and send command block
-uint8_t scsi_select_and_cmd(uint8_t readNotWrite, uint8_t scsiId, uint8_t *cmd, uint8_t cmdLength, uint8_t *dataAddr, uint32_t dataByteCount)
+// scsiSelectAndSendCmd() - set DMA pointer and count and send command block
+uint8_t scsiSelectAndSendCmd(uint8_t readNotWrite, uint8_t scsiId, uint8_t *cmd, uint8_t cmdLength, uint8_t *dataAddr, uint32_t dataByteCount)
 {
     uint8_t res;
 
-    res = selscsi(scsiId);  // select required device
+    res = scsiSelection(scsiId);  // select required device
 
     if(res) {               // if failed, quit with failure
-        logMsg("scsi_select_and_cmd() failed on SELECT\r\n");
+        logMsg("scsiSelectAndSendCmd() failed on SELECT\r\n");
         return -1;
     }
 
@@ -238,7 +238,7 @@ uint8_t scsi_select_and_cmd(uint8_t readNotWrite, uint8_t scsiId, uint8_t *cmd, 
     res = (*hdIf.pDmaDataTx_prepare)(readNotWrite, dataAddr, dataByteCount);
 
     if(res) {
-        logMsg("scsi_select_and_cmd() failed on DmaDataTx_prepare()\r\n");
+        logMsg("scsiSelectAndSendCmd() failed on DmaDataTx_prepare()\r\n");
         return -1;
     }
 #endif
@@ -252,7 +252,7 @@ uint8_t scsi_select_and_cmd(uint8_t readNotWrite, uint8_t scsiId, uint8_t *cmd, 
         PIO_write(cmd[i]);
 
         if(!hdIf.success) {                                 // if time out happened, fail
-            logMsg("scsi_select_and_cmd() - CMD phase failed on PIO_write()\r\n");
+            logMsg("scsiSelectAndSendCmd() - CMD phase failed on PIO_write()\r\n");
             logMsgProgress(i, cmdLength);
             return -1;
         }
@@ -262,7 +262,7 @@ uint8_t scsi_select_and_cmd(uint8_t readNotWrite, uint8_t scsiId, uint8_t *cmd, 
 }
 
 // Selects the SCSI device with specified SCSI ID
-uint8_t selscsi(uint8_t scsiId)
+uint8_t scsiSelection(uint8_t scsiId)
 {
     uint8_t res;
 
@@ -336,11 +336,11 @@ void scsi_reset(void)
     }
 }
 
-// w4int - wait for interrupts from 5380 or DMAC during DMA transfer
+// scsiWaitForInt - wait for interrupts from 5380 or DMAC during DMA transfer
 // Comments:
 //	When 5380 is interrupted, it indicates a change of data to status phase (i.e., DMA is done), or ...
 //	When DMAC is interrupted, it indicates either DMA count is zero, or there is an internal bus error.
-uint8_t w4int(void)
+uint8_t scsiWaitForInt(void)
 {
     uint8_t res;
 
@@ -371,8 +371,31 @@ uint8_t w4int(void)
     return 0;
 }
 
-// w4stat - wait for status byte and message byte.
-void w4stat(void)
+int scsiWaitForPhaseMatch(void)
+{
+    uint8_t phaseWant = ((*hdIf.pGetReg)(REG_TargetCommand)) & 0x07;
+
+    while(1) {
+        uint8_t phaseGot = (((*hdIf.pGetReg)(REG_CurrentScsiBusStatus)) >> 2) & 0x07;
+
+        if(phaseGot == phaseWant) {     // phase match? good
+            return 0;
+        }
+
+        uint32_t now = *HZ_200;
+        if(now >= _cmdTimeOut) {        // if time out, fail
+            logMsg("scsiWaitForPhaseMatch failed to wait for phase: ");
+            logMsgHexByte(phaseWant);
+            logMsg("\r\n");
+
+            hdIf.success = FALSE;
+            return -1;
+        }
+    }
+}
+
+// scsiGetStatusAndMsgIn - wait for status byte and message byte.
+void scsiGetStatusAndMsgIn(void)
 {
 	(*hdIf.pSetReg)(REG_TargetCommand, TCR_PHASE_STATUS);     // STATUS IN phase
 	(*hdIf.pGetReg)(REG_ResetParityInterrupts);                       // clear potential interrupt
@@ -382,7 +405,7 @@ void w4stat(void)
     uint8_t status = PIO_read();
 
     if(!hdIf.success) {                             // failed?
-        logMsg("w4stat failed on reading status byte \r\n");
+        logMsg("scsiGetStatusAndMsgIn failed on reading status byte \r\n");
         return;
     }
 
@@ -393,7 +416,7 @@ void w4stat(void)
 
     (void) PIO_read();
     if(!hdIf.success) {
-        logMsg("w4stat failed on reading message in \r\n");
+        logMsg("scsiGetStatusAndMsgIn failed on reading message in \r\n");
         return;
     }
 
@@ -409,24 +432,32 @@ uint8_t PIO_read(void)
     hdIf.phaseChanged   = FALSE;
     hdIf.success        = FALSE;
 
-    res = w4req();                      // wait for status byte
+    res = scsiWaitForReq();                      // wait for status byte
     if(res) {                           // if timed-out, fail
-        logMsg("PIO_read() - fail on w4req() \r\n");
+        logMsg("PIO_read() - fail on scsiWaitForReq() \r\n");
         return 0;
     }
 
     res = (*hdIf.pGetReg)(REG_BusAndStatus);
     if((res & (1 << 3)) == 0) {         // PHASE MATCH bit from BUS AND STATUS REGISTER is low? SCSI phase changed
-        logMsg("PIO_read() - phase changed, fail\r\n");
+        uint8_t phaseWant = ((*hdIf.pGetReg)(REG_TargetCommand)) & 0x07;
+        uint8_t phaseGot = (((*hdIf.pGetReg)(REG_CurrentScsiBusStatus)) >> 2) & 0x07;
+
+        logMsg("PIO_read() - phase changed, fail - want: ");
+        logMsgHexByte(phaseWant);
+        logMsg(", got: ");
+        logMsgHexByte(phaseGot);
+        logMsg("\r\n");
+
         hdIf.phaseChanged   = TRUE;
         return 0;
     }
 
     uint8_t data = (*hdIf.pGetReg)(REG_CurrentScsiData); // get the status byte
 
-    res = doack();                      // signal that status byte is here
+    res = scsiAck();                      // signal that status byte is here
     if(res) {                           // if timed-out, fail
-        logMsg("PIO_read() - fail on doack() \r\n");
+        logMsg("PIO_read() - fail on scsiAck() \r\n");
         return 0;
     }
 
@@ -441,9 +472,9 @@ void PIO_write(uint8_t data)
     hdIf.phaseChanged   = FALSE;
     hdIf.success        = FALSE;
 
-    res = w4req();                      // wait for status byte
+    res = scsiWaitForReq();                      // wait for status byte
     if(res) {                           // if timed-out, fail
-        logMsg("PIO_write() - fail on w4req() \r\n");
+        logMsg("PIO_write() - fail on scsiWaitForReq() \r\n");
         return;
     }
 
@@ -458,17 +489,17 @@ void PIO_write(uint8_t data)
     (*hdIf.pSetReg)(REG_InitiatorCommand, ICR_DBUS);  // assert data bus (enable data output)
     (*hdIf.pSetReg)(REG_CurrentScsiData, data);
 
-    res = doack();                      // signal that status byte is here
+    res = scsiAck();                      // signal that status byte is here
     if(res) {                           // if timed-out, fail
-        logMsg("PIO_write() - fail on doack() \r\n");
+        logMsg("PIO_write() - fail on scsiAck() \r\n");
         return;
     }
 
     hdIf.success = TRUE;
 }
 
-// w4req() - wait for REQ to come during hand shake of non-data bytes
-uint8_t w4req(void)
+// scsiWaitForReq() - wait for REQ to come during hand shake of non-data bytes
+uint8_t scsiWaitForReq(void)
 {
     while(1) {                      // wait for REQ
         uint8_t icr = (*hdIf.pGetReg)(REG_CurrentScsiBusStatus);
@@ -485,8 +516,8 @@ uint8_t w4req(void)
     return -1;                      // time out
 }
 
-// doack() - assert ACK
-uint8_t doack(void)
+// scsiAck() - assert ACK
+uint8_t scsiAck(void)
 {
     scsi_setBit(REG_InitiatorCommand, ICR_ACK);   // assert ACK
 
@@ -548,7 +579,7 @@ void setDmaCnt_TT(uint32_t dataCount)
 }
 //----------------------
 // functions for SETING SCSI register
-void scsi_setReg_TT(int whichReg, uint32_t value)
+void scsiSetRegTT(int whichReg, uint32_t value)
 {
     if(whichReg == REG_DMACTL) {
         *SDMACTL = value;
@@ -561,7 +592,7 @@ void scsi_setReg_TT(int whichReg, uint32_t value)
 
 //----------------------
 // functions for GETTING SCSI register
-uint32_t scsi_getReg_TT(int whichReg)
+uint32_t scsiGetRegTT(int whichReg)
 {
     if(whichReg == REG_DMARES) {
         return *SDMARES;
@@ -623,9 +654,9 @@ uint8_t dmaDataTx_do_TT(uint8_t readNotWrite, uint8_t *buffer, uint32_t dataByte
     }
 
     uint8_t res;
-    res = w4int();                                  // wait for int
+    res = scsiWaitForInt();                                  // wait for int
     if(res) {
-        logMsg(" dmaDataTansfer() failed - w4int() timeout\r\n");
+        logMsg(" dmaDataTansfer() failed - scsiWaitForInt() timeout\r\n");
         return -1;
     }
 
