@@ -132,14 +132,14 @@ uint16_t dataTransfer(uint8_t readNotWrite, uint8_t *bfr, uint32_t byteCount, ui
     uint16_t res;
 
     if(readNotWrite) {                                  // read
-        (*hdIf.pSetReg)(REG_ICR, 0);                         // deassert the data bus
-        (*hdIf.pSetReg)(REG_TCR, TCR_PHASE_DATA_IN);         // set DATA IN  phase
+        (*hdIf.pSetReg)(REG_InitiatorCommand, 0);                         // deassert the data bus
+        (*hdIf.pSetReg)(REG_TargetCommand, TCR_PHASE_DATA_IN);         // set DATA IN  phase
     } else {                                            // write
-        (*hdIf.pSetReg)(REG_ICR, ICR_DBUS);                  // assert data bus
-        (*hdIf.pSetReg)(REG_TCR, TCR_PHASE_DATA_OUT);        // set DATA OUT phase
+        (*hdIf.pSetReg)(REG_InitiatorCommand, ICR_DBUS);                  // assert data bus
+        (*hdIf.pSetReg)(REG_TargetCommand, TCR_PHASE_DATA_OUT);        // set DATA OUT phase
     }
 
-    res = (*hdIf.pGetReg)(REG_REI);             // clear potential interrupt
+    res = (*hdIf.pGetReg)(REG_ResetParityInterrupts);             // clear potential interrupt
 
 #ifdef USE_DMA                    // if using DMA for data transfer
     res = (*hdIf.pDmaDataTx_do) (readNotWrite, bfr, byteCount);
@@ -243,8 +243,8 @@ uint8_t scsi_select_and_cmd(uint8_t readNotWrite, uint8_t scsiId, uint8_t *cmd, 
     }
 #endif
 
-    (*hdIf.pSetReg)(REG_TCR, TCR_PHASE_CMD);                // set COMMAND PHASE (assert C/D)
-    (*hdIf.pSetReg)(REG_ICR, ICR_DBUS);                     // assert data bus
+    (*hdIf.pSetReg)(REG_TargetCommand, TCR_PHASE_CMD);                // set COMMAND PHASE (assert C/D)
+    (*hdIf.pSetReg)(REG_InitiatorCommand, ICR_DBUS);                     // assert data bus
 
     int i;
 
@@ -267,7 +267,7 @@ uint8_t selscsi(uint8_t scsiId)
     uint8_t res;
 
     while(1) {                                              // STILL busy from last time?
-        uint8_t icr = (*hdIf.pGetReg)(REG_CR);
+        uint8_t icr = (*hdIf.pGetReg)(REG_CurrentScsiBusStatus);
         if((icr & ICR_BUSY) == 0) {                         // if not, it's available
             break;
         }
@@ -278,19 +278,19 @@ uint8_t selscsi(uint8_t scsiId)
         }
     }
 
-    (*hdIf.pSetReg)(REG_TCR, TCR_PHASE_DATA_OUT);           // data out phase
-    (*hdIf.pSetReg)(REG_ISR, 0);                            // no interrupt from selection
-    (*hdIf.pSetReg)(REG_ICR, ICR_BSY | ICR_SEL);            // assert BSY and SEL
+    (*hdIf.pSetReg)(REG_TargetCommand, TCR_PHASE_DATA_OUT);           // data out phase
+    (*hdIf.pSetReg)(REG_SelectEnable, 0);                            // no interrupt from selection
+    (*hdIf.pSetReg)(REG_InitiatorCommand, ICR_BSY | ICR_SEL);            // assert BSY and SEL
 
     uint8_t selId  = (1 << scsiId);                            // convert number of device to bit
-    (*hdIf.pSetReg)(REG_ODR, selId);                        // set dest SCSI IDs
+    (*hdIf.pSetReg)(REG_OutputData, selId);                        // set dest SCSI IDs
 
-    (*hdIf.pSetReg)(REG_ICR, ICR_BSY | ICR_SEL | ICR_DBUS); // assert BUSY, SEL and data bus
-    scsi_clrBit(REG_MR, MR_ARBIT);                          // clear arbitrate bit
-    scsi_clrBit(REG_ICR, ICR_BSY);                          // clear BUSY
+    (*hdIf.pSetReg)(REG_InitiatorCommand, ICR_BSY | ICR_SEL | ICR_DBUS); // assert BUSY, SEL and data bus
+    scsi_clrBit(REG_Mode, MR_ARBIT);                          // clear arbitrate bit
+    scsi_clrBit(REG_InitiatorCommand, ICR_BSY);                          // clear BUSY
 
     while(1) {                          // wait for busy bit to appear
-        uint8_t icr = (*hdIf.pGetReg)(REG_CR);
+        uint8_t icr = (*hdIf.pGetReg)(REG_CurrentScsiBusStatus);
 
         if(icr & ICR_BUSY) {            // if bit set, good
             res = 0;
@@ -304,13 +304,13 @@ uint8_t selscsi(uint8_t scsiId)
         }
     }
 
-    (*hdIf.pSetReg)(REG_ICR, 0);                            // clear SEL and data bus assertion
+    (*hdIf.pSetReg)(REG_InitiatorCommand, 0);                            // clear SEL and data bus assertion
     return res;
 }
 
 void scsi_reset(void)
 {
-    (*hdIf.pSetReg)(REG_ICR, ICR_RST);                      // assert RST
+    (*hdIf.pSetReg)(REG_InitiatorCommand, ICR_RST);                      // assert RST
 
     _cmdTimeOut = *HZ_200 + 100;                            // wait 0.5 s
 
@@ -323,7 +323,7 @@ void scsi_reset(void)
         }
     }
 
-    (*hdIf.pSetReg)(REG_ICR, 0);                            // back to normal
+    (*hdIf.pSetReg)(REG_InitiatorCommand, 0);                            // back to normal
 
     _cmdTimeOut = *HZ_200 + 100;                            // wait 0.5 s
 
@@ -363,10 +363,10 @@ uint8_t w4int(void)
         }
     }
 
-    (*hdIf.pGetReg)(REG_REI);               // clear potential interrupt
+    (*hdIf.pGetReg)(REG_ResetParityInterrupts);               // clear potential interrupt
     (*hdIf.pSetReg)(REG_DMACTL, DMADIS);    // disable DMA
-    (*hdIf.pSetReg)(REG_MR,  0);            // disable DMA mode
-    (*hdIf.pSetReg)(REG_ICR, 0);            // make sure data bus is not asserted
+    (*hdIf.pSetReg)(REG_Mode,  0);            // disable DMA mode
+    (*hdIf.pSetReg)(REG_InitiatorCommand, 0);            // make sure data bus is not asserted
 
     return 0;
 }
@@ -374,8 +374,8 @@ uint8_t w4int(void)
 // w4stat - wait for status byte and message byte.
 void w4stat(void)
 {
-	(*hdIf.pSetReg)(REG_TCR, TCR_PHASE_STATUS);     // STATUS IN phase
-	(*hdIf.pGetReg)(REG_REI);                       // clear potential interrupt
+	(*hdIf.pSetReg)(REG_TargetCommand, TCR_PHASE_STATUS);     // STATUS IN phase
+	(*hdIf.pGetReg)(REG_ResetParityInterrupts);                       // clear potential interrupt
 
     //-----------------
     // receive status byte
@@ -388,8 +388,8 @@ void w4stat(void)
 
     //-----------------
     // receive message byte
-	(*hdIf.pSetReg)(REG_TCR, TCR_PHASE_MESSAGE_IN); // MESSAGE IN phase
-	(*hdIf.pGetReg)(REG_REI);                       // clear potential interrupt
+	(*hdIf.pSetReg)(REG_TargetCommand, TCR_PHASE_MESSAGE_IN); // MESSAGE IN phase
+	(*hdIf.pGetReg)(REG_ResetParityInterrupts);                       // clear potential interrupt
 
     (void) PIO_read();
     if(!hdIf.success) {
@@ -404,7 +404,7 @@ void w4stat(void)
 uint8_t PIO_read(void)
 {
     uint8_t res;
-    (*hdIf.pSetReg)(REG_ICR, 0);         // deassert data bus (disable data output)
+    (*hdIf.pSetReg)(REG_InitiatorCommand, 0);         // deassert data bus (disable data output)
 
     hdIf.phaseChanged   = FALSE;
     hdIf.success        = FALSE;
@@ -415,15 +415,14 @@ uint8_t PIO_read(void)
         return 0;
     }
 
-    res = (*hdIf.pGetReg)(REG_DSR);
+    res = (*hdIf.pGetReg)(REG_BusAndStatus);
     if((res & (1 << 3)) == 0) {         // PHASE MATCH bit from BUS AND STATUS REGISTER is low? SCSI phase changed
-//        logMsg("PIO_read() - phase change \r\n");
-
+        logMsg("PIO_read() - phase changed, fail\r\n");
         hdIf.phaseChanged   = TRUE;
         return 0;
     }
 
-    uint8_t data = (*hdIf.pGetReg)(REG_DB); // get the status byte
+    uint8_t data = (*hdIf.pGetReg)(REG_CurrentScsiData); // get the status byte
 
     res = doack();                      // signal that status byte is here
     if(res) {                           // if timed-out, fail
@@ -448,7 +447,7 @@ void PIO_write(uint8_t data)
         return;
     }
 
-    res = (*hdIf.pGetReg)(REG_DSR);
+    res = (*hdIf.pGetReg)(REG_BusAndStatus);
     if((res & (1 << 3)) == 0) {         // PHASE MATCH bit from BUS AND STATUS REGISTER is low? SCSI phase changed
 //        logMsg("PIO_write() - phase change \r\n");
 
@@ -456,8 +455,8 @@ void PIO_write(uint8_t data)
         return;
     }
 
-    (*hdIf.pSetReg)(REG_ICR, ICR_DBUS);  // assert data bus (enable data output)
-    (*hdIf.pSetReg)(REG_DB, data);
+    (*hdIf.pSetReg)(REG_InitiatorCommand, ICR_DBUS);  // assert data bus (enable data output)
+    (*hdIf.pSetReg)(REG_CurrentScsiData, data);
 
     res = doack();                      // signal that status byte is here
     if(res) {                           // if timed-out, fail
@@ -472,7 +471,7 @@ void PIO_write(uint8_t data)
 uint8_t w4req(void)
 {
     while(1) {                      // wait for REQ
-        uint8_t icr = (*hdIf.pGetReg)(REG_CR);
+        uint8_t icr = (*hdIf.pGetReg)(REG_CurrentScsiBusStatus);
         if(icr & ICR_REQ) {         // if REQ appeared, good
             return 0;
         }
@@ -489,12 +488,12 @@ uint8_t w4req(void)
 // doack() - assert ACK
 uint8_t doack(void)
 {
-    scsi_setBit(REG_ICR, ICR_ACK);   // assert ACK
+    scsi_setBit(REG_InitiatorCommand, ICR_ACK);   // assert ACK
 
     uint8_t res;
 
     while(1) {
-        uint8_t icr = (*hdIf.pGetReg)(REG_ICR);
+        uint8_t icr = (*hdIf.pGetReg)(REG_InitiatorCommand);
         if((icr & ICR_REQ) == 0) {      // if REQ gone, good
             res = 0;
             break;
@@ -507,7 +506,7 @@ uint8_t doack(void)
         }
     }
 
-    scsi_clrBit(REG_ICR, ICR_ACK);      // clear ACK
+    scsi_clrBit(REG_InitiatorCommand, ICR_ACK);      // clear ACK
     return res;
 }
 
@@ -611,14 +610,14 @@ uint8_t dmaDataTx_prepare_TT(uint8_t readNotWrite, uint8_t *buffer, uint32_t dat
 uint8_t dmaDataTx_do_TT(uint8_t readNotWrite, uint8_t *buffer, uint32_t dataByteCount)
 {
     // Set up the DMAC for data transfer
-    (*hdIf.pSetReg)(REG_MR, 2);                      // enable DMA mode
+    (*hdIf.pSetReg)(REG_Mode, 2);                      // enable DMA mode
 
     if(readNotWrite) {                          // on read
-        (*hdIf.pSetReg)(REG_DIR, 0);                 // start the DMA receive
+        (*hdIf.pSetReg)(REG_StartDmaInitiatorReceive, 0);                 // start the DMA receive
         (*hdIf.pSetReg)(REG_DMACTL, DMAIN);          // set the DMAC direction to IN
         (*hdIf.pSetReg)(REG_DMACTL, DMAIN+DMAENA);   // turn on DMAC
     } else {                                    // on write
-        (*hdIf.pSetReg)(REG_SDS, 0);                 // start the DMA send -- WrSCSI  #0,SDS
+        (*hdIf.pSetReg)(REG_StartDmaSend, 0);                 // start the DMA send -- WrSCSI  #0,SDS
         (*hdIf.pSetReg)(REG_DMACTL, DMAOUT);         // set the DMAC direction to OUT
         (*hdIf.pSetReg)(REG_DMACTL, DMAOUT+DMAENA);  // turn on DMAC
     }

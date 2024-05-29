@@ -19,21 +19,24 @@
 #define ICR_BUSY        (1 << 6)
 
 // TT uint8_t regs for reading
-#define REG_DB      0x1
-#define REG_ICR     0x3
-#define REG_MR      0x5
-#define REG_TCR     0x7
-#define REG_CR      0x9
-#define REG_DSR     0xb
-#define REG_IDR     0xd
-#define REG_REI     0xf
+#define REG_CurrentScsiData             0x1
+#define REG_InitiatorCommand            0x3
+#define REG_Mode                        0x5
+#define REG_TargetCommand               0x7
+#define REG_CurrentScsiBusStatus        0x9
+#define REG_BusAndStatus                0xb
+#define REG_InputData                   0xd
+#define REG_ResetParityInterrupts       0xf
 
 // TT uint8_t regs for writing
-#define REG_ODR     0x1
-#define REG_ISR     0x9
-#define REG_SDS     0xb
-#define REG_DTR     0xd
-#define REG_DIR     0xf
+#define REG_OutputData                  0x1
+// #define REG_InitiatorCommand         0x3
+// #define REG_Mode                     0x5
+// #define REG_TargetCommand            0x7
+#define REG_SelectEnable                0x9
+#define REG_StartDmaSend                0xb
+#define REG_StartDmaTargetReceive       0xd
+#define REG_StartDmaInitiatorReceive    0xf
 
 #define REG_DMARES  0x10
 #define REG_DMACTL  0x11

@@ -23,9 +23,9 @@ uint8_t w4int(void);
 
 void stopDmaFalcon(void)
 {
-    (*hdIf.pGetReg)(REG_REI);           // reset ints by reading register
-    scsi_clrBit(REG_MR, MR_DMA);        // DMA mode off
-    (*hdIf.pSetReg)(REG_ICR, 0);
+    (*hdIf.pGetReg)(REG_ResetParityInterrupts);           // reset ints by reading register
+    scsi_clrBit(REG_Mode, MR_DMA);        // DMA mode off
+    (*hdIf.pSetReg)(REG_InitiatorCommand, 0);
 
     clearCache030();
 }
@@ -42,14 +42,14 @@ void scsi_setReg_Falcon(int whichReg, uint32_t value)
     uint8_t which = 0;
 
     switch(whichReg) {
-        case REG_DB :   which = SPCSD; break;   // for REG_DB  and REG_ODR
-        case REG_ICR:   which = SPICR; break;
-        case REG_MR :   which = SPMR2; break;
-        case REG_TCR:   which = SPTCR; break;
-        case REG_CR :   which = SPCSB; break;   // for REG_CR  and REG_ISR
-        case REG_SDS:   which = SPBSR; break;   // for REG_DSR and REG_DS
-        case REG_DTR:   which = SPIDR; break;   // for REG_DTR and REG_IDR
-        case REG_DIR:   which = SPRPI; break;   // for REG_DIR and REG_REI
+        case REG_CurrentScsiData :   which = SPCSD; break;   // for REG_CurrentScsiData  and REG_OutputData
+        case REG_InitiatorCommand:   which = SPICR; break;
+        case REG_Mode :   which = SPMR2; break;
+        case REG_TargetCommand:   which = SPTCR; break;
+        case REG_CurrentScsiBusStatus :   which = SPCSB; break;   // for REG_CurrentScsiBusStatus  and REG_SelectEnable
+        case REG_StartDmaSend:   which = SPBSR; break;   // for REG_BusAndStatus and REG_DS
+        case REG_StartDmaTargetReceive:   which = SPIDR; break;   // for REG_StartDmaTargetReceive and REG_InputData
+        case REG_StartDmaInitiatorReceive:   which = SPRPI; break;   // for REG_StartDmaInitiatorReceive and REG_ResetParityInterrupts
         default     :   logMsg("setReg - default!!!\n\r");  return;     // fail, not found
     }
 
@@ -62,14 +62,14 @@ uint32_t scsi_getReg_Falcon(int whichReg)
     uint8_t which = 0;
 
     switch(whichReg) {
-        case REG_DB :   which = SPCSD; break;   // for REG_DB  and REG_ODR
-        case REG_ICR:   which = SPICR; break;
-        case REG_MR :   which = SPMR2; break;
-        case REG_TCR:   which = SPTCR; break;
-        case REG_CR :   which = SPCSB; break;   // for REG_CR  and REG_ISR
-        case REG_SDS:   which = SPBSR; break;   // for REG_DSR and REG_DS
-        case REG_DTR:   which = SPIDR; break;   // for REG_DTR and REG_IDR
-        case REG_DIR:   which = SPRPI; break;   // for REG_DIR and REG_REI
+        case REG_CurrentScsiData :   which = SPCSD; break;   // for REG_CurrentScsiData  and REG_OutputData
+        case REG_InitiatorCommand:   which = SPICR; break;
+        case REG_Mode :   which = SPMR2; break;
+        case REG_TargetCommand:   which = SPTCR; break;
+        case REG_CurrentScsiBusStatus :   which = SPCSB; break;   // for REG_CurrentScsiBusStatus  and REG_SelectEnable
+        case REG_StartDmaSend:   which = SPBSR; break;   // for REG_BusAndStatus and REG_DS
+        case REG_StartDmaTargetReceive:   which = SPIDR; break;   // for REG_StartDmaTargetReceive and REG_InputData
+        case REG_StartDmaInitiatorReceive:   which = SPRPI; break;   // for REG_StartDmaInitiatorReceive and REG_ResetParityInterrupts
         default     :   logMsg("getReg - default!!!\n\r");  return 0;     // fail, not found
     }
 
@@ -89,10 +89,10 @@ uint8_t dmaDataTx_prepare_Falcon(uint8_t readNotWrite, uint8_t *buffer, uint32_t
 uint8_t dmaDataTx_do_Falcon(uint8_t readNotWrite, uint8_t *buffer, uint32_t dataByteCount)
 {
     // Set up the DMA for data transfer
-    (*hdIf.pSetReg)(REG_MR, MR_DMA);                // enable DMA mode
+    (*hdIf.pSetReg)(REG_Mode, MR_DMA);                // enable DMA mode
 
     if(!readNotWrite) {                             // on write
-        (*hdIf.pSetReg)(REG_SDS, 0);                // start the DMA send -- WrSCSI  #0,SDS
+        (*hdIf.pSetReg)(REG_StartDmaSend, 0);                // start the DMA send -- WrSCSI  #0,SDS
     }
 
     // set DMA pointer to buffer address
@@ -117,7 +117,7 @@ uint8_t dmaDataTx_do_Falcon(uint8_t readNotWrite, uint8_t *buffer, uint32_t data
 
     while(1) {                                      // wait till it's safe to access the DMA channel
         uint8_t sr = *WDSR;
-        if((sr & (1 << 3)) == 0) {         // ??? NEMAM TOTO OPACNE ???
+        if((sr & (1 << 3)) == 0) {                  // TODO: check if this is OK
             break;
         }
 
@@ -129,12 +129,12 @@ uint8_t dmaDataTx_do_Falcon(uint8_t readNotWrite, uint8_t *buffer, uint32_t data
     delay();
 
     if(readNotWrite) {                              // on read
-        (*hdIf.pSetReg)(REG_DIR, 0);                // start the DMA receive
+        (*hdIf.pSetReg)(REG_StartDmaInitiatorReceive, 0);                // start the DMA receive
 
         *WDL = 0;                                   // turn on DMA read
     } else {                                        // on write
         *WDL = 0x18D;
-        *WDC = 0;                   // ??? Podobne ako (*hdIf.pSetReg)(REG_SDS, 0);
+        *WDC = 0;                   // TODO: similar to (*hdIf.pSetReg)(REG_StartDmaSend, 0);
 
         *WDL = 0x100;               // DMA_WR, DMA enable
     }
@@ -150,7 +150,7 @@ uint8_t dmaDataTx_do_Falcon(uint8_t readNotWrite, uint8_t *buffer, uint32_t data
         return -1;
     }
 
-    res = (*hdIf.pGetReg)(REG_SDS);                 // get DMA STATUS
+    res = (*hdIf.pGetReg)(REG_StartDmaSend);                 // get DMA STATUS
 
     stopDmaFalcon();
 
