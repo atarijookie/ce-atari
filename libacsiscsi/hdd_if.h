@@ -29,26 +29,27 @@ uint8_t dmaDataTx_prepare_Falcon   (uint8_t readNotWrite, uint8_t *buffer, uint3
 uint8_t dmaDataTx_do_Falcon        (uint8_t readNotWrite, uint8_t *buffer, uint32_t dataByteCount);
 
 typedef struct {
-    THddIfCmd		    cmd;
-    THddIfCmd		    cmd_nolock;
-    THddIfCmd           cmd_intern;
+    THddIfCmd   cmd;
+    THddIfCmd   cmd_nolock;
+    THddIfCmd   cmd_intern;
 
-    uint8_t                success;
-    uint8_t                statusByte;
-    uint8_t                phaseChanged;
+    uint8_t     success;
+    uint8_t     statusByte;
+    uint8_t     phaseChanged;
 
-    int                 retriesDoneCount;
-    int                 maxRetriesCount;
+    int         retriesDoneCount;
+    int         maxRetriesCount;
 
-    uint8_t                forceFlock;
+    uint8_t     forceFlock;
 
-    TsetReg             pSetReg;
-    TgetReg             pGetReg;
+    TsetReg     pSetReg;
+    TgetReg     pGetReg;
 
     TdmaDataTx_prepare  pDmaDataTx_prepare;
     TdmaDataTx_do       pDmaDataTx_do;
 
-    uint8_t                scsiHostId;
+    uint8_t     scsiHostId;
+    uint8_t     showLogs;
 } THDif;
 
 extern THDif hdIf;

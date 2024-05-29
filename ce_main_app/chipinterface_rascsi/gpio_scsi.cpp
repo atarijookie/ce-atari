@@ -82,7 +82,7 @@ bool GpioScsi::getCmd(uint8_t* cmd)
     setPhase(SCSI_PHASE_SELECTION);
 
     if(!waitForTwoPinLevels(PIN_SEL, LOW, PIN_BSY, HIGH)) {
-        Debug::out(LOG_DEBUG, "GpioScsi::getCmd - failed to wait for selection with BSY released");
+        Debug::out(LOG_WARNING, "GpioScsi::getCmd - failed to wait for selection with BSY released");
         return false;
     }
 
@@ -129,7 +129,7 @@ bool GpioScsi::getCmd(uint8_t* cmd)
         cmd[i] = recvByte();
 
         if(isTimeout()) {                   // if something was wrong, quit, failed
-            Debug::out(LOG_DEBUG, "GpioScsi::getCmd - timeout on cmd byte %d", i);
+            Debug::out(LOG_WARNING, "GpioScsi::getCmd - timeout on cmd byte %d", i);
             Debug::cmdStart(cmd, "CMD T/O");
             setPhase(SCSI_PHASE_BUSFREE);
             return false;

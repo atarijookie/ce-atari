@@ -36,6 +36,7 @@ void scsi_reset(void);
 void CEread(uint8_t verbose);
 void sequentialWrite(void);
 
+void zeroDataRead(void);
 void CEwrite(void);
 int  writeHansTest(int byteCount, uint16_t xorVal);
 void showInt(int value, int length);
@@ -233,6 +234,11 @@ int main(void)
             continue;
         }
 
+        if(key == 'o') {            // read with zero data
+            zeroDataRead();
+            continue;
+        }
+
         if(key == 's') {            // read 
             SDread();
             continue;
@@ -311,6 +317,7 @@ void showMenu(void)
     (void) Cconws("x - SCSI reset\r\n");
     (void) Cconws("i -  1 x INQUIRY\r\n");
     (void) Cconws("I - 10 x INQUIRY\r\n");
+    (void) Cconws("o - read with no data\r\n");
     (void) Cconws("s -  1 x SD card READ\r\n");
     (void) Cconws("r -  1 x READ\r\n");
     (void) Cconws("R - 10 x READ\r\n");
@@ -324,6 +331,34 @@ void showMenu(void)
 
 uint8_t commandLong[CMD_LENGTH_LONG] = {0x1f,	0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0, 0, 0, 0, 0, 0, 0}; 
 int readHansTest(int byteCount, uint16_t xorVal, uint8_t verbose);
+
+void zeroDataRead(void)
+{
+    // this is GEMDOS_Dsetdrv to drive A:, which returns just status without
+    uint8_t cmd[6] = {0x20, 0x43, 0x45, 0x03, 0x0e, 0x00};
+    cmd[0] = (deviceID << 5) | cmd[0];
+
+    (void) Cconws("Zero Data Read...\r\n");
+
+    // issue command with no retries but with logs
+    hdIf.showLogs = 1;
+    int maxRetriesCountWas = hdIf.maxRetriesCount;
+    hdIf.maxRetriesCount = 0;
+
+    hdIfCmdAsUser(1, cmd, 6, pBuffer, 1);
+
+    hdIf.showLogs = 0;
+    hdIf.maxRetriesCount = maxRetriesCountWas;
+
+    // show results
+    (void) Cconws("  success: ");
+    showHexByte(hdIf.success);
+    (void) Cconws("\r\n");
+
+    (void) Cconws("  status : ");
+    showHexByte(hdIf.statusByte);
+    (void) Cconws("  (ok when 7F)\r\n");
+}
 
 void CEread(uint8_t verbose)
 {

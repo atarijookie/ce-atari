@@ -1,6 +1,7 @@
 #include <mint/sysbind.h>
 #include <mint/osbind.h>
 
+#include "hdd_if.h"
 #include "stdlib.h"
 #include "keys.h"
 
@@ -294,22 +295,22 @@ void showHexDword(uint32_t val)
 
 void logMsg(char* logMsg)
 {
-//    if(showLogs) {
-//        (void) Cconws(logMsg);
-//    }
+   if(hdIf.showLogs) {
+       (void) Cconws(logMsg);
+   }
 }
 
 void logMsgProgress(uint32_t current, uint32_t total)
 {
-//    if(!showLogs) {
-//        return;
-//    }
+   if(!hdIf.showLogs) {
+       return;
+   }
 
-//    (void) Cconws("Progress: ");
-//    showHexDword(current);
-//    (void) Cconws(" out of ");
-//    showHexDword(total);
-//    (void) Cconws("\n\r");
+   (void) Cconws("Progress: ");
+   showHexDword(current);
+   (void) Cconws(" out of ");
+   showHexDword(total);
+   (void) Cconws("\n\r");
 }
 
 uint8_t getMachineType(void)

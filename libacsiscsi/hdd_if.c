@@ -110,6 +110,7 @@ void hdd_if_select(int ifType)
             hdIf.pDmaDataTx_prepare = NULL;
             hdIf.pDmaDataTx_do      = NULL;
             hdIf.scsiHostId         = 0xff;
+            hdIf.showLogs           = 0;
             break;
 
         case IF_SCSI_TT:        // for TT SCSI
@@ -120,6 +121,7 @@ void hdd_if_select(int ifType)
             hdIf.pDmaDataTx_do      = (TdmaDataTx_do)       dmaDataTx_do_TT;
 
             hdIf.scsiHostId         = 7;               // SCSI ID 7 is reserved by host
+            hdIf.showLogs           = 0;
             break;
 
         case IF_SCSI_FALCON:    // for Falcon SCSI
@@ -131,6 +133,7 @@ void hdd_if_select(int ifType)
             hdIf.pDmaDataTx_do      = (TdmaDataTx_do)       dmaDataTx_do_Falcon;
 
             hdIf.scsiHostId         = 0;               // SCSI ID 0 is reserved by host
+            hdIf.showLogs           = 0;
             break;
 
         default:
@@ -138,6 +141,7 @@ void hdd_if_select(int ifType)
             hdIf.pSetReg    = NULL;
             hdIf.pGetReg    = NULL;
             hdIf.scsiHostId = 0xff;
+            hdIf.showLogs   = 0;
             break;
 	}
 }
