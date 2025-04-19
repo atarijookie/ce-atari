@@ -1,7 +1,0 @@
-setproctitle
-pyinotify
-pythonping
-wrapt_timeout_decorator
-psutil
-python-dotenv
-loguru

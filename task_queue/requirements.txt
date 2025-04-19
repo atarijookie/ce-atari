@@ -1,8 +1,0 @@
-setproctitle
-urllib3
-urwid
-python-dotenv
-wrapt_timeout_decorator
-psutil
-loguru
-ntplib
