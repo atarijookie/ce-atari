@@ -14,7 +14,6 @@
 #include <arpa/inet.h>
 
 #include "../main_netserver.h"
-#include "../chipinterface_v1_v2/chipinterface12.h"
 #include "chipinterfacenetwork.h"
 #include "../utils.h"
 #include "../debug.h"

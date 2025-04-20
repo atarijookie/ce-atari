@@ -4,7 +4,6 @@
 
 class AcsiDataTrans;
 class Scsi;
-class ConsoleAppsStream;
 class ImageStorage;
 class ImageSilo;
 

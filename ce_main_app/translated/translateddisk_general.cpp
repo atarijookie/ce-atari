@@ -23,7 +23,6 @@
 #include "gemdos.h"
 #include "gemdos_errno.h"
 #include "desktopcreator.h"
-#include "../display/displaythread.h"
 #include "../../libdospath/libdospath.h"
 
 extern THwConfig hwConfig;
@@ -1198,11 +1197,14 @@ void TranslatedDisk::fillTranslatedDisplayLines(void)
     bool useZipdirNotFile = s.getBool("USE_ZIP_DIR", 1);
     strcpy(tmp, mountRawNotTrans ? "USB raw    " : "USB trans  ");
     strcat(tmp, useZipdirNotFile ? "ZIP dir"     : "ZIP file");
-    display_setLine(DISP_LINE_TRAN_SETT, tmp);
+
+    // TODO: store display data elsewhere
+    // display_setLine(DISP_LINE_TRAN_SETT, tmp);
 
     // what letter is for config and shared drive?
     sprintf(tmp, "config:%c   shared:%c", driveLetters.confDrive + 'A', driveLetters.shared + 'A');
-    display_setLine(DISP_LINE_CONF_SHAR, tmp);
+    // TODO: store display data elsewhere
+    // display_setLine(DISP_LINE_CONF_SHAR, tmp);
 
     // other drives
     bool hasDrive = false;
@@ -1221,5 +1223,6 @@ void TranslatedDisk::fillTranslatedDisplayLines(void)
         strcat(tmp, "-");
     }
 
-    display_setLine(DISP_LINE_TRAN_DRIV, tmp);
+    // TODO: store display data elsewhere
+    // display_setLine(DISP_LINE_TRAN_DRIV, tmp);
 }

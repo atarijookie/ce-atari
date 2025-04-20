@@ -17,7 +17,6 @@
 #include "update.h"
 #include "utils.h"
 #include "statusreport.h"
-#include "display/displaythread.h"
 
 #include "floppy/imagesilo.h"
 #include "floppy/imagestorage.h"
@@ -100,17 +99,12 @@ CCoreThread::CCoreThread()
 
     misc.setDataTrans(dataTrans);
 
-    configStream = new ConsoleAppsStream();
-    configStream->setAcsiDataTrans(dataTrans);
-    configStream->setSettingsReloadProxy(&settingsReloadProxy);
-
     extensionHandler = new ExtensionHandler();
     extensionHandler->setAcsiDataTrans(dataTrans);
 }
 
 CCoreThread::~CCoreThread()
 {
-    delete configStream;
     delete dataTrans;
     delete retryMod;
     delete extensionHandler;
@@ -213,7 +207,6 @@ void CCoreThread::handleOtherStuff(void)
     static bool initialized = false;
     static uint32_t nextFloppyEncodingCheck = 0;
     static uint32_t getHwInfoTimeout = 0;
-    static uint32_t nextHousekeeping = 0;
     static bool shouldCheckHansFranzAlive = false;
     static uint32_t hansFranzAliveCheckTime = 0;
 
@@ -222,7 +215,6 @@ void CCoreThread::handleOtherStuff(void)
 
         nextFloppyEncodingCheck = Utils::getEndTime(1000);
         getHwInfoTimeout = Utils::getEndTime(3000);         // create a time when we already should have info about HW, and if we don't have that by that time, then fail
-        nextHousekeeping = Utils::getEndTime(1000);
 
         shouldCheckHansFranzAlive = true;                   // when true and the 15 second timeout since start passed, check for Hans and Franz being alive
         hansFranzAliveCheckTime = Utils::getEndTime(15000); // get the time when we should check if Hans and Franz are alive
@@ -259,13 +251,6 @@ void CCoreThread::handleOtherStuff(void)
     if(now >= lastFwInfoTime.nextDisplay) {
         lastFwInfoTime.nextDisplay  = Utils::getEndTime(1000);
         displayStatusToConsole(now);
-    }
-
-    // minor house-keeping tasks might be launched here, just be sure they take little time to finish
-    if(now >= nextHousekeeping) {
-        nextHousekeeping = Utils::getEndTime(1000);
-
-        configStream->houseKeeping(now);
     }
 
     // should we check if Hans and Franz are alive?
@@ -525,7 +510,7 @@ void CCoreThread::handleAcsiCommand(uint8_t *bufIn)
         case HOSTMOD_CONFIG:                            // config console command?
             Debug::cmdStart(bufIn, "CE_CONF");
             wasHandled = true;
-            configStream->processCommand(pCmd);
+            // NOP: no longer supported
             break;
 
         case HOSTMOD_TRANSLATED_DISK:                   // translated disk command?
@@ -651,8 +636,9 @@ void CCoreThread::fillDisplayLines(void)
     }
 
     // now set the constructed strings
-    display_setLine(DISP_LINE_HDD_IDS, tmpLine1);
-    display_setLine(DISP_LINE_HDD_TYPES, tmpLine2);
+    // TODO: store display data elsewhere
+    // display_setLine(DISP_LINE_HDD_IDS, tmpLine1);
+    // display_setLine(DISP_LINE_HDD_TYPES, tmpLine2);
 }
 
 void CCoreThread::loadSettings(void)
@@ -933,8 +919,6 @@ void CCoreThread::handleSendTrack(uint8_t *inBuf)
 
     // now we should do some buzzing because of floppy seek
     if(prevTrack != track) {                        // track changed?
-        int trackDiff = abs(prevTrack - track);     // get how many tracks we've moved
-        beeper_floppySeek(trackDiff);               // do the beep
         prevTrack = track;
     }
 }

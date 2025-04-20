@@ -20,7 +20,6 @@
 #include "utils.h"
 #include "settings.h"
 #include <stdint.h>
-#include "config/consoleappsstream.h"
 #include "chipinterface.h"
 
 #include "ikbd.h"
@@ -137,8 +136,6 @@ void *ikbdThreadCode(void *ptr)
             }
         }
 
-        // TODO: fix this later
-        //bool clientConnected = ((Utils::getCurrentMs() - shared.configStream.acsi->getLastCmdTimestamp()) <= 2000);
         bool clientConnected = false;
 
         if(fdUart >= 0 && FD_ISSET(fdUart, &readfds)) {

@@ -1,14 +1,9 @@
 # control verbosity. use make V=1
 V = 0
 
-#ONPC   = yes
-
 CXX	    = g++
 CC	    = gcc
 #STRIP	= strip
-ifneq ($(ONPC),yes)
-CPU_FLAGS   = -march=armv6 -mtune=arm1176jzf-s -mfpu=vfp -mfloat-abi=hard -marm
-endif
 CFLAGS	= -Wall -g -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE $(CPU_FLAGS)
 CXXFLAGS = $(CFLAGS)
 DEPFLAGS = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
@@ -20,21 +15,8 @@ LDLIBS = -ldospath -lrt -lanl -lpthread -ldl -lutil
 OBJDIR = obj
 TARGET = cosmosex.elf
 
-ifeq ($(ONPC),yes)
-    CFLAGS += -DONPC -I./
-    LDLIBS += -ldl
-else
-    LDLIBS	+= -lbcm2835
-    CFLAGS += -I./
-    LDLIBS += -ldl
-    # add search path for libbcm2835.a
-    # /usr/local/bin on rpi or more exotic path when cross-compiling
-    VPATH += $(shell for d in `$(ACTUAL_CC) -print-search-dirs | \
-                     sed '/^lib/b 1;d;:1;s,/[^/.][^/]*/\.\./,/,;t 1;s,:[^=]*=,:;,;s,;,;  ,g' | \
-                     tr ';' \\\\012 | tail -n 1 | tr ':' \\\\012 ` /usr/local/lib ; do \
-                       [ -f "$$d/libbcm2835.a" ] && echo $$d && break ; \
-                     done )
-endif
+CFLAGS += -I./
+LDLIBS += -ldl
 
 # uncomment following line to get map file (ce.map)
 #LDFLAGS += -Wl,-Map,ce.map
@@ -55,58 +37,34 @@ AT_0 := @
 AT_1 :=
 AT = $(AT_$(V))
 
-SUBDIR1	= config
 SUBDIR2	= native
 SUBDIR3	= translated
 SUBDIR4	= floppy
 SUBDIR7	= service
 SUBDIR8	= acsicommand
-SUBDIR10 = dir2fdd
 SUBDIR11 = ikbd
-SUBDIR12 = display
-SUBDIR13 = chipinterface_v1_v2
-SUBDIR14 = chipinterface_v3
-SUBDIR15 = chipinterface_v4
-SUBDIR16 = chipinterface_rascsi
-SUBDIR17 = chipinterface_dummy
 SUBDIR18 = chipinterface_network
 SUBDIR19 = misc
 SUBDIR20 = extension
 
 SRCS  = $(wildcard *.cpp) 
-SRCS += $(wildcard $(SUBDIR1)/*.cpp) 
 SRCS += $(wildcard $(SUBDIR2)/*.cpp) 
 SRCS += $(wildcard $(SUBDIR3)/*.cpp)
 SRCS += $(wildcard $(SUBDIR4)/*.cpp)
 SRCS += $(wildcard $(SUBDIR7)/*.cpp)
 SRCS += $(wildcard $(SUBDIR8)/*.cpp)
-SRCS += $(wildcard $(SUBDIR10)/*.cpp)
 SRCS += $(wildcard $(SUBDIR11)/*.cpp)
-SRCS += $(wildcard $(SUBDIR12)/*.cpp)
-SRCS += $(wildcard $(SUBDIR13)/*.cpp)
-SRCS += $(wildcard $(SUBDIR14)/*.cpp)
-SRCS += $(wildcard $(SUBDIR15)/*.cpp)
-SRCS += $(wildcard $(SUBDIR16)/*.cpp)
-SRCS += $(wildcard $(SUBDIR17)/*.cpp)
 SRCS += $(wildcard $(SUBDIR18)/*.cpp)
 SRCS += $(wildcard $(SUBDIR19)/*.cpp)
 SRCS += $(wildcard $(SUBDIR20)/*.cpp)
 
 HDRS  = $(wildcard *.h)
-HDRS += $(wildcard $(SUBDIR1)/*.h)
 HDRS += $(wildcard $(SUBDIR2)/*.h)
 HDRS += $(wildcard $(SUBDIR3)/*.h)
 HDRS += $(wildcard $(SUBDIR4)/*.h)
 HDRS += $(wildcard $(SUBDIR7)/*.h)
 HDRS += $(wildcard $(SUBDIR8)/*.h)
-HDRS += $(wildcard $(SUBDIR10)/*.h)
 HDRS += $(wildcard $(SUBDIR11)/*.h)
-HDRS += $(wildcard $(SUBDIR12)/*.h)
-HDRS += $(wildcard $(SUBDIR13)/*.h)
-HDRS += $(wildcard $(SUBDIR14)/*.h)
-HDRS += $(wildcard $(SUBDIR15)/*.h)
-HDRS += $(wildcard $(SUBDIR16)/*.h)
-HDRS += $(wildcard $(SUBDIR17)/*.h)
 HDRS += $(wildcard $(SUBDIR18)/*.h)
 HDRS += $(wildcard $(SUBDIR19)/*.h)
 HDRS += $(wildcard $(SUBDIR20)/*.h)

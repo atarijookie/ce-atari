@@ -15,8 +15,6 @@
 #include "settings.h"
 #include <stdint.h>
 #include "statusreport.h"
-#include "../config/consoleappsstream.h"
-#include "../display/displaythread.h"
 
 #include "chipinterface.h"
 #include "ikbd.h"
@@ -120,7 +118,8 @@ void Ikbd::fillDisplayLine(void)
         strcat(tmp, "-");
     }
 
-    display_setLine(DISP_LINE_IKDB, tmp);
+    // TODO: store display data elsewhere
+    // display_setLine(DISP_LINE_IKDB, tmp);
 }
 
 void Ikbd::findDevices(void)

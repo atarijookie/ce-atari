@@ -16,7 +16,6 @@
 #include "imagesilo.h"
 #include "floppysetup.h"
 #include "floppyencoder.h"
-#include "../display/displaythread.h"
 
 extern pthread_mutex_t floppyEncoderMutex;
 extern pthread_cond_t  floppyEncoderShouldWork;
@@ -297,10 +296,9 @@ void ImageSilo::setCurrentSlot(int index)
         snprintf(tmp, 32, "FDD%d: %s", (int) currentSlot, slots[currentSlot].imageFile.c_str());
     }
 
-    display_setLine(DISP_LINE_FLOPPY, tmp);     // store the floppy display line
-    display_showNow(DISP_SCREEN_HDD1_IDX);      // show it right now - floppy image changed
-
-    beeper_beep(BEEP_SHORT);                    // do a beep on button press / changing floppy slot
+    // TODO: store display data elsewhere
+    // display_setLine(DISP_LINE_FLOPPY, tmp);     // store the floppy display line
+    // display_showNow(DISP_SCREEN_HDD1_IDX);      // show it right now - floppy image changed
 
     // active slot number to file
     Utils::intToFileFromEnv(currentSlot, "FILE_FLOPPY_ACTIVE_SLOT");

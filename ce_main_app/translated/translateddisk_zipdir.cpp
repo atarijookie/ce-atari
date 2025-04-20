@@ -23,7 +23,6 @@
 #include "gemdos.h"
 #include "gemdos_errno.h"
 #include "desktopcreator.h"
-#include "../display/displaythread.h"
 #include "../../libdospath/libdospath.h"
 
 void TranslatedDisk::fillSupportedArchiveExtensionsIfNeeded(void)

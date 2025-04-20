@@ -17,7 +17,6 @@
 #include "imagesilo.h"
 #include "floppysetup.h"
 #include "floppyencoder.h"
-#include "../display/displaythread.h"
 
 pthread_mutex_t floppyEncoderMutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t  floppyEncoderShouldWork = PTHREAD_COND_INITIALIZER;

@@ -11,7 +11,6 @@
 #include <errno.h>
 #include <limits.h>
 
-#include "config/consoleappsstream.h"
 #include "settings.h"
 #include "global.h"
 #include "ccorethread.h"
@@ -21,14 +20,8 @@
 #include "version.h"
 #include "cmdsockthread.h"
 #include "extension/extensionrecvthread.h"
-#include "display/displaythread.h"
 #include "floppy/floppyencoder.h"
-#include "chipinterface_v1_v2/chipinterface12.h"
-#include "chipinterface_v3/chipinterface3.h"
-#include "chipinterface_v4/chipinterface4.h"
-#include "chipinterface_rascsi/chipinterface_rascsi.h"
 #include "chipinterface_network/chipinterfacenetwork.h"
-#include "chipinterface_dummy/chipinterfacedummy.h"
 #include "../libdospath/libdospath.h"
 
 volatile sig_atomic_t sigintReceived = 0;
@@ -108,36 +101,9 @@ int main(int argc, char *argv[])
     bool good = false;
     chipInterface = NULL;
 
-    if(flags.chipInterface == CHIPIF_UNKNOWN || flags.chipInterface == CHIPIF_V1_V2) {  // chip interface unknown or v1/v2
-        Debug::out(LOG_INFO, "ChipInterface: v1/v2");
-        chipInterface = new ChipInterface12();                  // create chip interface v1/v2
-        hwConfig.version = 2;
-    } else if(flags.chipInterface == CHIPIF_V3) {
-        Debug::out(LOG_INFO, "ChipInterface: v3");
-        chipInterface = new ChipInterface3();                   // create chip interface v3
-        hwConfig.version = 2;
-    } else if(flags.chipInterface == CHIPIF_V4) {
-        Debug::out(LOG_INFO, "ChipInterface: v4");
-        chipInterface = new ChipInterface4();                   // create chip interface v4
-        hwConfig.version = 2;
-    } else if(flags.chipInterface == CHIPIF_RASCSI) {           // this is RaSCSI interface
-        Debug::out(LOG_INFO, "ChipInterface: RaSCSI");
-        chipInterface = new ChipInterfaceRaSCSI();
-        hwConfig.version = 2;
-    } else if(flags.chipInterface == CHIPIF_DUMMY) {
-        Debug::out(LOG_INFO, "ChipInterface: opening DUMMY chip interface");
-        chipInterface = new ChipInterfaceDummy();
-        hwConfig.version = 2;
-        flags.noReset = true;
-    } else if(flags.chipInterface == CHIPIF_NETWORK) {
-        Debug::out(LOG_INFO, "ChipInterface: starting NETWORK server");
-        networkServerMain();
-        return 0;
-    } else {
-        Debug::out(LOG_INFO, "ChipInterface - unknown option, terminating.");
-        printf("\nChipInterface - unknown option, terminating.\n");
-        return 0;
-    }
+    Debug::out(LOG_INFO, "ChipInterface: starting NETWORK server");
+    networkServerMain();
+    return 0;
 
     good = chipInterface->ciOpen();                         // try to open chip interface v1/v2
 
@@ -205,7 +171,6 @@ int runCore(int instanceNo, bool localNotNetwork)
     CCoreThread *core;
     pthread_t   ikbdThreadInfo;
     pthread_t   floppyEncThreadInfo;
-    pthread_t   displayThreadInfo;
     pthread_t   cmdSockThreadInfo;
     pthread_t   extensionThreadInfo;
 
@@ -243,20 +208,10 @@ int runCore(int instanceNo, bool localNotNetwork)
     //-------------
     core = new CCoreThread();
 
-    // display thread - only on RPi 2 or newer (RPi 1 doesn't have the extra GPIO pins and this then kills eth + usb on RPi1)
-    bool hasDisplay = rpiConfig.revisionInt >= 0xa01041;
-
     handlePthreadCreate("ikbd", &ikbdThreadInfo, (void*) ikbdThreadCode);
     handlePthreadCreate("floppy encode", &floppyEncThreadInfo, (void*) floppyEncodeThreadCode);
     handlePthreadCreate("command socket", &cmdSockThreadInfo, (void*) cmdSockThreadCode);
     handlePthreadCreate("extension", &extensionThreadInfo, (void*) extensionThreadCode);
-
-    if(hasDisplay) {
-        Debug::out(LOG_INFO, "Running on RPi 2 or newer (%x), starting displayThread.", rpiConfig.revisionInt);
-        handlePthreadCreate("display", &displayThreadInfo, (void*) displayThreadCode);
-    } else {
-        Debug::out(LOG_INFO, "Running on RPi 1 (%x), not starting displayThread.", rpiConfig.revisionInt);
-    }
 
     printf("Entering main loop...\n");
 
@@ -271,10 +226,6 @@ int runCore(int instanceNo, bool localNotNetwork)
     pthread_kill_join("floppy encoder", floppyEncThreadInfo);
     pthread_kill_join("command socket", cmdSockThreadInfo);
     pthread_kill_join("extension", extensionThreadInfo);
-
-    if(hasDisplay) {             // kill display thread
-        pthread_kill_join("display", displayThreadInfo);
-    }
 
     //---------------------------------------------------
     // Closing of GPIO should be done after stopping IKBD thread and DISPLAY thread
@@ -323,7 +274,6 @@ void initializeFlags(void)
     flags.noFranz      = false;         // if set to true, won't communicate with Franz
     flags.ikbdLogs     = false;         // no ikbd logs by default
     flags.fakeOldApp   = false;         // don't fake old app by default
-    flags.display      = false;         // if set to true, show string on front display, if possible
     flags.noCapture    = false;         // if true, don't do exclusive mouse and keyboard capture
 
     flags.localNotNetwork   = true;     // if true, this app runs handling localy connected device; if false then this core is part of the network server
@@ -483,11 +433,6 @@ void parseCmdLineArguments(int argc, char *argv[])
             flags.fakeOldApp    = true;
         }
 
-        if(strcmp(argv[i], "display") == 0) {
-            isKnownTag          = true;                             // this is a known tag
-            flags.display       = true;
-        }
-
         // don't capture USB mouse and keyboard
         if(strcmp(argv[i], "nocap") == 0) {
             isKnownTag          = true;                             // this is a known tag
@@ -512,7 +457,6 @@ void printfPossibleCmdLineArgs(void)
     printf("hwinfo   - get HW version and HDD interface type\n");
     printf("ikbdlogs - write IKBD logs to file\n");
     printf("fakeold  - fake old app version for reinstall tests\n");
-    printf("display  - show string on front display, if possible\n");
     printf("nocap    - don't do exclusive USB mouse and keyboard capture\n");
 }
 
@@ -575,14 +519,3 @@ bool otherInstanceIsRunning(void)
     return false;
 }
 
-void showOnDisplay(int argc, char *argv[])
-{
-    if(argc != 3) {
-        printf("To use display command: %s display 'Your message'\n", argv[0]);
-        return;
-    }
-
-    display_init();
-    display_print_center(argv[2]);
-    display_deinit();
-}

@@ -7,7 +7,6 @@
 #include "settingsreloadproxy.h"
 #include "isettingsuser.h"
 
-#include "config/consoleappsstream.h"
 #include "floppy/floppysetup.h"
 #include "misc/misc.h"
 
@@ -40,7 +39,6 @@ private:
     bool running;
 
     AcsiDataTrans       *dataTrans;
-    ConsoleAppsStream   *configStream;
     ExtensionHandler    *extensionHandler;
 
     //-----------------------------------
@@ -57,7 +55,6 @@ private:
 
     bool handleHdd(uint8_t* inBuff);
     void handleAcsiCommand(uint8_t *bufIn);
-    void handleConsoleAppsStream(uint8_t *cmd);
 
     //-----------------------------------
     // handle FW version
