@@ -22,7 +22,6 @@
 #include "debug.h"
 #include "utils.h"
 #include "main_netserver.h"
-#include "netservermainpage.h"
 
 void sigint_handler(int sig);
 void handlePthreadCreate(int res, const char *threadName, pthread_t *pThread);
@@ -42,7 +41,6 @@ extern InterProcessEvents  events;
 
 TCEServerStatus serverStatus[MAX_SERVER_COUNT];
 std::string mainPage;
-void generateMainPage(void);
 
 uint8_t serverIp[4] = {127, 0, 0, 1};
 
@@ -114,9 +112,6 @@ void networkServerMain(void)
     forkCEliteServer(0);
     Debug::out(LOG_INFO, "Starting first server on index # 0");
 
-    // generate first main page
-    generateMainPage();
-
     struct timeval timeout;
     fd_set readfds;
     uint8_t recvData[64];
@@ -179,8 +174,6 @@ void onServerStatus(uint8_t* recvData, int len)
     // don't modify clientIp here, it's not the IP of client but rather IP of server itself
 
     Debug::out(LOG_DEBUG, "netServer: onServerStatus at index: %d, status: %d", index, ss->status);
-
-    generateMainPage();
 }
 
 void onClientRequest(sockaddr_in *clientAddr, uint8_t *recvData, int len)
@@ -283,27 +276,5 @@ void udpSend(uint32_t ip, uint16_t port, uint8_t* data, uint16_t len)
 
     if(rv < 0) {
         Debug::out(LOG_ERROR, "updSend - failed to sendto() response");
-    }
-}
-
-void generateMainPage(void)
-{
-    // generate new report into string, check if changed since last time, if changed then write to file
-    std::string mainPageNew;
-    NetServerMainPage::create(mainPageNew, serverIp);
-
-    if(mainPage != mainPageNew) {   // main page changed?
-        mainPage = mainPageNew;
-
-        // create dir if it doesn't exist
-        mkdir(NETSERVER_WEBROOT, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-
-        // try to write page to file
-        FILE *f = fopen(NETSERVER_WEBROOT_INDEX, "wt");
-
-        if(f) { // if could open file, write and close
-            fwrite(mainPage.c_str(), 1, mainPage.length(), f);
-            fclose(f);
-        }
     }
 }
