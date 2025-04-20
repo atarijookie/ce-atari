@@ -148,10 +148,6 @@ void CCoreThread::run(void)
 
     loadSettings();
 
-    if(!flags.noReset) {            // if we should reset Hans and Franz on start, do it (and we're probably not debugging Hans or Franz)
-        chipInterface->resetHDDandFDD();
-    }
-
     //------------------------------
 
     lastFwInfoTime.nextDisplay = Utils::getEndTime(1000);
@@ -180,7 +176,7 @@ void CCoreThread::run(void)
             gotAcsiCommand = handleHdd(inBuff);
         }
 
-        if(!flags.noFranz && needsAction && !hardNotFloppy) {   // not running without Franz & floppy drive needs action?
+        if(needsAction && !hardNotFloppy) {   // not running without Franz & floppy drive needs action?
             gotFddCommand = handleFdd(inBuff);
         }
 
@@ -206,33 +202,10 @@ void CCoreThread::handleOtherStuff(void)
 {
     static bool initialized = false;
     static uint32_t nextFloppyEncodingCheck = 0;
-    static uint32_t getHwInfoTimeout = 0;
-    static bool shouldCheckHansFranzAlive = false;
-    static uint32_t hansFranzAliveCheckTime = 0;
 
     if(!initialized) {          // timers and flags not initialized yet?
         initialized = true;
-
         nextFloppyEncodingCheck = Utils::getEndTime(1000);
-        getHwInfoTimeout = Utils::getEndTime(3000);         // create a time when we already should have info about HW, and if we don't have that by that time, then fail
-
-        shouldCheckHansFranzAlive = true;                   // when true and the 15 second timeout since start passed, check for Hans and Franz being alive
-        hansFranzAliveCheckTime = Utils::getEndTime(15000); // get the time when we should check if Hans and Franz are alive
-
-        flags.gotHansFwVersion  = false;
-        flags.gotFranzFwVersion = false;
-
-        if(flags.noFranz) {                                 // if running without Franz, pretend we got his FW version
-            Debug::out(LOG_DEBUG, "noFranz: %d", flags.noFranz);
-            flags.gotFranzFwVersion = true;
-        }
-
-        if(flags.noReset) {                                 // if we're debugging Hans or Franz (noReset is set to true), don't do this alive check
-            Debug::out(LOG_DEBUG, "noReset: %d", flags.noReset);
-            shouldCheckHansFranzAlive = false;
-        }
-
-        Debug::out(LOG_DEBUG, "Will check for Hans and Franz alive: %s", (shouldCheckHansFranzAlive ? "yes" : "no") );
     }
 
     uint32_t now = Utils::getCurrentMs();
@@ -242,34 +215,9 @@ void CCoreThread::handleOtherStuff(void)
         events.insertSpecialFloppyImageId = 0;
     }
 
-    // if should just get the HW version and HDD interface, but timeout passed, quit
-    if(flags.getHwInfo && now >= getHwInfoTimeout) {
-        showHwVersion();                                            // show the default HW version
-        sigintReceived = 1;                                         // quit
-    }
-
     if(now >= lastFwInfoTime.nextDisplay) {
         lastFwInfoTime.nextDisplay  = Utils::getEndTime(1000);
         displayStatusToConsole(now);
-    }
-
-    // should we check if Hans and Franz are alive?
-    if(shouldCheckHansFranzAlive) {
-        if(now >= hansFranzAliveCheckTime) {                            // did enough time pass since the Hans and Franz reset?
-            if(!flags.gotHansFwVersion || !flags.gotFranzFwVersion) {   // if don't have version from Hans or Franz, then they're not alive
-                // Removed flashing first FW when the chips don't reply -- something this detection goes bad,
-                // and this resulted in writing FW to chips even if it was not needed. Now this possible action will be left for
-                // user manual launch (to avoid automatic writing FW over and over again if it won't help).
-
-                Debug::out(LOG_INFO, "No answer from Hans or Franz, will quit app, hopefully app restart will solve this.");
-                Debug::out(LOG_INFO, "If not, and this will happen in a loop, consider writing chips firmware again.");
-                sigintReceived = 1;
-            } else {
-                Debug::out(LOG_DEBUG, "Got answers from both Hans and Franz :)");
-            }
-
-            shouldCheckHansFranzAlive = false;                      // don't check this again
-        }
     }
 
     if(now >= nextFloppyEncodingCheck) {
@@ -395,33 +343,8 @@ void CCoreThread::displayStatusToConsole(uint32_t now)
     hansTime  = (hansTime  < 15.0f) ? hansTime  : 15.0f;
     franzTime = (franzTime < 15.0f) ? franzTime : 15.0f;
 
-    bool hansAlive  = (hansTime < 3.0f);
-    bool franzAlive = (franzTime < 3.0f);
-
-    int chipIfType = chipInterface->chipInterfaceType();
-    if(chipIfType == CHIP_IF_V1_V2) {       // v1 v2 - with Hans and Franz
-        printf("\033[2K  [ %c ]  Hans: %s, Franz: %s\033[A\n", progChars[lastFwInfoTime.progress], hansAlive ? "LIVE" : "DEAD", franzAlive ? "LIVE" : "DEAD");
-    } else if(chipIfType == CHIP_IF_V4) {   // v4 has only Franz
-        printf("\033[2K  [ %c ]  Franz: %s\033[A\n", progChars[lastFwInfoTime.progress], franzAlive ? "LIVE" : "DEAD");
-    } else {
-        printf("\033[2K  [ %c ]  CE core is running\033[A\n", progChars[lastFwInfoTime.progress]);
-    }
-
+    printf("\033[2K  [ %c ]  CE core is running\033[A\n", progChars[lastFwInfoTime.progress]);
     lastFwInfoTime.progress = (lastFwInfoTime.progress + 1) % 4;
-
-    if(!hansAlive && !flags.noReset && (now - lastFwInfoTime.hansResetTime) >= 3000) {
-        printf("\033[2KHans not alive, resetting Hans.\n");
-        Debug::out(LOG_INFO, "Hans not alive, resetting Hans.");
-        lastFwInfoTime.hansResetTime = now;
-        chipInterface->resetHDD();
-    }
-
-    if(!flags.noFranz && !franzAlive && !flags.noReset && (now - lastFwInfoTime.franzResetTime) >= 3000) {
-        printf("\033[2KFranz not alive, resetting Franz.\n");
-        Debug::out(LOG_INFO, "Franz not alive, resetting Franz.");
-        lastFwInfoTime.franzResetTime = now;
-        chipInterface->resetFDD();
-    }
 
     load.clear();                       // clear load counter
 }
@@ -668,13 +591,9 @@ void CCoreThread::handleFwVersion_hans(void)
     chipInterface->setHDDconfig(enabledIDbits, sdCardAcsiId, shared.imageSilo->getSlotBitmap(), setNewFloppyImageLed, newFloppyImageLed);
     chipInterface->getFWversion(true, fwVer);
 
-    int chipIfType = chipInterface->chipInterfaceType();
-
     if(setNewFloppyImageLed) {                  // if was setting floppy LED
         setNewFloppyImageLed = false;           // don't sent this anymore (until needed)
     }
-
-    flags.gotHansFwVersion = true;
 
     //----------------------------------
     // if HW info changed
@@ -723,26 +642,6 @@ void CCoreThread::handleFwVersion_hans(void)
         diskChanged     = true;                         // tell Franz that floppy changed
         setDiskChanged  = true;
     }
-
-    // if should get the HW info and should quit
-    if(flags.getHwInfo) {
-        showHwVersion();                                // show what HW version we have found
-
-        Debug::out(LOG_INFO, ">>> Terminating app, because it was used as HW INFO tool <<<\n");
-        sigintReceived = 1;
-        return;
-    }
-
-    //----------------------------------
-    // do the following only for chip interface v1 v2
-    if(chipIfType == CHIP_IF_V1_V2) {
-        // if Xilinx HW vs FW mismatching, flash Xilinx again to fix the situation
-        if(hwConfig.fwMismatch) {
-            Debug::out(LOG_ERROR, ">>> Terminating app, because there's Xilinx HW vs FW mismatch! <<<\n");
-            sigintReceived = 1;
-            return;
-        }
-    }
 }
 
 void CCoreThread::handleFwVersion_franz(void)
@@ -770,8 +669,6 @@ void CCoreThread::handleFwVersion_franz(void)
     }
 
     franzHandledOnce = true;
-    flags.gotFranzFwVersion = true;
-
     Debug::out(LOG_DEBUG, "FW: Franz, %d-%02d-%02d", Update::versions.franz.getYear(), Update::versions.franz.getMonth(), Update::versions.franz.getDay());
 }
 

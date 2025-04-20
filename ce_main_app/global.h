@@ -90,25 +90,15 @@ typedef struct {
 typedef struct {
     bool justShowHelp;          // show possible command line arguments and quit
     int  logLevel;              // init current log level to LOG_ERROR
-    int  chipInterface;         // what kind of chip interface we will use - CHIPIF_...
-    bool justDoReset;           // if shouldn't run the app, but just reset Hans and Franz (used with STM32 ST-Link JTAG)
-    bool noReset;               // don't reset Hans and Franz on start - used with STM32 ST-Link JTAG
     bool test;                  // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
-    bool getHwInfo;             // if set to true, wait for HW info from Hans, and then quit and report it
-    bool noFranz;               // if set to true, won't communicate with Franz
     bool ikbdLogs;              // if set to true, will generate ikbd logs file
     bool fakeOldApp;            // if set to true, will always return old app version, so you can test app installation over and over
-    bool display;               // if set to true, show string on front display, if possible
     bool noCapture;             // if set to true, don't do exclusive USB mouse and keyboard capture
 
     bool localNotNetwork;       // if true, this app runs handling localy connected device; if false then this core is part of the network server
     bool instanceNo;            // number of core instance
 
-    bool deviceGetLicense;      // if true, device should get license again
     bool deviceDoUpdate;        // if true, device should download update and write it to flash
-
-    bool gotHansFwVersion;
-    bool gotFranzFwVersion;
 } TFlags;
 
 typedef struct {

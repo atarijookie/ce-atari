@@ -150,11 +150,6 @@ void ChipInterface::setHDDconfig(uint8_t hddEnabledIDs, uint8_t sdCardId, uint8_
     }
 
     //--------------
-    if(flags.deviceGetLicense) {                                // should the device get new hw license?
-        flags.deviceGetLicense = false;
-        responseAddWord(fwResponseBfr, CMD_GET_LICENSE);
-    }
-
     if(flags.deviceDoUpdate) {                                  // should the device do the ?
         flags.deviceDoUpdate = false;
         responseAddWord(fwResponseBfr, CMD_DO_UPDATE);

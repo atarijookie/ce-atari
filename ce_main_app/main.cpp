@@ -92,8 +92,7 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    Debug::out(LOG_INFO, "logLevel: %d, chipInterface: %d, justDoReset: %d, noReset: %d, test: %d, noFranz: %d, noCapture: %d",
-        flags.logLevel, flags.chipInterface, flags.justDoReset, flags.noReset, flags.test, flags.noFranz, flags.noCapture);
+    Debug::out(LOG_INFO, "logLevel: %d, test: %d, noCapture: %d", flags.logLevel, flags.test, flags.noCapture);
 
     //------------------------------------------------------------
     // Opening of chip interface.
@@ -112,8 +111,8 @@ int main(int argc, char *argv[])
         printf("\nHW_VER: UNKNOWN\n");
         printf("\nHDD_IF: UNKNOWN\n");
 
-        Debug::out(LOG_ERROR, "ChipInterface - failed to open chip Interface %d, terminating.", flags.chipInterface);
-        printf("\nChipInterface - failed to open chip Interface %d, terminating.\n", flags.chipInterface);
+        Debug::out(LOG_ERROR, "ChipInterface - failed to open chip Interface, terminating.");
+        printf("\nChipInterface - failed to open chip Interface, terminating.\n");
         return 0;
     }
 
@@ -131,28 +130,6 @@ int main(int argc, char *argv[])
     }
 
     //------------------------------------------------------------
-    if(flags.display || flags.getHwInfo || flags.justDoReset) {
-        if(flags.display) {                             // if should show some string on front display
-            showOnDisplay(argc, argv);
-
-        } else if(flags.getHwInfo) {                    // if should just get HW info, do a shorter / simpler version of app run
-            Debug::out(LOG_INFO, ">>> Starting app as HW INFO tool <<<\n");
-
-            CCoreThread *core = new CCoreThread();   // create main thread
-            core->run();                               // run the main thread
-
-        } else if(flags.justDoReset) {                  // is this a reset command? (used with STM32 ST-Link debugger)
-            chipInterface->resetHDDandFDD();
-        }
-
-        // close the chip interface
-        chipInterface->ciClose();
-        delete chipInterface;
-        chipInterface = NULL;
-
-        return 0;
-    }
-
     // if came here, we should run this app as the main local core
     return runCore(0, true);
 }
@@ -183,7 +160,6 @@ int runCore(int instanceNo, bool localNotNetwork)
         Debug::out(LOG_INFO, "runCore as network server instance # %d", instanceNo);
 
         hwConfig.version = 3;
-        flags.noReset = true;
 
         chipInterface = new ChipInterfaceNetwork();     // create network chip interface
         chipInterface->setInstanceIndex(instanceNo);    // set index of this instance
@@ -266,12 +242,7 @@ void initializeFlags(void)
 {
     flags.justShowHelp = false;
     Debug::setLogLevel(LOG_ERROR);      // init current log level to LOG_ERROR
-    flags.chipInterface = CHIPIF_UNKNOWN; // start with unknown chip interface
-    flags.justDoReset  = false;         // if shouldn't run the app, but just reset Hans and Franz (used with STM32 ST-Link JTAG)
-    flags.noReset      = false;         // don't reset Hans and Franz on start - used with STM32 ST-Link JTAG
     flags.test         = false;         // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
-    flags.getHwInfo    = false;         // if set to true, wait for HW info from Hans, and then quit and report it
-    flags.noFranz      = false;         // if set to true, won't communicate with Franz
     flags.ikbdLogs     = false;         // no ikbd logs by default
     flags.fakeOldApp   = false;         // don't fake old app by default
     flags.noCapture    = false;         // if true, don't do exclusive mouse and keyboard capture
@@ -279,11 +250,7 @@ void initializeFlags(void)
     flags.localNotNetwork   = true;     // if true, this app runs handling localy connected device; if false then this core is part of the network server
     flags.instanceNo        = 0;
 
-    flags.deviceGetLicense  = false;    // if true, device should get license again
     flags.deviceDoUpdate    = false;    // if true, device should download update and write it to flash
-
-    flags.gotHansFwVersion  = false;
-    flags.gotFranzFwVersion = false;
 }
 
 void loadDefaultArgumentsFromFile(void)
@@ -356,48 +323,9 @@ void parseCmdLineArguments(int argc, char *argv[])
             continue;
         }
 
-        // it's a CHIP INTERFACE command (ci)
-        if(strncmp(argv[i], "ci", 2) == 0) {
-            isKnownTag = true;                                      // this is a known tag
-            int ci;
-
-            ci = (int) argv[i][2];
-
-            if(ci >= 48 && ci <= 57) {                              // if it's a number between 0 and 9
-                ci = ci - 48;
-
-                switch(ci) {
-                    case 1:
-                    case 2: flags.chipInterface = CHIPIF_V1_V2;     break;  // 1 or 2 means old SPI interface
-                    case 3: flags.chipInterface = CHIPIF_V3;        break;  // 3 means new SPI interface
-                    case 4: flags.chipInterface = CHIPIF_V4;        break;  // 4 stands for Franz via SPI and ACSI via GPIO
-
-                    case 0: flags.chipInterface = CHIPIF_DUMMY;     break;  // 0 for dummy interface
-                    case 8: flags.chipInterface = CHIPIF_RASCSI;    break;  // 8 for RaSCSI
-                    case 9: flags.chipInterface = CHIPIF_NETWORK;   break;  // 9 for network server
-                }
-            }
-
-            continue;
-        }
-
         if(strcmp(argv[i], "help") == 0 || strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "/?") == 0 || strcmp(argv[i], "?") == 0) {
             isKnownTag          = true;                             // this is a known tag
             flags.justShowHelp  = true;
-            continue;
-        }
-
-        // should we just reset Hans and Franz and quit? (used with STM32 ST-Link JTAG)
-        if(strcmp(argv[i], "reset") == 0) {
-            isKnownTag          = true;                             // this is a known tag
-            flags.justDoReset   = true;
-            continue;
-        }
-
-        // don't resetHans and Franz on start (used with STM32 ST-Link JTAG)
-        if(strcmp(argv[i], "noreset") == 0) {
-            isKnownTag          = true;                             // this is a known tag
-            flags.noReset       = true;
             continue;
         }
 
@@ -407,18 +335,6 @@ void parseCmdLineArguments(int argc, char *argv[])
             isKnownTag          = true;                             // this is a known tag
             flags.test          = true;
             continue;
-        }
-
-        // get hardware version and HDD interface type
-        if(strcmp(argv[i], "hwinfo") == 0) {
-            isKnownTag          = true;                             // this is a known tag
-            flags.getHwInfo     = true;
-        }
-
-        // run the device without communicating with Franz
-        if(strcmp(argv[i], "nofranz") == 0) {
-            isKnownTag          = true;                             // this is a known tag
-            flags.noFranz       = true;
         }
 
         // produce ikbd logs
