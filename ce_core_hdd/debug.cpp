@@ -40,7 +40,10 @@ void Debug::setDefaultLogFile(void)
     }
 
     FILE* f = logFileOpen(CORE_LOG_FILENAME);   // call this to update map, then just close the file
-    fclose(f);
+    
+    if(f) {
+        fclose(f);
+    }
 }
 
 void Debug::setLogFile(const char *path)
