@@ -35,17 +35,15 @@ void initializeFlags(void);
 
 THwConfig           hwConfig;                           // info about the current HW setup
 TFlags              flags;                              // global flags from command line
-RPiConfig           rpiConfig;                          // RPi model, revision, serial
 InterProcessEvents  events;
 SharedObjects       shared;
 ChipInterface*      chipInterface;
 ExternalServices    externalServices;
 
 bool otherInstanceIsRunning(void);
-int  singleInstanceSocketFd;
 
 void showOnDisplay(int argc, char *argv[]);
-int  runCore(int instanceNo, bool localNotNetwork);
+int  runCore(void);
 void networkServerMain(void);
 
 int main(int argc, char *argv[])
@@ -90,31 +88,8 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    Debug::out(LOG_INFO, "logLevel: %d, test: %d, noCapture: %d", flags.logLevel, flags.test, flags.noCapture);
+    Debug::out(LOG_INFO, "logLevel: %d", flags.logLevel);
 
-    //------------------------------------------------------------
-    // Opening of chip interface.
-
-    bool good = false;
-    chipInterface = NULL;
-
-    Debug::out(LOG_INFO, "ChipInterface: starting NETWORK server");
-    networkServerMain();
-    return 0;
-
-    good = chipInterface->ciOpen();                         // try to open chip interface v1/v2
-
-    // after the previous lines the good flag should contain if we were able to open the chip interface
-    if(!good) {
-        printf("\nHW_VER: UNKNOWN\n");
-        printf("\nHDD_IF: UNKNOWN\n");
-
-        Debug::out(LOG_ERROR, "ChipInterface - failed to open chip Interface, terminating.");
-        printf("\nChipInterface - failed to open chip Interface, terminating.\n");
-        return 0;
-    }
-
-    //------------------------------------------------------------
     loadLastHwConfig();                                     // load last found HW IF, HW version, SCSI machine
 
     //------------------------------------
@@ -127,9 +102,7 @@ int main(int argc, char *argv[])
         printf("Cannot register SIGHUP handler!\n");
     }
 
-    //------------------------------------------------------------
-    // if came here, we should run this app as the main local core
-    return runCore(0, true);
+    return runCore();
 }
 
 void pthread_kill_join(const char* threadName, pthread_t& threadInfo)
@@ -139,28 +112,16 @@ void pthread_kill_join(const char* threadName, pthread_t& threadInfo)
     pthread_join(threadInfo, NULL);             // wait until thread finishes
 }
 
-// instanceNo: number of core instance, used for separating folders and ports
-// localNotNetwork: if true, will access local hardware for communication; if false then will use network interface
-int runCore(int instanceNo, bool localNotNetwork)
+int runCore(void)
 {
     CCoreThread *core;
-    pthread_t   cmdSockThreadInfo;
-    pthread_t   extensionThreadInfo;
+    pthread_t cmdSockThreadInfo;
+    pthread_t extensionThreadInfo;
 
-    flags.localNotNetwork = localNotNetwork;            // store if this core runs as local device or as network server
-    flags.instanceNo = instanceNo;
-
-    //------------------------------------
-    // if should run this core as network server
-    if(!localNotNetwork) {
-        Debug::out(LOG_INFO, "runCore as network server instance # %d", instanceNo);
-
-        hwConfig.version = 3;
-
-        chipInterface = new ChipInterfaceNetwork();     // create network chip interface
-        chipInterface->setInstanceIndex(instanceNo);    // set index of this instance
-        chipInterface->ciOpen();                        // try to open it
-    }
+    Debug::out(LOG_INFO, "runCore as network server");
+    hwConfig.version = 3;
+    chipInterface = new ChipInterfaceNetwork();     // create network chip interface
+    chipInterface->ciOpen();                        // try to open it
 
     //------------------------------------
     // normal app run follows
@@ -170,10 +131,6 @@ int runCore(int instanceNo, bool localNotNetwork)
     Version::getAppVersion(appVersion);
     Debug::out(LOG_INFO, "CosmosEx core starting, version: %s", appVersion);
     printf("\nCosmosEx core starting, version: %s\n", appVersion);
-
-    Version::getRaspberryPiInfo();                                  // fetch model, revision, serial of RPi
-
-//  system("sudo echo none > /sys/class/leds/led0/trigger");        // disable usage of GPIO 23 (pin 16) by LED
 
     Utils::setTimezoneVariable_inThisContext();
 
@@ -202,10 +159,6 @@ int runCore(int instanceNo, bool localNotNetwork)
     chipInterface = NULL;
     //---------------------------------------------------
 
-    if(singleInstanceSocketFd > 0) {                    // if we got the single instance socket, close it
-        close(singleInstanceSocketFd);
-    }
-
     // remove PID file on termination
     std::string pidFilePath = Utils::dotEnvValue("CORE_PID_FILE", DATA_DIR_DEFAULT "/core.pid");
     unlink(pidFilePath.c_str());
@@ -226,22 +179,14 @@ void loadLastHwConfig(void)
     hwConfig.changed        = false;
 
     memset(hwConfig.hwSerial, 0, 13);
-    hwConfig.hwLicenseValid = false;
 }
 
 void initializeFlags(void)
 {
     flags.justShowHelp = false;
     Debug::setLogLevel(LOG_ERROR);      // init current log level to LOG_ERROR
-    flags.test         = false;         // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
-    flags.ikbdLogs     = false;         // no ikbd logs by default
-    flags.fakeOldApp   = false;         // don't fake old app by default
-    flags.noCapture    = false;         // if true, don't do exclusive mouse and keyboard capture
-
-    flags.localNotNetwork   = true;     // if true, this app runs handling localy connected device; if false then this core is part of the network server
-    flags.instanceNo        = 0;
-
-    flags.deviceDoUpdate    = false;    // if true, device should download update and write it to flash
+    flags.portServerReport = 9001;
+    flags.portClient = 9100;
 }
 
 void loadDefaultArgumentsFromFile(void)
@@ -314,36 +259,28 @@ void parseCmdLineArguments(int argc, char *argv[])
             continue;
         }
 
+        if(argv[i][0] == 'p') {
+            isKnownTag = true;                                      // this is a known tag
+            int res = sscanf(argv[i] + 1, "%d", &flags.portClient);
+            if(res != 1) {
+                printf(">>> BAD CLIENT PORT VALUE: '%s' <<<\n", argv[i] + 1);
+                Debug::out(LOG_ERROR, ">>> BAD CLIENT PORT VALUE: '%s' <<<\n", argv[i] + 1);
+            }
+        }
+
+        if(argv[i][0] == 'r') {
+            isKnownTag = true;                                      // this is a known tag
+            int res = sscanf(argv[i] + 1, "%d", &flags.portServerReport);
+            if(res != 1) {
+                printf(">>> BAD REPORT PORT VALUE: '%s' <<<\n", argv[i] + 1);
+                Debug::out(LOG_ERROR, ">>> BAD REPORT PORT VALUE: '%s' <<<\n", argv[i] + 1);
+            }
+        }
+
         if(strcmp(argv[i], "help") == 0 || strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "/?") == 0 || strcmp(argv[i], "?") == 0) {
             isKnownTag          = true;                             // this is a known tag
             flags.justShowHelp  = true;
             continue;
-        }
-
-        // for testing purposes: set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
-        if(strcmp(argv[i], "test") == 0) {
-            printf("Testing setup active!\n");
-            isKnownTag          = true;                             // this is a known tag
-            flags.test          = true;
-            continue;
-        }
-
-        // produce ikbd logs
-        if(strcmp(argv[i], "ikbdlogs") == 0) {
-            isKnownTag          = true;                             // this is a known tag
-            flags.ikbdLogs      = true;
-        }
-
-        // should fake old app version? (for reinstall tests)
-        if(strcmp(argv[i], "fakeold") == 0) {
-            isKnownTag          = true;                             // this is a known tag
-            flags.fakeOldApp    = true;
-        }
-
-        // don't capture USB mouse and keyboard
-        if(strcmp(argv[i], "nocap") == 0) {
-            isKnownTag          = true;                             // this is a known tag
-            flags.noCapture     = true;
         }
 
         if(!isKnownTag) {                                           // if tag unknown, show warning
@@ -355,16 +292,9 @@ void parseCmdLineArguments(int argc, char *argv[])
 void printfPossibleCmdLineArgs(void)
 {
     printf("\nPossible command line args:\n");
-    printf("reset    - reset Hans and Franz, release lines, quit\n");
-    printf("noreset  - when starting, don't reset Hans and Franz\n");
     printf("llx      - set log level to x (default is 1, max is 4)\n");
-    printf("cix      - set chip interface type to x (1 & 2 for old SPI, 3 for new SPI, 4 for HDD via logic chips + old SPI, 8 for RaSCSI, 9 for network server, 0 for dummy)\n");
-    printf("test     - some default config for device testing\n");
-    printf("ce_conf  - use this app as ce_conf on RPi (the app must be running normally, too)\n");
-    printf("hwinfo   - get HW version and HDD interface type\n");
-    printf("ikbdlogs - write IKBD logs to file\n");
-    printf("fakeold  - fake old app version for reinstall tests\n");
-    printf("nocap    - don't do exclusive USB mouse and keyboard capture\n");
+    printf("pXXXX    - set listening port to XXXX\n");
+    printf("rXXXX    - set port for status reporting to XXXX\n");
 }
 
 void handlePthreadCreate(const char* threadName, pthread_t* pThreadInfo, void* threadCode)

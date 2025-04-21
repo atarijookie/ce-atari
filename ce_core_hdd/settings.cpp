@@ -304,15 +304,6 @@ void Settings::loadAcsiIDs(AcsiIDinfo *aii, bool useDefaultsIfNoSettings)
         }
 
         //-------------------------
-        // if we're in testing mode
-        if(flags.test) {
-            switch(id) {
-            case 0:     devType = DEVTYPE_TRANSLATED;   break;
-            case 1:     devType = DEVTYPE_SD;           break;
-            default:    devType = DEVTYPE_OFF;          break;
-            }
-        }
-        //-------------------------
 
         aii->acsiIDdevType[id] = devType;
 

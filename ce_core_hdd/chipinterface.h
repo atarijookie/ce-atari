@@ -89,25 +89,10 @@ public:
     // this return CHIP_IF_V1_V2 or some other
     virtual int chipInterfaceType(void) = 0;
 
-    void setInstanceIndex(int index);
-    int  getInstanceIndex(void);            // -1 for physical interface (only single instance), 0-15 for network interfaces
-
     //----------------
     // chip interface initialization and deinitialization - e.g. open GPIO, or open socket, ...
     virtual bool ciOpen(void) = 0;
     virtual void ciClose(void) = 0;
-
-    //----------------
-    // call this with true to enable ikdb UART communication
-    virtual void ikbdUartEnable(bool enable) = 0;
-    virtual int  ikbdUartReadFd(void) = 0;
-    virtual int  ikbdUartWriteFd(void) = 0;
-
-    //----------------
-    // reset both or just one of the parts
-    virtual void resetHDDandFDD(void) = 0;
-    virtual void resetHDD(void) = 0;
-    virtual void resetFDD(void) = 0;
 
     //----------------
     // if following function returns true, some command is waiting for action in the inBuf and hardNotFloppy flag distiguishes hard-drive or floppy-drive command
@@ -128,19 +113,6 @@ public:
     virtual bool hdd_recvData_transferBlock(uint8_t *pData, uint32_t dataCount) = 0;
 
     virtual bool hdd_sendStatusToHans(uint8_t statusByte) = 0;
-
-    //----------------
-    // FDD: all you need for handling the floppy interface
-    virtual void fdd_sendTrackToChip(int byteCount, uint8_t *encodedTrack) = 0;    // send encodedTrack to chip for MFM streaming
-    virtual uint8_t* fdd_sectorWritten(int &side, int &track, int &sector, int &byteCount) = 0;
-
-    //----------------
-    // button, beeper and display handling
-    virtual void handleButton(int& btnDownTime, uint32_t& nextScreenTime) = 0;
-    virtual void handleBeeperCommand(int beeperCommand, bool floppySoundEnabled) = 0;
-    virtual bool handlesDisplay(void) = 0;                          // returns true if should handle i2c display from RPi
-    virtual void displayBuffer(uint8_t *bfr, uint16_t size) = 0;    // send this display buffer data to remote display
-    virtual void getDisplayGpioSignals(uint32_t& gpioScl, uint32_t& gpioSda);   // which GPIO pins are used for i2c display
 
 protected:
     uint8_t fwResponseBfr[FW_RESPONSE_LEN_BIGGER];
@@ -163,9 +135,6 @@ protected:
         int bfrLengthInBytes;
         int currentLength;
     } response;
-
-    bool floppySoundEnabled;
-    uint8_t currentFloppyImageLed;
 
     virtual void responseStart(int bufferLengthInBytes);        // use this to start creating response (commands) to Hans or Franz
     virtual void responseAddWord(uint8_t *bfr, uint16_t value);        // add a uint16_t to the response (command) to Hans or Franz

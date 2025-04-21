@@ -14,7 +14,6 @@
 #include <arpa/inet.h>
 #include <sys/ioctl.h>
 
-#include "../main_netserver.h"
 #include "chipinterfacenetwork.h"
 #include "../utils.h"
 #include "../debug.h"
@@ -24,6 +23,10 @@
 extern THwConfig hwConfig;
 extern TFlags    flags;                 // global flags from command line
 
+#define SERVER_STATUS_NOT_RUNNING   0       // when this server slot is not used yet and server is not running
+#define SERVER_STATUS_FREE          1       // server is running but no client is connected there
+#define SERVER_STATUS_OCCUPIED      2       // server is running and client is connected
+
 ChipInterfaceNetwork::ChipInterfaceNetwork()
 {
     nextReportTime = 0;
@@ -32,9 +35,6 @@ ChipInterfaceNetwork::ChipInterfaceNetwork()
     fdListen = -1;
     fdClient = -1;
     fdReport = -1;
-
-    pipeFromAtariToRPi[0] = pipeFromAtariToRPi[1] = -1;
-    pipeFromRPiToAtari[0] = pipeFromRPiToAtari[1] = -1;
 
     bufOut = new uint8_t[MFM_STREAM_SIZE];
     bufIn = new uint8_t[MFM_STREAM_SIZE];
@@ -83,7 +83,7 @@ void ChipInterfaceNetwork::createListeningSocket(void)
 
     addressListen.sin_family = AF_INET;
     addressListen.sin_addr.s_addr = INADDR_ANY;
-    addressListen.sin_port = htons( SERVER_TCP_PORT_FIRST + serverIndex );
+    addressListen.sin_port = htons( flags.portClient );
 
     // bind to address
     if (bind(fdListen, (struct sockaddr *) &addressListen, sizeof(addressListen)) < 0) {
@@ -149,7 +149,7 @@ void ChipInterfaceNetwork::createServerReportSocket(void)
 
     addressReport.sin_family = AF_INET;
     addressReport.sin_addr.s_addr = inet_addr("127.0.0.1");
-    addressReport.sin_port = htons(SERVER_UDP_PORT);
+    addressReport.sin_port = htons(flags.portServerReport);
 }
 
 void ChipInterfaceNetwork::sendReportToMainServerSocket(void)
@@ -180,8 +180,6 @@ bool ChipInterfaceNetwork::ciOpen(void)
     createServerReportSocket();
     createListeningSocket();
 
-    serialSetup();
-
     return true;
 }
 
@@ -191,60 +189,6 @@ void ChipInterfaceNetwork::ciClose(void)
     Utils::closeFdIfOpen(fdListen);
     Utils::closeFdIfOpen(fdClient);
     Utils::closeFdIfOpen(fdReport);
-
-    // close IKDB pipes
-    Utils::closeFdIfOpen(pipeFromAtariToRPi[0]);
-    Utils::closeFdIfOpen(pipeFromAtariToRPi[1]);
-    Utils::closeFdIfOpen(pipeFromRPiToAtari[0]);
-    Utils::closeFdIfOpen(pipeFromRPiToAtari[1]);
-}
-
-void ChipInterfaceNetwork::ikbdUartEnable(bool enable)
-{
-    // nothing needed to be done here
-}
-
-int ChipInterfaceNetwork::ikbdUartReadFd(void)
-{
-    return pipeFromAtariToRPi[0];       // IKBD thread will READ from read end ([0]) of pipe going from Atari to RPi
-}
-
-int ChipInterfaceNetwork::ikbdUartWriteFd(void)
-{
-    return pipeFromRPiToAtari[1];       // IKBD thread will WRITE to write end ([1]) of pipe going from RPi to Atari
-}
-
-void ChipInterfaceNetwork::serialSetup(void)
-{
-    // create pipes for communication with ikbd thread
-    int res;
-
-    res = pipe(pipeFromAtariToRPi);
-
-    if(res  < 0) {
-        Debug::out(LOG_ERROR, "failed to create pipeFromAtariToRPi");
-    }
-
-    res = pipe(pipeFromRPiToAtari);
-
-    if(res  < 0) {
-        Debug::out(LOG_ERROR, "failed to create pipeFromRPiToAtari");
-    }
-}
-
-void ChipInterfaceNetwork::resetHDDandFDD(void)
-{
-    // can't reset the chip via network
-}
-
-void ChipInterfaceNetwork::resetHDD(void)
-{
-    // can't reset the chip via network
-}
-
-void ChipInterfaceNetwork::resetFDD(void)
-{
-    // can't reset the chip via network
 }
 
 bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
@@ -278,7 +222,6 @@ bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
             }
         }
 
-        sendIkbdDataToAtari();                  // but send IKBD data to Atari
         return false;
     }
 
@@ -479,27 +422,6 @@ bool ChipInterfaceNetwork::hdd_sendStatusToHans(uint8_t statusByte)
     return true;
 }
 
-void ChipInterfaceNetwork::fdd_sendTrackToChip(int byteCount, uint8_t *encodedTrack)
-{
-    // send encoded track out, read garbage into bufIn and don't care about it
-    sendDataToChip(NET_TAG_FRANZ_STR, encodedTrack, byteCount);
-}
-
-uint8_t* ChipInterfaceNetwork::fdd_sectorWritten(int &side, int &track, int &sector, int &byteCount)
-{
-    byteCount = bufReader.getRemainingLength();             // get how many data we still have
-
-    // get all the remaining data
-    recvFromClient(bufIn, byteCount);
-
-    // get the written sector, side, track number
-    sector  = bufIn[1];
-    track   = bufIn[0] & 0x7f;
-    side    = (bufIn[0] & 0x80) ? 1 : 0;
-
-    return bufIn;                                           // return pointer to received written sector
-}
-
 void ChipInterfaceNetwork::handleZerosAndIkbd(int atnId)
 {
     int cntWant = bufReader.getRemainingLength();   // get how much we should get to receive whole packet
@@ -513,13 +435,6 @@ void ChipInterfaceNetwork::handleZerosAndIkbd(int atnId)
 
     if(cntGot <= 0) {                                   // on error, nothing more to do
         return;
-    }
-
-    if(atnId == NET_ATN_IKBD_ID) {                          // for IKBD - read data, feed to pipe
-        // write data WRITE end ([1]) in ikbd pipe going from Atari to RPi
-        if(pipeFromAtariToRPi[1] != -1) {                   // got this pipe open?
-            write(pipeFromAtariToRPi[1], bufIn, cntGot);    // write all the data into pipe
-        }
     }
 
     // for NET_ATN_ZEROS_ID - nothing to do, just ignore the zeros
@@ -588,27 +503,6 @@ bool ChipInterfaceNetwork::waitForAtn(int atnIdWant, uint8_t atnCode, uint32_t t
     return false;
 }
 
-void ChipInterfaceNetwork::sendIkbdDataToAtari(void)
-{
-    if(pipeFromRPiToAtari[0] < 0 || fdClient < 0) {         // no pipe or socket open? quit
-        return;
-    }
-
-    int bytesAvailable;
-    int rv = ioctl(pipeFromRPiToAtari[0], FIONREAD, &bytesAvailable);    // how many bytes we can read?
-
-    if(rv <= 0 || bytesAvailable <= 0) {                    // ioctl fail or nothing to read? no action needed
-        return;
-    }
-
-    ssize_t cntWant = MIN(bytesAvailable, MFM_STREAM_SIZE); // limit read size to maximum of buffer size
-    ssize_t cntGot = read(pipeFromRPiToAtari[0], bufOut, cntWant);
-
-    if(cntGot > 0) {                                        // got some data from pipe? send it to socket
-        sendDataToChip(NET_TAG_IKBD_STR, bufOut, cntGot);         // write all the data into socket
-    }
-}
-
 void ChipInterfaceNetwork::sendDataToChip(const char* tag, uint8_t* data, uint16_t len)        // send data to chip with specified tag
 {
     if(fdClient < 0) {                      // no client socket? quit
@@ -658,26 +552,4 @@ void ChipInterfaceNetwork::byteSwapBfr(uint8_t* buf, int len)
         buf[i] = buf[i+1];
         buf[i+1] = tmp;
     }
-}
-
-void ChipInterfaceNetwork::handleButton(int& btnDownTime, uint32_t& nextScreenTime)
-{
-
-}
-
-void ChipInterfaceNetwork::handleBeeperCommand(int beeperCommand, bool floppySoundEnabled)
-{
-
-}
-
-// returns true if should handle i2c display from RPi
-bool ChipInterfaceNetwork::handlesDisplay(void)
-{
-    return false;        // network interface doesn't handle display locally
-}
-
-// send this display buffer data to remote display
-void ChipInterfaceNetwork::displayBuffer(uint8_t *bfr, uint16_t size)
-{
-    // TODO: send this buffer to client, so he can show it
 }

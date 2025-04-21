@@ -68,21 +68,12 @@
 //////////////////////////////////////////////////////
 
 typedef struct {
-    char serial  [20];
-    char revision[8];
-    char model   [40];
-
-    uint32_t revisionInt;
-} RPiConfig;
-
-typedef struct {
     int  version;               // returned from Hans: HW version (1 for HW from 2014, 2 for HW from 2015, 3 for HW from 2020)
     int  hddIface;              // returned from Hans: HDD interface type (ACSI or SCSI (added in 2015))
     int  scsiMachine;           // when HwHddIface is HDD_IF_SCSI, this specifies what machine (TT or Falcon) is using this device
     bool fwMismatch;            // when HW and FW types don't match (e.g. SCSI HW + ACSI FW, or ACSI HW + SCSI FW)
 
     uint8_t hwSerial[13];          // contains HW serial number, if HW version is 3 and device is running for few seconds
-    bool hwLicenseValid;        // if true, then HW has a valid license and we don't need to show HW lincese screen in config
 
     bool changed;               // true if the value has changes recently
 } THwConfig;
@@ -90,15 +81,8 @@ typedef struct {
 typedef struct {
     bool justShowHelp;          // show possible command line arguments and quit
     int  logLevel;              // init current log level to LOG_ERROR
-    bool test;                  // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
-    bool ikbdLogs;              // if set to true, will generate ikbd logs file
-    bool fakeOldApp;            // if set to true, will always return old app version, so you can test app installation over and over
-    bool noCapture;             // if set to true, don't do exclusive USB mouse and keyboard capture
-
-    bool localNotNetwork;       // if true, this app runs handling localy connected device; if false then this core is part of the network server
-    bool instanceNo;            // number of core instance
-
-    bool deviceDoUpdate;        // if true, device should download update and write it to flash
+    int  portServerReport;
+    int  portClient;
 } TFlags;
 
 typedef struct {

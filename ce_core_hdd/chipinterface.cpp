@@ -10,8 +10,6 @@ extern TFlags     flags;
 
 ChipInterface::ChipInterface()
 {
-    currentFloppyImageLed = 0xff;
-    floppySoundEnabled = true;
     instanceIndex = -1;
 }
 
@@ -150,16 +148,9 @@ void ChipInterface::setHDDconfig(uint8_t hddEnabledIDs, uint8_t sdCardId, uint8_
     }
 
     //--------------
-    if(flags.deviceDoUpdate) {                                  // should the device do the ?
-        flags.deviceDoUpdate = false;
-        responseAddWord(fwResponseBfr, CMD_DO_UPDATE);
-    }
-
-    //--------------
     if(setNewFloppyImageLed) {
         responseAddWord(fwResponseBfr, CMD_FLOPPY_SWITCH);               // CMD: set new image LED (bytes 8 & 9)
         responseAddWord(fwResponseBfr, MAKEWORD(fddEnabledSlots, newFloppyImageLed));  // store which floppy images LED should be on
-        currentFloppyImageLed = newFloppyImageLed;
     }
 }
 
@@ -168,7 +159,6 @@ void ChipInterface::setFDDconfig(bool setFloppyConfig, FloppyConfig* fddConfig, 
     memset(fwResponseBfr, 0, FDD_FW_RESPONSE_LEN);
 
     responseStart(FDD_FW_RESPONSE_LEN);                             // init the response struct
-    floppySoundEnabled = fddConfig->soundEnabled;               // store this in instance var for later use
 
     if(setFloppyConfig) {                                       // should set floppy config?
         responseAddByte(fwResponseBfr, ( fddConfig->enabled         ? CMD_DRIVE_ENABLED     : CMD_DRIVE_DISABLED) );
@@ -179,21 +169,4 @@ void ChipInterface::setFDDconfig(bool setFloppyConfig, FloppyConfig* fddConfig, 
     if(setDiskChanged) {
         responseAddByte(fwResponseBfr, ( diskChanged    ? CMD_DISK_CHANGE_ON    : CMD_DISK_CHANGE_OFF) );
     }
-}
-
-void ChipInterface::setInstanceIndex(int index)
-{
-    instanceIndex = index;
-}
-
-int ChipInterface::getInstanceIndex(void)
-{
-    return instanceIndex;
-}
-
-// Get on which GPIO pins the i2c display is. Not real values on base ChipInterface class.
-void ChipInterface::getDisplayGpioSignals(uint32_t& gpioScl, uint32_t& gpioSda)
-{
-    gpioScl = 0;
-    gpioSda = 0;
 }

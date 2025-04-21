@@ -28,18 +28,6 @@ public:
     void ciClose(void);
 
     //----------------
-    // call this with true to enable ikdb UART communication
-    void ikbdUartEnable(bool enable);
-    int  ikbdUartReadFd(void);
-    int  ikbdUartWriteFd(void);
-
-    //----------------
-    // reset both or just one of the parts
-    void resetHDDandFDD(void);
-    void resetHDD(void);
-    void resetFDD(void);
-
-    //----------------
     // if following function returns true, some command is waiting for action in the inBuf and hardNotFloppy flag distiguishes hard-drive or floppy-drive command
     bool actionNeeded(bool &hardNotFloppy, uint8_t *inBuf);
 
@@ -57,18 +45,6 @@ public:
 
     bool hdd_sendStatusToHans(uint8_t statusByte);
 
-    //----------------
-    // FDD: all you need for handling the floppy interface
-    void fdd_sendTrackToChip(int byteCount, uint8_t *encodedTrack);    // send encodedTrack to chip for MFM streaming
-    uint8_t* fdd_sectorWritten(int &side, int &track, int &sector, int &byteCount);
-
-    //----------------
-    // button, beeper and display handling
-    void handleButton(int& btnDownTime, uint32_t& nextScreenTime);
-    void handleBeeperCommand(int beeperCommand, bool floppySoundEnabled);
-    bool handlesDisplay(void);                              // returns true if should handle i2c display from RPi
-    void displayBuffer(uint8_t *bfr, uint16_t size);        // send this display buffer data to remote display
-
 private:
     uint32_t lastTimeRecv;
     int serverIndex;    // on which server index we're running
@@ -79,15 +55,6 @@ private:
 
     struct sockaddr_in addressListen;
     struct sockaddr_in addressReport;
-
-    int ikbdReadFd;     // fd used for IKBD read
-    int ikbdWriteFd;    // fd used for IKDB write
-
-    // got 2 pipes, with 2 ends...
-    // pipefd[0] refers to the read end of the pipe.
-    // pipefd[1] refers to the write end of the pipe.
-    int pipeFromAtariToRPi[2];
-    int pipeFromRPiToAtari[2];
 
     uint32_t nextReportTime;    // when should we send next report to main server socket
 
@@ -107,9 +74,6 @@ private:
 
     bool waitForAtn(int atnIdWant, uint8_t atnCode, uint32_t timeoutMs, uint8_t *inBuf);
     void handleZerosAndIkbd(int atnId);
-
-    void serialSetup(void);                             // open IKDB serial port
-    void sendIkbdDataToAtari(void);
 
     void sendDataToChip(const char* tag, uint8_t* data, uint16_t len);    // send data to chip with specified tag
     void byteSwapBfr(uint8_t* buf, int len);

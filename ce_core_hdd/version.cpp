@@ -7,7 +7,6 @@
 #include "debug.h"
 
 extern TFlags flags;        // global flags from command line
-extern RPiConfig rpiConfig;
 
 Version::Version()
 {
@@ -164,40 +163,10 @@ void Version::getAppVersion(char *bfr)
 
     i = sscanf(buildDate + 4, "%d %d", &day, &year);
 
-    if(flags.fakeOldApp) {      // if should fake that the app is old, subtract 2 years from app year
-        year -= 2;
-    }
-
     if(i == 2 && month > 0) {
         sprintf(bfr, "%04d-%02d-%02d", year, month, day);
     } else {
         strcpy(bfr, "YYYY-MM-DD");
-    }
-}
-
-void Version::getRaspberryPiInfo(void)
-{
-    // first parse the files, so we won't have to do this in C
-    system("cat /proc/cpuinfo | grep 'Serial' | tr -d ' ' | awk -F ':' '{print $2}' > /tmp/rpiserial.txt");
-    system("cat /proc/cpuinfo | grep 'Revision' | tr -d ' ' | awk -F ':' '{print $2}' > /tmp/rpirevision.txt");
-
-    system("dmesg | grep 'Machine model' | awk -F 'model: ' '{print $2}' > /tmp/rpimodel.txt");
-
-    // read in the data
-    readLineFromFile("/tmp/rpiserial.txt",      rpiConfig.serial,   20, "unknown");
-    readLineFromFile("/tmp/rpirevision.txt",    rpiConfig.revision,  8, "unknown");
-    readLineFromFile("/tmp/rpimodel.txt",       rpiConfig.model,    40, "Raspberry Pi unknown model");
-
-    // print to log file in debug mode
-    Debug::out(LOG_DEBUG, "RPi serial  : %s", rpiConfig.serial);
-    Debug::out(LOG_DEBUG, "RPi revision: %s", rpiConfig.revision);
-    Debug::out(LOG_DEBUG, "RPi model   : %s", rpiConfig.model);
-
-    // now try to convert revision from hex string to int, for easy comparing
-    int res = sscanf(rpiConfig.revision, "%x", &rpiConfig.revisionInt);
-
-    if(res != 1) {      // failed to get int from string? set zero
-        rpiConfig.revisionInt = 0;
     }
 }
 
