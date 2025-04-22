@@ -223,7 +223,7 @@ bool CCoreThread::handleHdd(uint8_t* inBuff)
         break;
 
     default:
-        Debug::out(LOG_ERROR, "CCoreThread received weird ATN code %02x waitForATN()", inBuff[3]);
+        Debug::out(LOG_ERROR, "CCoreThread received weird ATN code %02x waitForAtn()", inBuff[3]);
         break;
     }
 
@@ -253,7 +253,7 @@ void CCoreThread::displayStatusToConsole(uint32_t now)
     hansTime  = (hansTime  < 15.0f) ? hansTime  : 15.0f;
     franzTime = (franzTime < 15.0f) ? franzTime : 15.0f;
 
-    printf("\033[2K  [ %c ]  CE core is running\033[A\n", progChars[lastFwInfoTime.progress]);
+    printf("\033[2K  [ %c ]  CE HDD core is running\033[A\n", progChars[lastFwInfoTime.progress]);
     lastFwInfoTime.progress = (lastFwInfoTime.progress + 1) % 4;
 
     load.clear();                       // clear load counter

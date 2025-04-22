@@ -47,7 +47,6 @@ public:
 
 private:
     uint32_t lastTimeRecv;
-    int serverIndex;    // on which server index we're running
 
     int fdListen;       // socket for listen()
     int fdClient;       // socket received on accept()

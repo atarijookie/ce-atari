@@ -30,7 +30,6 @@ extern TFlags    flags;                 // global flags from command line
 ChipInterfaceNetwork::ChipInterfaceNetwork()
 {
     nextReportTime = 0;
-    serverIndex = 0;
 
     fdListen = -1;
     fdClient = -1;
@@ -66,7 +65,7 @@ void ChipInterfaceNetwork::createListeningSocket(void)
 
     // open socket
     if ((fdListen = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
-        Debug::out(LOG_ERROR, "netServer %d - failed to open socket", serverIndex);
+        Debug::out(LOG_ERROR, "netServer - failed to open socket");
         return;
     }
 
@@ -74,7 +73,7 @@ void ChipInterfaceNetwork::createListeningSocket(void)
     int opt = 1;
 
     if (setsockopt(fdListen, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
-        Debug::out(LOG_ERROR, "netServer %d - setsockopt() failed", serverIndex);
+        Debug::out(LOG_ERROR, "netServer - setsockopt() failed");
         return;
     }
 
@@ -87,15 +86,17 @@ void ChipInterfaceNetwork::createListeningSocket(void)
 
     // bind to address
     if (bind(fdListen, (struct sockaddr *) &addressListen, sizeof(addressListen)) < 0) {
-        Debug::out(LOG_ERROR, "netServer %d - bind() failed", serverIndex);
+        Debug::out(LOG_ERROR, "netServer - bind() failed");
         return;
     }
 
     // mark the socket as a passive socket
     if (listen(fdListen, 1) < 0) {
-        Debug::out(LOG_ERROR, "netServer %d - listen() failed", serverIndex);
+        Debug::out(LOG_ERROR, "netServer - listen() failed");
         return;
     }
+
+    Debug::out(LOG_INFO, "netServer - listening on tcp port: %d", flags.portClient);
 }
 
 void ChipInterfaceNetwork::acceptSocketIfNeededAndPossible(void)
@@ -166,10 +167,11 @@ void ChipInterfaceNetwork::sendReportToMainServerSocket(void)
     memset(data, 0, sizeof(data));      // clear data buffer
     memcpy(data, "CELS", 4);            // 0..3: message tag
 
-    data[4] = serverIndex;              // 4: this server's index
+    data[4] = (uint8_t) (flags.portClient >> 8);     // 4..5: this server's port
+    data[5] = (uint8_t) (flags.portClient     );
 
     uint8_t status = (fdClient > 0) ? SERVER_STATUS_OCCUPIED : SERVER_STATUS_FREE;  // got client socket? we're occupied, otherwise free
-    data[5] = status;                   // 5: status
+    data[6  ] = status;                   // 5: status
 
     // send report to main server report port
     sendto(fdReport, data, sizeof(data), 0, (sockaddr*) &addressReport, sizeof(addressReport));
@@ -227,7 +229,7 @@ bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
 
     lastTimeRecv = Utils::getCurrentMs();       // last time we've something received - now
 
-    // if waitForATN() succeeds, it fills 8 bytes of data in buffer
+    // if waitForAtn() succeeds, it fills 8 bytes of data in buffer
     // ...but then we might need some little more, so let's determine what it was
     // and keep reading as much as needed
 
@@ -250,15 +252,6 @@ bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
             }
 
             hardNotFloppy = true;
-            return true;
-        }
-
-        if(gotAtnId == NET_ATN_FRANZ_ID) {                  // for Franz
-            if(gotAtnCode == ATN_SEND_TRACK) {              // for this command read 2 more bytes: side + track
-                recvFromClient(inBuf + 8, 2);
-            }
-
-            hardNotFloppy = false;
             return true;
         }
 
@@ -288,14 +281,6 @@ void ChipInterfaceNetwork::getFWversion(bool hardNotFloppy, uint8_t *inFwVer)
 
         int year = Utils::bcdToInt(inFwVer[1]) + 2000;
         Update::versions.hans.fromInts(year, Utils::bcdToInt(inFwVer[2]), Utils::bcdToInt(inFwVer[3]));       // store found FW version of Hans
-    } else {                // for FDD
-        // fwResponseBfr should be filled with Franz config - by calling setFDDconfig() (and not calling anything else inbetween)
-        sendDataToChip(NET_TAG_FRANZ_STR, fwResponseBfr, FDD_FW_RESPONSE_LEN);
-
-        recvFromClient(inFwVer, FDD_FW_RESPONSE_LEN);
-
-        int year = Utils::bcdToInt(inFwVer[1]) + 2000;
-        Update::versions.franz.fromInts(year, Utils::bcdToInt(inFwVer[2]), Utils::bcdToInt(inFwVer[3]));              // store found FW version of Franz
     }
 }
 
@@ -450,7 +435,7 @@ bool ChipInterfaceNetwork::waitForAtn(int atnIdWant, uint8_t atnCode, uint32_t t
     // we might need to wait for ATN multiple times, as there might be ZEROS packet or IKBD packet before we read wanted Hans or Franz packet
     while(sigintReceived == 0) {
         // check for any ATN code waiting from Hans
-        int atnIdGot = bufReader.waitForATN(atnCode, timeoutMs);            // which chip wants to communicate? (which chip's stream we should process?)
+        int atnIdGot = bufReader.waitForAtn(atnCode, timeoutMs);            // which chip wants to communicate? (which chip's stream we should process?)
         uint8_t atnCode = bufReader.getAtnCode();                           // what command does this chip wants us to handle?
 
         if(atnIdGot == NET_ATN_DISCONNECTED) {         // if buffered reader detected client disconnect, close it and quit

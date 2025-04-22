@@ -53,6 +53,10 @@ int main(int argc, char *argv[])
 
     printf("\033[H\033[2J\n");
 
+    // create dirs for logs and other temporary data
+    system("mkdir -p /tmp/ce/log");
+    system("mkdir -p /tmp/ce/data");
+
     Debug::setDefaultLogFile();                // set log file before env vars available
     initializeFlags();                                          // initialize flags
     Debug::out(LOG_INFO, "\n\n"); Debug::out(LOG_INFO, "---------------------------------------------------");
@@ -129,8 +133,8 @@ int runCore(void)
 
     char appVersion[16];
     Version::getAppVersion(appVersion);
-    Debug::out(LOG_INFO, "CosmosEx core starting, version: %s", appVersion);
-    printf("\nCosmosEx core starting, version: %s\n", appVersion);
+    Debug::out(LOG_INFO, "CosmosEx HDD core starting at port %d, version: %s", flags.portClient, appVersion);
+    printf("\nCosmosEx HDD core starting at port %d, version: %s\n", flags.portClient, appVersion);
 
     Utils::setTimezoneVariable_inThisContext();
 

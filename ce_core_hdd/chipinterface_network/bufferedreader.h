@@ -31,7 +31,7 @@ public:
     void clear(void);
 
     // reads (and waits for) data from socket and if valid header found, returns one of the NET_ATN_*_ID codes or NET_ATN_NONE_ID if header not received
-    int waitForATN(uint8_t atnCode, uint32_t timeoutMs);
+    int waitForAtn(uint8_t atnCode, uint32_t timeoutMs);
 
     // from the current buffer gets and returns the ATN code found in header
     uint8_t getAtnCode(void);
@@ -40,7 +40,7 @@ public:
     uint8_t* getHeaderPointer(void);
 
     // how many bytes we should read to read this ATN command completely?
-    uint16_t getRemainingLength(void);
+    uint32_t getRemainingLength(void);
 
 private:
     int fd;
@@ -48,9 +48,8 @@ private:
     uint8_t buffer[32];
     int     gotBytes;
 
-    uint16_t txLen;
-    uint16_t rxLen;
-    uint16_t remainingPacketLength;
+    uint32_t txLen;
+    uint32_t remainingPacketLength;
 
     void popFirst(void);
     int readHeaderFromBuffer(uint8_t atnCodeWant);

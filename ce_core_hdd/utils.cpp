@@ -983,6 +983,8 @@ bool Utils::loadDotEnvFrom(const char* path)
     }
 
     fclose(f);
+    Debug::out(LOG_INFO, "Utils::loadDotEnv - loaded file %s", path);
+
     return true;
 }
 

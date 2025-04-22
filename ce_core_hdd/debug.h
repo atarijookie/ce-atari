@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <cstdio>
 
-#define CORE_LOG_FILENAME   "core.log"
+#define CORE_LOG_FILENAME   "core_hdd.log"
 #define CHIP_LOG_FILENAME   "chip.log"
 #define HDD_LOG_FILENAME    "hdd.log"
 

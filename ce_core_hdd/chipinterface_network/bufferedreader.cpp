@@ -13,7 +13,6 @@ BufferedReader::BufferedReader()
     fd = -1;
     gotBytes = 0;
     txLen = 0;
-    rxLen = 0;
     remainingPacketLength = 0;
 }
 
@@ -27,7 +26,7 @@ void BufferedReader::setFd(int inFd)
     fd = inFd;
 }
 
-int BufferedReader::waitForATN(uint8_t atnCode, uint32_t timeoutMs)
+int BufferedReader::waitForAtn(uint8_t atnCode, uint32_t timeoutMs)
 {
     if(fd <= 0) {                   //  no fd, no ATN
         return NET_ATN_NONE_ID;
@@ -38,11 +37,11 @@ int BufferedReader::waitForATN(uint8_t atnCode, uint32_t timeoutMs)
 
     while(sigintReceived == 0) {
         // got data? process
-        if(gotBytes >= 12) {    // have enough data?
+        if(gotBytes >= 5) {                             // have enough data?
             int atnId = readHeaderFromBuffer(atnCode);
 
             if(atnId != NET_ATN_NONE_ID) {                  // if valid ATN ID found and header seems to be OK, return that ATN ID
-                //Debug::out(LOG_DEBUG, "waitForATN() - found valid atnId: %d", atnId);
+                //Debug::out(LOG_DEBUG, "waitForAtn() - found valid atnId: %d", atnId);
                 return atnId;
             }
 
@@ -56,8 +55,8 @@ int BufferedReader::waitForATN(uint8_t atnCode, uint32_t timeoutMs)
         // if data is  available, the rest does: ioctl()            + recv()
         // if data not available, the rest does: ioctl() + select() + recv()
 
-        // we need 12 bytes - 4 are the ATN STR, 8 are header (0xcafe, 0, ATN code, txLen, rxLen)
-        int needCnt = 12 - gotBytes;
+        // we need 5 bytes to have full header
+        int needCnt = 5 - gotBytes;
 
         int res, bytesAvailable;
         res = ioctl(fd, FIONREAD, &bytesAvailable);     // how many bytes we can read immediately?
@@ -76,7 +75,7 @@ int BufferedReader::waitForATN(uint8_t atnCode, uint32_t timeoutMs)
             }
 
             if(timeLeftUs <= 0) {                       // no time left? quit loop, return NONE ATN
-                //Debug::out(LOG_DEBUG, "waitForATN() - timeLeftUs <= 0");
+                //Debug::out(LOG_DEBUG, "waitForAtn() - timeLeftUs <= 0");
                 break;
             }
 
@@ -101,7 +100,7 @@ int BufferedReader::waitForATN(uint8_t atnCode, uint32_t timeoutMs)
         ssize_t recvCnt = recv(fd, &buffer[gotBytes], needCnt, 0);
 
         if(recvCnt == 0) {                              // if recv() returned 0, then client disconnected
-            Debug::out(LOG_DEBUG, "waitForATN() - recvCount=0, returning NET_ATN_DISCONNECTED");
+            Debug::out(LOG_DEBUG, "waitForAtn() - recvCount=0, returning NET_ATN_DISCONNECTED");
             return NET_ATN_DISCONNECTED;
         }
 
@@ -113,7 +112,7 @@ int BufferedReader::waitForATN(uint8_t atnCode, uint32_t timeoutMs)
         // on failed to get data code continues here, try the loop again
     }
 
-    //Debug::out(LOG_DEBUG, "waitForATN() - quitting, returning NET_ATN_NONE_ID");
+    //Debug::out(LOG_DEBUG, "waitForAtn() - quitting, returning NET_ATN_NONE_ID");
     return NET_ATN_NONE_ID;     // nothing usable found
 }
 
@@ -134,86 +133,38 @@ void BufferedReader::popFirst(void)
 int BufferedReader::readHeaderFromBuffer(uint8_t atnCodeWant)
 {
     // The buffer should contain:
-    //  0...3: ATN tag (4 bytes)
-    //  4...5: 0xcafe (2 bytes)
-    //  6...7: ATN code/command (2 bytes)
-    //  8...9: txLen (2 bytes)
-    // 10..11: rxLen (2 bytes) 
-    // total: 12 bytes
+    //  0..3: 0xc050d1c5 [COSmODICS] (4 bytes)
+    //  4..5: ATN code (2 bytes)
+    //  6..9: txLen (4 bytes)
+    // total: 10 bytes
 
-    if(gotBytes < 12) {                 // should have enough data to check them
+    if(gotBytes < 10) {                  // should have enough data to check them
         return NET_ATN_NONE_ID;
     }
 
     int atnId = NET_ATN_NONE_ID;
 
-    if(memcmp(buffer, NET_ATN_HANS_STR, 4) == 0) {  // ATN Hans string?
-        atnId = NET_ATN_HANS_ID;
-    }
-
-    if(memcmp(buffer, NET_ATN_FRANZ_STR, 4) == 0) {  // ATN Franz string?
-        atnId = NET_ATN_FRANZ_ID;
-    }
-
-    if(memcmp(buffer, NET_ATN_IKBD_STR, 4) == 0) {  // ATN IKBD string?
-        atnId = NET_ATN_IKBD_ID;
-    }
-
-    if(memcmp(buffer, NET_ATN_ZEROS_STR, 4) == 0) {  // ATN Zeros string?
-        atnId =  NET_ATN_ZEROS_ID;
-    }
-
-    if(atnId == NET_ATN_NONE_ID) {      // no valid ATN STR tag found? quit
-        //Debug::out(LOG_DEBUG, "readHeaderFromBuffer() - no valid atnId found");
+    uint32_t syncDword = Utils::getDword(&buffer[0]);
+    if(syncDword != 0xc050d1c5) {                       // sync bytes wrong?
         return NET_ATN_NONE_ID;
     }
 
-    // if it's IKDB data or ZEROS padding, data format is slightly different
-    if(atnId == NET_ATN_IKBD_ID || atnId == NET_ATN_ZEROS_ID) {
-        txLen = Utils::getWord(&buffer[8]);     // this is length in bytes, not words
+    if(atnCodeWant != ATN_ANY) {                                // if it's not this special value, we're waiting for specific ATN code
+        uint8_t atnCodeGot = getAtnCode();
 
-        if(txLen >= 8) {                        // if byte count is at least 8, subtract 8 because we got this header in already (and 4 bytes of TAG is not included)
-            txLen -= 8;
-        }
-
-        Debug::out(LOG_DEBUG, "readHeaderFromBuffer() - got IKBD or ZEROS of txLen: %d", txLen);
-
-        remainingPacketLength = txLen;
-        rxLen = 0;                              // no data to be RXed
-        return atnId;                           // we're done here prematurely
-    }
-
-    uint16_t syncWord = Utils::getWord(&buffer[4]);
-
-    if(syncWord != 0xfeca) {                    // if sync word is not 0xfeca (0xcafe with reversed order)
-        Debug::out(LOG_DEBUG, "readHeaderFromBuffer() - invalid syncWord: %04X", syncWord);
-        return NET_ATN_NONE_ID;
-    }
-
-    if(atnId == NET_ATN_HANS_ID || atnId == NET_ATN_FRANZ_ID) {     // if it's for Hans or Franz, possibly check ATN code (for ZEROS and IKBD don't check it)
-        if(atnCodeWant != ATN_ANY) {                                // if it's not this special value, we're waiting for specific ATN code
-            uint8_t atnCodeGot = getAtnCode();
-
-            if(atnCodeGot != atnCodeWant) {                         // the ATN code (command) is wrong, fail
-                Debug::out(LOG_DEBUG, "readHeaderFromBuffer() - wanted atnCodeWant: %d, but got atnCodeGod: %d", atnCodeWant, atnCodeGot);
-                return NET_ATN_NONE_ID;
-            }
+        if(atnCodeGot != atnCodeWant) {                         // the ATN code (command) is wrong, fail
+            Debug::out(LOG_DEBUG, "readHeaderFromBuffer() - wanted atnCodeWant: %d, but got atnCodeGod: %d", atnCodeWant, atnCodeGot);
+            return NET_ATN_NONE_ID;
         }
     }
 
-    // read TX and RX length in words
-    txLen = Utils::SWAPWORD2(Utils::getWord(&buffer[ 8]));
-    rxLen = Utils::SWAPWORD2(Utils::getWord(&buffer[10]));
-
-    // uint16_t count to uint8_t count
-    txLen *= 2;
-    rxLen *= 2;
+    // read TX length in bytes
+    txLen = Utils::getDword(&buffer[6]);
 
     // remove 8 bytes from the length, as we've already read this 8 byte long headers
     txLen = (txLen >= 8) ? (txLen - 8) : 0;
-    rxLen = (rxLen >= 8) ? (rxLen - 8) : 0;
 
-    remainingPacketLength = MAX(txLen, rxLen);  // the remaining length is the bigger one out of TX and RX length
+    remainingPacketLength = txLen;
 
     //Debug::out(LOG_DEBUG, "readHeaderFromBuffer() - got AtnCode=%d, txLen=%d, rxLen=%d", getAtnCode(), txLen, rxLen);
 
@@ -224,10 +175,10 @@ int BufferedReader::readHeaderFromBuffer(uint8_t atnCodeWant)
 // from the current buffer gets and returns the ATN code found in header
 uint8_t BufferedReader::getAtnCode(void)
 {
-    return buffer[6];
+    return Utils::getWord(&buffer[4]);
 }
 
-uint16_t BufferedReader::getRemainingLength(void)
+uint32_t BufferedReader::getRemainingLength(void)
 {
     return remainingPacketLength;
 }
@@ -242,5 +193,5 @@ uint8_t* BufferedReader::getHeaderPointer(void)
 void BufferedReader::clear(void)
 {
     gotBytes = 0;               // don't have any bytes anymore
-    memset(buffer, 0, 12);
+    memset(buffer, 0, 10);
 }
