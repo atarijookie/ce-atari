@@ -133,7 +133,6 @@ void CCoreThread::run(void)
     lastFwInfoTime.franzResetTime = Utils::getCurrentMs();
 
     bool needsAction;
-    bool hardNotFloppy;
 
     load.clear();                               // clear load counter
 
@@ -147,9 +146,9 @@ void CCoreThread::run(void)
 
         load.busy.markStart();                  // mark the start of the busy part of the code
 
-        needsAction = chipInterface->actionNeeded(hardNotFloppy, inBuff);
+        needsAction = chipInterface->actionNeeded(inBuff);
 
-        if(needsAction && hardNotFloppy) {      // hard drive needs action?
+        if(needsAction) {                       // hard drive needs action?
             gotAcsiCommand = handleHdd(inBuff);
         }
 
@@ -479,7 +478,7 @@ void CCoreThread::handleFwVersion_hans(void)
     getIdBits(enabledIDbits, sdCardAcsiId);     // get the enabled IDs
 
     chipInterface->setHDDconfig(enabledIDbits, sdCardAcsiId, 0, false, false);
-    chipInterface->getFWversion(true, fwVer);
+    chipInterface->getFWversion(fwVer);
 
     //----------------------------------
     // if HW info changed

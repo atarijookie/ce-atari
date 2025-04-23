@@ -37,7 +37,7 @@ int BufferedReader::waitForAtn(uint8_t atnCode, uint32_t timeoutMs)
 
     while(sigintReceived == 0) {
         // got data? process
-        if(gotBytes >= 5) {                             // have enough data?
+        if(gotBytes >= 10) {                                // have enough data?
             int atnId = readHeaderFromBuffer(atnCode);
 
             if(atnId != NET_ATN_NONE_ID) {                  // if valid ATN ID found and header seems to be OK, return that ATN ID
@@ -55,8 +55,8 @@ int BufferedReader::waitForAtn(uint8_t atnCode, uint32_t timeoutMs)
         // if data is  available, the rest does: ioctl()            + recv()
         // if data not available, the rest does: ioctl() + select() + recv()
 
-        // we need 5 bytes to have full header
-        int needCnt = 5 - gotBytes;
+        // we need 10 bytes to have full header
+        int needCnt = 10 - gotBytes;
 
         int res, bytesAvailable;
         res = ioctl(fd, FIONREAD, &bytesAvailable);     // how many bytes we can read immediately?
@@ -75,7 +75,7 @@ int BufferedReader::waitForAtn(uint8_t atnCode, uint32_t timeoutMs)
             }
 
             if(timeLeftUs <= 0) {                       // no time left? quit loop, return NONE ATN
-                //Debug::out(LOG_DEBUG, "waitForAtn() - timeLeftUs <= 0");
+                Debug::out(LOG_DEBUG, "waitForAtn() - timeLeftUs <= 0");
                 break;
             }
 
@@ -106,6 +106,7 @@ int BufferedReader::waitForAtn(uint8_t atnCode, uint32_t timeoutMs)
 
         if(recvCnt > 0) {                               // if read was OK, we got those bytes and we can restart the loop
             gotBytes += recvCnt;
+            Debug::out(LOG_DEBUG, "waitForAtn() - received data, gotBytes: %d", gotBytes);
             continue;
         }
 
@@ -142,10 +143,9 @@ int BufferedReader::readHeaderFromBuffer(uint8_t atnCodeWant)
         return NET_ATN_NONE_ID;
     }
 
-    int atnId = NET_ATN_NONE_ID;
-
     uint32_t syncDword = Utils::getDword(&buffer[0]);
     if(syncDword != 0xc050d1c5) {                       // sync bytes wrong?
+        Debug::out(LOG_DEBUG, "readHeaderFromBuffer() - bad syncDword: %08x", syncDword);
         return NET_ATN_NONE_ID;
     }
 
@@ -160,16 +160,12 @@ int BufferedReader::readHeaderFromBuffer(uint8_t atnCodeWant)
 
     // read TX length in bytes
     txLen = Utils::getDword(&buffer[6]);
-
-    // remove 8 bytes from the length, as we've already read this 8 byte long headers
-    txLen = (txLen >= 8) ? (txLen - 8) : 0;
-
     remainingPacketLength = txLen;
 
     //Debug::out(LOG_DEBUG, "readHeaderFromBuffer() - got AtnCode=%d, txLen=%d, rxLen=%d", getAtnCode(), txLen, rxLen);
 
     // value other than NET_ATN_NONE_ID means success
-    return atnId;
+    return NET_ATN_HANS_ID;
 }
 
 // from the current buffer gets and returns the ATN code found in header
@@ -183,10 +179,11 @@ uint32_t BufferedReader::getRemainingLength(void)
     return remainingPacketLength;
 }
 
-// pointer to header start in our buffer
+// pointer to header start, so the header would end up looking like 8 bytes (even if it's really 10 bytes long)
+// and the ATN code is at the index 3
 uint8_t* BufferedReader::getHeaderPointer(void)
 {
-    return &buffer[4];
+    return &buffer[2];
 }
 
 // clear buffer after reading valid header

@@ -96,10 +96,10 @@ public:
 
     //----------------
     // if following function returns true, some command is waiting for action in the inBuf and hardNotFloppy flag distiguishes hard-drive or floppy-drive command
-    virtual bool actionNeeded(bool &hardNotFloppy, uint8_t *inBuf) = 0;
+    virtual bool actionNeeded(uint8_t *inBuf) = 0;
 
     // to handle FW version, first call setHDDconfig() / setFDDconfig() to fill config into bufOut, then call getFWversion to get the FW version from chip
-    virtual void getFWversion(bool hardNotFloppy, uint8_t *inFwVer) = 0;
+    virtual void getFWversion(uint8_t *inFwVer) = 0;
     virtual void setHDDconfig(uint8_t hddEnabledIDs, uint8_t sdCardId, uint8_t fddEnabledSlots, bool setNewFloppyImageLed, uint8_t newFloppyImageLed);
     virtual void setFDDconfig(bool setFloppyConfig, FloppyConfig* fddConfig, bool setDiskChanged, bool diskChanged);
 

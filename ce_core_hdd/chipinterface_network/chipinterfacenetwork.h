@@ -29,10 +29,10 @@ public:
 
     //----------------
     // if following function returns true, some command is waiting for action in the inBuf and hardNotFloppy flag distiguishes hard-drive or floppy-drive command
-    bool actionNeeded(bool &hardNotFloppy, uint8_t *inBuf);
+    bool actionNeeded(uint8_t *inBuf);
 
     // to handle FW version, first call setHDDconfig() / setFDDconfig() to fill config into bufOut, then call getFWversion to get the FW version from chip
-    void getFWversion(bool hardNotFloppy, uint8_t *inFwVer);
+    void getFWversion(uint8_t *inFwVer);
 
     //----------------
     // HDD: READ/WRITE functions for large (>1 MB) block transfers (Scsi::readSectors(), Scsi::writeSectors()) and also by the convenient functions above
@@ -67,7 +67,7 @@ private:
     void createListeningSocket(void);
     void acceptSocketIfNeededAndPossible(void);
     void closeClientSocket(void);
-    int  recvFromClient(uint8_t* buf, int len, bool byteSwap=true);
+    int  recvFromClient(uint8_t* buf, int len);
     void createServerReportSocket(void);
     void sendReportToMainServerSocket(void);
 

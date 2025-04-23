@@ -193,7 +193,7 @@ void ChipInterfaceNetwork::ciClose(void)
     Utils::closeFdIfOpen(fdReport);
 }
 
-bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
+bool ChipInterfaceNetwork::actionNeeded(uint8_t *inBuf)
 {
     // send current status report every once in a while (could do it on change only, but doing it repeatedly as UDP packet might get lost, even on localhost only)
     if(Utils::getCurrentMs() >= nextReportTime) {
@@ -212,7 +212,7 @@ bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
     int rv = ioctl(fdClient, FIONREAD, &bytesAvailable);    // how many bytes we can read?
 
     if(rv < 0 || bytesAvailable <= 0) {                     // ioctl fail or nothing to read? no action needed
-        //Debug::out(LOG_DEBUG, "actionNeeded() - nothing comming from fdClient");
+        // Debug::out(LOG_DEBUG, "actionNeeded() - nothing comming from fdClient");
 
         if(rv == 0 && bytesAvailable == 0) {    // ioctl() succeeded, but can't read anything
             uint32_t now = Utils::getCurrentMs();
@@ -226,6 +226,7 @@ bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
 
         return false;
     }
+    Debug::out(LOG_DEBUG, "actionNeeded() - bytesAvailable: %d", bytesAvailable);
 
     lastTimeRecv = Utils::getCurrentMs();       // last time we've something received - now
 
@@ -251,7 +252,6 @@ bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
                 recvFromClient(inBuf + 8, 14);
             }
 
-            hardNotFloppy = true;
             return true;
         }
 
@@ -264,24 +264,20 @@ bool ChipInterfaceNetwork::actionNeeded(bool &hardNotFloppy, uint8_t *inBuf)
     return false;
 }
 
-void ChipInterfaceNetwork::getFWversion(bool hardNotFloppy, uint8_t *inFwVer)
+void ChipInterfaceNetwork::getFWversion(uint8_t *inFwVer)
 {
-    // Debug::out(LOG_DEBUG, "getFWversion(): hardNotFloppy=%d", hardNotFloppy);
+    // fwResponseBfr should be filled with Hans config - by calling setHDDconfig() (and not calling anything else inbetween)
+    sendDataToChip(NET_TAG_HANS_STR, fwResponseBfr, HDD_FW_RESPONSE_LEN);
 
-    if(hardNotFloppy) {     // for HDD
-        // fwResponseBfr should be filled with Hans config - by calling setHDDconfig() (and not calling anything else inbetween)
-        sendDataToChip(NET_TAG_HANS_STR, fwResponseBfr, HDD_FW_RESPONSE_LEN);
+    recvFromClient(inFwVer, HDD_FW_RESPONSE_LEN);
 
-        recvFromClient(inFwVer, HDD_FW_RESPONSE_LEN);
+    ChipInterface::convertXilinxInfo(inFwVer[5]);  // convert xilinx info into hwInfo struct
 
-        ChipInterface::convertXilinxInfo(inFwVer[5]);  // convert xilinx info into hwInfo struct
+    hansConfigWords.current.acsi = MAKEWORD(inFwVer[6], inFwVer[7]);
+    hansConfigWords.current.fdd  = MAKEWORD(inFwVer[8],        0);
 
-        hansConfigWords.current.acsi = MAKEWORD(inFwVer[6], inFwVer[7]);
-        hansConfigWords.current.fdd  = MAKEWORD(inFwVer[8],        0);
-
-        int year = Utils::bcdToInt(inFwVer[1]) + 2000;
-        Update::versions.hans.fromInts(year, Utils::bcdToInt(inFwVer[2]), Utils::bcdToInt(inFwVer[3]));       // store found FW version of Hans
-    }
+    int year = Utils::bcdToInt(inFwVer[1]) + 2000;
+    Update::versions.hans.fromInts(year, Utils::bcdToInt(inFwVer[2]), Utils::bcdToInt(inFwVer[3]));       // store found FW version of Hans
 }
 
 bool ChipInterfaceNetwork::hdd_sendData_start(uint32_t totalDataCount, uint8_t scsiStatus, bool withStatus)
@@ -407,26 +403,6 @@ bool ChipInterfaceNetwork::hdd_sendStatusToHans(uint8_t statusByte)
     return true;
 }
 
-void ChipInterfaceNetwork::handleZerosAndIkbd(int atnId)
-{
-    int cntWant = bufReader.getRemainingLength();   // get how much we should get to receive whole packet
-    cntWant = MIN(cntWant, MFM_STREAM_SIZE);            // limit the received lenght to buffer size
-
-    int cntGot = recvFromClient(bufIn, cntWant);    // read data
-
-    if(cntGot < cntWant) {                              // not enough data read? 
-        Debug::out(LOG_DEBUG, "handleZerosAndIkbd: got %d bytes, but wanted %d bytes (%d < %d)", cntGot, cntWant, cntGot, cntWant);
-    }
-
-    if(cntGot <= 0) {                                   // on error, nothing more to do
-        return;
-    }
-
-    // for NET_ATN_ZEROS_ID - nothing to do, just ignore the zeros
-
-    bufReader.clear(); 
-}
-
 bool ChipInterfaceNetwork::waitForAtn(int atnIdWant, uint8_t atnCode, uint32_t timeoutMs, uint8_t *inBuf)
 {
     gotAtnId = 0;
@@ -445,14 +421,6 @@ bool ChipInterfaceNetwork::waitForAtn(int atnIdWant, uint8_t atnCode, uint32_t t
             return false;
         }
 
-        // if ZEROS or IKBD packed was found, process it and then try looking for Franz or Hans packet again
-        if(atnIdGot == NET_ATN_ZEROS_ID || atnIdGot == NET_ATN_IKBD_ID) {
-            Debug::out(LOG_DEBUG, "waitForAtn() - got ZEROS or IKDB");
-
-            handleZerosAndIkbd(atnIdGot);
-            continue;
-        }
-
         // it's not ZEROS and not IKBD, but it's NONE? fail
         if(atnIdGot == NET_ATN_NONE_ID) {
             return false;
@@ -462,7 +430,6 @@ bool ChipInterfaceNetwork::waitForAtn(int atnIdWant, uint8_t atnCode, uint32_t t
 
         // if we got here, it'z not ZEROS, IKDB or NONE, so it's FRANZ or HANS
         memcpy(inBuf, bufReader.getHeaderPointer(), 8); // copy in the header to start of buffer
-        byteSwapBfr(inBuf, 8);
         bufReader.clear();                              // clear buffered reader after reading data
 
         //Debug::out(LOG_DEBUG, "waitForAtn() - %02X %02X %02X %02X %02X %02X %02X %02X", inBuf[0], inBuf[1], inBuf[2], inBuf[3], inBuf[4], inBuf[5], inBuf[6], inBuf[7]);
@@ -502,7 +469,7 @@ void ChipInterfaceNetwork::sendDataToChip(const char* tag, uint8_t* data, uint16
     write(fdClient, data, len);             // send data
 }
 
-int ChipInterfaceNetwork::recvFromClient(uint8_t* buf, int len, bool byteSwap)
+int ChipInterfaceNetwork::recvFromClient(uint8_t* buf, int len)
 {
     int received = 0;                       // total received count
 
@@ -516,10 +483,6 @@ int ChipInterfaceNetwork::recvFromClient(uint8_t* buf, int len, bool byteSwap)
 
     if(bytes == 0) {                            // if recv() returned 0, client has disconnected
         closeClientSocket();
-    }
-
-    if(byteSwap) {                              // if should byteswap data
-        byteSwapBfr(buf, len);
     }
 
     // if(received > 0) {
