@@ -124,42 +124,6 @@ void ChipInterface::setHDDconfig(uint8_t hddEnabledIDs)
     memset(fwResponseBfr, 0, HDD_FW_RESPONSE_LEN);
     responseStart(HDD_FW_RESPONSE_LEN);                         // init the response struct
 
-    hansConfigWords.next.acsi = MAKEWORD(hddEnabledIDs, 0);
-
-    //Debug::out(LOG_DEBUG, "setHDDconfig - next.acsi: %04x <=> current.acsi: %04x, next.fdd: %04x <=> current.fdd: %04x", hansConfigWords.next.acsi, hansConfigWords.current.acsi, hansConfigWords.next.fdd, hansConfigWords.current.fdd);
-
-    if( (hansConfigWords.next.acsi  != hansConfigWords.current.acsi) ||
-        (hansConfigWords.next.fdd   != hansConfigWords.current.fdd )) {
-
-        // hansConfigWords.skipNextSet - it's a flag used for skipping one config sending, because we send the new config now, but receive it processed in the next (not this) fw version packet
-
-        if(!hansConfigWords.skipNextSet) {
-            Debug::out(LOG_DEBUG, "setHDDconfig - will send next.acsi: %04x, next.fdd: %04x", hansConfigWords.next.acsi, hansConfigWords.next.fdd);
-
-            responseAddWord(fwResponseBfr, CMD_ACSI_CONFIG);             // CMD: send acsi config
-            responseAddWord(fwResponseBfr, hansConfigWords.next.acsi);   // store ACSI enabled IDs and which ACSI ID is used for SD card
-            responseAddWord(fwResponseBfr, hansConfigWords.next.fdd);    // store which floppy images are enabled
-
-            hansConfigWords.skipNextSet = true;                 // we have just sent the config, skip the next sending, so we won't send it twice in a row
-        } else {                                                // if we should skip sending config this time, then don't skip it next time (if needed)
-            hansConfigWords.skipNextSet = false;
-        }
-    }
-}
-
-void ChipInterface::setFDDconfig(bool setFloppyConfig, FloppyConfig* fddConfig, bool setDiskChanged, bool diskChanged)
-{
-    memset(fwResponseBfr, 0, FDD_FW_RESPONSE_LEN);
-
-    responseStart(FDD_FW_RESPONSE_LEN);                             // init the response struct
-
-    if(setFloppyConfig) {                                       // should set floppy config?
-        responseAddByte(fwResponseBfr, ( fddConfig->enabled         ? CMD_DRIVE_ENABLED     : CMD_DRIVE_DISABLED) );
-        responseAddByte(fwResponseBfr, ((fddConfig->id == 0)        ? CMD_SET_DRIVE_ID_0    : CMD_SET_DRIVE_ID_1) );
-        responseAddByte(fwResponseBfr, ( fddConfig->writeProtected  ? CMD_WRITE_PROTECT_ON  : CMD_WRITE_PROTECT_OFF) );
-    }
-
-    if(setDiskChanged) {
-        responseAddByte(fwResponseBfr, ( diskChanged    ? CMD_DISK_CHANGE_ON    : CMD_DISK_CHANGE_OFF) );
-    }
+    responseAddByte(fwResponseBfr, CMD_ACSI_CONFIG);             // CMD: send acsi config
+    responseAddByte(fwResponseBfr, hddEnabledIDs);               // store ACSI enabled IDs
 }

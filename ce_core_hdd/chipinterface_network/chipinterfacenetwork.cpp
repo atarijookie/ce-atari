@@ -42,8 +42,6 @@ ChipInterfaceNetwork::ChipInterfaceNetwork()
     gotAtnCode = 0;
 
     lastTimeRecv = Utils::getCurrentMs();
-
-    memset(&hansConfigWords, 0, sizeof(hansConfigWords));
 }
 
 ChipInterfaceNetwork::~ChipInterfaceNetwork()
@@ -267,14 +265,11 @@ bool ChipInterfaceNetwork::actionNeeded(uint8_t *inBuf)
 void ChipInterfaceNetwork::getFWversion(uint8_t *inFwVer)
 {
     // fwResponseBfr should be filled with Hans config - by calling setHDDconfig() (and not calling anything else inbetween)
-    sendDataToChip(NET_TAG_HANS_STR, fwResponseBfr, HDD_FW_RESPONSE_LEN);
+    sendDataToChip(CMD_ACSI_CONFIG, fwResponseBfr, response.currentLength);
 
     recvFromClient(inFwVer, HDD_FW_RESPONSE_LEN);
 
     ChipInterface::convertXilinxInfo(inFwVer[5]);  // convert xilinx info into hwInfo struct
-
-    hansConfigWords.current.acsi = MAKEWORD(inFwVer[6], inFwVer[7]);
-    hansConfigWords.current.fdd  = MAKEWORD(inFwVer[8],        0);
 
     int year = Utils::bcdToInt(inFwVer[1]) + 2000;
     Update::versions.hans.fromInts(year, Utils::bcdToInt(inFwVer[2]), Utils::bcdToInt(inFwVer[3]));       // store found FW version of Hans
@@ -287,47 +282,19 @@ bool ChipInterfaceNetwork::hdd_sendData_start(uint32_t totalDataCount, uint8_t s
         return false;
     }
 
-    memset(bufOut, 0, COMMAND_SIZE);
-
-    bufOut[3] = withStatus ? CMD_DATA_READ_WITH_STATUS : CMD_DATA_READ_WITHOUT_STATUS;  // store command - with or without status
-    bufOut[4] = totalDataCount >> 16;                           // store data size
-    bufOut[5] = totalDataCount >>  8;
-    bufOut[6] = totalDataCount  & 0xff;
-    bufOut[7] = scsiStatus;                                     // store status
+    Utils::store24bits(&bufOut[0], totalDataCount);             // store data size
+    bufOut[3] = scsiStatus;                                     // store status
 
     // transmit this command
-    sendDataToChip(NET_TAG_HANS_STR, bufOut, COMMAND_SIZE);
+    uint8_t cmd = withStatus ? CMD_DATA_READ_WITH_STATUS : CMD_DATA_READ_WITHOUT_STATUS;  // store command - with or without status
+    sendDataToChip(cmd, bufOut, 4);
 
     return true;
 }
 
 bool ChipInterfaceNetwork::hdd_sendData_transferBlock(uint8_t *pData, uint32_t dataCount)
 {
-    bufOut[0] = 0;
-    bufOut[1] = CMD_DATA_MARKER;                                  // mark the start of data
-
-    if((dataCount & 1) != 0) {                                      // odd number of bytes? make it even, we're sending words...
-        dataCount++;
-    }
-
-    while(dataCount > 0) {                                          // while there's something to send
-        bool good = waitForAtn(NET_ATN_HANS_ID, ATN_READ_MORE_DATA, 1000, bufIn);
-
-        if(!good) {         // failed to get right CMD from Hans? fail
-            return false;
-        }
-
-        uint32_t cntNow = (dataCount > 512) ? 512 : dataCount;         // max 512 bytes per transfer
-
-        memcpy(bufOut + 2, pData, cntNow);                          // copy the data after the header (2 bytes)
-
-        // transmit this buffer with header + terminating zero (uint16_t)
-        sendDataToChip(NET_TAG_HANS_STR, bufOut, cntNow + 4);
-
-        pData       += cntNow;                                      // move the data pointer further
-        dataCount   -= cntNow;
-    }
-
+    sendDataToChip(CMD_DATA_MARKER, pData, dataCount);
     return true;
 }
 
@@ -338,17 +305,12 @@ bool ChipInterfaceNetwork::hdd_recvData_start(uint8_t *recvBuffer, uint32_t tota
         return false;
     }
 
-    memset(bufOut, 0, COMMAND_SIZE);
-
     // first send the command and tell Hans that we need WRITE data
-    bufOut[3] = CMD_DATA_WRITE;                                 // store command - WRITE
-    bufOut[4] = totalDataCount >> 16;                           // store data size
-    bufOut[5] = totalDataCount >>  8;
-    bufOut[6] = totalDataCount  & 0xff;
-    bufOut[7] = 0xff;                                           // store INVALID status, because the real status will be sent on CMD_SEND_STATUS
+    Utils::store24bits(&bufOut[0], totalDataCount);             // store data size
+    bufOut[3] = 0xff;                                           // store INVALID status, because the real status will be sent on CMD_SEND_STATUS
 
     // transmit this command
-    sendDataToChip(NET_TAG_HANS_STR, bufOut, COMMAND_SIZE);
+    sendDataToChip(CMD_DATA_WRITE, bufOut, 4);
 
     return true;
 }
@@ -393,12 +355,8 @@ bool ChipInterfaceNetwork::hdd_sendStatusToHans(uint8_t statusByte)
         return false;
     }
 
-    memset(bufOut, 0, 16);                                // clear the tx buffer
-    bufOut[1] = CMD_SEND_STATUS;                          // set the command and the statusByte
-    bufOut[2] = statusByte;
-
-    // transmit the statusByte (16 bytes total, but 8 already received)
-    sendDataToChip(NET_TAG_HANS_STR, bufOut, 16 - 8);
+    bufOut[0] = statusByte;                          // set the command and the statusByte
+    sendDataToChip(CMD_SEND_STATUS, bufOut, 1);
 
     return true;
 }
@@ -455,17 +413,18 @@ bool ChipInterfaceNetwork::waitForAtn(int atnIdWant, uint8_t atnCode, uint32_t t
     return false;
 }
 
-void ChipInterfaceNetwork::sendDataToChip(const char* tag, uint8_t* data, uint16_t len)        // send data to chip with specified tag
+void ChipInterfaceNetwork::sendDataToChip(uint16_t cmdCode, uint8_t* data, uint16_t len)        // send data to chip with specified tag
 {
     if(fdClient < 0) {                      // no client socket? quit
         return;
     }
 
-    uint8_t head[6];
-    memcpy(head, tag, 4);                   // 0..3: tag
-    Utils::storeWord(head + 4, len);        // 4..5: length
+    uint8_t head[10];
+    Utils::storeDword(head + 0, 0xc050d1c5);    // 0..3: 0xc050d1c5 [COSmODICS] (4 bytes)
+    Utils::storeDword(head + 4, cmdCode);       // 4..5: ATN code (2 bytes)
+    Utils::storeDword(head + 6, len);           // 6..9: txLen (4 bytes)
 
-    write(fdClient, head, 6);               // send header
+    write(fdClient, head, 10);              // send header
     write(fdClient, data, len);             // send data
 }
 
@@ -491,13 +450,4 @@ int ChipInterfaceNetwork::recvFromClient(uint8_t* buf, int len)
     // }
 
     return received;                            // return total bytes received
-}
-
-void ChipInterfaceNetwork::byteSwapBfr(uint8_t* buf, int len)
-{
-    for(int i=0; i<len; i += 2) {
-        uint8_t tmp = buf[i];
-        buf[i] = buf[i+1];
-        buf[i+1] = tmp;
-    }
 }

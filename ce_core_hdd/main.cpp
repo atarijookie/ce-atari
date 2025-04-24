@@ -188,12 +188,7 @@ void loadLastHwConfig(void)
 {
     Settings s;
 
-    hwConfig.version        = s.getInt("HW_VERSION",       1);
-    hwConfig.hddIface       = s.getInt("HW_HDD_IFACE",     HDD_IF_ACSI);
-    hwConfig.scsiMachine    = s.getInt("HW_SCSI_MACHINE",  SCSI_MACHINE_UNKNOWN);
-    hwConfig.fwMismatch     = false;
     hwConfig.changed        = false;
-
     memset(hwConfig.hwSerial, 0, 13);
 }
 

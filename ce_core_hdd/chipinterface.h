@@ -98,10 +98,9 @@ public:
     // if following function returns true, some command is waiting for action in the inBuf and hardNotFloppy flag distiguishes hard-drive or floppy-drive command
     virtual bool actionNeeded(uint8_t *inBuf) = 0;
 
-    // to handle FW version, first call setHDDconfig() / setFDDconfig() to fill config into bufOut, then call getFWversion to get the FW version from chip
+    // to handle FW version, first call setHDDconfig() to fill config into bufOut, then call getFWversion to get the FW version from chip
     virtual void getFWversion(uint8_t *inFwVer) = 0;
     virtual void setHDDconfig(uint8_t hddEnabledIDs);
-    virtual void setFDDconfig(bool setFloppyConfig, FloppyConfig* fddConfig, bool setDiskChanged, bool diskChanged);
 
     //----------------
     // HDD: READ/WRITE functions for large (>1 MB) block transfers (Scsi::readSectors(), Scsi::writeSectors()) and also by the convenient functions above
@@ -116,20 +115,6 @@ public:
 
 protected:
     uint8_t fwResponseBfr[FW_RESPONSE_LEN_BIGGER];
-
-    struct {
-        struct {
-            uint16_t acsi;
-            uint16_t fdd;
-        } current;
-
-        struct {
-            uint16_t acsi;
-            uint16_t fdd;
-        } next;
-
-        bool skipNextSet;
-    } hansConfigWords;
 
     struct {
         int bfrLengthInBytes;

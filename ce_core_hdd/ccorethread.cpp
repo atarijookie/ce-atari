@@ -75,15 +75,6 @@ CCoreThread::CCoreThread()
     settingsReloadProxy.addSettingsUser((ISettingsUser *) TranslatedDisk::getInstance(), SETTINGSUSER_TRANSLATED);
     settingsReloadProxy.addSettingsUser((ISettingsUser *) TranslatedDisk::getInstance(), SETTINGSUSER_SHARED);
 
-    // give floppy setup everything it needs
-    // TODO: rework
-    // floppySetup.setAcsiDataTrans(dataTrans);
-    // floppySetup.setSettingsReloadProxy(&settingsReloadProxy);
-
-    // the floppy image silo might change settings (when images are changes), add settings reload proxy
-    // shared.imageSilo->setSettingsReloadProxy(&settingsReloadProxy);
-    // settingsReloadProxy.reloadSettings(SETTINGSUSER_FLOPPYIMGS);            // mark that floppy settings changed (when imageSilo loaded the settings)
-
     misc.setDataTrans(dataTrans);
 
     extensionHandler = new ExtensionHandler();
@@ -179,11 +170,6 @@ void CCoreThread::handleOtherStuff(void)
     }
 
     uint32_t now = Utils::getCurrentMs();
-
-    // if(events.insertSpecialFloppyImageId != 0) {            // very stupid way of letting web IF to insert special image
-    //     insertSpecialFloppyImage(events.insertSpecialFloppyImageId);
-    //     events.insertSpecialFloppyImageId = 0;
-    // }
 
     if(now >= lastFwInfoTime.nextDisplay) {
         lastFwInfoTime.nextDisplay  = Utils::getEndTime(1000);
@@ -339,11 +325,6 @@ void CCoreThread::handleAcsiCommand(uint8_t *bufIn)
         Debug::out(LOG_DEBUG, "handleAcsiCommand - CE specific command - module: %02x", module);
 
         switch(module) {
-        case HOSTMOD_CONFIG:                            // config console command?
-            Debug::cmdStart(bufIn, "CE_CONF");
-            wasHandled = true;
-            // NOP: no longer supported
-            break;
 
         case HOSTMOD_TRANSLATED_DISK:                   // translated disk command?
             Debug::cmdStart(bufIn, "CE_TRANS");
@@ -357,15 +338,6 @@ void CCoreThread::handleAcsiCommand(uint8_t *bufIn)
                     translated->mutexUnlock();
                 }
             }
-            break;
-
-        case HOSTMOD_FDD_SETUP:                         // floppy setup command?
-            // TODO: rework
-            Debug::cmdStart(bufIn, "CE_FDD");
-            wasHandled = true;
-            // pthread_mutex_lock(&shared.mtxImages);      // lock floppy images shared objects -- now used by floppy setup object
-            // floppySetup.processCommand(pCmd);
-            // pthread_mutex_unlock(&shared.mtxImages);    // unlock floppy images shared objects
             break;
 
         case HOSTMOD_MISC:
@@ -474,8 +446,7 @@ void CCoreThread::handleFwVersion_hans(void)
     uint8_t fwVer[16];
     memset(fwVer, 0, 16);
 
-    uint8_t enabledIDbits, sdCardAcsiId;
-    getIdBits(enabledIDbits, sdCardAcsiId);     // get the enabled IDs
+    uint8_t enabledIDbits = getIdBits();     // get the enabled IDs
 
     chipInterface->setHDDconfig(enabledIDbits);
     chipInterface->getFWversion(fwVer);
@@ -495,28 +466,17 @@ void CCoreThread::handleFwVersion_hans(void)
         saveHwConfig();                             // save the new config
     }
 
-    //----------------------------------
-    // do the following only for chip interface v1 v2
-
-    char recoveryLevel = fwVer[9];
-    if(recoveryLevel != 0) {                                                        // if the recovery level is not empty
-        if(recoveryLevel == 'R' || recoveryLevel == 'S' || recoveryLevel == 'T') {  // and it's a valid recovery level
-            handleRecoveryCommands(recoveryLevel - 'Q');                            // handle recovery action
-        }
-    }
-
     Debug::out(LOG_DEBUG, "FW: %d-%02d-%02d", Update::versions.hans.getYear(), Update::versions.hans.getMonth(), Update::versions.hans.getDay());
 }
 
-void CCoreThread::getIdBits(uint8_t &enabledIDbits, uint8_t &sdCardAcsiId)
+uint8_t CCoreThread::getIdBits(void)
 {
     // get the bits from struct
-    enabledIDbits  = acsiIdInfo.enabledIDbits;
-    sdCardAcsiId   = acsiIdInfo.sdCardAcsiId;
+    uint8_t enabledIDbits = acsiIdInfo.enabledIDbits;
 
     if(hwConfig.hddIface != HDD_IF_SCSI) {          // not SCSI? Don't change anything
 //        Debug::out(LOG_DEBUG, "CCoreThread::getIdBits() -- we're running on ACSI");
-        return;
+        return enabledIDbits;
     }
 
     // if we're on SCSI bus, remove ID bits if they are used for SCSI Initiator on that machine (ID 7 on TT, ID 0 on Falcon)
@@ -525,9 +485,6 @@ void CCoreThread::getIdBits(uint8_t &enabledIDbits, uint8_t &sdCardAcsiId)
 //            Debug::out(LOG_DEBUG, "CCoreThread::getIdBits() -- we're running on TT, will remove ID 7 from enabled ID bits");
 
             enabledIDbits = enabledIDbits & 0x7F;
-            if(sdCardAcsiId == 7) {
-                sdCardAcsiId = 0xff;
-            }
             break;
 
         //------------
@@ -535,9 +492,6 @@ void CCoreThread::getIdBits(uint8_t &enabledIDbits, uint8_t &sdCardAcsiId)
 //            Debug::out(LOG_DEBUG, "CCoreThread::getIdBits() -- we're running on Falcon, will remove ID 0 from enabled ID bits");
 
             enabledIDbits = enabledIDbits & 0xFE;
-            if(sdCardAcsiId == 0) {
-                sdCardAcsiId = 0xff;
-            }
             break;
 
         //------------
@@ -546,103 +500,13 @@ void CCoreThread::getIdBits(uint8_t &enabledIDbits, uint8_t &sdCardAcsiId)
 //            Debug::out(LOG_DEBUG, "CCoreThread::getIdBits() -- we're running on unknown machine, will remove ID 7 and ID 0 from enabled ID bits");
 
             enabledIDbits = enabledIDbits & 0x7E;
-            if(sdCardAcsiId == 0 || sdCardAcsiId == 7) {
-                sdCardAcsiId = 0xff;
-            }
             break;
     }
+
+    return enabledIDbits;
 }
 
 void CCoreThread::saveHwConfig(void)
 {
-    Settings s;
 
-    int ver, hddIf, scsiMch;
-
-    // get current values for these configs
-    ver     = s.getInt("HW_VERSION",       1);
-    hddIf   = s.getInt("HW_HDD_IFACE",     HDD_IF_ACSI);
-    scsiMch = s.getInt("HW_SCSI_MACHINE",  SCSI_MACHINE_UNKNOWN);
-
-    // store value only if it has changed
-    if(ver != hwConfig.version) {
-        s.setInt("HW_VERSION", ver);
-    }
-
-    if(hddIf != hwConfig.hddIface) {
-        s.setInt("HW_HDD_IFACE", hddIf);
-    }
-
-    if(scsiMch != hwConfig.scsiMachine) {
-        s.setInt("HW_SCSI_MACHINE", scsiMch);
-    }
-}
-
-void CCoreThread::showHwVersion(void)
-{
-    char tmp[256];
-
-    Debug::out(LOG_INFO, "Reporting this as HW INFO...");   // show in log file
-
-    // HW version is 1 | 2 | 3, and in other cases defaults to 1
-    int hwVer = 1;
-
-    if(hwConfig.version >= 1 && hwConfig.version <=3) {     // if HW version is within valid values, use it
-        hwVer = hwConfig.version;
-    }
-    
-    sprintf(tmp, "HW_VER: %d", hwVer);
-    printf("\n%s\n", tmp);                  // show on stdout
-    Debug::out(LOG_INFO, "   %s", tmp);    // show in log file
-
-    // HDD interface is either SCSI, or defaults to ACSI
-    sprintf(tmp, "HDD_IF: %s", (hwConfig.hddIface == HDD_IF_SCSI) ? "SCSI" : "ACSI");
-    printf("\n%s\n", tmp);                  // show on stdout
-    Debug::out(LOG_INFO, "   %s", tmp);    // show in log file
-
-    sprintf(tmp, "HWFWMM: %s", hwConfig.fwMismatch ? "MISMATCH" : "OK");
-    printf("\n%s\n", tmp);                  // show on stdout
-    Debug::out(LOG_INFO, "   %s", tmp);    // show in log file
-}
-
-void CCoreThread::handleRecoveryCommands(int recoveryLevel)
-{
-    Debug::out(LOG_DEBUG, "CCoreThread::handleRecoveryCommands() -- recoveryLevel is %d", recoveryLevel);
-
-    switch(recoveryLevel) {
-        case 1: // just insert config floppy image into slot 1
-                // insertSpecialFloppyImage(SPECIAL_FDD_IMAGE_CE_CONF);
-                break;
-
-        //----------------------------------------------------
-        case 2: // delete settings, set network to DHCP
-                Debug::out(LOG_INFO, ">>> CCoreThread::handleRecoveryCommands -- LEVEL 2 - removing settings, restarting whole linux <<<\n");
-
-                deleteSetting();         // delete all settings, set network to DHCP
-
-                Debug::out(LOG_INFO, ">>> Terminating app and will reboot device, because app settings and network settings changed <<<\n");
-
-                system("reboot");                           // reboot device
-                sigintReceived = 1;                         // turn off app (probably not needed)
-                break;
-
-        //----------------------------------------------------
-        case 3: // like 2, but also flash first firmware
-                Debug::out(LOG_INFO, ">>> CCoreThread::handleRecoveryCommands -- LEVEL 3 - removing settings, flashing first FW <<<\n");
-
-                deleteSetting();         // delete all settings, set network to DHCP
-
-                Debug::out(LOG_INFO, ">>> Terminating app, because will do flashFirstFw as a part of handleRecoveryCommands() ! <<<\n");
-                sigintReceived = 1;                         // turn off app
-                break;
-    }
-}
-
-void CCoreThread::deleteSetting(void)
-{
-    // delete settings
-    system("rm -f /ce/settings/*");
-
-    // sync to write stuff to card
-    system("sync");
 }

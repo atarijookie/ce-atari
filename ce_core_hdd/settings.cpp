@@ -289,9 +289,6 @@ void Settings::loadAcsiIDs(AcsiIDinfo *aii, bool useDefaultsIfNoSettings)
 
     aii->gotDevTypeRaw          = false;                    // no raw and translated types found yet
     aii->gotDevTypeTranslated   = false;
-    aii->gotDevTypeSd           = false;
-
-    aii->sdCardAcsiId = 0xff;                               // at start mark that we don't have SD card ID yet
 
     char key[32];
     for(int id=0; id<8; id++) {                         // read the list of device types from settings
@@ -306,11 +303,6 @@ void Settings::loadAcsiIDs(AcsiIDinfo *aii, bool useDefaultsIfNoSettings)
         //-------------------------
 
         aii->acsiIDdevType[id] = devType;
-
-        if(devType == DEVTYPE_SD) {                     // if on this ACSI ID we should have the native SD card, store this ID
-            aii->sdCardAcsiId = id;
-            aii->gotDevTypeSd = true;
-        }
 
         if(devType != DEVTYPE_OFF) {                    // if ON
             aii->enabledIDbits |= (1 << id);            // set the bit to 1
@@ -327,7 +319,7 @@ void Settings::loadAcsiIDs(AcsiIDinfo *aii, bool useDefaultsIfNoSettings)
     }
 
     // no ACSI ID was enabled? enable ACSI ID 0
-    if(!aii->gotDevTypeRaw && !aii->gotDevTypeTranslated && !aii->gotDevTypeSd) {
+    if(!aii->gotDevTypeRaw && !aii->gotDevTypeTranslated) {
         if(useDefaultsIfNoSettings) {                   // if should use defaults if no settings found, store those defaults and call this function again
             storeDefaultValues();
             loadAcsiIDs(aii, false);                    // ...but call this function without storing defaults next time - to avoid endless loop in some weird case

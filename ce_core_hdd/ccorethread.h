@@ -60,20 +60,13 @@ private:
     void handleFwVersion_franz(void);
 
     void saveHwConfig(void);
-    void getIdBits(uint8_t &enabledIDbits, uint8_t &sdCardAcsiId);
+    uint8_t getIdBits(void);
 
     // host module - misc
     Misc                misc;
-    //----------------------------------
-    // recovery stuff
-    void handleRecoveryCommands(int recoveryLevel);
-    void deleteSetting(void);
-    // void insertSpecialFloppyImage(int specialImageId);
 
     //----------------------------------
     // other
-    void showHwVersion(void);
-
     void sharedObjects_create(void);
     void sharedObjects_destroy(void);
 

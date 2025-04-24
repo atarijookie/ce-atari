@@ -7,12 +7,6 @@
 #include "../chipinterface.h"
 #include "bufferedreader.h"
 
-// tags that are being sent from RPi to chip to mark start of data
-#define NET_TAG_HANS_STR    "TGHA"
-#define NET_TAG_FRANZ_STR   "TGFR"
-#define NET_TAG_IKBD_STR    "TGIK"
-#define NET_TAG_ZEROS_STR   "TGZE"
-
 class ChipInterfaceNetwork: public ChipInterface
 {
 public:
@@ -31,7 +25,7 @@ public:
     // if following function returns true, some command is waiting for action in the inBuf and hardNotFloppy flag distiguishes hard-drive or floppy-drive command
     bool actionNeeded(uint8_t *inBuf);
 
-    // to handle FW version, first call setHDDconfig() / setFDDconfig() to fill config into bufOut, then call getFWversion to get the FW version from chip
+    // to handle FW version, first call setHDDconfig() to fill config into bufOut, then call getFWversion to get the FW version from chip
     void getFWversion(uint8_t *inFwVer);
 
     //----------------
@@ -74,8 +68,7 @@ private:
     bool waitForAtn(int atnIdWant, uint8_t atnCode, uint32_t timeoutMs, uint8_t *inBuf);
     void handleZerosAndIkbd(int atnId);
 
-    void sendDataToChip(const char* tag, uint8_t* data, uint16_t len);    // send data to chip with specified tag
-    void byteSwapBfr(uint8_t* buf, int len);
+    void sendDataToChip(uint16_t cmdCode, uint8_t* data, uint16_t len);    // send data to chip with specified tag
 };
 
 #endif // __CHIPINTERFACENETWORK_H__
