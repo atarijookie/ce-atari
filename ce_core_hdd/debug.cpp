@@ -110,13 +110,13 @@ void Debug::out(int logLevel, const char *format, ...)
     sprintf(humanTime, "%02d:%02d:%02d.%06ld", tm.tm_hour, tm.tm_min, tm.tm_sec, tv.tv_usec);
 
     if(logLevel == LOG_ERROR && dbgVars.isInHandleAcsiCommand) {    // it's an error, and we're debugging ACSI stuff
-        fprintf(f, "%08d %4d (%s) %s\n", now, diff, humanTime, ll); // CLOCK in ms, diff in ms, date/time in human readable format
+        fprintf(f, "%s %4d %s\n", humanTime, diff, ll); // diff in ms, date/time in human readable format
         fprintf(f, "     LOG_ERROR occurred\n");
         fprintf(f, "     Time since beginning of ACSI command handling: %d\n", now - dbgVars.thisAcsiCmdTime);
         fprintf(f, "     Time between this and previous ACSI command  : %d\n", dbgVars.thisAcsiCmdTime - dbgVars.prevAcsiCmdTime);
     }
 
-    fprintf(f, "%08d %4d (%s) %s\t", now, diff, humanTime, ll); // CLOCK in ms, diff in ms, date/time in human readable format
+    fprintf(f, "%s %4d %s\t", humanTime, diff, ll); // CLOCK in ms, diff in ms, date/time in human readable format
 
     vfprintf(f, format, args);
     fprintf(f, "\n");
@@ -232,7 +232,7 @@ void Debug::chipLog(uint16_t cnt, char* bfr)
         oneLine += val;         // append to string
 
         if(val == '\n') {       // if last char was new line, dump it to file
-            fprintf(f, "%08d\t%08d\t ", now, diff);
+            fprintf(f, "%08d\t ", diff);
             fputs(oneLine.c_str(), f);
             oneLine.clear();    // clear gathered line
         }

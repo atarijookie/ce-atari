@@ -119,13 +119,12 @@ bool ChipInterface::responseAddByte(uint8_t *bfr, uint8_t value)        // add a
     return true;
 }
 
-void ChipInterface::setHDDconfig(uint8_t hddEnabledIDs, uint8_t sdCardId, uint8_t fddEnabledSlots, bool setNewFloppyImageLed, uint8_t newFloppyImageLed)
+void ChipInterface::setHDDconfig(uint8_t hddEnabledIDs)
 {
     memset(fwResponseBfr, 0, HDD_FW_RESPONSE_LEN);
     responseStart(HDD_FW_RESPONSE_LEN);                         // init the response struct
 
-    hansConfigWords.next.acsi = MAKEWORD(hddEnabledIDs, sdCardId);
-    hansConfigWords.next.fdd  = MAKEWORD(fddEnabledSlots, 0);
+    hansConfigWords.next.acsi = MAKEWORD(hddEnabledIDs, 0);
 
     //Debug::out(LOG_DEBUG, "setHDDconfig - next.acsi: %04x <=> current.acsi: %04x, next.fdd: %04x <=> current.fdd: %04x", hansConfigWords.next.acsi, hansConfigWords.current.acsi, hansConfigWords.next.fdd, hansConfigWords.current.fdd);
 
@@ -145,12 +144,6 @@ void ChipInterface::setHDDconfig(uint8_t hddEnabledIDs, uint8_t sdCardId, uint8_
         } else {                                                // if we should skip sending config this time, then don't skip it next time (if needed)
             hansConfigWords.skipNextSet = false;
         }
-    }
-
-    //--------------
-    if(setNewFloppyImageLed) {
-        responseAddWord(fwResponseBfr, CMD_FLOPPY_SWITCH);               // CMD: set new image LED (bytes 8 & 9)
-        responseAddWord(fwResponseBfr, MAKEWORD(fddEnabledSlots, newFloppyImageLed));  // store which floppy images LED should be on
     }
 }
 

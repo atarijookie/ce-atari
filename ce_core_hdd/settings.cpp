@@ -7,25 +7,25 @@
 #include <errno.h>
 #include <stdlib.h>
 
-#define SETTINGS_PATH       "/ce/settings"
-
 #include "global.h"
 #include "debug.h"
+#include "utils.h"
 
 extern TFlags       flags;
 extern THwConfig    hwConfig;
 
 Settings::Settings(void)
 {
-    int res = mkdir(SETTINGS_PATH, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);      // mod: 0x775
+    std::string settingsDir = Utils::dotEnvValue("SETTINGS_DIR", "./settings"); // path to settings dir
+    int res = mkdir(settingsDir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);      // mod: 0x775
 
     if(res == 0) {                  // dir created
-        Debug::out(LOG_DEBUG, "Settings: directory %s was created.", SETTINGS_PATH);
+        Debug::out(LOG_DEBUG, "Settings: directory %s was created.", settingsDir.c_str());
 
         storeDefaultValues();
     } else {                        // dir not created
         if(errno != EEXIST) {       // and it's not because it already exists...
-            Debug::out(LOG_ERROR, "Settings: failed to create settings directory - %s", strerror(errno));
+            Debug::out(LOG_ERROR, "Settings: failed to create settings directory %s - %s", settingsDir.c_str(), strerror(errno));
         }
     }
 }
@@ -353,18 +353,15 @@ void Settings::saveFloppyConfig(FloppyConfig *fc)
 //-------------------------
 FILE *Settings::sOpen(const char *key, bool readNotWrite)
 {
-    char path[1024];
-
-    strcpy(path, SETTINGS_PATH);
-    strcat(path, "/");
-    strcat(path, key);
+    std::string settingsDir = Utils::dotEnvValue("SETTINGS_DIR", "./settings"); // path to settings dir
+    std::string path = Utils::mergeHostPaths3(settingsDir, key);
 
     FILE *file;
 
     if(readNotWrite) {
-        file = fopen(path, "r");                // try to open file for reading
+        file = fopen(path.c_str(), "r");                // try to open file for reading
     } else {
-        file = fopen(path, "w");                // try to open file for writing
+        file = fopen(path.c_str(), "w");                // try to open file for writing
     }
 
     return file;

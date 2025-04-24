@@ -17,7 +17,7 @@ extern TFlags flags;
 
 void preloadGlobalsFromDotEnv(void)
 {
-    corePath = Utils::dotEnvValue("CORE_SERVICE_PATH");     // path to where the core service is stored
+    corePath = Utils::dotEnvValue("CE_DIR");     // path to where the core service is stored
 
     CE_CONF_FDD_IMAGE_PATH_AND_FILENAME = Utils::mergeHostPaths3(corePath, CE_CONF_FDD_IMAGE_JUST_FILENAME);
     FDD_TEST_IMAGE_PATH_AND_FILENAME = Utils::mergeHostPaths3(corePath, FDD_TEST_IMAGE_JUST_FILENAME);
@@ -29,7 +29,8 @@ void preloadGlobalsFromDotEnv(void)
     PATH_CE_DD_BS_L2 = Utils::mergeHostPaths3(driversPath, "ce_dd_l2.bs");
     PATH_CE_DD_PRG_PATH_AND_FILENAME = Utils::mergeHostPaths3(driversPath, "ce_dd.prg");
 
-    CONFIG_DRIVE_PATH = Utils::dotEnvValue("CONFIG_PATH_COPY");     // where the copy of configdrive is
+    std::string dataDir = Utils::dotEnvValue("DATA_DIR");
+    CONFIG_DRIVE_PATH = Utils::mergeHostPaths3(dataDir, "configdrive");     // where the copy of configdrive is
 
     Debug::out(LOG_DEBUG, "CORE_SERVICE_PATH: %s", corePath.c_str());
     Debug::out(LOG_DEBUG, "driversPath      : %s", driversPath.c_str());

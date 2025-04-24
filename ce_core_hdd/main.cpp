@@ -77,6 +77,10 @@ int main(int argc, char *argv[])
     Utils::screenShotVblEnabled(false);                         // screenshot vbl not enabled by default
     preloadGlobalsFromDotEnv();
 
+    // make copy of config drive
+    std::string cmdCopyConfigDrive = std::string("cp -r ") + Utils::mergeHostPaths3(corePath, "configdrive") + std::string(" ") + CONFIG_DRIVE_PATH;
+    system(cmdCopyConfigDrive.c_str());
+
     //------------------------------------
     // if should only show help and quit
     if(flags.justShowHelp) {
@@ -114,6 +118,14 @@ void pthread_kill_join(const char* threadName, pthread_t& threadInfo)
     printf("Stoping %s thread\n", threadName);
     pthread_kill(threadInfo, SIGINT);           // stop the select()
     pthread_join(threadInfo, NULL);             // wait until thread finishes
+}
+
+// return path and filename to pid file for this core's instance, include port to distinguish between instances
+std::string pidFileName(void)
+{
+    std::string dataDir = Utils::dotEnvValue("DATA_DIR", DATA_DIR_DEFAULT);
+    std::string pidFilePath = dataDir + std::string("/ce_hdd_") + std::to_string(flags.portClient) + std::string(".pid");
+    return pidFilePath;
 }
 
 int runCore(void)
@@ -164,7 +176,7 @@ int runCore(void)
     //---------------------------------------------------
 
     // remove PID file on termination
-    std::string pidFilePath = Utils::dotEnvValue("CORE_PID_FILE", DATA_DIR_DEFAULT "/core.pid");
+    std::string pidFilePath = pidFileName();
     unlink(pidFilePath.c_str());
 
     Debug::out(LOG_INFO, "CosmosEx terminated.");
@@ -329,7 +341,7 @@ bool otherInstanceIsRunning(void)
     char self_exe[PATH_MAX];
 
     self_pid = getpid();
-    std::string pidFilePath = Utils::dotEnvValue("CORE_PID_FILE", DATA_DIR_DEFAULT "/core.pid");
+    std::string pidFilePath = pidFileName();
 
     f = fopen(pidFilePath.c_str(), "r");
     if(!f) {    // can't open file? other instance probably not running (or is, but can't figure out, so screw it)

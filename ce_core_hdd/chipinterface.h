@@ -100,7 +100,7 @@ public:
 
     // to handle FW version, first call setHDDconfig() / setFDDconfig() to fill config into bufOut, then call getFWversion to get the FW version from chip
     virtual void getFWversion(uint8_t *inFwVer) = 0;
-    virtual void setHDDconfig(uint8_t hddEnabledIDs, uint8_t sdCardId, uint8_t fddEnabledSlots, bool setNewFloppyImageLed, uint8_t newFloppyImageLed);
+    virtual void setHDDconfig(uint8_t hddEnabledIDs);
     virtual void setFDDconfig(bool setFloppyConfig, FloppyConfig* fddConfig, bool setDiskChanged, bool diskChanged);
 
     //----------------

@@ -477,7 +477,7 @@ void CCoreThread::handleFwVersion_hans(void)
     uint8_t enabledIDbits, sdCardAcsiId;
     getIdBits(enabledIDbits, sdCardAcsiId);     // get the enabled IDs
 
-    chipInterface->setHDDconfig(enabledIDbits, sdCardAcsiId, 0, false, false);
+    chipInterface->setHDDconfig(enabledIDbits);
     chipInterface->getFWversion(fwVer);
 
     //----------------------------------
@@ -497,7 +497,6 @@ void CCoreThread::handleFwVersion_hans(void)
 
     //----------------------------------
     // do the following only for chip interface v1 v2
-    int currentLed = fwVer[4];
 
     char recoveryLevel = fwVer[9];
     if(recoveryLevel != 0) {                                                        // if the recovery level is not empty
@@ -506,7 +505,7 @@ void CCoreThread::handleFwVersion_hans(void)
         }
     }
 
-    Debug::out(LOG_DEBUG, "FW: Hans,  %d-%02d-%02d, LED is: %d", Update::versions.hans.getYear(), Update::versions.hans.getMonth(), Update::versions.hans.getDay(), currentLed);
+    Debug::out(LOG_DEBUG, "FW: %d-%02d-%02d", Update::versions.hans.getYear(), Update::versions.hans.getMonth(), Update::versions.hans.getDay());
 }
 
 void CCoreThread::getIdBits(uint8_t &enabledIDbits, uint8_t &sdCardAcsiId)
