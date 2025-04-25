@@ -38,21 +38,15 @@ void Settings::storeDefaultValues(void)
     for(int id=0; id<8; id++) {                         // read the list of device types from settings
         sprintf(key, "ACSI_DEVTYPE_%d", id);            // create settings KEY, e.g. ACSI_DEVTYPE_0
 
-        if(id == 1) {                                   // ACSI id 0 enaled by defaul
+        if(id == 1) {                                   // ACSI id 1 enaled by default
             setInt(key, DEVTYPE_TRANSLATED);
         } else {                                        // other ACSI id's disabled
             setInt(key, DEVTYPE_OFF);
         }
     }
 
-    setChar("DRIVELETTER_FIRST",      'C');
-    setChar("DRIVELETTER_SHARED",     'P');
-    setChar("DRIVELETTER_CONFDRIVE",  'O');
-
-    setBool("MOUNT_RAW_NOT_TRANS",     false);
-
-    setBool("SHARED_ENABLED",           false);
-    setBool("SHARED_NFS_NOT_SAMBA", false);
+    setString("TRANS_DRIVE_C", "/mnt/");
+    setChar("DRIVELETTER_CONFDRIVE", 'O');
 }
 
 bool Settings::getBool(const char *key, bool defValue)

@@ -128,7 +128,7 @@ public:
     static void pathSeparatorAtariToHost(std::string &path);
 
     bool createFullAtariPathAndFullHostPath(const std::string &inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, bool* isInArchive=NULL);
-    void createFullHostPath(const std::string &inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, bool* isInArchive=NULL);
+    void createFullHostPath(const std::string &inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath);
 
     // for status report
     bool driveIsEnabled(int driveIndex);
@@ -139,7 +139,6 @@ public:
 		return conf[driveIndex].hostRootPath.c_str();
 	}
 
-    void handleZipMounted(std::string& zip_path, std::string& mount_path);  // Call this method when some (ZIP) archive with zip_path got mounted to mount_path.
     void fillTranslatedDisplayLines(void);
 
 private:
@@ -151,15 +150,12 @@ private:
 
     TranslatedConf  conf[MAX_DRIVES];       // 16 possible TOS drives
     char            currentDriveLetter;
-    uint8_t            currentDriveIndex;
+    uint8_t         currentDriveIndex;
+
+    uint8_t         configDriveIndex;
+    char            configDriveLetter;
 
     TranslatedFiles files[MAX_FILES];       // open files
-
-    struct {
-        int firstTranslated;
-        int shared;
-        int confDrive;
-    } driveLetters;
 
     char asciiAtariToPc[256];
 
@@ -227,7 +223,6 @@ private:
 
 	// other functions
 	void onGetMounts(uint8_t *cmd);
-    void onUnmountDrive(uint8_t *cmd);
     void onStLog(uint8_t *cmd);
     void onStHttp(uint8_t *cmd);
     void onTestRead(uint8_t *cmd);
@@ -259,16 +254,7 @@ private:
 
     bool createFullAtariPath(std::string inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex);
     void checkPathForArchiveAndRequestMountIfNeeded(const std::string& outFullHostPath, bool &waitingForMount, std::vector<std::string>* pSymlinksApplied, bool* isInArchive);
-    void isArchiveInThisPath(const std::string& outFullHostPath, bool& pathHasArchive, std::string& zipFilePath);
-    void getWaitingForMountAndRequestMountIfNeeded(const std::string& zipFilePath, bool& waitingForMount);
-    //-----------------------------------
-    // ZIP DIR stuff
-    bool useZipdirNotFile;
-    bool hasArchiveExtension(const std::string& longPath);
 
-    void fillSupportedArchiveExtensionsIfNeeded(void);
-    std::vector<std::string> supportedArchiveExtensions;        // vector of strings holding supported archive extensions from MOUNT_ARCHIVES_SUPPORTED
-    std::map<std::string, bool> archiveMounted;                 // map of archive path to flag, so we can tell if this archive is already mounted
     //-----------------------------------
     // helpers for find storage
     void initFindStorages(void);

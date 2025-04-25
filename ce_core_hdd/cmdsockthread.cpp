@@ -51,7 +51,9 @@ int createRecvSocket(const char* dotEnvKey)
 
     fchmod(sock, S_IRUSR | S_IWUSR);        // restrict permissions before bind
 
-    std::string sockPath = Utils::dotEnvValue(dotEnvKey);
+    std::string sockPathEnv = Utils::dotEnvValue(dotEnvKey);
+    std::string sockPath = sockPathEnv + std::to_string(flags.portClient);
+
     Debug::out(LOG_DEBUG, "createRecvSocket - %s = %s", dotEnvKey, sockPath.c_str());
 
     unlink(sockPath.c_str());               // delete sock file if exists
@@ -409,39 +411,6 @@ void handleDisksAction(std::string& action, json& data)
         pthread_mutex_lock(&shared.mtxHdd);
         shared.scsi->findAttachedDisks();
         pthread_mutex_unlock(&shared.mtxHdd);
-    } else if(action == "zip_mounted") {        // ZIP file was mounted?
-        if(data.contains("zip_path") && data.contains("mount_path") && data.contains("success")) {
-            std::string zip_path = data["zip_path"].get<std::string>();
-            std::string mount_path = data["mount_path"].get<std::string>();
-            bool success = data["success"].get<bool>();
-
-            if(success) {                       // on success
-                Debug::out(LOG_WARNING, "handleDisksAction: zip_mounted - adding symlink %s -> %s", zip_path.c_str(), mount_path.c_str());
-
-                pthread_mutex_lock(&shared.mtxHdd);
-                TranslatedDisk* translated = TranslatedDisk::getInstance();
-                translated->handleZipMounted(zip_path, mount_path);         // create virtual symlink from archive path to next mount path
-                pthread_mutex_unlock(&shared.mtxHdd);
-            } else {                            // on fail
-                Debug::out(LOG_WARNING, "handleDisksAction: zip_mounted - success says FALSE, ignoring message!");
-            }
-        } else {                                // on argument missing
-            Debug::out(LOG_WARNING, "handleDisksAction: zip_mounted - missing 'zip_path' or 'mount_path' or 'success' in message, ignoring message!");
-        }
-    } else if(action == "zip_unmounted") {      // ZIP file was unmounted?
-        if(data.contains("zip_path")) {
-            std::string zip_path = data["zip_path"].get<std::string>();
-
-            Debug::out(LOG_WARNING, "handleDisksAction: zip_unmounted - removing symlink for source %s", zip_path.c_str());
-
-            pthread_mutex_lock(&shared.mtxHdd);
-            std::string emptyStr;
-            TranslatedDisk* translated = TranslatedDisk::getInstance();
-            translated->handleZipMounted(zip_path, emptyStr);     // remove virtual symlink by setting destination to ''
-            pthread_mutex_unlock(&shared.mtxHdd);
-        } else {                                // on argument missing
-            Debug::out(LOG_WARNING, "handleDisksAction: zip_unmounted - missing 'zip_path' in message, ignoring message!");
-        }
     } else {
         Debug::out(LOG_WARNING, "handleDisksAction: unknown action '%s', ignoring message!", action.c_str());
     }

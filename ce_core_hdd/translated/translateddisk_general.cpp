@@ -64,7 +64,6 @@ TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt)
     dataTrans = dt;
 
     reloadProxy = NULL;
-    useZipdirNotFile = true;
 
     dataBuffer  = new uint8_t[ACSI_BUFFER_SIZE];
     dataBuffer2 = new uint8_t[ACSI_BUFFER_SIZE];
@@ -84,6 +83,10 @@ TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt)
         files[i].atariHandle    = EIHNDL;
         files[i].hostPath       = "";
     }
+
+    Settings s;
+    configDriveLetter = s.getChar("DRIVELETTER_CONFDRIVE", 'C');
+    configDriveIndex = configDriveLetter - 65;
 
     findAttachedDisks();                // find all the currently mounted disks
     initFindStorages();
@@ -121,51 +124,27 @@ void TranslatedDisk::findAttachedDisks(void)
     Debug::out(LOG_DEBUG, "TranslatedDisk::findAttachedDisks starting");
 
     Settings s;
-    char driveFirst, driveShared, driveConfig;
-
-    driveFirst = s.getChar("DRIVELETTER_FIRST",      -1);
-    driveShared = s.getChar("DRIVELETTER_SHARED",    -1);
-    driveConfig = s.getChar("DRIVELETTER_CONFDRIVE", 'O');
-
-    driveLetters.firstTranslated = driveFirst - 'A';
-    driveLetters.shared          = driveShared - 'A';
-    driveLetters.confDrive       = driveConfig - 'A';
-
-    useZipdirNotFile = s.getBool("USE_ZIP_DIR", 1);
-
-    std::string dirTrans = Utils::dotEnvValue("MOUNT_DIR_TRANS");    // where the translated disks are symlinked
-    Utils::mergeHostPaths(dirTrans, "/X");          // add placeholder
-    int len = dirTrans.length();
-
-    std::string fileWithDesc = dirTrans + ".desc";  // file with description will have .desc added to path
 
     for(int i=2; i<MAX_DRIVES; i++) {               // go through all the possible drives
-        dirTrans[len - 1] = (char) (65 + i);        // replace placeholder / drive character with the current drive char
-        fileWithDesc[len - 1] = (char) (65 + i);    // replace placeholder / drive character with the current drive char
+        char driveLetter = ((char) (65 + i));
+        std::string settingPath = std::string("TRANS_DRIVE_") + driveLetter;   // create a setting name, under which the path to translated drive i is stored
+        std::string drivePath = s.getString(settingPath.c_str(), "");          // get the setting value
 
-        if(!Utils::dirExists(dirTrans)) {           // dir doesn't exist? skip rest
+        if(drivePath.length() == 0 || !Utils::dirExists(drivePath)) {          // dir doesn't exist? skip rest
             conf[i].enabled = false;                // not enabled
             continue;
         }
 
-        char diskLabel[32];
-        if(i == driveLetters.shared) {              // for shared drive use fixed value
-            strcpy(diskLabel, "Shared Drive");
-        } else if(i == driveLetters.confDrive) {    // for config drive use fixed value
-            strcpy(diskLabel, "Config Drive");
-        } else {                                    // for other drives - try to get description from .desc file
-            memset(diskLabel, 0, sizeof(diskLabel));
-            Utils::textFromFile(diskLabel, sizeof(diskLabel) - 1, fileWithDesc.c_str());    // try to read disk description from file
-        }
+        std::string diskLabel = std::string("Atari Drive ") + driveLetter;
 
         // fill in device info accordingly
         conf[i].enabled = true;
-        conf[i].hostRootPath = dirTrans;
+        conf[i].hostRootPath = drivePath;
         conf[i].currentAtariPath = HOSTPATH_SEPAR_STRING;
         conf[i].mediaChanged = true;
         conf[i].label = diskLabel;              // store disk description
 
-        Debug::out(LOG_DEBUG, "TranslatedDisk::findAttachedDisks: [%d] %c: -> %s", i, i + 65, dirTrans.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::findAttachedDisks: [%d] %c: -> %s", i, driveLetter, drivePath.c_str());
     }
 }
 
@@ -252,7 +231,7 @@ void TranslatedDisk::processCommand(uint8_t *cmd)
 
         // other functions
         case ACC_GET_MOUNTS:            onGetMounts(cmd);               break;
-        case ACC_UNMOUNT_DRIVE:         onUnmountDrive(cmd);            break;
+        case ACC_UNMOUNT_DRIVE:                                         break;
         case ST_LOG_TEXT:               onStLog(cmd);                   break;
         case ST_LOG_HTTP:               onStHttp(cmd);                  break;
         case TEST_READ:                 onTestRead(cmd);                break;
@@ -269,44 +248,6 @@ void TranslatedDisk::processCommand(uint8_t *cmd)
     dataTrans->sendDataAndStatus();     // send all the stuff after handling, if we got any
 }
 
-void TranslatedDisk::onUnmountDrive(uint8_t *cmd)
-{
-    int drive = cmd[5];
-
-    if(drive < 2 || drive > 15) {               // index out of range?
-        Debug::out(LOG_WARNING, "onUnmountDrive -- drive number %d is out of range, not unmounting", drive);
-        dataTrans->setStatus(EDRVNR);
-        return;
-    }
-
-    if(!conf[drive].enabled) {                  // skip if drive not enabled
-        Debug::out(LOG_WARNING, "onUnmountDrive -- drive number %d is not enabled, not unmounting", drive);
-        dataTrans->setStatus(E_OK);             // respond with OK
-        return;
-    }
-
-    Debug::out(LOG_DEBUG, "onUnmountDrive -- drive: %d, hostRootPath: %s", drive, conf[drive].hostRootPath.c_str());
-
-    if(!Utils::dirExists(conf[drive].hostRootPath)) {   // dir doesn't exist? skip rest
-        Debug::out(LOG_WARNING, "onUnmountDrive -- dir doesn't exist: %s , not unmounting", conf[drive].hostRootPath.c_str());
-        dataTrans->setStatus(E_OK);             // respond with OK
-        return;
-    }
-
-    // if this is not a conf drive and shared drive, we can trigger unmount
-    if(drive != driveLetters.shared && drive != driveLetters.confDrive) {
-        // send command to mounter to mount this archive
-        std::string jsonString = "{\"cmd_name\": \"unmount\", \"path\": \"";
-        jsonString += conf[drive].hostRootPath;     // add drive path
-        jsonString += "\"}";
-        Utils::sendToMounter(jsonString);
-    } else {
-        Debug::out(LOG_WARNING, "onUnmountDrive -- drive number %d is shared drive or config drive, not unmounting", drive);
-    }
-
-    dataTrans->setStatus(E_OK);
-}
-
 void TranslatedDisk::onGetMounts(uint8_t *cmd)
 {
     char tmp[256];
@@ -315,12 +256,11 @@ void TranslatedDisk::onGetMounts(uint8_t *cmd)
 
     for(int i=2; i<MAX_DRIVES; i++) {       // create enabled drive bits
         if(conf[i].enabled) {
-            if(i == driveLetters.shared) {              // for shared drive
-                mountStr = "shared drive";
-            } else if(i == driveLetters.confDrive) {    // for config drive
+            mountStr = "drive";
+            if(i == configDriveIndex) {    // for config drive
                 mountStr = "config drive";
             } else {                                    // for other drives - USB Drive
-                mountStr = "USB drive";
+                mountStr = "drive";
             }
         } else {        // not enabled drive - empty type
             mountStr = "";
@@ -441,8 +381,7 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
     dc.currentResolution = curRes;                       // screen resolution as reported by Getrez()
     dc.drivesAll         = drives | translatedDrives;    // all drives = drives reported by Drvmap() + all translated drives
     dc.translatedDrives  = translatedDrives;             // just translated drives
-    dc.configDrive       = driveLetters.confDrive;       // index of config drive
-    dc.sharedDrive       = driveLetters.shared;          // index of shared drive
+    dc.configDrive       = configDriveIndex;             // index of config drive
 
     Settings s;
     dc.settingsResolution   = s.getInt("SCREEN_RESOLUTION", 1);
@@ -462,9 +401,9 @@ void TranslatedDisk::onGetConfig(uint8_t *cmd)
     dataTrans->addDataWord(drives);                             // drive bits first
 
     // bytes 2,3,4 -- drive letters assignment
-    dataTrans->addDataByte(driveLetters.firstTranslated);       // first translated drive
-    dataTrans->addDataByte(driveLetters.shared);                // shared drive
-    dataTrans->addDataByte(driveLetters.confDrive);             // config drive
+    dataTrans->addDataByte(2);                  // first translated drive
+    dataTrans->addDataByte(0);                  // shared drive
+    dataTrans->addDataByte(configDriveIndex);   // config drive
 
     //------------------
     // this can be used to set the right date and time on ST
@@ -628,7 +567,7 @@ bool TranslatedDisk::createFullAtariPathAndFullHostPath(const std::string &inPar
     }
 
     // got full atari path, now try to create full host path
-    createFullHostPath(outFullAtariPath, outAtariDriveIndex, outFullHostPath, waitingForMount, isInArchive);
+    createFullHostPath(outFullAtariPath, outAtariDriveIndex, outFullHostPath);
     return true;
 }
 
@@ -1193,16 +1132,12 @@ void TranslatedDisk::fillTranslatedDisplayLines(void)
 
     // mount USB drives as raw/translated + ZIP files are dirs/files
     Settings s;
-    bool mountRawNotTrans = s.getBool("MOUNT_RAW_NOT_TRANS", 0);
-    bool useZipdirNotFile = s.getBool("USE_ZIP_DIR", 1);
-    strcpy(tmp, mountRawNotTrans ? "USB raw    " : "USB trans  ");
-    strcat(tmp, useZipdirNotFile ? "ZIP dir"     : "ZIP file");
 
     // TODO: store display data elsewhere
     // display_setLine(DISP_LINE_TRAN_SETT, tmp);
 
     // what letter is for config and shared drive?
-    sprintf(tmp, "config:%c   shared:%c", driveLetters.confDrive + 'A', driveLetters.shared + 'A');
+    sprintf(tmp, "config:%c            ", configDriveLetter);
     // TODO: store display data elsewhere
     // display_setLine(DISP_LINE_CONF_SHAR, tmp);
 

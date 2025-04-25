@@ -28,7 +28,6 @@ void sigint_handler(int sig);
 void handlePthreadCreate(const char* threadName, pthread_t* pThreadInfo, void* threadCode);
 void parseCmdLineArguments(int argc, char *argv[]);
 void printfPossibleCmdLineArgs(void);
-void loadDefaultArgumentsFromFile(void);
 
 void loadLastHwConfig(void);
 void initializeFlags(void);
@@ -61,7 +60,6 @@ int main(int argc, char *argv[])
     initializeFlags();                                          // initialize flags
     Debug::out(LOG_INFO, "\n\n"); Debug::out(LOG_INFO, "---------------------------------------------------");
 
-    loadDefaultArgumentsFromFile();                             // first parse default arguments from file
     parseCmdLineArguments(argc, argv);                          // then parse cmd line arguments and set global variables
     Debug::printfLogLevelString();
 
@@ -198,49 +196,6 @@ void initializeFlags(void)
     Debug::setLogLevel(LOG_ERROR);      // init current log level to LOG_ERROR
     flags.portServerReport = 9001;
     flags.portClient = 9100;
-}
-
-void loadDefaultArgumentsFromFile(void)
-{
-    FILE *f = fopen("/ce/default_args", "rt");  // try to open default args file
-
-    if(!f) {
-        printf("No default app arguments.\n");
-        return;
-    }
-
-    char args[1024];
-    memset(args, 0, 1024);
-    fgets(args, 1024, f);                       // read line from file
-    fclose(f);
-
-    int argc = 0;
-    char *argv[64];
-    memset(argv, 0, 64 * 4);                    // clear the future argv field
-
-    argv[0] = (char *) "fake.exe";              // 0th argument is skipped, as it's usualy file name (when passed to main())
-    argc    = 1;
-    argv[1] = &args[0];                         // 1st argument starts at the start of the line
-
-    int len = strlen(args);
-    for(int i=0; i<len; i++) {                  // go through the arguments line
-        if(args[i] == ' ' || args[i]=='\n' || args[i] == '\r') {    // if found space or new line...
-            args[i] = 0;                        // convert space to string terminator
-
-            argc++;
-            if(argc >= 64) {                    // would be out of bondaries? quit
-                break;
-            }
-
-            argv[argc] = &args[i + 1];          // store pointer to next string, increment count
-        }
-    }
-
-    if(len > 0) {                               // the alg above can't detect last argument, so just increment argument count
-        argc++;
-    }
-
-    parseCmdLineArguments(argc, argv);
 }
 
 void parseCmdLineArguments(int argc, char *argv[])

@@ -421,7 +421,7 @@ void ChipInterfaceNetwork::sendDataToChip(uint16_t cmdCode, uint8_t* data, uint1
 
     uint8_t head[10];
     Utils::storeDword(head + 0, 0xc050d1c5);    // 0..3: 0xc050d1c5 [COSmODICS] (4 bytes)
-    Utils::storeDword(head + 4, cmdCode);       // 4..5: ATN code (2 bytes)
+    Utils::storeWord(head + 4, cmdCode);        // 4..5: ATN code (2 bytes)
     Utils::storeDword(head + 6, len);           // 6..9: txLen (4 bytes)
 
     write(fdClient, head, 10);              // send header

@@ -188,14 +188,11 @@ char *DesktopCreator::storeExistingDrives(char *bfr, DesktopConfig *dc)
                 if(i == dc->configDrive) {                  // it's a config drive
                     driveName = "CONFIG DRIVE";
                     driveIcon = 0x07;
-                } else if(i == dc->sharedDrive) {           // it's a shared drive
-                    driveName = "SHARED DRIVE";
-                    driveIcon = 0x06;
                 } else {                                    // it's a usb drive
                     if(!dc->label[i].empty()) {
                         driveName = dc->label[i].c_str();
                     } else {
-                        driveName = "USB DRIVE";
+                        driveName = "DRIVE";
                     }
 
                     driveIcon = 0x08;

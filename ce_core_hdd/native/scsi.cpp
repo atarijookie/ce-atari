@@ -41,19 +41,16 @@ void Scsi::findAttachedDisks(void)
 {
     Debug::out(LOG_DEBUG, "Scsi::findAttachedDisks() - starting");
 
-    std::string pathRaw = Utils::dotEnvValue("MOUNT_DIR_RAW");    // where the raw disks are symlinked
-    Utils::mergeHostPaths(pathRaw, "/X");           // add placeholder
-    int len = pathRaw.length();
-
     Settings s;
     s.loadAcsiIDs(&acsiIdInfo);
 
     for(int i=0; i<8; i++) {                        // go through all the possible drives
-        pathRaw[len - 1] = (char) ('0' + i);        // replace placeholder / drive character with the current drive char
+        std::string settingName = std::string("RAW_DRIVE_") + std::to_string(i);
+        std::string pathRaw = s.getString(settingName.c_str(), "");
 
         bool isBoot = (acsiIdInfo.ceddId == i);     // if this ID is used for CE_DD booting
-        bool isFile = Utils::fileExists(pathRaw);   // if it's a file, then it's an image
-        bool isDev = Utils::devExists(pathRaw);     // device is a device is a device is a device ;)
+        bool isFile = (pathRaw.length() > 0) ? Utils::fileExists(pathRaw) : false;   // if it's a file, then it's an image
+        bool isDev = (pathRaw.length() > 0) ? Utils::devExists(pathRaw) : false;     // device is a device is a device is a device ;)
 
         Debug::out(LOG_DEBUG, "Scsi::findAttachedDisks() - ID %d - isBoot: %d, isFile: %d, isDev: %d", i, isBoot, isFile, isDev);
 

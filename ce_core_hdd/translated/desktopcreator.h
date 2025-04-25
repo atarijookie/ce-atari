@@ -24,7 +24,6 @@ typedef struct {
     uint32_t drivesAll;            // bitmap of all drives available
     uint32_t translatedDrives;     // bitmap of drives which are translated
     uint8_t  configDrive;          // index of config drive
-    uint8_t  sharedDrive;          // index of shared drive
     std::string label[MAX_DRIVES];
 } DesktopConfig;
 

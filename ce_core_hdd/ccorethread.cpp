@@ -373,19 +373,6 @@ void CCoreThread::reloadSettings(int type)
         return;
     }
 
-    if(type == SETTINGSUSER_TRANSLATED) {
-        Settings s;
-        bool newMountRawNotTrans = s.getBool("MOUNT_RAW_NOT_TRANS", 0);
-
-        if(shared.mountRawNotTrans != newMountRawNotTrans) {       // mount strategy changed?
-            shared.mountRawNotTrans = newMountRawNotTrans;
-
-            Debug::out(LOG_DEBUG, "CCoreThread::reloadSettings -- USB media mount strategy changed, remounting");
-        }
-
-        return;
-    }
-
     // then load the new settings
     loadSettings();
 }
@@ -435,8 +422,6 @@ void CCoreThread::loadSettings(void)
     s.loadAcsiIDs(&acsiIdInfo);
 
     fillDisplayLines();     // fill lines for front display
-
-    shared.mountRawNotTrans = s.getBool("MOUNT_RAW_NOT_TRANS", 0);
 
     setEnabledIDbits = true;
 }

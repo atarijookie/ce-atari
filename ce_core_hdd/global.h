@@ -101,8 +101,6 @@ typedef struct {
     Scsi            *scsi;
     pthread_mutex_t  mtxHdd;
     pthread_mutex_t  mtxImages;
-
-    bool mountRawNotTrans;
 } SharedObjects;
 
 extern SharedObjects shared;

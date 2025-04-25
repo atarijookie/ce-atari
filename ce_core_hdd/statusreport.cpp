@@ -72,8 +72,6 @@ void StatusReport::createReport(std::string &report, int reportFormat)
 
     TranslatedDisk * translated = TranslatedDisk::getInstance();
 
-    dumpPair(report, "Mounting USB drives as", (shared.mountRawNotTrans) ? "RAW" : "translated", reportFormat, TEXT_COL1_WIDTH, 60);
-
     for(int i=2; i<MAX_DRIVES; i++) {
         if(translated->driveIsEnabled(i)) {
             std::string driveName = std::string("Drive X");
