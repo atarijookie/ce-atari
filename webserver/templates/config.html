@@ -19,14 +19,20 @@
     		document.write('<script type="text/javascript" src=static/js/config.js><\/script>');
     		</script>
         <script type='text/javascript'>
-          var devTypes = []
+          var dir = "/home";
+          var selectedFile = "";
+
+          var devTypes = [];
           var paths = [];
+          var selectingFileForIndex = -1;
+
           for(var i=0; i<8; i++) {
             paths.push("");
             devTypes.push(0);
           }
 
           window.onload = function() { 
+            $("[name=file-selector]").hide();
             bindHandlers();
             getIdsConfig();
           }
@@ -56,6 +62,77 @@
                   console.log("Error: " + xhr.statusText);
                 },
             })
+          }
+
+          function getDirContent(new_path)
+          {
+            selectedFile = "";
+            dir = new_path;
+            document.getElementById('currentPath').textContent = dir;
+
+            $.ajax({
+              url: '/config/get_dir_content',
+              type: 'POST',
+              dataType: 'json',
+              data: JSON.stringify({'path': new_path}),
+              success: function(data){
+                var dirs = data.dirs;
+                var files = data.files;
+
+                const itemList = document.getElementById('itemList');
+                itemList.innerHTML = '';
+
+                dirs.forEach(item => {
+                  const div = document.createElement('div');
+                  div.className = 'item';
+                  div.textContent = "[" + item + "]";
+                  div.onclick = () => getDirContent(`${new_path}/${item}`);
+                  itemList.appendChild(div);
+                });
+
+                files.forEach(item => {
+                  const div = document.createElement('div');
+                  div.className = 'item';
+                  div.textContent = item;
+                  div.onclick = () => onFileSelected(`${new_path}/${item}`);
+                  itemList.appendChild(div);
+                });
+              },
+                error: function (xhr) {
+                  console.log("Error: " + xhr.statusText);
+                },
+            })
+          }
+
+          function selectByText(fullFilePath, selectNotUnselect)
+          {
+            var items = document.getElementsByClassName("item");
+            var fileName = fullFilePath.split('/').pop();
+
+            for(x = 0; x < items.length; x++) {
+              item = items[x];
+
+              if(item.textContent == fileName) {
+                if(selectNotUnselect) {
+                  item.style.backgroundColor = "#cccccc";
+                } else {
+                  item.style.backgroundColor = "#ffffff";
+                }
+                break;
+              }
+            }
+          }
+
+          function onFileSelected(filePath)
+          {
+            if(filePath == selectedFile) {  // 2nd click - unselect
+              selectByText(selectedFile, false);
+              selectedFile = "";
+            } else {                        // 1st click - select
+              selectByText(selectedFile, false);
+              selectedFile = filePath;
+              selectByText(filePath, true);
+            }
           }
 
           function onIdsSave()
@@ -121,7 +198,38 @@
 
           function handleSelectClick(index)
           {
+            selectingFileForIndex = index;
+            $("[name=file-selector]").show();
+            getDirContent(dir);
+          }
 
+          function goUp() {
+            const parts = dir.split('/');
+            if (parts.length > 1) {
+              parts.pop();
+            }
+
+            var new_path = parts.join('/');
+            if(new_path == "") {
+              new_path = "/";
+            }
+
+            getDirContent(new_path);
+          }
+
+          function onOK() {
+            if(!selectedFile || selectingFileForIndex == -1) {
+              return;
+            }
+
+            paths[selectingFileForIndex] = selectedFile;
+            onComboChanged(selectingFileForIndex);
+
+            $("[name=file-selector]").hide();
+          }
+
+          function onCancel() {
+            $("[name=file-selector]").hide();
           }
         </script>
         <style>
@@ -134,6 +242,84 @@
           #device-ids-table td, #device-ids-table th {
             border: 1px solid #000000;
             padding: 15px;
+          }
+        </style>
+        <style>
+          body {
+            margin: 0;
+            height: 100vh;
+            background: #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: sans-serif;
+          }
+      
+          .container-file-selector {
+            z-index: 1000;
+            position: absolute;
+          }
+
+          .file-selector {
+            width: 400px;
+            height: 500px;
+            background: white;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+          }
+
+          .top-bar {
+            display: flex;
+            align-items: center;
+            padding: 10px 16px;
+            border-bottom: 1px solid #ddd;
+            background: #fafafa;
+          }
+      
+          .path {
+            flex-grow: 1;
+            font-size: 14px;
+            color: #333;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+      
+          .top-bar button {
+            margin-left: 10px;
+            padding: 6px 12px;
+            cursor: pointer;
+          }
+      
+          .item-list {
+            flex-grow: 1;
+            overflow-y: auto;
+          }
+      
+          .item {
+            padding: 12px 16px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+          }
+      
+          .item:hover {
+            background-color: #f9f9f9;
+          }
+      
+          .bottom-bar {
+            display: flex;
+            justify-content: flex-end;
+            padding: 10px 16px;
+            border-top: 1px solid #ddd;
+            background: #fafafa;
+          }
+      
+          .bottom-bar button {
+            margin-left: 10px;
+            padding: 6px 12px;
+            cursor: pointer;
           }
         </style>
       </head>
@@ -217,5 +403,24 @@
         </center>
       </form>
     </div>
+
+    <div class="container-file-selector">
+      <div class="file-selector" name="file-selector">
+        <div class="top-bar">
+          <div class="path" id="currentPath">/home/user/folder</div>
+          <button onclick="goUp()">Up</button>
+        </div>
+    
+        <div class="item-list" id="itemList">
+          <!-- List items will be loaded here -->
+        </div>
+    
+        <div class="bottom-bar">
+          <button onclick="onCancel()">Cancel</button>
+          <button onclick="onOK()">OK</button>
+        </div>
+      </div>
+    </div>
+
     </body>
 </html>

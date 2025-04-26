@@ -2,6 +2,9 @@ import os
 import re
 import math
 import json
+from os import listdir
+from os.path import isfile, isdir, join
+
 from flask import Blueprint, request, current_app as app, abort
 from utils import get_setting, set_setting
 
@@ -31,3 +34,22 @@ def set_ids():
         set_setting("ACSI_DEVTYPE_" + str(i), dev_types[i])
 
     return {'status': 'ok'}, 204
+
+@config.route('/get_dir_content', methods=['POST'])
+def get_dir_content():
+    data = request.get_json(force=True)
+    path = data['path']
+
+    resp = {'path': 'path', 'dirs': [], 'files': []}
+
+    for f in listdir(path):
+        if isfile(join(path, f)) and not f.startswith('.'):
+            resp['files'].append(f)
+
+        if isdir(join(path, f)) and not f.startswith('.'):
+            resp['dirs'].append(f)
+
+    resp['dirs'] = sorted(resp['dirs'], key=str.casefold)
+    resp['files'] = sorted(resp['files'], key=str.casefold)
+
+    return resp
