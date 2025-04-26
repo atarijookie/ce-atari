@@ -11,6 +11,7 @@ from floppy import floppy
 from screencast import screencast
 from debug import debug
 from hid import hid
+from config import config
 from auth import auth, login_required
 
 log_config()                                                    # configure logs
@@ -37,6 +38,7 @@ app.register_blueprint(floppy, url_prefix='/floppy')
 app.register_blueprint(screencast, url_prefix='/screencast')
 app.register_blueprint(debug, url_prefix='/debug')
 app.register_blueprint(hid, url_prefix='/hid')
+app.register_blueprint(config, url_prefix='/config')
 
 # generate routes for templates, expect few, which are added manually below
 generate_routes_for_templates(app, ['login', 'debug'])

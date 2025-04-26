@@ -27,12 +27,6 @@ def load_dotenv_config():
         load_dotenv(dotenv_path=path)
         return
 
-    # Then try the normal installation path for dotenv on ce: /ce/services/.env
-    ce_dot_env_file = '/ce/services/.env'
-    if os.path.exists(ce_dot_env_file):
-        load_dotenv(dotenv_path=ce_dot_env_file)
-        return
-
     # If that fails, try to find and use local dotenv file used during development - .env in your local dir
     load_dotenv()
 
@@ -61,6 +55,23 @@ def text_from_file(filename):
         app_log.warning(logging.WARNING, f"failed to read {filename}: {str(ex)}")
 
     return text
+
+
+def get_setting(setting_key, default_value):
+    settings_dir = os.getenv("SETTINGS_DIR")
+    key_path = os.path.join(settings_dir, setting_key)
+    val = text_from_file(key_path)
+    val = val if val is not None else default_value
+    return val
+
+
+def set_setting(setting_key, value):
+    if not isinstance(value, str):
+        value = str(value)
+
+    settings_dir = os.getenv("SETTINGS_DIR")
+    key_path = os.path.join(settings_dir, setting_key)
+    text_to_file(value, key_path)
 
 
 def log_config():

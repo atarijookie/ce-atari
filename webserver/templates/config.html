@@ -18,22 +18,124 @@
         <script type="text/javascript"> 
     		document.write('<script type="text/javascript" src=static/js/config.js><\/script>');
     		</script>
-      	<script language="Javascript">
-    		$(document).ready(function () {
-    		  	CosmosEx.configInit();
-    		});
-  		  </script>
-        <style>
-          #term {
-            float: left;
-            border: #000 solid 5px;
-            font-family: "DejaVu Sans Mono", "Liberation Mono", monospace;
-            font-size: 11px;
-            color: #ffffff;
-            background: #000;
-            cursor:none;
+        <script type='text/javascript'>
+          var devTypes = []
+          var paths = [];
+          for(var i=0; i<8; i++) {
+            paths.push("");
+            devTypes.push(0);
           }
-        </style> 
+
+          window.onload = function() { 
+            bindHandlers();
+            getIdsConfig();
+          }
+      
+          function bindHandlers()
+          {
+            for (let i=0; i<8; i++) {
+              var elemToBind = document.getElementById("devtype" + i);
+              elemToBind.onchange = function () { onComboChanged(i); }
+            }
+          }
+
+          function getIdsConfig()
+          {
+            $.ajax({
+                url: '/config/get_ids',
+                type: 'GET',
+                dataType: 'json',
+                success: function(data){
+                    paths = data.paths;
+                    devTypes = data.dev_types;
+
+                    console.log("config/get_ids - data: " + data + ", paths: " + paths + ", devTypes: " + devTypes);
+                    updateIdsFromData();
+                  },
+                error: function (xhr) {
+                  console.log("Error: " + xhr.statusText);
+                },
+            })
+          }
+
+          function onIdsSave()
+          {
+            var foundEnabled = false;
+
+            for(var i=0; i<8; i++) {
+              if(devTypes[i] != 0) {
+                foundEnabled = true;
+              }
+
+              if(devTypes[i] == 2 && !paths[i]) {
+                alert("The device #" + i + " does not have a path to file set. Please select file before saving.");
+                return;
+              }
+            }
+
+            if(!foundEnabled) {
+              alert("No device ID was enabled (set to RAW or CE_DD). Your device will not respond to your Atari. Please select at least one device ID as RAW or CE_DD before saving.");
+              return;
+            }
+
+            putIdsConfig();
+          }
+
+          function putIdsConfig()
+          {
+            $.ajax({
+                url: '/config/set_ids',
+                type: 'PUT',
+                dataType: 'json',
+                data: JSON.stringify({'paths': paths, 'dev_types': devTypes}),
+                success: function(data){
+                },
+                error: function (xhr) {
+                    console.log("Error: " + xhr.statusText);
+                },
+            })
+          }
+
+          function updateIdsFromData()
+          {
+            for (let i=0; i<8; i++) {
+              var elem = document.getElementById("devtype" + i);
+              elem.value = devTypes[i].toString();
+              onComboChanged(i);
+            }
+          }
+
+          function onComboChanged(index)
+          {
+            var devtype = document.getElementById("devtype" + index).value;
+            var td = document.getElementById("path" + index);
+
+            devTypes[index] =  Number(devtype);   // store the new device type to array
+
+            switch(devtype) {
+              case "0": td.innerHTML = ""; break;
+              case "2": td.innerHTML = "<button type=\"button\" onclick=\"handleSelectClick(" + index + ");\">Select file</button> &nbsp; " + paths[index]; break;
+              case "3": td.innerHTML = "[CE_DD.PRG]"; break;
+            }
+          }
+
+          function handleSelectClick(index)
+          {
+
+          }
+        </script>
+        <style>
+          button {
+            font-size: 16px;
+          }
+          #device-ids-table {
+            border-collapse: collapse;
+          }
+          #device-ids-table td, #device-ids-table th {
+            border: 1px solid #000000;
+            padding: 15px;
+          }
+        </style>
       </head>
     <body>
     <div class="container">
@@ -49,18 +151,71 @@
                     <li class="active"><a href="/config">Config</a></li>
                     <li><a href="/status">Status</a></li>
                 </ul>
-        <h3>Configuration</h3>
-        <p>This is the CosmosEx configuration terminal. Use Cursor Keys to navigate.</p>
+                <h3>ACSI IDs configuration</h3>
+                <p>Here you can set configure the ACSI IDs of your device. You need at least one ID set to CE_DD to be able to boot the CE_DD driver.</p>
             </div>
             <div class="span2">
                 <img class="logo" src="static/img/ce_logo.png">
             </div>
         </div>
-        <div class="row">
-            <div class="span10">
-            <div id="term" class="terminal" style=""></div>
-            </div>
-            </div>
+
+        <form id="combo-form">
+          <center>
+            <table id="device-ids-table">
+              <tr><td>ACSI ID</td><td>Device Type</td><td>path to image / physical device</td></tr>
+
+              <tr>
+                <td><center>0</center></td>
+                <td><select id="devtype0" name="devtype0"><option value="0">off</option><option value="3">ce_dd</option><option value="2">raw</option></select></td>
+                <td id="path0"></td>
+              </tr>
+
+              <tr>
+                <td><center>1</center></td>
+                <td><select id="devtype1" name="devtype1"><option value="0">off</option><option value="3">ce_dd</option><option value="2">raw</option></select></td>
+                <td id="path1"></td>
+              </tr>
+
+              <tr>
+                <td><center>2</center></td>
+                <td><select id="devtype2" name="devtype2"><option value="0">off</option><option value="3">ce_dd</option><option value="2">raw</option></select></td>
+                <td id="path2"></td>
+              </tr>
+
+              <tr>
+                <td><center>3</center></td>
+                <td><select id="devtype3" name="devtype3"><option value="0">off</option><option value="3">ce_dd</option><option value="2">raw</option></select></td>
+                <td id="path3"></td>
+              </tr>
+
+              <tr>
+                <td><center>4</center></td>
+                <td><select id="devtype4" name="devtype4"><option value="0">off</option><option value="3">ce_dd</option><option value="2">raw</option></select></td>
+                <td id="path4"></td>
+              </tr>
+
+              <tr>
+                <td><center>5</center></td>
+                <td><select id="devtype5" name="devtype5"><option value="0">off</option><option value="3">ce_dd</option><option value="2">raw</option></select></td>
+                <td id="path5"></td>
+              </tr>
+
+              <tr>
+                <td><center>6</center></td>
+                <td><select id="devtype6" name="devtype6"><option value="0">off</option><option value="3">ce_dd</option><option value="2">raw</option></select></td>
+                <td id="path6"></td>
+              </tr>
+
+              <tr>
+                <td><center>7</center></td>
+                <td><select id="devtype7" name="devtype7"><option value="0">off</option><option value="3">ce_dd</option><option value="2">raw</option></select></td>
+                <td id="path7"></td>
+              </tr>
+            </table>
+            <p></p>
+            <p><button type="button" onclick="onIdsSave();">Save</button></p>
+        </center>
+      </form>
     </div>
     </body>
 </html>

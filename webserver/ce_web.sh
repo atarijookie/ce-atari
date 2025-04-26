@@ -20,10 +20,12 @@ check_if_pid_running()
     fi
 }
 
-. /ce/services/.env                                     # source env variables
+. ./.env                                                # source env variables
 
 mkdir -p "${DATA_DIR}"                                  # make this var folder if it doesn't exist
 pid_file=${DATA_DIR}/webserver.pid
+
+mkdir -p "${SETTINGS_DIR}"
 
 app_running=$( check_if_pid_running $pid_file )         # check if PID is still running
 
@@ -83,7 +85,7 @@ fi
 echo "Starting the webserver"
 
 # start web service
-gunicorn --workers 2 --worker-class=gevent --bind 0.0.0.0:80 \
+gunicorn --workers 2 --worker-class=gevent --bind 0.0.0.0:"${WEBSERVER_PORT}" \
     --access-logformat '%(l)s %(t)s "%(r)s" %(s)s %(b)s %(M)s ms' \
     --access-logfile '-' \
     wsgi:app --pid $pid_file --log-level debug
