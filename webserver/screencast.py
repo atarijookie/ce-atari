@@ -3,7 +3,7 @@ import os
 import stat
 import mmap
 from flask import Blueprint, current_app as app, abort, make_response
-from utils import text_from_file, send_to_core, value_to_int
+from utils import text_from_file, send_to_core_hdd, value_to_int
 
 screencast = Blueprint('screencast', __name__)
 
@@ -68,21 +68,21 @@ def getscreen():
 @screencast.route('/do_screenshot', methods=['POST'])
 def do_screenshot():
     """ do single screenshot """
-    send_to_core({'module': 'screencast', 'action': 'do_screenshot'})
+    send_to_core_hdd({'module': 'screencast', 'action': 'do_screenshot'})
     return {'status': 'ok'}
 
 
 @screencast.route('/screenshot_vbl_enable', methods=['POST'])
 def screenshot_vbl_enable():
     """ disable screenshot vbl """
-    send_to_core({'module': 'screencast', 'action': 'screenshot_vbl_enable'})
+    send_to_core_hdd({'module': 'screencast', 'action': 'screenshot_vbl_enable'})
     return {'status': 'ok'}
 
 
 @screencast.route('/screenshot_vbl_disable', methods=['POST'])
 def screenshot_vbl_disable():
     """ enable screenshot vbl """
-    send_to_core({'module': 'screencast', 'action': 'screenshot_vbl_disable'})
+    send_to_core_hdd({'module': 'screencast', 'action': 'screenshot_vbl_disable'})
     return {'status': 'ok'}
 
 

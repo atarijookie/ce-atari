@@ -32,7 +32,7 @@ void preloadGlobalsFromDotEnv(void)
     std::string dataDir = Utils::dotEnvValue("DATA_DIR");
     CONFIG_DRIVE_PATH = Utils::mergeHostPaths3(dataDir, "configdrive");     // where the copy of configdrive is
 
-    Debug::out(LOG_DEBUG, "CORE_SERVICE_PATH: %s", corePath.c_str());
+    Debug::out(LOG_DEBUG, "CORE_PATH        : %s", corePath.c_str());
     Debug::out(LOG_DEBUG, "driversPath      : %s", driversPath.c_str());
     Debug::out(LOG_DEBUG, "CONFIG_DRIVE_PATH: %s", CONFIG_DRIVE_PATH.c_str());
 }

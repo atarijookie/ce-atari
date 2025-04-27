@@ -32,14 +32,14 @@ void Debug::setOutputToConsole(void)
 
 void Debug::setDefaultLogFile(void)
 {
-    std::string filename = CORE_LOG_FILENAME;
+    std::string filename = CORE_HDD_LOG_FILENAME;
     std::map<std::string, std::string>::iterator i = logPaths.find(filename);
 
     if(i != logPaths.end()) {   // got this log file? erase it from map
         logPaths.erase(i);
     }
 
-    FILE* f = logFileOpen(CORE_LOG_FILENAME);   // call this to update map, then just close the file
+    FILE* f = logFileOpen(CORE_HDD_LOG_FILENAME);   // call this to update map, then just close the file
     
     if(f) {
         fclose(f);
@@ -49,7 +49,7 @@ void Debug::setDefaultLogFile(void)
 void Debug::setLogFile(const char *path)
 {
     std::string pathStr = path;
-    logPaths[CORE_LOG_FILENAME] = pathStr;
+    logPaths[CORE_HDD_LOG_FILENAME] = pathStr;
 }
 
 const char* Debug::logLevelString(int ll)
@@ -85,7 +85,7 @@ void Debug::out(int logLevel, const char *format, ...)
     if(g_outToConsole) {                    // should log to console? f is null
         f = NULL;
     } else {                                    // log to file? open the file
-        f = logFileOpen(CORE_LOG_FILENAME);
+        f = logFileOpen(CORE_HDD_LOG_FILENAME);
     }
 
     if(!f) {
@@ -131,7 +131,7 @@ void Debug::outBfr(uint8_t *bfr, int count)
         return;
     }
 
-    FILE* f = logFileOpen(CORE_LOG_FILENAME);
+    FILE* f = logFileOpen(CORE_HDD_LOG_FILENAME);
 
     if(!f) {
         return;
@@ -189,7 +189,7 @@ void Debug::setLogLevel(int newLogLevel)
     flags.logLevel = newLogLevel;                               // new value to struct
     ldp_setParam(1, (uint64_t) flags.logLevel);                 // libDOSpath - set new log level to file
 
-    Utils::intToFileFromEnv(newLogLevel, "CORE_LOGLEVEL_FILE");        // new value to file
+    Utils::intToFileFromEnv(newLogLevel, "CORE_HDD_LOGLEVEL_FILE");        // new value to file
 }
 
 void Debug::logRotateIfNeeded(const char *logFilePath)

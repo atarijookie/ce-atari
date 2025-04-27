@@ -7,7 +7,7 @@ from os import listdir
 from os.path import isfile, isdir, join
 
 from flask import Blueprint, request, current_app as app, abort
-from utils import get_setting, set_setting, is_blockdev
+from utils import get_setting, set_setting, is_blockdev, send_to_core_hdd
 
 config = Blueprint('config', __name__)
 
@@ -19,7 +19,7 @@ def get_ids():
 
     # get path and device type for each raw drive
     for i in range(8):
-        resp['paths'].append(get_setting("RAW_DRIVE_" + str(i), ""))
+        resp['paths'].append(get_setting("PATH_RAW_" + str(i), ""))
         resp['dev_types'].append(get_setting("ACSI_DEVTYPE_" + str(i), 0))
 
     return resp
@@ -34,9 +34,10 @@ def set_ids():
 
     # set path and device type for each raw drive
     for i in range(8):
-        set_setting("RAW_DRIVE_" + str(i), paths[i])
+        set_setting("PATH_RAW_" + str(i), paths[i])
         set_setting("ACSI_DEVTYPE_" + str(i), dev_types[i])
 
+    send_to_core_hdd({'module': 'disks', 'action': 'reload_raw'})
     return {'status': 'ok'}
 
 
@@ -86,7 +87,7 @@ def get_drives():
         if drive_letter == conf_drive_letter:   # if this is a config drive letter, it's a config drive
             drive_type = 2
         else:                                   # get path, if path present then drive is GEM drive, otherwise off
-            path = get_setting("TRANS_DRIVE_" + str(i), "")
+            path = get_setting("PATH_GEM_" + str(i), "")
             drive_type = 0 if not path else 1
 
         resp['paths'].append(path)
@@ -109,11 +110,12 @@ def set_drives():
             continue
 
         path = paths[i] if drive_types[i] == 1 else ""        # path valid only for drive_types 1, otherwise store empty path
-        set_setting("TRANS_DRIVE_" + str(i), path)
+        set_setting("PATH_GEM_" + str(i), path)
 
         if drive_types[i] == 2:         # if this is the config drive, store it's letter
             config_drive_letter = chr(65 + i)
 
     set_setting("DRIVELETTER_CONFDRIVE", config_drive_letter)
+    send_to_core_hdd({'module': 'disks', 'action': 'reload_trans'})
 
     return {'status': 'ok'}

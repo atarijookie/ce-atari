@@ -45,7 +45,7 @@ void Scsi::findAttachedDisks(void)
     s.loadAcsiIDs(&acsiIdInfo);
 
     for(int i=0; i<8; i++) {                        // go through all the possible drives
-        std::string settingName = std::string("RAW_DRIVE_") + std::to_string(i);
+        std::string settingName = std::string("PATH_RAW_") + std::to_string(i);
         std::string pathRaw = s.getString(settingName.c_str(), "");
 
         bool isBoot = (acsiIdInfo.ceddId == i);     // if this ID is used for CE_DD booting

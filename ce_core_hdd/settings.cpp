@@ -45,7 +45,7 @@ void Settings::storeDefaultValues(void)
         }
     }
 
-    setString("TRANS_DRIVE_C", "/mnt/");
+    setString("PATH_GEM_C", "/mnt/");
     setChar("DRIVELETTER_CONFDRIVE", 'O');
 }
 

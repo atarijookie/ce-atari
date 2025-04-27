@@ -32,9 +32,7 @@ extern THwConfig        hwConfig;
 extern TFlags           flags;
 extern SharedObjects    shared;
 
-void handleFloppyAction(std::string& action, json& data);
 void handleGenericAction(std::string& action, json& data);
-void handleIkbdAction(std::string& action, json& data);
 void handleSceencastAction(std::string& action, json& data);
 void handleDisksAction(std::string& action, json& data);
 void closeFifo(bool keybNotMouse);
@@ -77,7 +75,7 @@ int createRecvSocket(const char* dotEnvKey)
 void *cmdSockThreadCode(void *ptr)
 {
     Debug::out(LOG_INFO, "Command Socket thread starting...");
-    int sock = createRecvSocket("CORE_SOCK_PATH");
+    int sock = createRecvSocket("CORE_HDD_SOCK_PATH");
 
     if(sock < 0) {              // without socket this thread has no use
         return 0;
@@ -128,14 +126,10 @@ void *cmdSockThreadCode(void *ptr)
 
             Debug::out(LOG_DEBUG, "cmdSockThreadCode: module: %s, action: %s", module.c_str(), action.c_str());
 
-            if(module == "floppy") {                // for floppy module?
-                handleFloppyAction(action, data);
-            } else if (module == "all") {           // generic / all modules?
+            if (module == "all") {                  // generic / all modules?
                 handleGenericAction(action, data);
             } else if (module == "disks") {         // disk modules?
                 handleDisksAction(action, data);
-            } else if(module == "ikbd") {           // ikbd module?
-                handleIkbdAction(action, data);
             } else if(module == "screencast") {
                 handleSceencastAction(action, data);
             } else {                                // for uknown module?
@@ -153,41 +147,6 @@ void *cmdSockThreadCode(void *ptr)
 
     Debug::out(LOG_INFO, "Command Socket thread terminated.");
     return 0;
-}
-
-void handleFloppyAction(std::string& action, json& data)
-{
-    // int slot = -1;
-    pthread_mutex_lock(&shared.mtxImages);      // lock floppy images shared objects
-
-    // if(data.contains("slot")) {                 // if can get slot, get slot number
-    //     slot = data["slot"].get<int>();
-    // }
-
-    if(action == "insert") {                    // for 'insert' action
-        if(data.contains("image")) {            // image is present in message
-            std::string empty;
-            std::string pathAndFile = data["image"].get<std::string>();     // get image full path
-
-            std::string path, file;
-            Utils::splitFilenameFromPath(pathAndFile, path, file);          // get just filename from full path
-
-            // TODO: rework
-            // shared.imageSilo->add(slot, file, pathAndFile, empty, true);    // insert into slot
-        } else {
-            Debug::out(LOG_WARNING, "handleFloppyAction: missing 'image' in message, ignoring message!");
-        }
-    } else if(action == "eject") {              // for 'eject' action
-        // TODO: rework
-        // shared.imageSilo->remove(slot);
-    } else if(action == "activate") {           // for 'activate' action
-        // TODO: rework
-        // shared.imageSilo->setCurrentSlot(slot);
-    } else {
-        Debug::out(LOG_WARNING, "handleFloppyAction: unknown action '%s', ignoring message!", action.c_str());
-    }
-
-    pthread_mutex_unlock(&shared.mtxImages);    // unlock floppy images shared objects
 }
 
 void handleGenericAction(std::string& action, json& data)

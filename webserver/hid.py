@@ -1,5 +1,5 @@
 from flask import Blueprint, request, current_app as app, abort
-from utils import send_to_core
+from utils import send_to_core_ikbd
 
 hid = Blueprint('hid', __name__)
 
@@ -10,7 +10,7 @@ def mouse_post():
 
     item = {'module': 'ikbd', 'action': 'mouse'}    # start the message in expected format
     item.update(data_dict)      # add received data
-    send_to_core(item)          # send to core
+    send_to_core_ikbd(item)     # send to core
 
     return {'status': 'ok'}
 
@@ -21,6 +21,6 @@ def keyboard_post():
 
     item = {'module': 'ikbd', 'action': 'keyboard'}    # start the message in expected format
     item.update(data_dict)      # add received data
-    send_to_core(item)          # send to core
+    send_to_core_ikbd(item)          # send to core
 
     return {'status': 'ok'}

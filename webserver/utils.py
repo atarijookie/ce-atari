@@ -3,6 +3,7 @@ import json
 import socket
 import logging
 import stat
+from glob import glob
 from dotenv import load_dotenv
 from zipfile import ZipFile
 from logging.handlers import RotatingFileHandler
@@ -195,9 +196,31 @@ def send_to_socket(sock_path, item):
         app_log.debug(f"failed to send {item} - {str(ex)}")
 
 
-def send_to_core(item):
+def send_to_core_hdd(item):
     """ send an item to core """
-    send_to_socket(os.getenv('CORE_SOCK_PATH'), item)
+    path_base = os.getenv('CORE_HDD_SOCK_PATH')
+    socket_files = glob(f'{path_base}*')
+    app_log.debug(f'found these hdd core sockets: {socket_files}')
+
+    for file in socket_files:
+        send_to_socket(file, item)
+
+
+def send_to_core_fdd(item):
+    """ send an item to core """
+    send_to_socket(os.getenv('CORE_FDD_SOCK_PATH'), item)
+
+
+def send_to_core_ikbd(item):
+    """ send an item to core """
+    send_to_socket(os.getenv('CORE_IKBD_SOCK_PATH'), item)
+
+
+def send_to_core_all(item):
+    """ send an item to core """
+    send_to_core_hdd(item)
+    send_to_core_fdd(item)
+    send_to_core_ikbd(item)
 
 
 def send_to_taskq(item):
@@ -211,7 +234,7 @@ def slot_insert(slot_index, path_to_image):
     :param path_to_image: filesystem path to image file which should be inserted
     """
     item = {'module': 'floppy', 'action': 'insert', 'slot': slot_index, 'image': path_to_image}
-    send_to_core(item)
+    send_to_core_fdd(item)
 
 
 def slot_activate(slot_index):
@@ -221,7 +244,7 @@ def slot_activate(slot_index):
             101 - test image
     """
     item = {'module': 'floppy', 'action': 'activate', 'slot': slot_index}
-    send_to_core(item)
+    send_to_core_fdd(item)
 
 
 def slot_eject(slot_index):
@@ -229,7 +252,7 @@ def slot_eject(slot_index):
     :param slot_index: index of slot to eject - 0-2
     """
     item = {'module': 'floppy', 'action': 'eject', 'slot': slot_index}
-    send_to_core(item)
+    send_to_core_fdd(item)
 
 
 def get_image_slots():

@@ -1,7 +1,7 @@
 import os
 import json
 from flask import Blueprint, request, abort, send_file
-from utils import send_to_core, text_from_file
+from utils import send_to_core_all, text_from_file
 
 debug = Blueprint('debug', __name__)
 
@@ -31,7 +31,7 @@ def set_loglevel():
         abort(400, f'invalid loglevel {loglevel}')
 
     item = {'module': 'all', 'action': 'set_loglevel', 'loglevel': loglevel}
-    send_to_core(item)
+    send_to_core_all(item)
 
     return {'status': 'ok'}
 
@@ -72,7 +72,7 @@ def get_corefile(filename):
 def get_statusfile():
     """ fetch status file  """
     item = {'module': 'all', 'action': 'generate_status'}
-    send_to_core(item)
+    send_to_core_all(item)
 
     status_path = os.getenv('CORE_STATUS_FILE')         # retrieve log dir from env
 
