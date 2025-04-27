@@ -2,6 +2,7 @@ import os
 import json
 import socket
 import logging
+import stat
 from dotenv import load_dotenv
 from zipfile import ZipFile
 from logging.handlers import RotatingFileHandler
@@ -372,3 +373,13 @@ def symlink_if_needed(source_path, symlink_path):
         app.logger.debug(f'symlink_if_needed: symlinked {source_path} -> {symlink_path}')
     except Exception as ex:
         app.logger.warning(f'symlink_if_needed: failed with: {type(ex).__name__} - {str(ex)}')
+
+
+# Is a path a block device?
+def is_blockdev(s):
+    """Return true if the pathname refers to an existing directory."""
+    try:
+        st = os.stat(s)
+    except (OSError, ValueError):
+        return False
+    return stat.S_ISBLK(st.st_mode)

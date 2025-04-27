@@ -1,22 +1,24 @@
 // for each combo box add a on-change handler
-function bindHandlersAcsiIDs() {
-    for (let i=0; i<8; i++) {
-        var elemToBind = document.getElementById("devtype" + i);
+function bindHandlersGEMDrives() {
+    for (let i=2; i<16; i++) {
+        let letter = String.fromCharCode(65 + i);
+
+        var elemToBind = document.getElementById(`TRANS_DRIVE_${letter}`);
         elemToBind.onchange = function () { onComboChanged(i); }
     }
 }
 
 // get ACSI IDs and paths from backend and update UI
-function getIdsConfig() {
+function getDrivesConfig() {
     $.ajax({
-        url: '/config/get_ids',
+        url: '/config/get_drives',
         type: 'GET',
         dataType: 'json',
         success: function (data) {
             paths = data.paths;
-            devTypes = data.dev_types;
+            driveTypes = data.drive_types;
 
-            console.log("config/get_ids - data: " + data + ", paths: " + paths + ", devTypes: " + devTypes);
+            console.log("config/get_drives - data: " + data + ", paths: " + paths + ", driveTypes: " + driveTypes);
             updateIdsFromData();
         },
         error: function (xhr) {
@@ -39,7 +41,6 @@ function getDirContent(new_path) {
         data: JSON.stringify({ 'path': new_path }),
         success: function (data) {
             var dirs = data.dirs;
-            var files = data.files;
 
             const itemList = document.getElementById('itemList');
             itemList.innerHTML = '';
@@ -50,15 +51,6 @@ function getDirContent(new_path) {
                 div.className = 'item';
                 div.textContent = "[" + item + "]";
                 div.onclick = () => getDirContent(fullpath);
-                itemList.appendChild(div);
-            });
-
-            files.forEach(item => {
-                var fullpath = (new_path == "/") ? ("/" + item) : (new_path + "/" + item);
-                const div = document.createElement('div');
-                div.className = 'item';
-                div.textContent = item;
-                div.onclick = () => onFileSelected(fullpath);
                 itemList.appendChild(div);
             });
         },
@@ -103,34 +95,41 @@ function onFileSelected(filePath) {
 // Check if the selected configuration is valid and show warning if it isn't.
 // If config is valid, save it.
 function onIdsSave() {
-    var foundEnabled = false;
+    var configDriveFound = 0;
 
-    for (var i = 0; i < 8; i++) {
-        if (devTypes[i] != 0) {
-            foundEnabled = true;
+    for (var i = 2; i < 16; i++) {
+        let letter = String.fromCharCode(65 + i);
+
+        if (driveTypes[i] == 1 && !paths[i]) {
+            alert(`The drive ${letter} does not have any host path selected. Please select path before saving.`);
+            return;
         }
 
-        if (devTypes[i] == 2 && !paths[i]) {
-            alert("The device #" + i + " does not have a path to file set. Please select file before saving.");
-            return;
+        if (driveTypes[i] == 2) {
+            configDriveFound++;
         }
     }
 
-    if (!foundEnabled) {
-        alert("No device ID was enabled (set to RAW or CE_DD). Your device will not respond to your Atari. Please select at least one device ID as RAW or CE_DD before saving.");
+    if (configDriveFound == 0) {
+        alert("Config drive was not assigned to any GEM drive letter. Please select one drive as CONFIG drive before saving.");
         return;
     }
 
-    putIdsConfig();
+    if (configDriveFound > 1) {
+        alert("Multiple drives selected as config drives. Please select only one drive as CONFIG drive before saving.");
+        return;
+    }
+
+    putDrivesConfig();
 }
 
-// save the configured paths and device types
-function putIdsConfig() {
+// save the configured paths and drive drives
+function putDrivesConfig() {
     $.ajax({
-        url: '/config/set_ids',
+        url: '/config/set_drives',
         type: 'PUT',
         dataType: 'json',
-        data: JSON.stringify({ 'paths': paths, 'dev_types': devTypes }),
+        data: JSON.stringify({ 'paths': paths, 'drive_types': driveTypes }),
         success: function (data) {
             alert("Config saved.");
         },
@@ -142,24 +141,26 @@ function putIdsConfig() {
 
 // go through all the rows, switch combo boxes to selected values and show paths on screen
 function updateIdsFromData() {
-    for (let i = 0; i < 8; i++) {
-        var elem = document.getElementById("devtype" + i);
-        elem.value = devTypes[i].toString();
+    for (let i = 2; i < 16; i++) {
+        let letter = String.fromCharCode(65 + i);
+        var elem = document.getElementById(`TRANS_DRIVE_${letter}`);
+        elem.value = driveTypes[i].toString();
         onComboChanged(i);
     }
 }
 
 // for the specified index show the button and path or nothing
 function onComboChanged(index) {
-    var devtype = document.getElementById("devtype" + index).value;
-    var td = document.getElementById("path" + index);
+    let letter = String.fromCharCode(65 + index);
+    var devtype = document.getElementById(`TRANS_DRIVE_${letter}`).value;
+    var td = document.getElementById(`PATH_${letter}`);
 
-    devTypes[index] = Number(devtype);   // store the new device type to array
+    driveTypes[index] = Number(devtype);   // store the new device type to array
 
     switch (devtype) {
         case "0": td.innerHTML = ""; break;
-        case "2": td.innerHTML = "<button type=\"button\" onclick=\"handleSelectClick(" + index + ");\">Select file</button> &nbsp; " + paths[index]; break;
-        case "3": td.innerHTML = "[CE_DD.PRG]"; break;
+        case "1": td.innerHTML = `<button type="button" onclick="handleSelectClick(${index});">Select host dir</button> &nbsp; ${paths[index]}`; break;
+        case "2": td.innerHTML = "[CONFIG DRIVE]"; break;
     }
 }
 
@@ -201,11 +202,7 @@ function goUp() {
 
 // when 'OK' button is clicked on the file selector
 function onOK() {
-    if (!selectedFile || selectingFileForIndex == -1) {
-        return;
-    }
-
-    paths[selectingFileForIndex] = selectedFile;
+    paths[selectingFileForIndex] = dir;
     onComboChanged(selectingFileForIndex);
 
     $("[name=file-selector]").hide();
