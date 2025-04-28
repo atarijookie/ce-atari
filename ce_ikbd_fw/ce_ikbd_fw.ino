@@ -57,11 +57,16 @@ void uartResend(void)
   }
 }
 
+#define EEPROM_MAGIC_VALUE  0xda
+
 void eepromStoreFromBuffer(int eepromStartAddress, uint8_t* bfr, uint8_t maxSize)
 {
+  // at 0th position store magic value so we can tell that the value has been written
+  EEPROM.write(eepromStartAddress, EEPROM_MAGIC_VALUE);
+
   int i;
   for(i=0; i<maxSize; i++) {    // go through the buffer, up to max size
-    EEPROM.write(eepromStartAddress + i, bfr[i]);   // write value to eeprom
+    EEPROM.write(eepromStartAddress + i + 1, bfr[i]);   // write value to eeprom (including the zero value)
 
     if(bfr[i] == 0) {   // zero terminated end of string found, quit
       return;
@@ -74,15 +79,22 @@ void eepromStoreFromBuffer(int eepromStartAddress, uint8_t* bfr, uint8_t maxSize
 
 void eepromReadToSerial(int eepromStartAddress, uint8_t maxSize)
 {
+  // if the 0th position doesn't contain magic value, return empty string, because this hasn't been written yet
+  if(EEPROM.read(eepromStartAddress) != EEPROM_MAGIC_VALUE) {
+    Serial.write('\n');
+    return;  
+  }
+
   int i;
 
   for(i=0; i<maxSize; i++) {    // go through the buffer, up to max size
-    uint8_t data = EEPROM.read(eepromStartAddress + i);
-    Serial.write(data);
+    uint8_t data = EEPROM.read(eepromStartAddress + i + 1);
 
-    if(data == 0) {   // zero terminated end of string found, quit
+    if(data == 0) {             // zero terminated end of string found, quit (don't output the zero to serial port)
       break;
     }
+
+    Serial.write(data);
   }
 
   Serial.write('\n');
@@ -94,8 +106,9 @@ void handleEsp32Commands(void)
   uint8_t buffer[BUFFER_SIZE];
   uint8_t cnt = 0;
 
-  #define EEPROM_ADDR_SSID      0
-  #define EEPROM_ADDR_PSWD      BUFFER_SIZE
+  #define EEPROM_ADDR_SSID      (0 * BUFFER_SIZE)
+  #define EEPROM_ADDR_PSWD      (1 * BUFFER_SIZE)
+  #define EEPROM_ADDR_IDS       (2 * BUFFER_SIZE)
 
   while(digitalRead(PIN_CMD_DATA) == HIGH) {
     if(Serial.available() <=0) {    // no data? just wait for more data or controll pin change
@@ -116,11 +129,13 @@ void handleEsp32Commands(void)
         switch(buffer[1]) {
           case 'S': eepromStoreFromBuffer(EEPROM_ADDR_SSID, buffer + 2, BUFFER_SIZE - 2); break;    // write SSID
           case 'P': eepromStoreFromBuffer(EEPROM_ADDR_PSWD, buffer + 2, BUFFER_SIZE - 2); break;    // write password
+          case 'I': eepromStoreFromBuffer(EEPROM_ADDR_IDS,  buffer + 2, 3); break;                  // ACSI IDs (from 0 to 255, as string, so max 3 chars)
         }
       } else if(buffer[0] == 'R') {   // read?
         switch(buffer[1]) {
-          case 'S': eepromReadToSerial(EEPROM_ADDR_SSID, BUFFER_SIZE - 2); break;    // read SSID
-          case 'P': eepromReadToSerial(EEPROM_ADDR_PSWD, BUFFER_SIZE - 2); break;    // read password
+          case 'S': eepromReadToSerial(EEPROM_ADDR_SSID, BUFFER_SIZE - 2); break;   // read SSID
+          case 'P': eepromReadToSerial(EEPROM_ADDR_PSWD, BUFFER_SIZE - 2); break;   // read password
+          case 'I': eepromReadToSerial(EEPROM_ADDR_IDS,  3); break;                 // read ACSI IDs as string
         }
       }
 
