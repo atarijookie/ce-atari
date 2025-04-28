@@ -6,7 +6,6 @@ from utils import log_config, generate_routes_for_templates, text_from_file, loa
 load_dotenv_config()        # load dotenv before our imports which might need it already loaded
 
 from stream import stream
-from download import download
 from floppy import floppy
 from screencast import screencast
 from debug import debug
@@ -33,7 +32,6 @@ app.config['MAX_CONTENT_PATH'] = 5*1024*1024                    # max file size
 # register individual blueprints with their url prefixes
 app.register_blueprint(auth, url_prefix='/auth')
 app.register_blueprint(stream, url_prefix='/stream')
-app.register_blueprint(download, url_prefix='/download')
 app.register_blueprint(floppy, url_prefix='/floppy')
 app.register_blueprint(screencast, url_prefix='/screencast')
 app.register_blueprint(debug, url_prefix='/debug')

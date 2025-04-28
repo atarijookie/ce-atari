@@ -3,7 +3,7 @@
     <head>
         <meta http-equiv="content-type" content="text/html; charset=utf-8">
 	    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
-        <title>CosmosEx ACSI IDs</title>
+        <title>CosmosEx GEM drives</title>
         <link rel="stylesheet" type="text/css" href="static/css/bootstrap.light.css">
         <link rel="stylesheet" type="text/css" href="static/css/style.css">
 		    <script type="text/javascript" src="static/js/modernizr.custom.50426.js"></script>
@@ -11,29 +11,46 @@
         //unfortunately we have to support IE<10, so decide on zepto/jquery here
     		document.write('<script type="text/javascript" src=static/js/jquery.js><\/script>');
     		</script>
-        <script type="text/javascript" src="static/js/term.js"></script>
         <script type="text/javascript"> 
-    		document.write('<script type="text/javascript" src=static/js/config.js><\/script>');
-    		</script>
-        <script type='text/javascript'>
+    		  document.write('<script type="text/javascript" src=static/js/drives.js><\/script>');
+
           var dir = "/home";
           var selectedFile = "";
 
-          var devTypes = [];
+          var driveTypes = [];
           var paths = [];
           var selectingFileForIndex = -1;
 
-          // initialize paths and devTypes
-          for(var i=0; i<8; i++) {
+          // initialize paths and driveTypes
+          for(var i=0; i<16; i++) {
             paths.push("");
-            devTypes.push(0);
+            driveTypes.push(0);
           }
 
           // bind handlers to combo change and get IDs from backend
           window.onload = function() { 
             $("[name=file-selector]").hide();
-            bindHandlersAcsiIDs();
-            getIdsConfig();
+
+            var table = document.getElementById("device-ids-table");
+
+            for(let i=2; i<16; i++) {
+              const tr = table.insertRow();
+
+              var letter = String.fromCharCode(65 + i);
+
+              const td1 = tr.insertCell();
+              td1.innerHTML = `<center>${letter}</center>`;
+
+              const td2 = tr.insertCell();
+              td2.innerHTML = `<center><select id="TRANS_DRIVE_${letter}" name="TRANS_DRIVE_${letter}"><option value="0">off</option><option value="1">GEM</option><option value="2">config</option></select></center>`;
+
+              const td3 = tr.insertCell();
+              td3.id = `PATH_${letter}`;
+              td3.innerHTML = "";
+            }
+
+            bindHandlersGEMDrives();
+            getDrivesConfig();
           }
         </script>
         <style>
@@ -133,15 +150,14 @@
                     <li><a href="/">Home</a></li>
                     <li><a href="http://joo.kie.sk/?page_id=415" target="_blank">Manual</a></li>
                     <li><a href="/floppy">Floppy</a></li>
-                    <li><a href="/download">Download</a></li>
                     <li><a href="/remote">Remote</a></li>
                     <li><a href="/screenshots">Screenshots</a></li>
-                    <li class="active"><a href="/config">ACSI IDs</a></li>
-                    <li><a href="/drives">GEM Drives</a></li>
+                    <li><a href="/acsi_ids">ACSI IDs</a></li>
+                    <li class="active"><a href="/gem_drives">GEM Drives</a></li>
                     <li><a href="/status">Status</a></li>
                 </ul>
-                <h3>ACSI IDs configuration</h3>
-                <p>Configure the ACSI IDs of your device. You need at least one ID set to CE_DD to be able to boot the CE_DD driver.</p>
+                <h3>GEM drives configuration</h3>
+                <p>Configure the host paths which will be accessible via drives in GEM. You need exactly one drive set to CONFIG to be able to access files of the CE config drive.</p>
             </div>
             <div class="span2">
                 <img class="logo" src="static/img/ce_logo.png">
@@ -151,55 +167,10 @@
         <form id="combo-form">
           <center>
             <table id="device-ids-table">
-              <tr bgcolor="#cccccc"><td><b>ACSI ID</b></td><td><b>Device Type</b></td><td><b>path to image / physical device</b></td></tr>
+              <tr bgcolor="#cccccc"><td><b>Drive</b></td><td><b>Drive type</b></td><td><b>path to host folder</b></td></tr>
 
-              <tr>
-                <td><center>0</center></td>
-                <td><select id="devtype0" name="devtype0"><option value="0">off</option><option value="3">ce_dd</option><option value="2">raw</option></select></td>
-                <td id="path0"></td>
-              </tr>
+              <!-- the rows of this table are generated via javascript -->
 
-              <tr>
-                <td><center>1</center></td>
-                <td><select id="devtype1" name="devtype1"><option value="0">off</option><option value="3">ce_dd</option><option value="2">raw</option></select></td>
-                <td id="path1"></td>
-              </tr>
-
-              <tr>
-                <td><center>2</center></td>
-                <td><select id="devtype2" name="devtype2"><option value="0">off</option><option value="3">ce_dd</option><option value="2">raw</option></select></td>
-                <td id="path2"></td>
-              </tr>
-
-              <tr>
-                <td><center>3</center></td>
-                <td><select id="devtype3" name="devtype3"><option value="0">off</option><option value="3">ce_dd</option><option value="2">raw</option></select></td>
-                <td id="path3"></td>
-              </tr>
-
-              <tr>
-                <td><center>4</center></td>
-                <td><select id="devtype4" name="devtype4"><option value="0">off</option><option value="3">ce_dd</option><option value="2">raw</option></select></td>
-                <td id="path4"></td>
-              </tr>
-
-              <tr>
-                <td><center>5</center></td>
-                <td><select id="devtype5" name="devtype5"><option value="0">off</option><option value="3">ce_dd</option><option value="2">raw</option></select></td>
-                <td id="path5"></td>
-              </tr>
-
-              <tr>
-                <td><center>6</center></td>
-                <td><select id="devtype6" name="devtype6"><option value="0">off</option><option value="3">ce_dd</option><option value="2">raw</option></select></td>
-                <td id="path6"></td>
-              </tr>
-
-              <tr>
-                <td><center>7</center></td>
-                <td><select id="devtype7" name="devtype7"><option value="0">off</option><option value="3">ce_dd</option><option value="2">raw</option></select></td>
-                <td id="path7"></td>
-              </tr>
             </table>
             <p></p>
             <p><button type="button" onclick="onIdsSave();">Save</button></p>
