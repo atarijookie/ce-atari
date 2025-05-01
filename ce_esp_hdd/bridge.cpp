@@ -4,29 +4,11 @@
 extern uint8_t brStat; // status from bridge
 extern uint8_t isAcsiNotScsi;
 extern uint8_t lastScsiStatusByte;
+extern uint8_t busIdle;
 
 uint8_t pioReadFailed;
 
-uint32_t timeoutStartMillis;
-
 const int dataPins[8] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7};
-
-void timeoutStart(void)
-{
-    timeoutStartMillis = millis();
-}
-
-uint8_t timeout(void)
-{
-    uint32_t now = millis();
-
-    if ((now - timeoutStartMillis) > CMD_TIMEOUT_SHORT)
-    {
-        return TRUE;
-    }
-
-    return FALSE;
-}
 
 uint8_t PIO_gotFirstCmdByte(void)
 {
@@ -109,7 +91,6 @@ void PIO_read_solely(uint8_t val)
     }
 
     resetBridge();
-    return ok;
 }
 
 // send MESSAGE IN byte to ST
@@ -132,8 +113,6 @@ void DMA_read(uint8_t val)
     {
         brStat = E_TimeOut; // set the bridge status
     }
-
-    return ok;
 }
 
 uint8_t DMA_write(void)
@@ -244,7 +223,7 @@ uint8_t waitForEOT(void)
             return TRUE;
         }
 
-        if (isTimeout())
+        if (timeout())
         { // timeout? fail
             return FALSE;
         }

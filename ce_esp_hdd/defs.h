@@ -1,12 +1,22 @@
 #ifndef DEFS_H_
 #define DEFS_H_
 
+#include <arduino.h>
+
 #ifndef TRUE
     #define TRUE 1
 #endif
 
 #ifndef FALSE
     #define FALSE 0
+#endif
+
+#ifndef MIN
+    #define MIN(X,Y)    ((X < Y) ? X : Y)
+#endif
+
+#ifndef MAX
+    #define MAX(X,Y)    ((X > Y) ? X : Y)
 #endif
 
 #define CMD_TIMEOUT_SECS_PER_MB 3

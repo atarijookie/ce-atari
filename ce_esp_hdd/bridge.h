@@ -15,6 +15,8 @@ void timeoutStart(void);                // starts the timeout timer
 uint8_t timeout(void);                  // returns TRUE if timeout since writeFirst occured
 
 void resetBridge(void);
+void getBridgeStatus(void);
+uint8_t isBusIdle(void);
 
 uint8_t PIO_gotFirstCmdByte(void);      // check if we got the 1st command byte
 uint8_t PIO_writeFirst(void);          // get 1st CMD byte from ST  -- without setting INT

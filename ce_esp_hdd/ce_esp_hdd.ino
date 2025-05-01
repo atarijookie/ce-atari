@@ -79,7 +79,7 @@ void sendFwToHost(void);
 //--------------------------
 void setup(void)
 {
-#define INPUTS_COUNT 12
+    #define INPUTS_COUNT 12
     int inputs[INPUTS_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_CMD1ST, PIN_EOT, PIN_SDA, PIN_BOOT_BTN};
 
     for (int i = 0; i < INPUTS_COUNT; i++)
@@ -87,7 +87,7 @@ void setup(void)
         pinMode(inputs[i], INPUT);
     }
 
-#define OUTPUTS_COUNT 6
+    #define OUTPUTS_COUNT 6
     int outputs[OUTPUTS_COUNT] = {PIN_OUT_OE, PIN_FF12D, PIN_INT_TRIG, PIN_DRQ_TRIG, PIN_SCL, PIN_CMD_DATA};
 
     for (int i = 0; i < OUTPUTS_COUNT; i++)
@@ -113,8 +113,6 @@ void setup(void)
 
 void loop(void)
 {
-    //-------------
-    // main loop
     while (1)
     {
         //---------------------------
@@ -152,7 +150,7 @@ void loop(void)
 void sendFwToHost(void)
 {
     sendFwVersion = FALSE;
-    sendBufferToHost((uint8_t *)&atnSendFwVersion[0], ATN_SENDFWVERSION_LEN_TX * 2);
+    sendBufferToHost((uint8_t *) &atnSendFwVersion[0], ATN_SENDFWVERSION_LEN_TX * 2);
     shouldProcessCommands = TRUE;
 }
 
@@ -211,16 +209,15 @@ void handleAcsiCommand(void)
         // sending and receiving data over SPI using DMA
         // IN  STATE: any
         // OUT STATE: STATE_DATA_WRITE, STATE_DATA_READ_WITH_STATUS, STATE_DATA_READ_WITHOUT_STATUS, or unchanged
-        if (spiDmaIsIdle && shouldProcessCommands)
-        {                          // SPI DMA: nothing to Tx and nothing to Rx?
-            processHostCommands(); // and process all the received commands
+        // if (spiDmaIsIdle && shouldProcessCommands)
+        // {                          // SPI DMA: nothing to Tx and nothing to Rx?
+        //     processHostCommands(); // and process all the received commands
 
-            shouldProcessCommands = FALSE; // mark that we don't need to process commands until next time
-        }
+        //     shouldProcessCommands = FALSE; // mark that we don't need to process commands until next time
+        // }
 
         if (timeout())
         { // if the data from host doesn't come within timeout, quit
-            LOG_ERROR(50);
             state = STATE_GET_COMMAND;
             break;
         }
@@ -253,30 +250,19 @@ void handleAcsiCommand(void)
 
 void onButtonPress(void)
 {
-    uint16_t cnt, diff;
+    // uint16_t cnt, diff;
 
-    EXTI->PR = BUTTON; // clear pending EXTI
+    // EXTI->PR = BUTTON; // clear pending EXTI
 
-    cnt = TIM1->CNT; // get the current time
-    diff = cnt - prevBtnPressTime;
+    // cnt = TIM1->CNT; // get the current time
+    // diff = cnt - prevBtnPressTime;
 
-    if (diff < 500)
-    { // the previous button press happened less than 250 ms before? ignore
-        return;
-    }
+    // if (diff < 500)
+    // { // the previous button press happened less than 250 ms before? ignore
+    //     return;
+    // }
 
-    prevBtnPressTime = cnt; // store current time
-
-    currentLed++; // change LED
-
-    if (currentLed > 2)
-    { // overflow?
-        currentLed = 0xff;
-    }
-
-    fixLedsByEnabledImgs(); // if we switched to not enabled floppy image, fix this
-
-    showCurrentLED(); // and show the current LED
+    // prevBtnPressTime = cnt; // store current time
 }
 
 void onGetCommand(void)
@@ -303,17 +289,11 @@ void onGetCommand(void)
     }
 
     id = (cmd[0] >> 5) & 0x07; // get only device ID
-    //-----
-    // if we came here, everything went OK
-    if (enabledIDs[id])
-    { // for this ID is enabled (to let the CS commands be handled by any CE ID, even the one not assigned to CE SD)
-        uint8_t processedLocally;
-        processedLocally = tryProcessLocally(); // try to process command locally
 
-        if (processedLocally)
-        { // if it was processed locally, quit
-            return;
-        }
+    //-----
+    if (!enabledIDs[id])        // this ID not enabled, ignore command
+    {
+        return;
     }
 
     //----------------
@@ -435,113 +415,113 @@ uint8_t onGetCommandScsi(void)
 
 void onDataRead(uint8_t withStatus)
 {
-    uint16_t i, loopCount, l, dataBytesCount;
-    uint8_t dataMarkerFound;
-    uint8_t res;
-    TReadBuffer *rdBufNow;
-    uint16_t *pData;
+    // uint16_t i, loopCount, l, dataBytesCount;
+    // uint8_t dataMarkerFound;
+    // uint8_t res;
+    // TReadBuffer *rdBufNow;
+    // uint16_t *pData;
 
-    seqNo = 0;
-    state = STATE_GET_COMMAND; // this will be the next state once this function finishes with fail
+    // seqNo = 0;
+    // state = STATE_GET_COMMAND; // this will be the next state once this function finishes with fail
 
-    // nothing to send AND should send status? then just quit with status byte
-    if (dataCnt == 0 && withStatus)
-    {
-        PIO_read(statusByte);
-        return;
-    }
+    // // nothing to send AND should send status? then just quit with status byte
+    // if (dataCnt == 0 && withStatus)
+    // {
+    //     PIO_read(statusByte);
+    //     return;
+    // }
 
-    // calculate how many loops we will have to do
-    loopCount = dataCnt / 512;
+    // // calculate how many loops we will have to do
+    // loopCount = dataCnt / 512;
 
-    if ((dataCnt % 512) != 0)
-    {
-        loopCount++;
-    }
+    // if ((dataCnt % 512) != 0)
+    // {
+    //     loopCount++;
+    // }
 
-    // receive 0th data block in rdBuf1
-    rdBufNow = &rdBuf1;
+    // // receive 0th data block in rdBuf1
+    // rdBufNow = &rdBuf1;
 
-    startSpiDmaForDataRead(dataCnt, rdBufNow);
-    dataCnt -= (uint32_t)rdBufNow->dataBytesCount; // update remaining data size
+    // startSpiDmaForDataRead(dataCnt, rdBufNow);
+    // dataCnt -= (uint32_t)rdBufNow->dataBytesCount; // update remaining data size
 
-    // now start the double buffered transfer to ST
-    setDataDirection(DIR_SEND); // data direction for reading
+    // // now start the double buffered transfer to ST
+    // setDataDirection(DIR_SEND); // data direction for reading
 
-    for (l = 0; l < loopCount; l++)
-    {
-        // first wait until all data arrives in SPI DMA transfer
-        while (!spiDmaIsIdle)
-        {
-            if (timeout())
-            {                               // if the data from host doesn't come within timeout, quit
-                setDataDirection(DIR_RECV); // data direction for writing, and quit
-                return;
-            }
-        }
+    // for (l = 0; l < loopCount; l++)
+    // {
+    //     // first wait until all data arrives in SPI DMA transfer
+    //     while (!spiDmaIsIdle)
+    //     {
+    //         if (timeout())
+    //         {                               // if the data from host doesn't come within timeout, quit
+    //             setDataDirection(DIR_RECV); // data direction for writing, and quit
+    //             return;
+    //         }
+    //     }
 
-        // if after transfering this block there should be another block of data
-        if (dataCnt > 0)
-        {
-            TReadBuffer *nextRdBuffer = rdBufNow->next;
+    //     // if after transfering this block there should be another block of data
+    //     if (dataCnt > 0)
+    //     {
+    //         TReadBuffer *nextRdBuffer = rdBufNow->next;
 
-            startSpiDmaForDataRead(dataCnt, nextRdBuffer);     // start receiving data to the other buffer
-            dataCnt -= (uint32_t)nextRdBuffer->dataBytesCount; // update remaining data size
-        }
+    //         startSpiDmaForDataRead(dataCnt, nextRdBuffer);     // start receiving data to the other buffer
+    //         dataCnt -= (uint32_t)nextRdBuffer->dataBytesCount; // update remaining data size
+    //     }
 
-        ///////////////////////////////////////////////////////////////
-        // send the received data to ST
-        // find the data marker
-        dataMarkerFound = FALSE;
-        pData = &rdBufNow->buffer[0];
+    //     ///////////////////////////////////////////////////////////////
+    //     // send the received data to ST
+    //     // find the data marker
+    //     dataMarkerFound = FALSE;
+    //     pData = &rdBufNow->buffer[0];
 
-        for (i = 0; i < rdBufNow->count; i++)
-        {
-            uint16_t data;
+    //     for (i = 0; i < rdBufNow->count; i++)
+    //     {
+    //         uint16_t data;
 
-            data = *pData; // get data
-            pData++;
+    //         data = *pData; // get data
+    //         pData++;
 
-            if (data == CMD_DATA_MARKER)
-            { // found data marker?
-                dataMarkerFound = TRUE;
-                break;
-            }
-        }
+    //         if (data == CMD_DATA_MARKER)
+    //         { // found data marker?
+    //             dataMarkerFound = TRUE;
+    //             break;
+    //         }
+    //     }
 
-        if (dataMarkerFound == FALSE)
-        { // didn't find the data marker?
-            if (withStatus)
-            {
-                PIO_read(SCSI_ST_CHECK_CONDITION); // send status: CHECK CONDITION and quit
-            }
-            return;
-        }
+    //     if (dataMarkerFound == FALSE)
+    //     { // didn't find the data marker?
+    //         if (withStatus)
+    //         {
+    //             PIO_read(SCSI_ST_CHECK_CONDITION); // send status: CHECK CONDITION and quit
+    //         }
+    //         return;
+    //     }
 
-        // now try to trasmit the data
-        dataBytesCount = rdBufNow->dataBytesCount;
+    //     // now try to trasmit the data
+    //     dataBytesCount = rdBufNow->dataBytesCount;
 
-        res = dataReadCloop(pData, dataBytesCount);
+    //     res = dataReadCloop(pData, dataBytesCount);
 
-        if (res == 0)
-        {
-            setDataDirection(DIR_RECV); // data direction for writing, and quit
-            return;
-        }
+    //     if (res == 0)
+    //     {
+    //         setDataDirection(DIR_RECV); // data direction for writing, and quit
+    //         return;
+    //     }
 
-        // one cycle finished, now swap buffers and start all over again
-        rdBufNow = rdBufNow->next; // swap buffers
-    }
+    //     // one cycle finished, now swap buffers and start all over again
+    //     rdBufNow = rdBufNow->next; // swap buffers
+    // }
 
-    if (withStatus)
-    { // if should send status, then send status and go to STATE_GET_COMMAND
-        state = STATE_GET_COMMAND;
-        PIO_read(statusByte); // send the status to Atari
-    }
-    else
-    { // if shouldn't send status here, switch to state STATE_READ_STATUS, which will retrieve status from RPi and send it to ST
-        state = STATE_READ_STATUS;
-    }
+    // if (withStatus)
+    // { // if should send status, then send status and go to STATE_GET_COMMAND
+    //     state = STATE_GET_COMMAND;
+    //     PIO_read(statusByte); // send the status to Atari
+    // }
+    // else
+    // { // if shouldn't send status here, switch to state STATE_READ_STATUS, which will retrieve status from RPi and send it to ST
+    //     state = STATE_READ_STATUS;
+    // }
 }
 
 void startSpiDmaForDataRead(uint32_t dataCnt, TReadBuffer *readBfr)
@@ -564,86 +544,86 @@ void startSpiDmaForDataRead(uint32_t dataCnt, TReadBuffer *readBfr)
 
 void onDataWrite(void)
 {
-    uint8_t firstLoop, previousSpiSuccess;
-    uint16_t subCount, recvCount;
-    uint16_t index, data, i, value;
-    TWriteBuffer *wrBufNow;
+    // uint8_t firstLoop, previousSpiSuccess;
+    // uint16_t subCount, recvCount;
+    // uint16_t index, data, i, value;
+    // TWriteBuffer *wrBufNow;
 
-    seqNo = 0;
-    wrBufNow = &wrBuf1;
+    // seqNo = 0;
+    // wrBufNow = &wrBuf1;
 
-    setDataDirection(DIR_RECV); // data direction for reading
+    // setDataDirection(DIR_RECV); // data direction for reading
 
-    firstLoop = TRUE;
+    // firstLoop = TRUE;
 
-    while (dataCnt > 0)
-    { // something to write?
-        // request maximum 512 bytes from host
-        subCount = (dataCnt > 512) ? 512 : dataCnt;
-        dataCnt -= subCount;
+    // while (dataCnt > 0)
+    // { // something to write?
+    //     // request maximum 512 bytes from host
+    //     subCount = (dataCnt > 512) ? 512 : dataCnt;
+    //     dataCnt -= subCount;
 
-        wrBufNow->buffer[4] = seqNo; // set the sequence # to Attention
-        seqNo++;
+    //     wrBufNow->buffer[4] = seqNo; // set the sequence # to Attention
+    //     seqNo++;
 
-        recvCount = subCount / 2;    // uint16_ts to receive: convert # of uint8_ts to # of uint16_ts
-        recvCount += (subCount & 1); // if subCount is odd number, then we need to transfer 1 uint16_t more
+    //     recvCount = subCount / 2;    // uint16_ts to receive: convert # of uint8_ts to # of uint16_ts
+    //     recvCount += (subCount & 1); // if subCount is odd number, then we need to transfer 1 uint16_t more
 
-        index = 5; // length of header before data
+    //     index = 5; // length of header before data
 
-        for (i = 0; i < recvCount; i++)
-        {                        // write this many uint16_ts
-            value = DMA_write(); // get data from Atari
-            value = value << 8;  // store as upper byte
+    //     for (i = 0; i < recvCount; i++)
+    //     {                        // write this many uint16_ts
+    //         value = DMA_write(); // get data from Atari
+    //         value = value << 8;  // store as upper byte
 
-            if (brStat == E_TimeOut)
-            {                              // if timeout occured
-                state = STATE_GET_COMMAND; // transfer failed, don't send status, just get next command
-                return;
-            }
+    //         if (brStat == E_TimeOut)
+    //         {                              // if timeout occured
+    //             state = STATE_GET_COMMAND; // transfer failed, don't send status, just get next command
+    //             return;
+    //         }
 
-            subCount--;
-            if (subCount == 0)
-            {                                    // in case of odd data count
-                wrBufNow->buffer[index] = value; // store data
-                index++;
+    //         subCount--;
+    //         if (subCount == 0)
+    //         {                                    // in case of odd data count
+    //             wrBufNow->buffer[index] = value; // store data
+    //             index++;
 
-                break;
-            }
+    //             break;
+    //         }
 
-            data = DMA_write();   // get data from Atari
-            value = value | data; // store as lower byte
+    //         data = DMA_write();   // get data from Atari
+    //         value = value | data; // store as lower byte
 
-            if (brStat == E_TimeOut)
-            {                              // if timeout occured
-                state = STATE_GET_COMMAND; // transfer failed, don't send status, just get next command
-                return;
-            }
+    //         if (brStat == E_TimeOut)
+    //         {                              // if timeout occured
+    //             state = STATE_GET_COMMAND; // transfer failed, don't send status, just get next command
+    //             return;
+    //         }
 
-            subCount--;
+    //         subCount--;
 
-            wrBufNow->buffer[index] = value; // store data
-            index++;
-        }
+    //         wrBufNow->buffer[index] = value; // store data
+    //         index++;
+    //     }
 
-        wrBufNow->buffer[index] = 0; // terminating zero
-        wrBufNow->count = index + 1; // store count, +1 because we have terminating zero
+    //     wrBufNow->buffer[index] = 0; // terminating zero
+    //     wrBufNow->count = index + 1; // store count, +1 because we have terminating zero
 
-        //----------
-        // set up the SPI DMA transfer
-        previousSpiSuccess = sendBufferToHost((uint8_t *)&wrBufNow->buffer[0], wrBufNow->count * 2);
+    //     //----------
+    //     // set up the SPI DMA transfer
+    //     previousSpiSuccess = sendBufferToHost((uint8_t *)&wrBufNow->buffer[0], wrBufNow->count * 2);
 
-        // if this is not the first loop and the previous SPI transfer failed (something from this WRITE command was not transfered to host), fail
-        if (!firstLoop && !previousSpiSuccess)
-        {
-            state = STATE_GET_COMMAND;
-            return;
-        }
+    //     // if this is not the first loop and the previous SPI transfer failed (something from this WRITE command was not transfered to host), fail
+    //     if (!firstLoop && !previousSpiSuccess)
+    //     {
+    //         state = STATE_GET_COMMAND;
+    //         return;
+    //     }
 
-        firstLoop = FALSE;
-        //----------
+    //     firstLoop = FALSE;
+    //     //----------
 
-        wrBufNow = wrBufNow->next; // use next write buffer
-    }
+    //     wrBufNow = wrBufNow->next; // use next write buffer
+    // }
 
     state = STATE_READ_STATUS; // continue with sending the status
 }
@@ -656,16 +636,16 @@ void onReadStatus(void)
 
     sendBufferToHost(&atnGetStatus[0], ATN_GETSTATUS_LEN_TX * 2);
 
-    spiDma_waitForFinish();
+    // spiDma_waitForFinish();
 
-    for (i = 0; i < 8; i++)
-    { // go through the received buffer
-        if (cmdBuffer[i] == CMD_SEND_STATUS)
-        {
-            newStatus = cmdBuffer[i + 1] >> 8;
-            break;
-        }
-    }
+    // for (i = 0; i < 8; i++)
+    // { // go through the received buffer
+    //     if (cmdBuffer[i] == CMD_SEND_STATUS)
+    //     {
+    //         newStatus = cmdBuffer[i + 1] >> 8;
+    //         break;
+    //     }
+    // }
 
     PIO_read(newStatus);       // send the status to Atari
     state = STATE_GET_COMMAND; // get the next command
@@ -844,7 +824,7 @@ void setupAtnBuffers(void)
 
 uint8_t sendBufferToHost(uint8_t *bfr, uint32_t txCount)
 {
-    storeDword(bfr + 6, txLen); // store the tx length on index 6..9
+    storeDword(bfr + 6, txCount); // store the tx length on index 6..9
 
     // TODO: add sending of data
 

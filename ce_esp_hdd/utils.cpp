@@ -1,3 +1,7 @@
+#include "defs.h"
+
+uint32_t timeoutStartMillis;
+uint32_t timeoutDuration;
 
 uint16_t getWord(uint8_t *bfr)
 {
@@ -63,4 +67,38 @@ void store24bits(uint8_t *bfr, uint32_t val)
     bfr[0] = val >> 16;
     bfr[1] = val >>  8;
     bfr[2] = val;
+}
+
+void longTimeout_basedOnSectorCount(uint16_t sectorCount)
+{
+    uint32_t mbCount       = (sectorCount >> 11) + 1;                  // convert sector count into megabytes (rounded up)
+    uint32_t timeoutSecs   = mbCount       * CMD_TIMEOUT_SECS_PER_MB;  // convert MBs into seconds
+    uint32_t timeoutPeriod = timeoutSecs   * CMD_TIMEOUT_ONESECOND;    // and convert seconds into ms
+
+    timeoutStartMillis = millis();
+    timeoutDuration = MIN(timeoutPeriod, 30000);        // Now limit the timeout period to 30 s
+}
+
+void timeoutStart(void)
+{
+    timeoutStartMillis = millis();
+    timeoutDuration = CMD_TIMEOUT_SHORT;
+}
+
+uint8_t timeout(void)
+{
+    uint32_t now = millis();
+
+    if ((now - timeoutStartMillis) > timeoutDuration)
+    {
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+void timerSetup_cmdTimeoutChangeLength(uint32_t newPeriod)
+{
+    timeoutStartMillis = millis();
+    timeoutDuration = newPeriod;
 }
