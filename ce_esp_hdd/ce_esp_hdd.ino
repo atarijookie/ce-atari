@@ -1,6 +1,7 @@
 #include "defs.h"
 #include "bridge.h"
 #include "utils.h"
+#include "command_handling.h"
 
 void onButtonPress(void);
 
@@ -8,20 +9,6 @@ void processHostCommands(void);
 void handleAcsiConfig(uint8_t acsiIds);
 
 uint8_t sendBufferToHost(uint8_t *bfr, uint32_t txCount);
-
-uint8_t onGetCommandAcsi(void);
-uint8_t onGetCommandScsi(void);
-void getCmdLengthFromCmdBytesAcsi(void);
-void getCmdLengthFromCmdBytesScsi(uint8_t cmd);
-
-void onGetCommand(void);
-void onDataRead(uint8_t withStatus);
-void onDataWrite(void);
-void onReadStatus(void);
-
-uint8_t state;
-uint32_t dataCnt;
-uint8_t statusByte;
 
 uint16_t version[2] = {0xa025, 0x0430}; // this means: hAns, 2025-04-30
 
@@ -31,6 +18,10 @@ char *DATE_STRING = {"04/30/25"}; // MM/DD/YY
 volatile uint8_t sendFwVersion;
 uint8_t atnSendFwVersion[ATN_SENDFWVERSION_LEN_TX];
 uint8_t atnSendACSIcommand[ATN_SENDACSICOMMAND_LEN_TX];
+
+uint8_t state;
+uint32_t dataCnt;
+uint8_t statusByte;
 
 uint16_t seqNo = 0;
 uint8_t atnMoreData[ATN_READMOREDATA_LEN_TX];
@@ -50,17 +41,14 @@ uint8_t brStat;  // status from bridge
 uint8_t lastScsiStatusByte;
 
 uint8_t enabledIDs;
-uint8_t idIsEnabled(uint8_t id);
+
+uint8_t isAcsiNotScsi;
+uint8_t busIdle;
 
 uint8_t firstConfigReceived; // used to turn LEDs on after first config received
 uint8_t shouldProcessCommands;
 
 uint16_t prevBtnPressTime;
-
-void handleAcsiCommand(void);
-
-uint8_t isAcsiNotScsi;
-uint8_t busIdle;
 
 uint32_t lastSendFwTime;
 
@@ -107,56 +95,24 @@ void loop(void)
 {
     while (1)
     {
-        //---------------------------
-        // get the command from ACSI and send it to host
-        if (PIO_gotFirstCmdByte())
-        { // if 1st CMD byte was received
-            handleAcsiCommand();
-        }
-
-        //---------------------------
-        // sending and receiving data over SPI using DMA
-        if (shouldProcessCommands)
-        {                          // SPI DMA: nothing to Tx and nothing to Rx?
-            processHostCommands(); // and process all the received commands
-
-            shouldProcessCommands = FALSE; // mark that we don't need to process commands until next time
-        }
-
-        // in command waiting state, nothing to do and should send FW version?
-        uint32_t now = millis();
-
-        if ((now - lastSendFwTime) >= 1000)
-        {
-            sendFwToHost();
-        }
-
-        //---------------------------
-        // if the button was pressed, handle it
-        // if(EXTI->PR & BUTTON) {
-        //     onButtonPress();
-        // }
-    }
-}
-
-void sendFwToHost(void)
-{
-    sendFwVersion = FALSE;
-    sendBufferToHost(atnSendFwVersion, ATN_SENDFWVERSION_LEN_TX);
-    shouldProcessCommands = TRUE;
-}
-
-void handleAcsiCommand(void)
-{
-    // this is the loop which should go through the whole command processing (cmd phase, data phase, status phase) without other stuff
-    while (1)
-    {
         // get the command from ACSI and send it to host
         // IN  STATE: STATE_GET_COMMAND
         // OUT STATE: WAIT_COMMAND_RESPONSE when GOOD, STATE_GET_COMMAND when FAIL
-        if (state == STATE_GET_COMMAND && PIO_gotFirstCmdByte())
-        { // if 1st CMD byte was received
-            onGetCommand();
+        if (state == STATE_GET_COMMAND)
+        {
+            if(PIO_gotFirstCmdByte())       // if 1st CMD byte was received
+            {
+                onGetCommand();
+            }
+            else                // in command waiting state, nothing to do and should send FW version?
+            {
+                uint32_t now = millis();
+
+                if ((now - lastSendFwTime) >= 1000)
+                {
+                    sendFwToHost();
+                }
+            }
         }
 
         // transfer the data - read (to ST)
@@ -170,9 +126,9 @@ void handleAcsiCommand(void)
             longTimeout_basedOnSectorCount(dataCnt >> 9); // set timeout time based on how many sectors are transfered
 
             onDataRead(state == STATE_DATA_READ_WITH_STATUS);
+            // at this point it's either success or fail, but we're finished here
 
             timerSetup_cmdTimeoutChangeLength(CMD_TIMEOUT_SHORT); // after data transfer restore short timeout value
-            break;                                                // at this point it's either success or fail, but we're finished here
         }
 
         // transfer the data - write (from ST)
@@ -195,7 +151,7 @@ void handleAcsiCommand(void)
             timeoutStart(); // start the timeout timer to give the rest of code full timeout time
 
             onReadStatus();
-            break; // at this point it's either success or fail, but we're finished here
+            // at this point it's either success or fail, but we're finished here
         }
 
         // sending and receiving data over SPI using DMA
@@ -208,36 +164,47 @@ void handleAcsiCommand(void)
         //     shouldProcessCommands = FALSE; // mark that we don't need to process commands until next time
         // }
 
-        if (timeout())
-        { // if the data from host doesn't come within timeout, quit
-            state = STATE_GET_COMMAND;
-            break;
-        }
-
-        // if we came here and we are in the basic state, go to the outside loop to do the rest of the code
-        if (state == STATE_GET_COMMAND)
+        if (timeout())      // if the data from host doesn't come within timeout, quit
         {
-            break;
-        }
-    }
+            state = STATE_GET_COMMAND;
+            
+            // if something was wrong, reset XILINX so it won't get stuck
+            if (brStat != E_OK)
+            {
+                resetBridge();
+            }
 
-    //---------------
-    // if something was wrong, reset XILINX so it won't get stuck
-    if (brStat != E_OK)
-    {
-        resetBridge();
-    }
-
-    // The following goes only for SCSI interface, because current getBridgeStatus() (which is called from isBusIdle())
-    // triggers INT going low, and thus blocks FDD. The issue is somewhere in the Xilinx code or in the idea to use
-    // both XPIO & XDMA going high for this getBridgeStatus().
-    if (!isAcsiNotScsi)
-    { // only for SCSI interface!
-        if (!isBusIdle())
-        { // if the bus is not idle, do the reset
-            resetBridge();
+            // The following goes only for SCSI interface, because current getBridgeStatus() (which is called from isBusIdle())
+            // triggers INT going low, and thus blocks FDD. The issue is somewhere in the Xilinx code or in the idea to use
+            // both XPIO & XDMA going high for this getBridgeStatus().
+            if (!isAcsiNotScsi && !isBusIdle())
+            { // only for SCSI interface!
+                resetBridge();
+            }
         }
+
+        //---------------------------
+        // // sending and receiving data over SPI using DMA
+        // if (shouldProcessCommands)
+        // {                          // SPI DMA: nothing to Tx and nothing to Rx?
+        //     processHostCommands(); // and process all the received commands
+        //     shouldProcessCommands = FALSE; // mark that we don't need to process commands until next time
+        // }
+
+
+        //---------------------------
+        // if the button was pressed, handle it
+        // if(EXTI->PR & BUTTON) {
+        //     onButtonPress();
+        // }
     }
+}
+
+void sendFwToHost(void)
+{
+    sendFwVersion = FALSE;
+    sendBufferToHost(atnSendFwVersion, ATN_SENDFWVERSION_LEN_TX);
+    shouldProcessCommands = TRUE;
 }
 
 void onButtonPress(void)
@@ -257,260 +224,6 @@ void onButtonPress(void)
     // prevBtnPressTime = cnt; // store current time
 }
 
-void onGetCommand(void)
-{
-    uint8_t i, id;
-
-    //---------
-    // retrieve the command. There are some slight differences between ACSI and SCSI part,
-    // but the resulting commands should be the same (to make the rest of app work without further changes).
-    uint8_t good;
-
-    if (isAcsiNotScsi)
-    { // for ACSI
-        good = onGetCommandAcsi();
-    }
-    else
-    { // for SCSI
-        good = onGetCommandScsi();
-    }
-
-    if (!good)
-    { // if failed to get the cmd, quit
-        return;
-    }
-
-    id = (cmd[0] >> 5) & 0x07; // get only device ID
-
-    //-----
-    if(!idIsEnabled(id))        // this ID not enabled, ignore command
-    {
-        return;
-    }
-
-    //----------------
-    // if we got here, we should handle this in host
-    timeoutStart(); // start the timeout timer to give the rest of code full timeout time
-
-    sendBufferToHost(atnSendACSIcommand, ATN_SENDACSICOMMAND_LEN_TX);
-
-    state = STATE_WAIT_COMMAND_RESPONSE;
-    shouldProcessCommands = TRUE; // mark that we should process the commands on next SPI DMA idle time
-}
-
-uint8_t onGetCommandAcsi(void)
-{
-    uint8_t id, i;
-
-    //----------------------
-    cmd[0] = PIO_writeFirst(); // get byte from ST (waiting for the 1st byte)
-    id = (cmd[0] >> 5) & 0x07; // get only device ID
-
-    //----------------------
-    if(!idIsEnabled(id)) // if this ID is not enabled, quit
-    {
-        return 0;
-    }
-
-    cmdLen = 6; // maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
-
-    for (i = 1; i < cmdLen; i++)
-    {                         // receive the next command bytes
-        cmd[i] = PIO_write(); // drop down IRQ, get byte
-
-        if (brStat != E_OK)
-        { // if something was wrong, quit, failed
-            resetBridge();
-            return 0;
-        }
-
-        if (i == 1)
-        {                                   // if we got also the 2nd byte
-            getCmdLengthFromCmdBytesAcsi(); // we set up the length of command, etc.
-        }
-    }
-
-    return 1;
-}
-
-uint8_t onGetCommandScsi(void)
-{
-    uint8_t id;
-    uint8_t sel;
-    int i;
-
-    //----------------------
-    sel = PIO_writeFirst(); // get SELection byte
-    id = 0xff;              // mark that ID hasn't been found yet
-
-    for (i = 0; i < 8; i++)
-    {
-        if ((sel & (1 << i)) != 0)
-        { // if bit is one, this ID is selected
-            if(idIsEnabled(id))
-            {           // if that ID is enabled
-                id = i; // store this ID and quit loop
-                break;
-            }
-        }
-    }
-
-    if (id == 0xff)
-    { // ID not found? quit
-        return 0;
-    }
-    //----------------------
-    if(!idIsEnabled(id))    // if this ID is not enabled, quit
-    {
-        return 0;
-    }
-
-    cmdLen = 6; // maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
-
-    for (i = 0; i < cmdLen; i++)
-    {                         // receive the next command bytes
-        cmd[i] = PIO_write(); // drop down IRQ, get byte
-
-        if (brStat != E_OK)
-        { // if something was wrong, quit, failed
-            resetBridge();
-            return 0;
-        }
-
-        if (i == 0)
-        {                                         // if we got also the 2nd byte
-            getCmdLengthFromCmdBytesScsi(cmd[0]); // we set up the length of command, etc.
-        }
-    }
-
-    // now fix the command if the length is more than 6 bytes
-    if (cmdLen > 6)
-    {
-        for (i = 13; i > 0; i--)
-        { // move the cmd one byte further (to make cmd[0] unused)
-            cmd[i] = cmd[i - 1];
-        }
-        cmd[0] = 0x1f; // store ICD command marker
-
-        cmdLen++; // now the command is one byte longer
-    }
-
-    // for all commands add fake ACSI ID on top of the 0th byte
-    cmd[0] = cmd[0] | (id << 5); // add ID on the top 3 bits
-    return 1;
-}
-
-void onDataRead(uint8_t withStatus)
-{
-    // uint16_t i, loopCount, l, dataBytesCount;
-    // uint8_t dataMarkerFound;
-    // uint8_t res;
-    // TReadBuffer *rdBufNow;
-    // uint16_t *pData;
-
-    // seqNo = 0;
-    // state = STATE_GET_COMMAND; // this will be the next state once this function finishes with fail
-
-    // // nothing to send AND should send status? then just quit with status byte
-    // if (dataCnt == 0 && withStatus)
-    // {
-    //     PIO_read(statusByte);
-    //     return;
-    // }
-
-    // // calculate how many loops we will have to do
-    // loopCount = dataCnt / 512;
-
-    // if ((dataCnt % 512) != 0)
-    // {
-    //     loopCount++;
-    // }
-
-    // // receive 0th data block in rdBuf1
-    // rdBufNow = &rdBuf1;
-
-    // startSpiDmaForDataRead(dataCnt, rdBufNow);
-    // dataCnt -= (uint32_t)rdBufNow->dataBytesCount; // update remaining data size
-
-    // // now start the double buffered transfer to ST
-    // setDataDirection(DIR_SEND); // data direction for reading
-
-    // for (l = 0; l < loopCount; l++)
-    // {
-    //     // first wait until all data arrives in SPI DMA transfer
-    //     while (!spiDmaIsIdle)
-    //     {
-    //         if (timeout())
-    //         {                               // if the data from host doesn't come within timeout, quit
-    //             setDataDirection(DIR_RECV); // data direction for writing, and quit
-    //             return;
-    //         }
-    //     }
-
-    //     // if after transfering this block there should be another block of data
-    //     if (dataCnt > 0)
-    //     {
-    //         TReadBuffer *nextRdBuffer = rdBufNow->next;
-
-    //         startSpiDmaForDataRead(dataCnt, nextRdBuffer);     // start receiving data to the other buffer
-    //         dataCnt -= (uint32_t)nextRdBuffer->dataBytesCount; // update remaining data size
-    //     }
-
-    //     ///////////////////////////////////////////////////////////////
-    //     // send the received data to ST
-    //     // find the data marker
-    //     dataMarkerFound = FALSE;
-    //     pData = &rdBufNow->buffer[0];
-
-    //     for (i = 0; i < rdBufNow->count; i++)
-    //     {
-    //         uint16_t data;
-
-    //         data = *pData; // get data
-    //         pData++;
-
-    //         if (data == CMD_DATA_MARKER)
-    //         { // found data marker?
-    //             dataMarkerFound = TRUE;
-    //             break;
-    //         }
-    //     }
-
-    //     if (dataMarkerFound == FALSE)
-    //     { // didn't find the data marker?
-    //         if (withStatus)
-    //         {
-    //             PIO_read(SCSI_ST_CHECK_CONDITION); // send status: CHECK CONDITION and quit
-    //         }
-    //         return;
-    //     }
-
-    //     // now try to trasmit the data
-    //     dataBytesCount = rdBufNow->dataBytesCount;
-
-    //     res = dataReadCloop(pData, dataBytesCount);
-
-    //     if (res == 0)
-    //     {
-    //         setDataDirection(DIR_RECV); // data direction for writing, and quit
-    //         return;
-    //     }
-
-    //     // one cycle finished, now swap buffers and start all over again
-    //     rdBufNow = rdBufNow->next; // swap buffers
-    // }
-
-    // if (withStatus)
-    // { // if should send status, then send status and go to STATE_GET_COMMAND
-    //     state = STATE_GET_COMMAND;
-    //     PIO_read(statusByte); // send the status to Atari
-    // }
-    // else
-    // { // if shouldn't send status here, switch to state STATE_READ_STATUS, which will retrieve status from host and send it to ST
-    //     state = STATE_READ_STATUS;
-    // }
-}
-
 void startSpiDmaForDataRead(uint32_t dataCnt, TReadBuffer *readBfr)
 {
     uint32_t subCount, recvCount;
@@ -527,237 +240,6 @@ void startSpiDmaForDataRead(uint32_t dataCnt, TReadBuffer *readBfr)
     // now transfer the 0th data buffer over SPI
     atnMoreData[4] = seqNo++; // set the sequence # to Attention
     sendBufferToHost(atnMoreData, ATN_READMOREDATA_LEN_TX);
-}
-
-void onDataWrite(void)
-{
-    // uint8_t firstLoop, previousSpiSuccess;
-    // uint16_t subCount, recvCount;
-    // uint16_t index, data, i, value;
-    // TWriteBuffer *wrBufNow;
-
-    // seqNo = 0;
-    // wrBufNow = &wrBuf1;
-
-    // setDataDirection(DIR_RECV); // data direction for reading
-
-    // firstLoop = TRUE;
-
-    // while (dataCnt > 0)
-    // { // something to write?
-    //     // request maximum 512 bytes from host
-    //     subCount = (dataCnt > 512) ? 512 : dataCnt;
-    //     dataCnt -= subCount;
-
-    //     wrBufNow->buffer[4] = seqNo; // set the sequence # to Attention
-    //     seqNo++;
-
-    //     recvCount = subCount / 2;    // uint16_ts to receive: convert # of uint8_ts to # of uint16_ts
-    //     recvCount += (subCount & 1); // if subCount is odd number, then we need to transfer 1 uint16_t more
-
-    //     index = 5; // length of header before data
-
-    //     for (i = 0; i < recvCount; i++)
-    //     {                        // write this many uint16_ts
-    //         value = DMA_write(); // get data from Atari
-    //         value = value << 8;  // store as upper byte
-
-    //         if (brStat == E_TimeOut)
-    //         {                              // if timeout occured
-    //             state = STATE_GET_COMMAND; // transfer failed, don't send status, just get next command
-    //             return;
-    //         }
-
-    //         subCount--;
-    //         if (subCount == 0)
-    //         {                                    // in case of odd data count
-    //             wrBufNow->buffer[index] = value; // store data
-    //             index++;
-
-    //             break;
-    //         }
-
-    //         data = DMA_write();   // get data from Atari
-    //         value = value | data; // store as lower byte
-
-    //         if (brStat == E_TimeOut)
-    //         {                              // if timeout occured
-    //             state = STATE_GET_COMMAND; // transfer failed, don't send status, just get next command
-    //             return;
-    //         }
-
-    //         subCount--;
-
-    //         wrBufNow->buffer[index] = value; // store data
-    //         index++;
-    //     }
-
-    //     wrBufNow->buffer[index] = 0; // terminating zero
-    //     wrBufNow->count = index + 1; // store count, +1 because we have terminating zero
-
-    //     //----------
-    //     // set up the SPI DMA transfer
-    //     previousSpiSuccess = sendBufferToHost(wrBufNow->buffer, wrBufNow->count * 2);
-
-    //     // if this is not the first loop and the previous SPI transfer failed (something from this WRITE command was not transfered to host), fail
-    //     if (!firstLoop && !previousSpiSuccess)
-    //     {
-    //         state = STATE_GET_COMMAND;
-    //         return;
-    //     }
-
-    //     firstLoop = FALSE;
-    //     //----------
-
-    //     wrBufNow = wrBufNow->next; // use next write buffer
-    // }
-
-    state = STATE_READ_STATUS; // continue with sending the status
-}
-
-void onReadStatus(void)
-{
-    uint8_t i, newStatus;
-
-    newStatus = 0xff; // no status received
-
-    sendBufferToHost(&atnGetStatus[0], ATN_GETSTATUS_LEN_TX * 2);
-
-    // spiDma_waitForFinish();
-
-    // for (i = 0; i < 8; i++)
-    // { // go through the received buffer
-    //     if (cmdBuffer[i] == CMD_SEND_STATUS)
-    //     {
-    //         newStatus = cmdBuffer[i + 1] >> 8;
-    //         break;
-    //     }
-    // }
-
-    PIO_read(newStatus);       // send the status to Atari
-    state = STATE_GET_COMMAND; // get the next command
-}
-
-void getCmdLengthFromCmdBytesAcsi(void)
-{
-    // now it's time to set up the receiver buffer and length
-    if ((cmd[0] & 0x1f) == 0x1f)
-    {                                 // if the command is '0x1f'
-        switch ((cmd[1] & 0xe0) >> 5) // get the length of the command
-        {
-        case 0:
-            cmdLen = 7;
-            break;
-        case 1:
-            cmdLen = 11;
-            break;
-        case 2:
-            cmdLen = 11;
-            break;
-        case 5:
-            cmdLen = 13;
-            break;
-        default:
-            cmdLen = 7;
-            break;
-        }
-    }
-    else
-    {               // if it isn't a ICD command
-        cmdLen = 6; // then length is 6 bytes
-    }
-}
-
-void getCmdLengthFromCmdBytesScsi(uint8_t cmd)
-{
-    switch ((cmd & 0xe0) >> 5) // get the length of the command
-    {
-    case 0:
-        cmdLen = 6;
-        break;
-    case 1:
-        cmdLen = 10;
-        break;
-    case 2:
-        cmdLen = 10;
-        break;
-    case 4:
-        cmdLen = 16;
-        break;
-    case 5:
-        cmdLen = 12;
-        break;
-    default:
-        cmdLen = 6;
-        break;
-    }
-}
-
-void processHostCommands(void)
-{
-    uint8_t i, j;
-
-    for (i = 0; i < CMD_BUFFER_LENGTH; i++)
-    {
-        switch (cmdBuffer[i])
-        {
-        // process ACSI configuration
-        case CMD_ACSI_CONFIG:
-            handleAcsiConfig((uint8_t)(cmdBuffer[i + 1] >> 8));
-
-            cmdBuffer[i] = 0; // clear this command
-            cmdBuffer[i + 1] = 0;
-            cmdBuffer[i + 2] = 0;
-
-            i += 2;
-            break;
-
-        case CMD_DATA_WRITE:
-            dataCnt = cmdBuffer[i + 1]; // store the count of bytes we should WRITE - highest and middle byte
-            dataCnt = dataCnt << 8;
-            dataCnt |= cmdBuffer[i + 2] >> 8; // lowest byte
-
-            statusByte = cmdBuffer[i + 2] & 0xff;
-
-            for (j = 0; j < 3; j++)
-            { // clear this command
-                cmdBuffer[i + j] = 0;
-            }
-
-            state = STATE_DATA_WRITE; // go into DATA_WRITE state
-            i += 2;
-            break;
-
-        case CMD_DATA_READ_WITH_STATUS:
-        case CMD_DATA_READ_WITHOUT_STATUS:
-        {
-            uint8_t whichCommand = cmdBuffer[i];
-
-            dataCnt = cmdBuffer[i + 1]; // store the count of bytes we should READ - highest and middle byte
-            dataCnt = dataCnt << 8;
-            dataCnt |= cmdBuffer[i + 2] >> 8; // lowest byte
-
-            statusByte = cmdBuffer[i + 2] & 0xff;
-
-            for (j = 0; j < 3; j++)
-            { // clear this command
-                cmdBuffer[i + j] = 0;
-            }
-
-            if (whichCommand == CMD_DATA_READ_WITH_STATUS)
-            { // CMD_DATA_READ? go into STATE_DATA_READ_WITH_STATUS state
-                state = STATE_DATA_READ_WITH_STATUS;
-            }
-            else
-            { // CMD_DATA_READ_WITHOUT_STATUS?
-                state = STATE_DATA_READ_WITHOUT_STATUS;
-            }
-
-            i += 2;
-            break;
-        }
-        }
-    }
 }
 
 void handleAcsiConfig(uint8_t acsiIds)
@@ -807,13 +289,4 @@ uint8_t sendBufferToHost(uint8_t *bfr, uint32_t txCount)
     // TODO: add sending of data - txCount + TX_HEADER_SIZE
 
     return TRUE;
-}
-
-uint8_t idIsEnabled(uint8_t id)
-{
-    if(id > 7) {
-        return FALSE;
-    }
-
-    return (enabledIDs & (1 << id));
 }
