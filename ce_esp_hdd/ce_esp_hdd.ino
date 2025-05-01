@@ -29,13 +29,13 @@ char *VERSION_STRING_SHORT = {"4.00"};
 char *DATE_STRING = {"04/30/25"}; // MM/DD/YY
 
 volatile uint8_t sendFwVersion;
-uint8_t atnSendFwVersion[ATN_SENDFWVERSION_LEN_TX * 2];
-uint8_t atnSendACSIcommand[ATN_SENDACSICOMMAND_LEN_TX * 2];
+uint8_t atnSendFwVersion[ATN_SENDFWVERSION_LEN_TX];
+uint8_t atnSendACSIcommand[ATN_SENDACSICOMMAND_LEN_TX];
 
 uint16_t seqNo = 0;
-uint8_t atnMoreData[ATN_READMOREDATA_LEN_TX * 2];
+uint8_t atnMoreData[ATN_READMOREDATA_LEN_TX];
 
-uint8_t atnGetStatus[ATN_GETSTATUS_LEN_TX * 2];
+uint8_t atnGetStatus[ATN_GETSTATUS_LEN_TX];
 
 TWriteBuffer wrBuf1, wrBuf2;
 TReadBuffer rdBuf1, rdBuf2;
@@ -44,17 +44,16 @@ uint16_t smallDataBuffer[2];
 uint8_t cmdBuffer[CMD_BUFFER_LENGTH];
 
 //----------
-uint8_t cmd[14]; // received command bytes
+uint8_t *cmd;   // received command bytes, should point beyond the header in atnSendACSIcommand
 uint8_t cmdLen;  // length of received command
 uint8_t brStat;  // status from bridge
 uint8_t lastScsiStatusByte;
 
-uint8_t enabledIDs[8]; // when 1, Hanz will react on that ACSI ID #
+uint8_t enabledIDs;
+uint8_t idIsEnabled(uint8_t id);
 
 uint8_t firstConfigReceived; // used to turn LEDs on after first config received
 uint8_t shouldProcessCommands;
-
-uint32_t isrNow, isrPrev;
 
 uint16_t prevBtnPressTime;
 
@@ -63,17 +62,9 @@ void handleAcsiCommand(void);
 uint8_t isAcsiNotScsi;
 uint8_t busIdle;
 
-uint32_t toStart;
-uint32_t lastStart, lastEnd;
-
 uint32_t lastSendFwTime;
 
 uint8_t btnDownTime;
-
-struct
-{
-    uint16_t acsi;
-} configWords;
 
 void sendFwToHost(void);
 //--------------------------
@@ -95,6 +86,7 @@ void setup(void)
         pinMode(outputs[i], OUTPUT);
     }
 
+    cmd = atnSendACSIcommand + TX_HEADER_SIZE;      // place command beyond the header
     state = STATE_GET_COMMAND;
 
     sendFwVersion = FALSE;
@@ -150,7 +142,7 @@ void loop(void)
 void sendFwToHost(void)
 {
     sendFwVersion = FALSE;
-    sendBufferToHost((uint8_t *) &atnSendFwVersion[0], ATN_SENDFWVERSION_LEN_TX * 2);
+    sendBufferToHost(atnSendFwVersion, ATN_SENDFWVERSION_LEN_TX);
     shouldProcessCommands = TRUE;
 }
 
@@ -291,21 +283,16 @@ void onGetCommand(void)
     id = (cmd[0] >> 5) & 0x07; // get only device ID
 
     //-----
-    if (!enabledIDs[id])        // this ID not enabled, ignore command
+    if(!idIsEnabled(id))        // this ID not enabled, ignore command
     {
         return;
     }
 
     //----------------
-    // if we got here, we should handle this in host (RPi)
-    for (i = 0; i < 7; i++)
-    { // fill the command to array
-        atnSendACSIcommand[4 + i] = (((uint16_t)cmd[i * 2 + 0]) << 8) | cmd[i * 2 + 1];
-    }
-
+    // if we got here, we should handle this in host
     timeoutStart(); // start the timeout timer to give the rest of code full timeout time
 
-    sendBufferToHost((uint8_t *)&atnSendACSIcommand[0], ATN_SENDACSICOMMAND_LEN_TX * 2);
+    sendBufferToHost(atnSendACSIcommand, ATN_SENDACSICOMMAND_LEN_TX);
 
     state = STATE_WAIT_COMMAND_RESPONSE;
     shouldProcessCommands = TRUE; // mark that we should process the commands on next SPI DMA idle time
@@ -320,8 +307,8 @@ uint8_t onGetCommandAcsi(void)
     id = (cmd[0] >> 5) & 0x07; // get only device ID
 
     //----------------------
-    if (!enabledIDs[id])
-    { // if this ID is not enabled, quit
+    if(!idIsEnabled(id)) // if this ID is not enabled, quit
+    {
         return 0;
     }
 
@@ -360,7 +347,7 @@ uint8_t onGetCommandScsi(void)
     {
         if ((sel & (1 << i)) != 0)
         { // if bit is one, this ID is selected
-            if (enabledIDs[i])
+            if(idIsEnabled(id))
             {           // if that ID is enabled
                 id = i; // store this ID and quit loop
                 break;
@@ -373,8 +360,8 @@ uint8_t onGetCommandScsi(void)
         return 0;
     }
     //----------------------
-    if (!enabledIDs[id])
-    { // if this ID is not enabled, quit
+    if(!idIsEnabled(id))    // if this ID is not enabled, quit
+    {
         return 0;
     }
 
@@ -519,7 +506,7 @@ void onDataRead(uint8_t withStatus)
     //     PIO_read(statusByte); // send the status to Atari
     // }
     // else
-    // { // if shouldn't send status here, switch to state STATE_READ_STATUS, which will retrieve status from RPi and send it to ST
+    // { // if shouldn't send status here, switch to state STATE_READ_STATUS, which will retrieve status from host and send it to ST
     //     state = STATE_READ_STATUS;
     // }
 }
@@ -539,7 +526,7 @@ void startSpiDmaForDataRead(uint32_t dataCnt, TReadBuffer *readBfr)
 
     // now transfer the 0th data buffer over SPI
     atnMoreData[4] = seqNo++; // set the sequence # to Attention
-    sendBufferToHost((uint8_t *)&atnMoreData[0], 6 * 2);
+    sendBufferToHost(atnMoreData, ATN_READMOREDATA_LEN_TX);
 }
 
 void onDataWrite(void)
@@ -610,7 +597,7 @@ void onDataWrite(void)
 
     //     //----------
     //     // set up the SPI DMA transfer
-    //     previousSpiSuccess = sendBufferToHost((uint8_t *)&wrBufNow->buffer[0], wrBufNow->count * 2);
+    //     previousSpiSuccess = sendBufferToHost(wrBufNow->buffer, wrBufNow->count * 2);
 
     //     // if this is not the first loop and the previous SPI transfer failed (something from this WRITE command was not transfered to host), fail
     //     if (!firstLoop && !previousSpiSuccess)
@@ -718,8 +705,6 @@ void processHostCommands(void)
         case CMD_ACSI_CONFIG:
             handleAcsiConfig((uint8_t)(cmdBuffer[i + 1] >> 8));
 
-            configWords.acsi = cmdBuffer[i + 1]; // store config words
-
             cmdBuffer[i] = 0; // clear this command
             cmdBuffer[i + 1] = 0;
             cmdBuffer[i + 2] = 0;
@@ -780,18 +765,7 @@ void handleAcsiConfig(uint8_t acsiIds)
     int j;
 
     firstConfigReceived = TRUE; // mark that we've received 1st config
-
-    for (j = 0; j < 8; j++)
-    { // for each bit in ids set the flag in enabledIDs[]
-        if (acsiIds & (1 << j))
-        {
-            enabledIDs[j] = TRUE;
-        }
-        else
-        {
-            enabledIDs[j] = FALSE;
-        }
-    }
+    enabledIDs = acsiIds;
 
     // TODO: check if new config different from previous, then write settings to EEPROM
 }
@@ -806,8 +780,8 @@ void storeHeader(uint8_t *bfr, uint16_t atnCode, uint32_t txLen)
 void setupAtnBuffers(void)
 {
     storeHeader(atnSendFwVersion, ATN_FW_VERSION, 0);
-    storeWord(atnSendFwVersion + 10, version[0]);
-    storeWord(atnSendFwVersion + 12, version[1]);
+    storeWord(atnSendFwVersion + TX_HEADER_SIZE, version[0]);
+    storeWord(atnSendFwVersion + TX_HEADER_SIZE + 2, version[1]);
 
     storeHeader(atnSendACSIcommand, ATN_ACSI_COMMAND, 0);
     storeHeader(atnMoreData, ATN_READ_MORE_DATA, 0);
@@ -822,11 +796,24 @@ void setupAtnBuffers(void)
     rdBuf2.next = (void *)&rdBuf1;
 }
 
+/*
+    @param bfr Pointer to start of the data buffer
+    @param txCount Size of the data portion after the header (header is TX_HEADER_SIZE bytes big) in bytes
+*/
 uint8_t sendBufferToHost(uint8_t *bfr, uint32_t txCount)
 {
     storeDword(bfr + 6, txCount); // store the tx length on index 6..9
 
-    // TODO: add sending of data
+    // TODO: add sending of data - txCount + TX_HEADER_SIZE
 
     return TRUE;
+}
+
+uint8_t idIsEnabled(uint8_t id)
+{
+    if(id > 7) {
+        return FALSE;
+    }
+
+    return (enabledIDs & (1 << id));
 }

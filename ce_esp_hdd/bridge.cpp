@@ -77,7 +77,7 @@ void PIO_read(uint8_t scsiStatusByte)
 void PIO_read_solely(uint8_t val)
 {
     setDataDirection(DIR_SEND); // finish with send status
-    dataOut(val);               // output data to RPi GPIO pins
+    dataOut(val);               // output data to GPIO pins
 
     digitalWrite(PIN_INT_TRIG, HIGH); // do CLK pulse
     waitForEOTlevel(LOW);             // wait until INT is L
@@ -101,7 +101,7 @@ void MSG_read(uint8_t val)
 void DMA_read(uint8_t val)
 {
     setDataDirection(DIR_SEND); // finish with send status
-    dataOut(val);               // output data to RPi GPIO pins
+    dataOut(val);               // output data to GPIO pins
 
     digitalWrite(PIN_DRQ_TRIG, HIGH); // do CLK pulse
     waitForEOTlevel(LOW);             // wait until INT is L
@@ -210,7 +210,7 @@ void setDataDirection(uint8_t sendNotRecv)
 }
 
 /*
-    This method waits for EOT (end-of-transfer) to become H, after it's been set to L by RPi and
+    This method waits for EOT (end-of-transfer) to become H, after it's been set to L by chip and
     will be reset back to H by Atari after each transfered byte. It's waiting up to the timeout time
     and can fail if Atari doesn't transfer the current byte.
 */

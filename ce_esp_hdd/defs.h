@@ -19,6 +19,8 @@
     #define MAX(X,Y)    ((X > Y) ? X : Y)
 #endif
 
+#define TX_HEADER_SIZE          10
+
 #define CMD_TIMEOUT_SECS_PER_MB 3
 #define CMD_TIMEOUT_ONESECOND   1000
 #define CMD_TIMEOUT_SHORT       (CMD_TIMEOUT_ONESECOND / 2)     // this period will be 0.5 second
@@ -76,20 +78,11 @@ typedef struct
 
 #define ATN_VARIABLE_LEN                0xffff
 
-#define ATN_SENDFWVERSION_LEN_TX        10
-#define ATN_SENDFWVERSION_LEN_RX        10
-
-#define ATN_SENDACSICOMMAND_LEN_TX      12
-#define ATN_SENDACSICOMMAND_LEN_RX      CMD_BUFFER_LENGTH
-
-#define ATN_READMOREDATA_LEN_TX         6   
-#define ATN_READMOREDATA_LEN_RX         ATN_VARIABLE_LEN
-
+#define ATN_SENDFWVERSION_LEN_TX        20
+#define ATN_SENDACSICOMMAND_LEN_TX      24
+#define ATN_READMOREDATA_LEN_TX         12
 #define ATN_WRITEMOREDATA_LEN_TX        ATN_VARIABLE_LEN
-#define ATN_WRITEMOREDATA_LEN_RX        1
-
-#define ATN_GETSTATUS_LEN_TX            5
-#define ATN_GETSTATUS_LEN_RX            8
+#define ATN_GETSTATUS_LEN_TX            10
 
 ///////////////////////////
 
