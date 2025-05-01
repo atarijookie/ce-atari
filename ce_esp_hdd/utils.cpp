@@ -102,3 +102,75 @@ void timerSetup_cmdTimeoutChangeLength(uint32_t newPeriod)
     timeoutStartMillis = millis();
     timeoutDuration = newPeriod;
 }
+
+void getSetting(uint8_t settingId, uint8_t* settingBfr, uint8_t settingMaxLen)
+{
+    digitalWrite(PIN_CMD_DATA, HIGH);       // ikbd/eeprom chip to command mode
+    delay(3);                               // give some time to stabilize
+
+    // before issuing command, read any data that's in serial waiting to be read and ignore them
+    while(Serial1.available() > 0) {
+        Serial1.read();
+    }
+
+    // send the READ setting command, starting with \n to make sure it's at the start of line
+    Serial1.print("\nR");
+    Serial1.write(settingId);
+    Serial1.print("\n");
+
+    uint32_t start = millis();
+
+    // read from serial, store to buffer
+    int i = 0;
+    while(true)
+    {
+        // we're at the end of buffer? quit
+        if(i >= (settingMaxLen - 1)) {
+            break;
+        }
+
+        // taking too long and no more chars comming in? quit
+        if((millis() - start) > 100) {
+            break;
+        }
+
+        // something to read? read and store
+        if(Serial1.available() > 0) {
+            uint8_t data = Serial1.read();
+  
+            if(data == '\n') {          // end of line? terminate and quit
+                settingBfr[i] = 0;
+                break;
+            }
+
+            settingBfr[i] = data;        // not end of line, just store
+            i++;
+        }
+    }
+
+    settingBfr[i] = 0;                  // terminate at the end of string
+    digitalWrite(PIN_CMD_DATA, LOW);    // ikbd/eeprom chip to data mode
+}
+
+void setSetting(uint8_t settingId, uint8_t* settingBfr, uint8_t settingMaxLen)
+{
+    digitalWrite(PIN_CMD_DATA, HIGH);       // ikbd/eeprom chip to command mode
+    delay(3);                               // give some time to stabilize
+
+    // send the WRITE setting command, starting with \n to make sure it's at the start of line
+    Serial1.print("\nW");
+    Serial1.write(settingId);
+
+    for(int i=0; i<settingMaxLen; i++) {
+        if(settingBfr[i] == 0 || settingBfr[i] == '\n') {   // current char is zero or EOL? don't send anything more
+            break;
+        }
+
+        Serial1.write(settingBfr[i]);   // send setting value
+    }
+
+    Serial1.print("\n");                // send EOL to terminate the command
+
+    delay(10);                          // give some time to finish writing
+    digitalWrite(PIN_CMD_DATA, LOW);    // ikbd/eeprom chip to data mode
+}

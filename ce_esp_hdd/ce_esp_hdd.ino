@@ -1,3 +1,5 @@
+#include "WiFi.h"
+
 #include "defs.h"
 #include "bridge.h"
 #include "utils.h"
@@ -6,7 +8,6 @@
 void onButtonPress(void);
 
 void processHostCommands(void);
-void handleAcsiConfig(uint8_t acsiIds);
 
 uint8_t sendBufferToHost(uint8_t *bfr, uint32_t txCount);
 
@@ -55,9 +56,16 @@ uint32_t lastSendFwTime;
 uint8_t btnDownTime;
 
 void sendFwToHost(void);
-//--------------------------
+
+uint8_t wifiSsid[40];
+uint8_t wifiPswd[40];
+void connectToWifiIfNotConnected(void);
+
 void setup(void)
 {
+    Serial.begin(115200);       // uart0 for debug strings
+    Serial1.begin(19200);       // uart1 for IKBD / eeprom chip
+
     #define INPUTS_COUNT 12
     int inputs[INPUTS_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_CMD1ST, PIN_EOT, PIN_SDA, PIN_BOOT_BTN};
 
@@ -73,6 +81,15 @@ void setup(void)
     {
         pinMode(outputs[i], OUTPUT);
     }
+
+    // read wifi settings
+    getSetting(SETTING_SSID, wifiSsid, 40);
+    getSetting(SETTING_PSWD, wifiPswd, 40);
+
+    // read acsi ids
+    uint8_t idsAsString[6];
+    getSetting(SETTING_IDS, idsAsString, 6);
+    enabledIDs = atoi((const char*) idsAsString);
 
     cmd = atnSendACSIcommand + TX_HEADER_SIZE;      // place command beyond the header
     state = STATE_GET_COMMAND;
@@ -93,8 +110,16 @@ void setup(void)
 
 void loop(void)
 {
-    while (1)
+    while(1)
     {
+        // connect to wifi if not connecter
+        connectToWifiIfNotConnected();
+
+        // TODO:
+        // find out the CE host ip and port
+        // connect to CE host
+
+
         // get the command from ACSI and send it to host
         // IN  STATE: STATE_GET_COMMAND
         // OUT STATE: WAIT_COMMAND_RESPONSE when GOOD, STATE_GET_COMMAND when FAIL
@@ -191,7 +216,6 @@ void loop(void)
         //     shouldProcessCommands = FALSE; // mark that we don't need to process commands until next time
         // }
 
-
         //---------------------------
         // if the button was pressed, handle it
         // if(EXTI->PR & BUTTON) {
@@ -242,14 +266,18 @@ void startSpiDmaForDataRead(uint32_t dataCnt, TReadBuffer *readBfr)
     sendBufferToHost(atnMoreData, ATN_READMOREDATA_LEN_TX);
 }
 
-void handleAcsiConfig(uint8_t acsiIds)
+void handleAcsiConfig(uint8_t newAcsiIds)
 {
-    int j;
-
     firstConfigReceived = TRUE; // mark that we've received 1st config
-    enabledIDs = acsiIds;
 
-    // TODO: check if new config different from previous, then write settings to EEPROM
+    // check if new config different from previous, then write settings to EEPROM
+    if(enabledIDs != newAcsiIds) {
+        enabledIDs = newAcsiIds;
+
+        uint8_t idsAsString[6];
+        itoa(newAcsiIds, (char*) idsAsString, 10);  // integer to string
+        setSetting(SETTING_IDS, idsAsString, 6);    // write settings
+    }
 }
 
 void storeHeader(uint8_t *bfr, uint16_t atnCode, uint32_t txLen)
@@ -290,3 +318,31 @@ uint8_t sendBufferToHost(uint8_t *bfr, uint32_t txCount)
 
     return TRUE;
 }
+
+void connectToWifiIfNotConnected(void)
+{
+    static uint32_t lastConnectAttempt = 0;
+
+    // if last attempt was less than short time ago, don't try
+    if(lastConnectAttempt != 0 && (millis() - lastConnectAttempt) < 15000) {
+        return;
+    }
+
+    // if already connected, don't do anything else
+    if(WiFi.status() == WL_CONNECTED) {
+        return;
+    }
+
+    // we're connecting now
+    lastConnectAttempt = millis();
+
+    // no wifi SSID stored? cannot connect
+    if(strlen((const char*) wifiSsid) == 0) {
+        return;
+    }
+
+    // not connected to wifi yet, try to connect
+    WiFi.mode(WIFI_STA);
+    WiFi.begin((const char*) wifiSsid, (const char*) wifiPswd);
+}
+

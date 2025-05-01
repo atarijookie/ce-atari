@@ -6,7 +6,7 @@
 void onButtonPress(void);
 
 void processHostCommands(void);
-void handleAcsiConfig(uint8_t acsiIds);
+void handleAcsiConfig(uint8_t newAcsiIds);
 
 uint8_t sendBufferToHost(uint8_t *bfr, uint32_t txCount);
 
