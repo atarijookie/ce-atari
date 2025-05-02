@@ -32,6 +32,9 @@ uint16_t hostPortIkbd;
 extern uint8_t state;
 extern uint32_t dataCnt;
 extern uint8_t statusByte;
+extern bool dataReceived;
+
+THeader hddHeader;      // keep the header global to preserve syncTag between calls
 
 // Read wifi settings, connect to wifi if not connected, don't try too often.
 void connectToWifi(void)
@@ -299,15 +302,81 @@ void handleSendStatus(void)
     state = STATE_READ_STATUS;          // transition to READ STATUS state
 }
 
-THeader hddHeader;      // keep the hader global to preserve syncTag between calls
+void handleReadStart(bool withStatus)
+{
+    uint8_t data[4];
+    memset(data, 0, 4);
+    clientHdd.read(data, 4);
+
+    dataCnt = get24bits(data);
+    statusByte = data[3];
+
+    state = withStatus ? STATE_DATA_READ_WITH_STATUS : STATE_DATA_READ_WITHOUT_STATUS;
+}
+
+void handleWriteStart(void)
+{
+    uint8_t data[4];
+    memset(data, 0, 4);
+    clientHdd.read(data, 4);
+
+    dataCnt = get24bits(data);
+    statusByte = data[3];
+
+    state = STATE_DATA_WRITE;
+}
+
+void handleReadDataReceived(void)
+{
+    dataCnt = hddHeader.len;
+    dataReceived = true;
+}
 
 void handleIncommingData(void)
 {
     if(getIncommingHeader(&clientHdd, SYNC_TAG_HDD, &hddHeader))   // if got valid hdd header
     {
+        dataReceived = false;
+
         switch(hddHeader.cmdCode) {
             case CMD_ACSI_CONFIG: handleAcsiConfig(hddHeader.len); break;
+            case CMD_DATA_READ_WITH_STATUS: handleReadStart(true); break;
+            case CMD_DATA_READ_WITHOUT_STATUS: handleReadStart(false); break;
+            case CMD_DATA_MARKER: handleReadDataReceived(); break;
+            case CMD_DATA_WRITE: handleWriteStart(); break;
             case CMD_SEND_STATUS: handleSendStatus(); break;
         }
     }
+}
+
+/*
+    Send header and data to host using the desired socket.
+    @param whichSock SOCK_HDD or SOCK_FDD
+    @param bfr Pointer to start of the data buffer
+    @param txCount Size of the data portion after the header (header is TX_HEADER_SIZE bytes big) in bytes
+*/
+uint8_t sendBufferToHost(uint8_t whichSock, uint8_t *bfr, uint32_t txCount)
+{
+    storeDword(bfr + 6, txCount); // store the tx length on index 6..9
+
+    switch(whichSock)
+    {
+        case SOCK_HDD: 
+        {
+            if(clientHdd.connected()) {
+                clientHdd.write(bfr, TX_HEADER_SIZE + txCount);
+            }
+            break;
+        }
+
+        // case SOCK_FDD: 
+        // {
+        //     if(clientFdd.connected()) {
+        //         clientFdd.write(bfr, TX_HEADER_SIZE + txCount);
+        //     }
+        //     break;
+        // }
+    }
+
+    return TRUE;
 }

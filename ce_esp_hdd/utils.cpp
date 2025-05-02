@@ -97,7 +97,7 @@ uint8_t timeout(void)
     return FALSE;
 }
 
-void timerSetup_cmdTimeoutChangeLength(uint32_t newPeriod)
+void cmdTimeoutChangeLength(uint32_t newPeriod)
 {
     timeoutStartMillis = millis();
     timeoutDuration = newPeriod;

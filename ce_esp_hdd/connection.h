@@ -3,8 +3,12 @@
 
 #include <arduino.h>
 
+#define SOCK_HDD    0
+#define SOCK_FDD    1
+
 void connectToHost(void);
 void handleIncommingData(void);
+uint8_t sendBufferToHost(uint8_t whichSock, uint8_t *bfr, uint32_t txCount);
 
 #define SYNC_TAG_HDD    0xc050d1c5
 

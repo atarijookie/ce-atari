@@ -29,23 +29,6 @@
 #define CMD_TIMEOUT_SHORT       (CMD_TIMEOUT_ONESECOND / 2)     // this period will be 0.5 second
 #define CMD_TIMEOUT_LONG        (CMD_TIMEOUT_ONESECOND * 3)     // this period will be 3.0 second
 
-typedef struct 
-{
-    uint8_t buffer[550];           // buffer for the written data - with some (38 bytes) reserve at the end in case of overflow
-    uint16_t count;                // count of uint16_ts in buffer 
-    
-    void *next;                    // pointer to the next available TAtnBuffer
-} TWriteBuffer;
-
-typedef struct 
-{
-    uint8_t buffer[550];            // buffer for the written data - with some (38 bytes) reserve at the end in case of overflow
-    uint16_t count;                 // count of uint16_ts in buffer - may include header, markers, data, terminating marker
-    uint16_t dataBytesCount;        // count of uint8_ts of just data in buffer
-    
-    void *next;                     // pointer to the next available TAtnBuffer
-} TReadBuffer;
-
 // commands sent from device to host
 #define ATN_FW_VERSION                      0x01                                // followed by string with FW version (length: 4 uint16_ts - cmd, v[0], v[1], 0)
 #define ATN_ACSI_COMMAND                    0x02

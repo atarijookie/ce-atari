@@ -13,7 +13,7 @@ void store24bits(uint8_t *bfr, uint32_t val);
 void timeoutStart(void);
 uint8_t timeout(void);
 void longTimeout_basedOnSectorCount(uint16_t sectorCount);
-void timerSetup_cmdTimeoutChangeLength(uint32_t newPeriod);
+void cmdTimeoutChangeLength(uint32_t newPeriod);
 
 #define SETTING_SSID 'S'
 #define SETTING_PSWD 'P'
