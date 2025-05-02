@@ -9,9 +9,6 @@
 #define UARTMARK_STCMD      0xAA
 #define UARTMARK_KEYBDATA   0xBB
 
-// pin used for cmd / data separation
-#define PIN_CMD_DATA        PIN_PA4
-
 void setup() {
   Serial.begin(19200);    // TX and RX are connected to ESP32         -- PORTMUX - default setup of UART0 is on PA[3:0]
   Serial1.begin(7812);    // TX - data from host, RX - data from IKBD -- PORTMUX - default setup of UART1 is on PC[3:0]
@@ -27,15 +24,12 @@ void setup() {
   // This probably has to be done after the Serial2.begin(), because UartClass::begin() sets this too, 
   // but I didn't find a proper way to define the remap using lib.
   PORTMUX.USARTROUTEA |= PORTMUX_USART2_ALT1_gc;
-
-  pinMode(PIN_CMD_DATA, INPUT_PULLUP);
 }
 
-void uartResend(void)
-{
+void loop() {
   uint8_t data;
 
-  while(digitalRead(PIN_CMD_DATA) == LOW) {
+  while(true) {
     if(Serial.available() > 0) {    // got data from ESP32?
       data = Serial.read();
       Serial1.write(data);
@@ -53,103 +47,6 @@ void uartResend(void)
 
       Serial.write(UARTMARK_KEYBDATA);
       Serial.write(data);
-    }
-  }
-}
-
-#define EEPROM_MAGIC_VALUE  0xda
-
-void eepromStoreFromBuffer(int eepromStartAddress, uint8_t* bfr, uint8_t maxSize)
-{
-  // at 0th position store magic value so we can tell that the value has been written
-  EEPROM.write(eepromStartAddress, EEPROM_MAGIC_VALUE);
-
-  int i;
-  for(i=0; i<maxSize; i++) {    // go through the buffer, up to max size
-    EEPROM.write(eepromStartAddress + i + 1, bfr[i]);   // write value to eeprom (including the zero value)
-
-    if(bfr[i] == 0) {   // zero terminated end of string found, quit
-      return;
-    }
-  }
-
-  // if we got here, we've reached the end of input buffer, so terminate string at the end
-  EEPROM.write(eepromStartAddress + maxSize - 1, 0);
-}
-
-void eepromReadToSerial(int eepromStartAddress, uint8_t maxSize)
-{
-  // if the 0th position doesn't contain magic value, return empty string, because this hasn't been written yet
-  if(EEPROM.read(eepromStartAddress) != EEPROM_MAGIC_VALUE) {
-    Serial.write('\n');
-    return;  
-  }
-
-  int i;
-
-  for(i=0; i<maxSize; i++) {    // go through the buffer, up to max size
-    uint8_t data = EEPROM.read(eepromStartAddress + i + 1);
-
-    if(data == 0) {             // zero terminated end of string found, quit (don't output the zero to serial port)
-      break;
-    }
-
-    Serial.write(data);
-  }
-
-  Serial.write('\n');
-}
-
-void handleEsp32Commands(void)
-{
-  #define BUFFER_SIZE 40
-  uint8_t buffer[BUFFER_SIZE];
-  uint8_t cnt = 0;
-
-  #define EEPROM_ADDR_SSID      (0 * BUFFER_SIZE)
-  #define EEPROM_ADDR_PSWD      (1 * BUFFER_SIZE)
-  #define EEPROM_ADDR_IDS       (2 * BUFFER_SIZE)
-
-  while(digitalRead(PIN_CMD_DATA) == HIGH) {
-    if(Serial.available() <=0) {    // no data? just wait for more data or controll pin change
-      continue;
-    }
-
-    uint8_t data = Serial.read();
-
-    if(cnt < (BUFFER_SIZE-2)) {   // buffer not full? add to buffer
-      buffer[cnt] = data;
-      cnt++;
-    }
-
-    if(data == '\n') {      // EOL? handle data
-      buffer[cnt - 1] = 0;  // zero terminate string by replacing last '\n' with zero
-
-      if(buffer[0] == 'W') {        // write?
-        switch(buffer[1]) {
-          case 'S': eepromStoreFromBuffer(EEPROM_ADDR_SSID, buffer + 2, BUFFER_SIZE - 2); break;    // write SSID
-          case 'P': eepromStoreFromBuffer(EEPROM_ADDR_PSWD, buffer + 2, BUFFER_SIZE - 2); break;    // write password
-          case 'I': eepromStoreFromBuffer(EEPROM_ADDR_IDS,  buffer + 2, 3); break;                  // ACSI IDs (from 0 to 255, as string, so max 3 chars)
-        }
-      } else if(buffer[0] == 'R') {   // read?
-        switch(buffer[1]) {
-          case 'S': eepromReadToSerial(EEPROM_ADDR_SSID, BUFFER_SIZE - 2); break;   // read SSID
-          case 'P': eepromReadToSerial(EEPROM_ADDR_PSWD, BUFFER_SIZE - 2); break;   // read password
-          case 'I': eepromReadToSerial(EEPROM_ADDR_IDS,  3); break;                 // read ACSI IDs as string
-        }
-      }
-
-      cnt = 0;              // restart receiving at the buffer start
-    }
-  }
-}
-
-void loop() {
-  while(true) {
-    if(digitalRead(PIN_CMD_DATA) == HIGH) {   // if high, handle commands from ESP32
-      handleEsp32Commands();
-    } else {    // if low, just pass data through UARTs
-      uartResend();
     }
   }
 }

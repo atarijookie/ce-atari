@@ -1,3 +1,4 @@
+#include <Preferences.h>
 #include "WiFi.h"
 
 #include "defs.h"
@@ -5,6 +6,8 @@
 #include "utils.h"
 #include "command_handling.h"
 #include "connection.h"
+
+Preferences preferences;
 
 void onButtonPress(void);
 
@@ -71,8 +74,8 @@ void setup(void)
         pinMode(inputs[i], INPUT);
     }
 
-    #define OUTPUTS_COUNT 6
-    int outputs[OUTPUTS_COUNT] = {PIN_OUT_OE, PIN_FF12D, PIN_INT_TRIG, PIN_DRQ_TRIG, PIN_SCL, PIN_CMD_DATA};
+    #define OUTPUTS_COUNT 5
+    int outputs[OUTPUTS_COUNT] = {PIN_OUT_OE, PIN_FF12D, PIN_INT_TRIG, PIN_DRQ_TRIG, PIN_SCL};
 
     for (int i = 0; i < OUTPUTS_COUNT; i++)
     {
@@ -80,9 +83,9 @@ void setup(void)
     }
 
     // read acsi ids
-    uint8_t idsAsString[6];
-    getSetting(SETTING_IDS, idsAsString, 6);
-    enabledIDs = atoi((const char*) idsAsString);
+    preferences.begin("acsi", PREFERENCES_RO_MODE);
+    enabledIDs = preferences.getUChar("ids", 0); 
+    preferences.end();
 
     cmd = atnSendACSIcommand + TX_HEADER_SIZE;      // place command beyond the header
     state = STATE_GET_COMMAND;
@@ -262,9 +265,9 @@ void handleAcsiConfig(uint8_t newAcsiIds)
     if(enabledIDs != newAcsiIds) {
         enabledIDs = newAcsiIds;
 
-        uint8_t idsAsString[6];
-        itoa(newAcsiIds, (char*) idsAsString, 10);  // integer to string
-        setSetting(SETTING_IDS, idsAsString, 6);    // write settings
+        preferences.begin("acsi", PREFERENCES_RW_MODE);
+        preferences.putUChar("ids", newAcsiIds); 
+        preferences.end();
     }
 }
 

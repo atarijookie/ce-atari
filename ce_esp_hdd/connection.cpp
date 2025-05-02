@@ -1,12 +1,17 @@
 #include "WiFi.h"
+#include <Preferences.h>
 
 #include "defs.h"
 #include "connection.h"
 #include "utils.h"
 
+#include "settings_for_development.h"
+
+extern Preferences preferences;
+
 bool wifiSettingsLoaded;
-uint8_t wifiSsid[40];
-uint8_t wifiPswd[40];
+String ssid;
+String password;
 
 #define SERVER_UDP_PORT 7200 // port number where CE listens for client requests
 #define CLIENT_UDP_PORT 7201 // port where this client should listen for CE responses
@@ -18,7 +23,7 @@ NetworkClient clientHdd;
 NetworkClient clientIkbd;
 
 uint8_t hostIp[4];
-char hostIpString[20];
+String hostIpString;
 uint16_t hostPortHdd;
 uint16_t hostPortFdd;
 uint16_t hostPortIkbd;
@@ -41,19 +46,24 @@ void connectToWifi(void)
     if (!wifiSettingsLoaded)
     {
         wifiSettingsLoaded = true;
-        getSetting(SETTING_SSID, wifiSsid, 40);
-        getSetting(SETTING_PSWD, wifiPswd, 40);
+
+        preferences.begin("credentials", PREFERENCES_RO_MODE);
+        ssid = preferences.getString("ssid", ""); 
+        password = preferences.getString("password", "");
+        preferences.end();
+
+        SET_SETTINGS_FOR_DEVELOPMENT(ssid, password, hostIp, hostIpString, hostPortHdd, hostPortFdd, hostPortIkbd);
     }
 
     // no wifi SSID stored? cannot connect
-    if (strlen((const char *)wifiSsid) == 0)
+    if (ssid.length() == 0)
     {
         return;
     }
 
     // not connected to wifi yet, try to connect
     WiFi.mode(WIFI_STA);
-    WiFi.begin((const char *)wifiSsid, (const char *)wifiPswd);
+    WiFi.begin(ssid.c_str(), password.c_str());
 }
 
 // Send broadcast to find any CE server on the network.
@@ -165,7 +175,7 @@ void ceDiscoveryReceive(void)
         }
 
         IPAddress addr(hostIp[0], hostIp[1], hostIp[2], hostIp[3]); // octets to IPAddress
-        strcpy(hostIpString, addr.toString().c_str());              // copy the ip address to char string
+        hostIpString = addr.toString();                             // copy the ip address as string
 
         // store ports and stop receiving
         hostPortHdd = getWord(buffer + 4);
@@ -178,7 +188,7 @@ void connectToCEhost(void)
 {
     static uint32_t lastAttempt = 0xffff0000; // -65k
 
-    if (clientHdd.connected() && clientIkbd.connected())
+    if (clientHdd.connected())  // && clientIkbd.connected())
     { // already connected? quit
         return;
     }
@@ -193,14 +203,14 @@ void connectToCEhost(void)
     lastAttempt = millis();
 
     // no host IP? not connecting
-    if (strlen(hostIpString) == 0)
+    if (hostIpString.length() == 0)
     {
         return;
     }
 
     // start connection attempt
-    clientHdd.connect(hostIpString, hostPortHdd);
-    clientIkbd.connect(hostIpString, hostPortIkbd);
+    clientHdd.connect(hostIpString.c_str(), hostPortHdd);
+    // clientIkbd.connect(hostIpString.c_str(), hostPortIkbd);
 }
 
 void connectToHost(void)
@@ -218,4 +228,47 @@ void connectToHost(void)
 
     // connect to CE server
     connectToCEhost();
+}
+
+bool getIncommingHeader(NetworkClient* client, uint32_t expectedSyncTag, THeader* header)
+{
+    if(!client->connected())    // client not connected, no header received
+    {
+        return false;
+    }
+
+    while(true)
+    {
+        if(client->available() < 10)    // not enough data for full header, no header received
+        {
+            return false;
+        }
+
+        uint32_t data = ((uint8_t) client->read()); // read byte
+        header->syncTag = header->syncTag << 8;     // shift previous sync tag one byte up
+        header->syncTag |= data;                    // add lowest byte to syncTag
+
+        if(header->syncTag == expectedSyncTag)      // found expected syncTag
+        {
+            uint8_t rest[6];
+            client->read(rest, 6);               // read rest of header
+            header->atnCode = getWord(rest);
+            header->len = getDword(rest + 2);
+
+            return true;                        // got complete header
+        }
+    }
+
+    return false;       // no valid header
+}
+
+THeader hddHeader;      // keep the hader global to preserve syncTag between calls
+
+void handleIncommingData(void)
+{
+    if(getIncommingHeader(&clientHdd, SYNC_TAG_HDD, &hddHeader))   // if got valid hdd header
+    {
+
+    }
+
 }

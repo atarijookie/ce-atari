@@ -21,6 +21,9 @@
 
 #define TX_HEADER_SIZE          10
 
+#define PREFERENCES_RW_MODE false
+#define PREFERENCES_RO_MODE true
+
 #define CMD_TIMEOUT_SECS_PER_MB 3
 #define CMD_TIMEOUT_ONESECOND   1000
 #define CMD_TIMEOUT_SHORT       (CMD_TIMEOUT_ONESECOND / 2)     // this period will be 0.5 second
@@ -108,7 +111,6 @@ typedef struct
 #define PIN_RXD_IKBD    18
 #define PIN_USB_DM      19
 #define PIN_USB_DP      20
-#define PIN_CMD_DATA    21      // output, for IKBD CMD / data switching
 #define PIN_TXD_DEBUG   43
 #define PIN_RXD_DEBUG   44
 #define PIN_BOOT_BTN    0       // input
