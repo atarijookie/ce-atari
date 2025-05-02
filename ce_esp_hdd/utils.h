@@ -15,11 +15,10 @@ uint8_t timeout(void);
 void longTimeout_basedOnSectorCount(uint16_t sectorCount);
 void timerSetup_cmdTimeoutChangeLength(uint32_t newPeriod);
 
-
-#define SETTING_SSID    'S'
-#define SETTING_PSWD    'P'
-#define SETTING_IDS     'I'
-void getSetting(uint8_t settingId, uint8_t* settingBfr, uint8_t settingMaxLen);
-void setSetting(uint8_t settingId, uint8_t* settingBfr, uint8_t settingMaxLen);
+#define SETTING_SSID 'S'
+#define SETTING_PSWD 'P'
+#define SETTING_IDS 'I'
+void getSetting(uint8_t settingId, uint8_t *settingBfr, uint8_t settingMaxLen);
+void setSetting(uint8_t settingId, uint8_t *settingBfr, uint8_t settingMaxLen);
 
 #endif

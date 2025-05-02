@@ -4,6 +4,7 @@
 #include "bridge.h"
 #include "utils.h"
 #include "command_handling.h"
+#include "connection.h"
 
 void onButtonPress(void);
 
@@ -57,10 +58,6 @@ uint8_t btnDownTime;
 
 void sendFwToHost(void);
 
-uint8_t wifiSsid[40];
-uint8_t wifiPswd[40];
-void connectToWifiIfNotConnected(void);
-
 void setup(void)
 {
     Serial.begin(115200);       // uart0 for debug strings
@@ -81,10 +78,6 @@ void setup(void)
     {
         pinMode(outputs[i], OUTPUT);
     }
-
-    // read wifi settings
-    getSetting(SETTING_SSID, wifiSsid, 40);
-    getSetting(SETTING_PSWD, wifiPswd, 40);
 
     // read acsi ids
     uint8_t idsAsString[6];
@@ -112,13 +105,8 @@ void loop(void)
 {
     while(1)
     {
-        // connect to wifi if not connecter
-        connectToWifiIfNotConnected();
-
-        // TODO:
-        // find out the CE host ip and port
-        // connect to CE host
-
+        // connect to wifi, discover CE server, connect to CE server
+        connectToHost();
 
         // get the command from ACSI and send it to host
         // IN  STATE: STATE_GET_COMMAND
@@ -317,32 +305,5 @@ uint8_t sendBufferToHost(uint8_t *bfr, uint32_t txCount)
     // TODO: add sending of data - txCount + TX_HEADER_SIZE
 
     return TRUE;
-}
-
-void connectToWifiIfNotConnected(void)
-{
-    static uint32_t lastConnectAttempt = 0;
-
-    // if last attempt was less than short time ago, don't try
-    if(lastConnectAttempt != 0 && (millis() - lastConnectAttempt) < 15000) {
-        return;
-    }
-
-    // if already connected, don't do anything else
-    if(WiFi.status() == WL_CONNECTED) {
-        return;
-    }
-
-    // we're connecting now
-    lastConnectAttempt = millis();
-
-    // no wifi SSID stored? cannot connect
-    if(strlen((const char*) wifiSsid) == 0) {
-        return;
-    }
-
-    // not connected to wifi yet, try to connect
-    WiFi.mode(WIFI_STA);
-    WiFi.begin((const char*) wifiSsid, (const char*) wifiPswd);
 }
 

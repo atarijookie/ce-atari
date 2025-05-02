@@ -166,7 +166,7 @@ void getBridgeStatus(void)
     busIdle = TRUE;
     isAcsiNotScsi = 1;
 #else
-    busIdle = TRUE;         // TODO: check if bus idle
+    busIdle = TRUE; // TODO: check if bus idle
     isAcsiNotScsi = 0;
 #endif
 }

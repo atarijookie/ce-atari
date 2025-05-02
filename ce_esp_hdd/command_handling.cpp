@@ -39,8 +39,8 @@ extern uint8_t cmdBuffer[CMD_BUFFER_LENGTH];
 
 //----------
 extern uint8_t *cmd;   // received command bytes, should point beyond the header in atnSendACSIcommand
-extern uint8_t cmdLen;  // length of received command
-extern uint8_t brStat;  // status from bridge
+extern uint8_t cmdLen; // length of received command
+extern uint8_t brStat; // status from bridge
 extern uint8_t lastScsiStatusByte;
 
 extern uint8_t enabledIDs;
@@ -79,7 +79,7 @@ void onGetCommand(void)
     id = (cmd[0] >> 5) & 0x07; // get only device ID
 
     //-----
-    if(!idIsEnabled(id))        // this ID not enabled, ignore command
+    if (!idIsEnabled(id)) // this ID not enabled, ignore command
     {
         return;
     }
@@ -103,7 +103,7 @@ uint8_t onGetCommandAcsi(void)
     id = (cmd[0] >> 5) & 0x07; // get only device ID
 
     //----------------------
-    if(!idIsEnabled(id)) // if this ID is not enabled, quit
+    if (!idIsEnabled(id)) // if this ID is not enabled, quit
     {
         return 0;
     }
@@ -143,7 +143,7 @@ uint8_t onGetCommandScsi(void)
     {
         if ((sel & (1 << i)) != 0)
         { // if bit is one, this ID is selected
-            if(idIsEnabled(id))
+            if (idIsEnabled(id))
             {           // if that ID is enabled
                 id = i; // store this ID and quit loop
                 break;
@@ -156,7 +156,7 @@ uint8_t onGetCommandScsi(void)
         return 0;
     }
     //----------------------
-    if(!idIsEnabled(id))    // if this ID is not enabled, quit
+    if (!idIsEnabled(id)) // if this ID is not enabled, quit
     {
         return 0;
     }
@@ -473,7 +473,8 @@ void getCmdLengthFromCmdBytesScsi(uint8_t cmd)
 
 uint8_t idIsEnabled(uint8_t id)
 {
-    if(id > 7) {
+    if (id > 7)
+    {
         return FALSE;
     }
 
