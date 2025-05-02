@@ -70,7 +70,8 @@ typedef struct
 #define STATE_DATA_READ_WITH_STATUS             3
 #define STATE_DATA_READ_WITHOUT_STATUS          4
 #define STATE_DATA_WRITE                        5
-#define STATE_READ_STATUS                       6
+#define STATE_WAIT_FOR_STATUS_ARRIVAL           6
+#define STATE_READ_STATUS                       7
 #define STATE_SEND_FW_VER                       10
 
 #define CMD_BUFFER_LENGTH                       16

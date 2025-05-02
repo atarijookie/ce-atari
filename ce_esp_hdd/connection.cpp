@@ -8,6 +8,7 @@
 #include "settings_for_development.h"
 
 extern Preferences preferences;
+extern uint8_t enabledIDs;
 
 bool wifiSettingsLoaded;
 String ssid;
@@ -27,6 +28,10 @@ String hostIpString;
 uint16_t hostPortHdd;
 uint16_t hostPortFdd;
 uint16_t hostPortIkbd;
+
+extern uint8_t state;
+extern uint32_t dataCnt;
+extern uint8_t statusByte;
 
 // Read wifi settings, connect to wifi if not connected, don't try too often.
 void connectToWifi(void)
@@ -48,7 +53,7 @@ void connectToWifi(void)
         wifiSettingsLoaded = true;
 
         preferences.begin("credentials", PREFERENCES_RO_MODE);
-        ssid = preferences.getString("ssid", ""); 
+        ssid = preferences.getString("ssid", "");
         password = preferences.getString("password", "");
         preferences.end();
 
@@ -252,7 +257,7 @@ bool getIncommingHeader(NetworkClient* client, uint32_t expectedSyncTag, THeader
         {
             uint8_t rest[6];
             client->read(rest, 6);               // read rest of header
-            header->atnCode = getWord(rest);
+            header->cmdCode = getWord(rest);
             header->len = getDword(rest + 2);
 
             return true;                        // got complete header
@@ -262,13 +267,47 @@ bool getIncommingHeader(NetworkClient* client, uint32_t expectedSyncTag, THeader
     return false;       // no valid header
 }
 
+void handleAcsiConfig(uint32_t len)
+{
+    uint8_t data[32];
+    memset(data, 0, 32);
+    uint32_t readLen = MIN(32, len);        // limit read length to buffer length
+
+    clientHdd.read(data, len);              // read data
+
+    for(int i=0; i<readLen; i++)            // go through all the received data
+    {
+        if(data[i] == CMD_ACSI_CONFIG) {
+            uint8_t newAcsiIds = data[i + 1];
+            i++;    // move 1 more byte forward, as we've read it
+
+            // check if new config different from previous, then write settings
+            if(enabledIDs != newAcsiIds) {
+                enabledIDs = newAcsiIds;
+
+                preferences.begin("acsi", PREFERENCES_RW_MODE);
+                preferences.putUChar("ids", newAcsiIds);
+                preferences.end();
+            }
+        }
+    }
+}
+
+void handleSendStatus(void)
+{
+    statusByte = clientHdd.read();      // read the status byte
+    state = STATE_READ_STATUS;          // transition to READ STATUS state
+}
+
 THeader hddHeader;      // keep the hader global to preserve syncTag between calls
 
 void handleIncommingData(void)
 {
     if(getIncommingHeader(&clientHdd, SYNC_TAG_HDD, &hddHeader))   // if got valid hdd header
     {
-
+        switch(hddHeader.cmdCode) {
+            case CMD_ACSI_CONFIG: handleAcsiConfig(hddHeader.len); break;
+            case CMD_SEND_STATUS: handleSendStatus(); break;
+        }
     }
-
 }

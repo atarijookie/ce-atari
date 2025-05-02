@@ -1,5 +1,5 @@
-#include <Preferences.h>
 #include "WiFi.h"
+#include <Preferences.h>
 
 #include "defs.h"
 #include "bridge.h"
@@ -11,8 +11,6 @@ Preferences preferences;
 
 void onButtonPress(void);
 
-void processHostCommands(void);
-
 uint8_t sendBufferToHost(uint8_t *bfr, uint32_t txCount);
 
 uint16_t version[2] = {0xa025, 0x0430}; // this means: hAns, 2025-04-30
@@ -20,7 +18,6 @@ uint16_t version[2] = {0xa025, 0x0430}; // this means: hAns, 2025-04-30
 char *VERSION_STRING_SHORT = {"4.00"};
 char *DATE_STRING = {"04/30/25"}; // MM/DD/YY
 
-volatile uint8_t sendFwVersion;
 uint8_t atnSendFwVersion[ATN_SENDFWVERSION_LEN_TX];
 uint8_t atnSendACSIcommand[ATN_SENDACSICOMMAND_LEN_TX];
 
@@ -50,7 +47,6 @@ uint8_t enabledIDs;
 uint8_t isAcsiNotScsi;
 uint8_t busIdle;
 
-uint8_t firstConfigReceived; // used to turn LEDs on after first config received
 uint8_t shouldProcessCommands;
 
 uint16_t prevBtnPressTime;
@@ -58,8 +54,6 @@ uint16_t prevBtnPressTime;
 uint32_t lastSendFwTime;
 
 uint8_t btnDownTime;
-
-void sendFwToHost(void);
 
 void setup(void)
 {
@@ -84,14 +78,11 @@ void setup(void)
 
     // read acsi ids
     preferences.begin("acsi", PREFERENCES_RO_MODE);
-    enabledIDs = preferences.getUChar("ids", 0); 
+    enabledIDs = preferences.getUChar("ids", 0);
     preferences.end();
 
     cmd = atnSendACSIcommand + TX_HEADER_SIZE;      // place command beyond the header
     state = STATE_GET_COMMAND;
-
-    sendFwVersion = FALSE;
-    firstConfigReceived = FALSE; // used to turn LEDs on after first config received
 
     setupAtnBuffers(); // fill the ATN buffers with needed headers and terminators
 
@@ -111,6 +102,9 @@ void loop(void)
         // connect to wifi, discover CE server, connect to CE server
         connectToHost();
 
+        // handle any data incoming
+        handleIncommingData();
+
         // get the command from ACSI and send it to host
         // IN  STATE: STATE_GET_COMMAND
         // OUT STATE: WAIT_COMMAND_RESPONSE when GOOD, STATE_GET_COMMAND when FAIL
@@ -126,7 +120,7 @@ void loop(void)
 
                 if ((now - lastSendFwTime) >= 1000)
                 {
-                    sendFwToHost();
+                    sendBufferToHost(atnSendFwVersion, ATN_SENDFWVERSION_LEN_TX);
                 }
             }
         }
@@ -159,6 +153,14 @@ void loop(void)
             timerSetup_cmdTimeoutChangeLength(CMD_TIMEOUT_SHORT); // after data transfer restore short timeout value
         }
 
+        // after write, we will wait for STATUS arrival from host
+        // IN  STATE: STATE_WAIT_FOR_STATUS_ARRIVAL
+        // OUT STATE: STATE_READ_STATUS
+        if (state == STATE_WAIT_FOR_STATUS_ARRIVAL)
+        {
+            handleIncommingData();
+        }
+
         // this happens after WRITE - wait for status byte, send it to ST (read)
         // IN  STATE: STATE_READ_STATUS
         // OUT STATE: always STATE_GET_COMMAND
@@ -167,6 +169,7 @@ void loop(void)
             timeoutStart(); // start the timeout timer to give the rest of code full timeout time
 
             onReadStatus();
+            state = STATE_GET_COMMAND; // get the next command
             // at this point it's either success or fail, but we're finished here
         }
 
@@ -200,26 +203,11 @@ void loop(void)
         }
 
         //---------------------------
-        // // sending and receiving data over SPI using DMA
-        // if (shouldProcessCommands)
-        // {                          // SPI DMA: nothing to Tx and nothing to Rx?
-        //     processHostCommands(); // and process all the received commands
-        //     shouldProcessCommands = FALSE; // mark that we don't need to process commands until next time
-        // }
-
-        //---------------------------
         // if the button was pressed, handle it
         // if(EXTI->PR & BUTTON) {
         //     onButtonPress();
         // }
     }
-}
-
-void sendFwToHost(void)
-{
-    sendFwVersion = FALSE;
-    sendBufferToHost(atnSendFwVersion, ATN_SENDFWVERSION_LEN_TX);
-    shouldProcessCommands = TRUE;
 }
 
 void onButtonPress(void)
@@ -255,20 +243,6 @@ void startSpiDmaForDataRead(uint32_t dataCnt, TReadBuffer *readBfr)
     // now transfer the 0th data buffer over SPI
     atnMoreData[4] = seqNo++; // set the sequence # to Attention
     sendBufferToHost(atnMoreData, ATN_READMOREDATA_LEN_TX);
-}
-
-void handleAcsiConfig(uint8_t newAcsiIds)
-{
-    firstConfigReceived = TRUE; // mark that we've received 1st config
-
-    // check if new config different from previous, then write settings to EEPROM
-    if(enabledIDs != newAcsiIds) {
-        enabledIDs = newAcsiIds;
-
-        preferences.begin("acsi", PREFERENCES_RW_MODE);
-        preferences.putUChar("ids", newAcsiIds); 
-        preferences.end();
-    }
 }
 
 void storeHeader(uint8_t *bfr, uint16_t atnCode, uint32_t txLen)

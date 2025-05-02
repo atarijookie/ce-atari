@@ -5,20 +5,12 @@
 
 void onButtonPress(void);
 
-void processHostCommands(void);
-void handleAcsiConfig(uint8_t newAcsiIds);
-
 uint8_t sendBufferToHost(uint8_t *bfr, uint32_t txCount);
 
 uint8_t onGetCommandAcsi(void);
 uint8_t onGetCommandScsi(void);
 void getCmdLengthFromCmdBytesAcsi(void);
 void getCmdLengthFromCmdBytesScsi(uint8_t cmd);
-
-void onGetCommand(void);
-void onDataRead(uint8_t withStatus);
-void onDataWrite(void);
-void onReadStatus(void);
 
 extern uint8_t state;
 extern uint32_t dataCnt;
@@ -45,7 +37,6 @@ extern uint8_t lastScsiStatusByte;
 
 extern uint8_t enabledIDs;
 
-extern uint8_t firstConfigReceived; // used to turn LEDs on after first config received
 extern uint8_t shouldProcessCommands;
 
 extern uint8_t isAcsiNotScsi;
@@ -390,30 +381,12 @@ void onDataWrite(void)
     //     wrBufNow = wrBufNow->next; // use next write buffer
     // }
 
-    state = STATE_READ_STATUS; // continue with sending the status
+    state = STATE_WAIT_FOR_STATUS_ARRIVAL;  // continue with sending the status
 }
 
 void onReadStatus(void)
 {
-    uint8_t i, newStatus;
-
-    newStatus = 0xff; // no status received
-
-    sendBufferToHost(&atnGetStatus[0], ATN_GETSTATUS_LEN_TX * 2);
-
-    // spiDma_waitForFinish();
-
-    // for (i = 0; i < 8; i++)
-    // { // go through the received buffer
-    //     if (cmdBuffer[i] == CMD_SEND_STATUS)
-    //     {
-    //         newStatus = cmdBuffer[i + 1] >> 8;
-    //         break;
-    //     }
-    // }
-
-    PIO_read(newStatus);       // send the status to Atari
-    state = STATE_GET_COMMAND; // get the next command
+    PIO_read(statusByte);       // send the status to Atari
 }
 
 void getCmdLengthFromCmdBytesAcsi(void)

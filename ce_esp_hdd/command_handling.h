@@ -3,7 +3,6 @@
 
 #include <arduino.h>
 
-void processHostCommands(void);
 uint8_t sendBufferToHost(uint8_t *bfr, uint32_t txCount);
 
 uint8_t idIsEnabled(uint8_t id);
