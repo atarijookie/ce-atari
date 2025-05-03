@@ -70,7 +70,7 @@ void onGetCommand(void)
     // if we got here, we should handle this in host
     timeoutStart(); // start the timeout timer to give the rest of code full timeout time
 
-    sendBufferToHost(SOCK_HDD, atnSendACSIcommand, ATN_SENDACSICOMMAND_LEN_TX);
+    sendHeaderAndDataToHost(SOCK_HDD, atnSendACSIcommand, ATN_SENDACSICOMMAND_LEN_TX - TX_HEADER_SIZE);
 
     state = STATE_WAIT_COMMAND_RESPONSE;
 }
@@ -244,8 +244,14 @@ void onDataRead(uint8_t withStatus)
 
 void onDataWrite(void)
 {
-    uint8_t data[512];
+    // create and send one header at the start
+    uint8_t header[TX_HEADER_SIZE];
 
+    storeHeader(header, ATN_WRITE_MORE_DATA, dataCnt);
+    sendDataToHost(SOCK_HDD, header, TX_HEADER_SIZE);
+
+    // get data from Atari and send it to host by sector sized chunks
+    uint8_t data[512];
     setDataDirection(DIR_RECV);     // data direction for reading
 
     while (dataCnt > 0)             // something to write?
@@ -264,7 +270,7 @@ void onDataWrite(void)
             }
         }
 
-        clientHdd.write(data, cntNow);      // send to host
+        sendDataToHost(SOCK_HDD, data, cntNow);     // send to host
     }
 
     state = STATE_WAIT_FOR_STATUS_ARRIVAL;  // continue with sending the status

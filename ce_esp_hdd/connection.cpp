@@ -21,6 +21,7 @@ NetworkUDP udp;
 bool udpInitialized;
 
 NetworkClient clientHdd;
+NetworkClient clientFdd;
 NetworkClient clientIkbd;
 
 uint8_t hostIp[4];
@@ -350,33 +351,42 @@ void handleIncommingData(void)
 }
 
 /*
-    Send header and data to host using the desired socket.
+    Send data as is to host using the desired socket.
+    This just selects the right socket and sends the count of data specified in dataSizeBytes.
     @param whichSock SOCK_HDD or SOCK_FDD
     @param bfr Pointer to start of the data buffer
-    @param txCount Size of the data portion after the header (header is TX_HEADER_SIZE bytes big) in bytes
+    @param dataSizeBytes Size of the data you want to send.
 */
-uint8_t sendBufferToHost(uint8_t whichSock, uint8_t *bfr, uint32_t txCount)
+bool sendDataToHost(uint8_t whichSock, uint8_t *bfr, uint32_t dataSizeBytes)
 {
-    storeDword(bfr + 6, txCount); // store the tx length on index 6..9
+    NetworkClient* client = NULL;
 
     switch(whichSock)
     {
-        case SOCK_HDD: 
-        {
-            if(clientHdd.connected()) {
-                clientHdd.write(bfr, TX_HEADER_SIZE + txCount);
-            }
-            break;
-        }
-
-        // case SOCK_FDD: 
-        // {
-        //     if(clientFdd.connected()) {
-        //         clientFdd.write(bfr, TX_HEADER_SIZE + txCount);
-        //     }
-        //     break;
-        // }
+        case SOCK_HDD: client = &clientHdd; break;
+        case SOCK_FDD: client = &clientFdd; break;
+        case SOCK_IKBD: client = &clientIkbd; break;
+        default: return false;
     }
 
-    return TRUE;
+    if(!client->connected())
+    {
+        return false;
+    }
+
+    uint32_t writtenCount = client->write(bfr, dataSizeBytes);
+    return (writtenCount == dataSizeBytes);
+}
+
+/*
+    Send header and data to host using the desired socket.
+    This is just extension to sendDataToHost, because it also stores the data size in the header and sends the header, too.
+    @param whichSock SOCK_HDD or SOCK_FDD
+    @param bfr Pointer to start of the data buffer
+    @param dataSizeBytes Size of the data portion after the header (header is TX_HEADER_SIZE bytes big) in bytes
+*/
+bool sendHeaderAndDataToHost(uint8_t whichSock, uint8_t *bfr, uint32_t dataSizeBytes)
+{
+    storeDword(bfr + 6, dataSizeBytes);     // store the tx length on index 6..9
+    return sendDataToHost(whichSock, bfr, TX_HEADER_SIZE + dataSizeBytes);
 }

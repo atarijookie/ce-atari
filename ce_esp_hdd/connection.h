@@ -5,10 +5,13 @@
 
 #define SOCK_HDD    0
 #define SOCK_FDD    1
+#define SOCK_IKBD   2
 
 void connectToHost(void);
 void handleIncommingData(void);
-uint8_t sendBufferToHost(uint8_t whichSock, uint8_t *bfr, uint32_t txCount);
+
+bool sendDataToHost(uint8_t whichSock, uint8_t *bfr, uint32_t dataSizeBytes);
+bool sendHeaderAndDataToHost(uint8_t whichSock, uint8_t *bfr, uint32_t dataSizeBytes);
 
 #define SYNC_TAG_HDD    0xc050d1c5
 

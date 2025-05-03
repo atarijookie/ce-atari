@@ -97,6 +97,7 @@
 #define PIN_USB_DP      20
 #define PIN_TXD_DEBUG   43
 #define PIN_RXD_DEBUG   44
+
 #define PIN_BOOT_BTN    0       // input
 
 #define HDD_ACSI    1

@@ -9,6 +9,7 @@ uint32_t get24bits(uint8_t *bfr);
 void storeWord(uint8_t *bfr, uint16_t val);
 void storeDword(uint8_t *bfr, uint32_t val);
 void store24bits(uint8_t *bfr, uint32_t val);
+void storeHeader(uint8_t *bfr, uint16_t atnCode, uint32_t txLen);
 
 void timeoutStart(void);
 uint8_t timeout(void);

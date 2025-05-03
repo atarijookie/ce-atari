@@ -102,3 +102,11 @@ void cmdTimeoutChangeLength(uint32_t newPeriod)
     timeoutStartMillis = millis();
     timeoutDuration = newPeriod;
 }
+
+void storeHeader(uint8_t *bfr, uint16_t atnCode, uint32_t txLen)
+{
+    storeDword(bfr, 0xc050d1c5); //  0..3: 0xc050d1c5 [COSmODICS] (4 bytes)
+    storeWord(bfr + 4, atnCode); //  4..5: ATN code (2 bytes)
+    storeDword(bfr + 6, txLen);  //  6..9: txLen (4 bytes)
+}
+

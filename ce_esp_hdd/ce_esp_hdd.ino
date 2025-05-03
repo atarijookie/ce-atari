@@ -9,8 +9,6 @@
 
 Preferences preferences;
 
-void onButtonPress(void);
-
 uint16_t version[2] = {0xa025, 0x0430}; // this means: hAns, 2025-04-30
 
 uint8_t atnSendFwVersion[ATN_SENDFWVERSION_LEN_TX];
@@ -21,7 +19,6 @@ uint32_t dataCnt;
 uint8_t statusByte;
 bool dataReceived;
 
-//----------
 uint8_t *cmd;   // received command bytes, should point beyond the header in atnSendACSIcommand
 uint8_t cmdLen;  // length of received command
 uint8_t brStat;  // status from bridge
@@ -32,9 +29,7 @@ uint8_t enabledIDs;
 uint8_t isAcsiNotScsi;
 uint8_t busIdle;
 
-uint16_t prevBtnPressTime;
-
-uint8_t btnDownTime;
+void handleButton(void);
 
 void setup(void)
 {
@@ -48,6 +43,8 @@ void setup(void)
     {
         pinMode(inputs[i], INPUT);
     }
+
+    pinMode(PIN_BOOT_BTN, INPUT_PULLUP);
 
     #define OUTPUTS_COUNT 5
     int outputs[OUTPUTS_COUNT] = {PIN_OUT_OE, PIN_FF12D, PIN_INT_TRIG, PIN_DRQ_TRIG, PIN_SCL};
@@ -67,10 +64,19 @@ void setup(void)
 
     setupAtnBuffers(); // fill the ATN buffers with needed headers and terminators
 
-    prevBtnPressTime = 0;
-
     getBridgeStatus();
     resetBridge();
+}
+
+void setupAtnBuffers(void)
+{
+    storeHeader(atnSendACSIcommand, ATN_ACSI_COMMAND, 0);
+
+    memset(atnSendFwVersion, 0, ATN_SENDFWVERSION_LEN_TX);
+    storeHeader(atnSendFwVersion, ATN_FW_VERSION, 0);
+    storeWord(atnSendFwVersion + TX_HEADER_SIZE, version[0]);
+    storeWord(atnSendFwVersion + TX_HEADER_SIZE + 2, version[1]);
+    atnSendFwVersion[TX_HEADER_SIZE + 5] = 0x41;                    // v.4, ACSI
 }
 
 void loop(void)
@@ -101,7 +107,7 @@ void loop(void)
                 if ((now - lastSendFwTime) >= 1000)
                 {
                     lastSendFwTime = now;
-                    sendBufferToHost(SOCK_HDD, atnSendFwVersion, ATN_SENDFWVERSION_LEN_TX);
+                    sendHeaderAndDataToHost(SOCK_HDD, atnSendFwVersion, ATN_SENDFWVERSION_LEN_TX - TX_HEADER_SIZE);
                 }
             }
         }
@@ -174,43 +180,49 @@ void loop(void)
         }
 
         //---------------------------
-        // if the button was pressed, handle it
-        // if(EXTI->PR & BUTTON) {
-        //     onButtonPress();
-        // }
+        // check the button state and press duration
+        handleButton();
     }
 }
 
-void onButtonPress(void)
+void handleButton(void)
 {
-    // uint16_t cnt, diff;
+    static uint32_t lastCheck = millis();
+    static int lastButtonState = HIGH;
+    static uint32_t buttonPressTime = 0;
 
-    // EXTI->PR = BUTTON; // clear pending EXTI
+    uint32_t now = millis();
 
-    // cnt = TIM1->CNT; // get the current time
-    // diff = cnt - prevBtnPressTime;
+    if(now - lastCheck < 100)      // check for button change only every now and then
+    {
+        return;
+    }
+    lastCheck = now;
 
-    // if (diff < 500)
-    // { // the previous button press happened less than 250 ms before? ignore
-    //     return;
-    // }
+    int buttonState = digitalRead(PIN_BOOT_BTN);    // read button
 
-    // prevBtnPressTime = cnt; // store current time
+    if(lastButtonState == buttonState)      // no change in button state? quit
+    {
+        return;
+    }
+    lastButtonState = buttonState;
+
+    if(buttonState == LOW)  // button now low, so button pressed
+    {
+        buttonPressTime = now;
+    }
+    else                    // button now high, so button released
+    {
+        uint32_t pressDuration = now - buttonPressTime;
+
+        if(pressDuration < 500)     // on short press
+        {
+
+        }
+
+        if(pressDuration > 3000)    // on long press
+        {
+
+        }
+    }    
 }
-
-void storeHeader(uint8_t *bfr, uint16_t atnCode, uint32_t txLen)
-{
-    storeDword(bfr, 0xc050d1c5); //  0..3: 0xc050d1c5 [COSmODICS] (4 bytes)
-    storeWord(bfr + 4, atnCode); //  4..5: ATN code (2 bytes)
-    storeDword(bfr + 6, txLen);  //  6..9: txLen (4 bytes)
-}
-
-void setupAtnBuffers(void)
-{
-    storeHeader(atnSendACSIcommand, ATN_ACSI_COMMAND, 0);
-
-    storeHeader(atnSendFwVersion, ATN_FW_VERSION, 0);
-    storeWord(atnSendFwVersion + TX_HEADER_SIZE, version[0]);
-    storeWord(atnSendFwVersion + TX_HEADER_SIZE + 2, version[1]);
-}
-
