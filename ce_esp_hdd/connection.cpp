@@ -4,6 +4,7 @@
 #include "defs.h"
 #include "connection.h"
 #include "utils.h"
+#include "captive_portal.h"
 
 #include "settings_for_development.h"
 
@@ -62,6 +63,11 @@ void connectToWifi(void)
         preferences.end();
 
         SET_SETTINGS_FOR_DEVELOPMENT(ssid, password, hostIp, hostIpString, hostPortHdd, hostPortFdd, hostPortIkbd);
+    }
+
+    // no ssid and no passowrd? run captive portal
+    if(ssid.length() == 0 && password.length() == 0) {
+        runCaptivePortal();
     }
 
     // no wifi SSID stored? cannot connect

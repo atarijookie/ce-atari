@@ -6,6 +6,7 @@
 #include "utils.h"
 #include "command_handling.h"
 #include "connection.h"
+#include "captive_portal.h"
 
 Preferences preferences;
 
@@ -220,9 +221,9 @@ void handleButton(void)
 
         }
 
-        if(pressDuration > 3000)    // on long press
+        if(pressDuration > 5000)    // on long press, run captive portal
         {
-
+            runCaptivePortal();
         }
     }    
 }
