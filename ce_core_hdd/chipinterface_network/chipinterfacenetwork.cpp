@@ -262,17 +262,19 @@ bool ChipInterfaceNetwork::actionNeeded(uint8_t *inBuf)
     return false;
 }
 
-void ChipInterfaceNetwork::getFWversion(uint8_t *inFwVer)
+void ChipInterfaceNetwork::getFWversion(void)
 {
     // fwResponseBfr should be filled with Hans config - by calling setHDDconfig() (and not calling anything else inbetween)
-    sendDataToChip(CMD_ACSI_CONFIG, fwResponseBfr, response.currentLength);
+    sendHeaderAndDataToChip(CMD_ACSI_CONFIG, fwResponseBfr, response.currentLength);
 
-    recvFromClient(inFwVer, HDD_FW_RESPONSE_LEN);
+    uint8_t bfr[10];
+    memset(bfr, 0, 10);
+    recvFromClient(bfr, 10);
 
-    ChipInterface::convertXilinxInfo(inFwVer[5]);  // convert xilinx info into hwInfo struct
+    ChipInterface::convertXilinxInfo(bfr[5]);  // convert xilinx info into hwInfo struct
 
-    int year = Utils::bcdToInt(inFwVer[1]) + 2000;
-    Update::versions.hans.fromInts(year, Utils::bcdToInt(inFwVer[2]), Utils::bcdToInt(inFwVer[3]));       // store found FW version of Hans
+    int year = Utils::bcdToInt(bfr[1]) + 2000;
+    Update::versions.hans.fromInts(year, Utils::bcdToInt(bfr[2]), Utils::bcdToInt(bfr[3]));       // store found FW version of Hans
 }
 
 bool ChipInterfaceNetwork::hdd_sendData_start(uint32_t totalDataCount, uint8_t scsiStatus, bool withStatus)
@@ -287,15 +289,20 @@ bool ChipInterfaceNetwork::hdd_sendData_start(uint32_t totalDataCount, uint8_t s
 
     // transmit this command
     uint8_t cmd = withStatus ? CMD_DATA_READ_WITH_STATUS : CMD_DATA_READ_WITHOUT_STATUS;  // store command - with or without status
-    sendDataToChip(cmd, bufOut, 4);
+    sendHeaderAndDataToChip(cmd, bufOut, 4);
 
     return true;
 }
 
-bool ChipInterfaceNetwork::hdd_sendData_transferBlock(uint8_t *pData, uint32_t dataCount)
+bool ChipInterfaceNetwork::hdd_sendData_transferBlock(uint8_t *pData, uint32_t dataCount, bool withHeader)
 {
-    sendDataToChip(CMD_DATA_MARKER, pData, dataCount);
-    return true;
+    if(withHeader)      // with header? send header and data
+    {
+        return sendHeaderAndDataToChip(CMD_DATA_MARKER, pData, dataCount);
+    }
+
+    // without header? send just data
+    return sendDataToChip(pData, dataCount);
 }
 
 bool ChipInterfaceNetwork::hdd_recvData_start(uint8_t *recvBuffer, uint32_t totalDataCount)
@@ -310,38 +317,36 @@ bool ChipInterfaceNetwork::hdd_recvData_start(uint8_t *recvBuffer, uint32_t tota
     bufOut[3] = 0xff;                                           // store INVALID status, because the real status will be sent on CMD_SEND_STATUS
 
     // transmit this command
-    sendDataToChip(CMD_DATA_WRITE, bufOut, 4);
+    sendHeaderAndDataToChip(CMD_DATA_WRITE, bufOut, 4);
 
     return true;
 }
 
-bool ChipInterfaceNetwork::hdd_recvData_transferBlock(uint8_t *pData, uint32_t dataCount)
+bool ChipInterfaceNetwork::hdd_recvData_transferBlock(uint8_t *pData, uint32_t dataCount, bool withHeader)
 {
-    memset(bufOut, 0, TX_RX_BUFF_SIZE);                   // nothing to transmit, really...
-    uint8_t inBuf[8];
-
-    while(dataCount > 0) {
-        // request maximum 512 bytes from host
-        uint32_t subCount = (dataCount > 512) ? 512 : dataCount;
-
+    if(withHeader)
+    {
+        uint8_t inBuf[10];
         bool good = waitForAtn(NET_ATN_HANS_ID, ATN_WRITE_MORE_DATA, 1000, inBuf);
 
         if(!good) {         // failed to get right CMD from Hans? fail
             return false;
         }
+    }
 
-        // transmit data (size = subCount) + header and footer (size = 8) - already received 4 bytes
-        int wantCount = subCount + 8 - 4;
-        int gotCount = recvFromClient(bufIn, wantCount);
+    memset(bufOut, 0, TX_RX_BUFF_SIZE);
 
-        if(gotCount < wantCount) {                          // if not all data was received
+    while(dataCount > 0) {
+        // request maximum 512 bytes from host
+        uint32_t subCount = MIN(dataCount, 512);
+        uint32_t gotCount = recvFromClient(pData, subCount);
+
+        if(gotCount < subCount) {       // if not all data was received, fail
             return false;
         }
 
-        memcpy(pData, bufIn + 2, subCount);                 // copy just the data, skip sequence number
-
-        dataCount   -= subCount;                            // decreate the data counter
-        pData       += subCount;                            // move in the buffer further
+        dataCount -= subCount;  // decreate the data counter
+        pData += subCount;      // move in the buffer further
     }
 
     return true;
@@ -349,14 +354,8 @@ bool ChipInterfaceNetwork::hdd_recvData_transferBlock(uint8_t *pData, uint32_t d
 
 bool ChipInterfaceNetwork::hdd_sendStatusToHans(uint8_t statusByte)
 {
-    bool good = waitForAtn(NET_ATN_HANS_ID, ATN_GET_STATUS, 1000, bufIn);
-
-    if(!good) {         // failed to get right CMD from Hans? fail
-        return false;
-    }
-
     bufOut[0] = statusByte;                          // set the command and the statusByte
-    sendDataToChip(CMD_SEND_STATUS, bufOut, 1);
+    sendHeaderAndDataToChip(CMD_SEND_STATUS, bufOut, 1);
 
     return true;
 }
@@ -413,35 +412,71 @@ bool ChipInterfaceNetwork::waitForAtn(int atnIdWant, uint8_t atnCode, uint32_t t
     return false;
 }
 
-void ChipInterfaceNetwork::sendDataToChip(uint16_t cmdCode, uint8_t* data, uint16_t len)        // send data to chip with specified tag
+bool ChipInterfaceNetwork::sendHeaderToChip(uint16_t cmdCode, uint32_t futureDatalen)        // send header to chip
 {
     if(fdClient < 0) {                      // no client socket? quit
-        return;
+        return false;
     }
 
     uint8_t head[10];
     Utils::storeDword(head + 0, 0xc050d1c5);    // 0..3: 0xc050d1c5 [COSmODICS] (4 bytes)
     Utils::storeWord(head + 4, cmdCode);        // 4..5: ATN code (2 bytes)
-    Utils::storeDword(head + 6, len);           // 6..9: txLen (4 bytes)
+    Utils::storeDword(head + 6, futureDatalen); // 6..9: futureDatalen (4 bytes)
 
-    write(fdClient, head, 10);              // send header
-    write(fdClient, data, len);             // send data
+    int res = write(fdClient, head, 10);        // send header
+    return (res == 10);
 }
 
-int ChipInterfaceNetwork::recvFromClient(uint8_t* buf, int len)
+bool ChipInterfaceNetwork::sendDataToChip(uint8_t* data, uint32_t len)        // send data to chip
+{
+    if(fdClient < 0) {                      // no client socket? quit
+        return false;
+    }
+
+    int res = write(fdClient, data, len);   // send data
+    return (((uint32_t)res) == len);
+}
+
+bool ChipInterfaceNetwork::sendHeaderAndDataToChip(uint16_t cmdCode, uint8_t* data, uint32_t len)        // send header and data to chip
+{
+    if(!sendHeaderToChip(cmdCode, len))
+    {
+        return false;
+    }
+
+    return sendDataToChip(data, len);
+}
+
+/*
+    Receive data from client, up to rest of the data size specified in header,
+    respecting maximum length of buffer (maxLen).
+*/
+uint32_t ChipInterfaceNetwork::recvFromClient(uint8_t* buf, int maxLen)
 {
     int received = 0;                       // total received count
 
-    int bytes = recv(fdClient, buf, len, 0);    // try to receive whole buffer
-    received += bytes;
+    uint32_t dataSize = bufReader.dataSizeRest();          // get how many bytes we can read from the client to get whole data part
+    uint32_t readSize = MIN(dataSize, (uint32_t) maxLen);   // read less if supplied buffer is not large enough, or there isn't as much data as requested
 
-    if(bytes > 0 && bytes < len) {              // if something was received, but it was less than wanted count, only part of data was received - we might either receive rest of data, or zero on client disconnected
-        bytes = recv(fdClient, buf + bytes, len - bytes, 0);    // try to receive rest of data. If client disconnected, this is return 0
-        received += bytes;
-    }
+    for(int i=0; i<3; i++)
+    {
+        int bytes = recv(fdClient, buf + received, readSize, 0);    // try to receive whole buffer
 
-    if(bytes == 0) {                            // if recv() returned 0, client has disconnected
-        closeClientSocket();
+        if(bytes > 0)      // on data received
+        {
+            received += bytes;
+            readSize -= bytes;
+        }
+        else                // on error / 0 received bytes, close socket
+        {
+            closeClientSocket();
+            break;
+        }
+
+        if(readSize < 1)    // nothing to read anymore?
+        {
+            break;
+        }
     }
 
     // if(received > 0) {
@@ -449,5 +484,6 @@ int ChipInterfaceNetwork::recvFromClient(uint8_t* buf, int len)
     //     Debug::outBfr(buf, received);
     // }
 
-    return received;                            // return total bytes received
+    bufReader.decreaseDataSize((uint32_t) received);    // decrease the remaining data by the size we have received
+    return received;        // return total bytes received
 }

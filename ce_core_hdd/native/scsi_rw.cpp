@@ -164,6 +164,8 @@ bool Scsi::readSectors_big(uint32_t startSectorNo, uint32_t sectorCount)
         return false;
     }
 
+    int blocks = 0;
+
     // now transfer the data in big chunks of BUFFER_SIZE_SECTORS
     while(sectorCount > 0) {
         // maximum transfer size is defined by the data media, so transfer that much or less
@@ -185,7 +187,8 @@ bool Scsi::readSectors_big(uint32_t startSectorNo, uint32_t sectorCount)
         sectorCount     -= sectorCountNow;
 
         // now transfer this block, which is up to BUFFER_SIZE_SECTORS big
-        res = dataTrans->sendData_transferBlock(dataBuffer, byteCountNow);
+        res = dataTrans->sendData_transferBlock(dataBuffer, byteCountNow, blocks == 0);
+        blocks++;
 
         if(!res) {
             Debug::out(LOG_ERROR, "Scsi::readSectors() - dataTrans->sendData_transferBlock() failed for startSectorNo: 0x%x, sectorCountNow: 0x%x", startSectorNo, sectorCountNow);
@@ -239,6 +242,8 @@ bool Scsi::writeSectors_big(uint32_t startSectorNo, uint32_t sectorCount)
         return false;
     }
 
+    int blocks = 0;
+
     // now transfer the data in big chunks of BUFFER_SIZE_SECTORS
     while(sectorCount > 0) {
         // maximum transfer size is defined by the data media, so transfer that much or less
@@ -248,7 +253,8 @@ bool Scsi::writeSectors_big(uint32_t startSectorNo, uint32_t sectorCount)
         Debug::out(LOG_DEBUG, "Scsi::writeSectors() - will write sectorCountNow: 0x%x, sectors to go: 0x%x", sectorCountNow, sectorCount - sectorCountNow);
 
         // get data from ST
-        res = dataTrans->recvData_transferBlock(dataBuffer, byteCountNow);
+        res = dataTrans->recvData_transferBlock(dataBuffer, byteCountNow, blocks == 0);     // transfer with header on 0th block, rest without header
+        blocks++;
 
         if(!res) {
             Debug::out(LOG_ERROR, "Scsi::writeSectors() - dataTrans->recvData_transferBlock() failed");

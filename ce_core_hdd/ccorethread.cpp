@@ -428,13 +428,10 @@ void CCoreThread::loadSettings(void)
 
 void CCoreThread::handleFwVersion_hans(void)
 {
-    uint8_t fwVer[16];
-    memset(fwVer, 0, 16);
-
     uint8_t enabledIDbits = getIdBits();     // get the enabled IDs
 
     chipInterface->setHDDconfig(enabledIDbits);
-    chipInterface->getFWversion(fwVer);
+    chipInterface->getFWversion();
 
     //----------------------------------
     // if HW info changed

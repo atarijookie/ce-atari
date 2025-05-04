@@ -12,8 +12,7 @@ BufferedReader::BufferedReader()
 {
     fd = -1;
     gotBytes = 0;
-    txLen = 0;
-    remainingPacketLength = 0;
+    dataSizeBytes = 0;
 }
 
 BufferedReader::~BufferedReader()
@@ -37,7 +36,7 @@ int BufferedReader::waitForAtn(uint8_t atnCode, uint32_t timeoutMs)
 
     while(sigintReceived == 0) {
         // got data? process
-        if(gotBytes >= 10) {                                // have enough data?
+        if(gotBytes == HEADER_BUFFER_SIZE) {                // have enough data?
             int atnId = readHeaderFromBuffer(atnCode);
 
             if(atnId != NET_ATN_NONE_ID) {                  // if valid ATN ID found and header seems to be OK, return that ATN ID
@@ -55,8 +54,8 @@ int BufferedReader::waitForAtn(uint8_t atnCode, uint32_t timeoutMs)
         // if data is  available, the rest does: ioctl()            + recv()
         // if data not available, the rest does: ioctl() + select() + recv()
 
-        // we need 10 bytes to have full header
-        int needCnt = 10 - gotBytes;
+        // we need HEADER_BUFFER_SIZE bytes to have full header
+        int needCnt = HEADER_BUFFER_SIZE - gotBytes;
 
         int res, bytesAvailable;
         res = ioctl(fd, FIONREAD, &bytesAvailable);     // how many bytes we can read immediately?
@@ -136,10 +135,10 @@ int BufferedReader::readHeaderFromBuffer(uint8_t atnCodeWant)
     // The buffer should contain:
     //  0..3: 0xc050d1c5 [COSmODICS] (4 bytes)
     //  4..5: ATN code (2 bytes)
-    //  6..9: txLen (4 bytes)
-    // total: 10 bytes
+    //  6..9: rest of the data size in bytes (4 bytes)
+    // total: 10 bytes (HEADER_BUFFER_SIZE)
 
-    if(gotBytes < 10) {                  // should have enough data to check them
+    if(gotBytes < HEADER_BUFFER_SIZE) {     // should have enough data to check them
         return NET_ATN_NONE_ID;
     }
 
@@ -158,9 +157,8 @@ int BufferedReader::readHeaderFromBuffer(uint8_t atnCodeWant)
         }
     }
 
-    // read TX length in bytes
-    txLen = Utils::getDword(&buffer[6]);
-    remainingPacketLength = txLen;
+    // read dataSizeBytes
+    dataSizeBytes = Utils::getDword(&buffer[6]);
 
     //Debug::out(LOG_DEBUG, "readHeaderFromBuffer() - got AtnCode=%d, txLen=%d, rxLen=%d", getAtnCode(), txLen, rxLen);
 
@@ -174,12 +172,17 @@ uint8_t BufferedReader::getAtnCode(void)
     return Utils::getWord(&buffer[4]);
 }
 
-uint32_t BufferedReader::getRemainingLength(void)
+uint32_t BufferedReader::dataSizeRest(void)
 {
-    return remainingPacketLength;
+    return dataSizeBytes;
 }
 
-// pointer to header start, so the header would end up looking like 8 bytes (even if it's really 10 bytes long)
+void BufferedReader::decreaseDataSize(uint32_t decreaseBy)
+{
+    dataSizeBytes = (dataSizeBytes >= decreaseBy) ? (dataSizeBytes - decreaseBy) : 0;
+}
+
+// pointer to header start, so the header would end up looking like 8 bytes (even if it's really HEADER_BUFFER_SIZE bytes long)
 // and the ATN code is at the index 3
 uint8_t* BufferedReader::getHeaderPointer(void)
 {
@@ -190,5 +193,5 @@ uint8_t* BufferedReader::getHeaderPointer(void)
 void BufferedReader::clear(void)
 {
     gotBytes = 0;               // don't have any bytes anymore
-    memset(buffer, 0, 10);
+    memset(buffer, 0, HEADER_BUFFER_SIZE);
 }

@@ -99,17 +99,17 @@ public:
     virtual bool actionNeeded(uint8_t *inBuf) = 0;
 
     // to handle FW version, first call setHDDconfig() to fill config into bufOut, then call getFWversion to get the FW version from chip
-    virtual void getFWversion(uint8_t *inFwVer) = 0;
+    virtual void getFWversion(void) = 0;
     virtual void setHDDconfig(uint8_t hddEnabledIDs);
 
     //----------------
     // HDD: READ/WRITE functions for large (>1 MB) block transfers (Scsi::readSectors(), Scsi::writeSectors()) and also by the convenient functions above
 
     virtual bool hdd_sendData_start(uint32_t totalDataCount, uint8_t scsiStatus, bool withStatus) = 0;
-    virtual bool hdd_sendData_transferBlock(uint8_t *pData, uint32_t dataCount) = 0;
+    virtual bool hdd_sendData_transferBlock(uint8_t *pData, uint32_t dataCount, bool withHeader = true) = 0;
 
     virtual bool hdd_recvData_start(uint8_t *recvBuffer, uint32_t totalDataCount) = 0;
-    virtual bool hdd_recvData_transferBlock(uint8_t *pData, uint32_t dataCount) = 0;
+    virtual bool hdd_recvData_transferBlock(uint8_t *pData, uint32_t dataCount, bool withHeader = true) = 0;
 
     virtual bool hdd_sendStatusToHans(uint8_t statusByte) = 0;
 

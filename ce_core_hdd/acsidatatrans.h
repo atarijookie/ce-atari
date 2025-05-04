@@ -60,10 +60,10 @@ public:
     // following functions are used for large (>1 MB) block transfers (Scsi::readSectors(), Scsi::writeSectors()) and also by the convenient functions above
     
     virtual bool sendData_start         (uint32_t totalDataCount, uint8_t scsiStatus, bool withStatus);
-    virtual bool sendData_transferBlock (uint8_t *pData, uint32_t dataCount);
+    virtual bool sendData_transferBlock (uint8_t *pData, uint32_t dataCount, bool withHeader = true);
 
     virtual bool recvData_start         (uint32_t totalDataCount);
-    virtual bool recvData_transferBlock (uint8_t *pData, uint32_t dataCount);
+    virtual bool recvData_transferBlock (uint8_t *pData, uint32_t dataCount, bool withHeader = true);
 
     virtual bool sendStatusToHans       (uint8_t statusByte);
 

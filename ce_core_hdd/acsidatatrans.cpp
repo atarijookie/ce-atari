@@ -227,10 +227,10 @@ bool AcsiDataTrans::sendData_start(uint32_t totalDataCount, uint8_t scsiStatus, 
     return com->hdd_sendData_start(totalDataCount, scsiStatus, withStatus);
 }
 
-bool AcsiDataTrans::sendData_transferBlock(uint8_t *pData, uint32_t dataCount)
+bool AcsiDataTrans::sendData_transferBlock(uint8_t *pData, uint32_t dataCount, bool withHeader)
 {
     sentDataCount += dataCount;
-    bool res = com->hdd_sendData_transferBlock(pData, dataCount);
+    bool res = com->hdd_sendData_transferBlock(pData, dataCount, withHeader);
 
     if(!res) {                                                  // failed? fail
         clear();                                                // clear all the variables
@@ -251,9 +251,9 @@ bool AcsiDataTrans::recvData_start(uint32_t totalDataCount)
     return com->hdd_recvData_start(recvBuffer, totalDataCount);
 }
 
-bool AcsiDataTrans::recvData_transferBlock(uint8_t *pData, uint32_t dataCount)
+bool AcsiDataTrans::recvData_transferBlock(uint8_t *pData, uint32_t dataCount, bool withHeader)
 {
-    bool res = com->hdd_recvData_transferBlock(pData, dataCount);
+    bool res = com->hdd_recvData_transferBlock(pData, dataCount, withHeader);
 
     if(!res) {              // failed?
         clear(false);       // clear all the variables
