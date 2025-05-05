@@ -467,13 +467,15 @@ uint32_t ChipInterfaceNetwork::recvFromClient(uint8_t* buf, int maxLen)
             received += bytes;
             readSize -= bytes;
         }
-        else                // on error / 0 received bytes, close socket
+
+        if(bytes == 0)      // recv() return 0 on disconnected
         {
+            Debug::out(LOG_DEBUG, "recvFromClient() - recv() returned 0");
             closeClientSocket();
             break;
         }
 
-        if(readSize < 1)    // nothing to read anymore?
+        if(readSize < 0)    // nothing to read anymore?
         {
             break;
         }

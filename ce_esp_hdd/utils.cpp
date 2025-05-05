@@ -2,6 +2,8 @@
 
 uint32_t timeoutStartMillis;
 uint32_t timeoutDuration;
+bool hasTimedOut;
+bool timeOutRunning;
 
 uint16_t getWord(uint8_t *bfr)
 {
@@ -75,26 +77,47 @@ void longTimeout_basedOnSectorCount(uint16_t sectorCount)
     uint32_t timeoutSecs   = mbCount       * CMD_TIMEOUT_SECS_PER_MB;  // convert MBs into seconds
     uint32_t timeoutPeriod = timeoutSecs   * CMD_TIMEOUT_ONESECOND;    // and convert seconds into ms
 
+    hasTimedOut = false;
+    timeOutRunning = true;
     timeoutStartMillis = millis();
     timeoutDuration = MIN(timeoutPeriod, 30000);        // Now limit the timeout period to 30 s
 }
 
 void timeoutStart(void)
 {
+    hasTimedOut = false;
+    timeOutRunning = true;
     timeoutStartMillis = millis();
     timeoutDuration = CMD_TIMEOUT_SHORT;
 }
 
-uint8_t timeout(void)
+bool timeout(void)
 {
+    if(hasTimedOut)
+    {
+        return true;
+    }
+
+    if(!timeOutRunning) {
+        return false;
+    }
+
     uint32_t now = millis();
 
     if ((now - timeoutStartMillis) > timeoutDuration)
     {
-        return TRUE;
+        timeOutRunning = false;
+        hasTimedOut = true;
+        return true;
     }
 
-    return FALSE;
+    return false;
+}
+
+void timeoutClear(void)
+{
+    hasTimedOut = false;
+    timeOutRunning = false;
 }
 
 void cmdTimeoutChangeLength(uint32_t newPeriod)

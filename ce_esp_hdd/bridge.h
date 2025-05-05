@@ -11,9 +11,6 @@
 #define DIR_RECV 0
 #define DIR_SEND 1
 
-void timeoutStart(void); // starts the timeout timer
-uint8_t timeout(void);   // returns TRUE if timeout since writeFirst occured
-
 void resetBridge(void);
 void getBridgeStatus(void);
 uint8_t isBusIdle(void);

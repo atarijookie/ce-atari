@@ -37,6 +37,8 @@ void setup(void)
     Serial.begin(115200);       // uart0 for debug strings
     Serial1.begin(19200);       // uart1 for IKBD / eeprom chip
 
+    Serial.println("setup() starting");
+
     #define INPUTS_COUNT 12
     int inputs[INPUTS_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_CMD1ST, PIN_EOT, PIN_SDA, PIN_BOOT_BTN};
 
@@ -67,6 +69,12 @@ void setup(void)
 
     getBridgeStatus();
     resetBridge();
+
+    Serial.print("setup() done, enabledIDs: ");
+    Serial.print(enabledIDs, HEX);
+    Serial.println("");
+
+    timeoutClear();
 }
 
 void setupAtnBuffers(void)
@@ -163,6 +171,9 @@ void loop(void)
 
         if (timeout())      // if the data from host doesn't come within timeout, quit
         {
+            timeoutClear();
+            Serial.println("timeout!");
+
             state = STATE_GET_COMMAND;
             
             // if something was wrong, reset XILINX so it won't get stuck

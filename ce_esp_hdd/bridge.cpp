@@ -1,5 +1,6 @@
 #include "defs.h"
 #include "bridge.h"
+#include "utils.h"
 
 extern uint8_t brStat; // status from bridge
 extern uint8_t isAcsiNotScsi;

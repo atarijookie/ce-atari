@@ -11,8 +11,9 @@ void storeDword(uint8_t *bfr, uint32_t val);
 void store24bits(uint8_t *bfr, uint32_t val);
 void storeHeader(uint8_t *bfr, uint16_t atnCode, uint32_t txLen);
 
+void timeoutClear(void);
 void timeoutStart(void);
-uint8_t timeout(void);
+bool timeout(void);
 void longTimeout_basedOnSectorCount(uint16_t sectorCount);
 void cmdTimeoutChangeLength(uint32_t newPeriod);
 

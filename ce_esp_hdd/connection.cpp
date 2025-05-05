@@ -62,11 +62,17 @@ void connectToWifi(void)
         password = preferences.getString("password", "");
         preferences.end();
 
-        SET_SETTINGS_FOR_DEVELOPMENT(ssid, password, hostIp, hostIpString, hostPortHdd, hostPortFdd, hostPortIkbd);
+        // SET_SETTINGS_FOR_DEVELOPMENT(ssid, password, hostIp, hostIpString, hostPortHdd, hostPortFdd, hostPortIkbd);
     }
+
+    Serial.print("connectToWifi - ssid: ");
+    Serial.print(ssid);
+    Serial.print(", password: ");
+    Serial.println(password);
 
     // no ssid and no passowrd? run captive portal
     if(ssid.length() == 0 && password.length() == 0) {
+        Serial.println("connectToWifi - no wifi settings, starting captive portal");
         runCaptivePortal();
     }
 
@@ -75,6 +81,9 @@ void connectToWifi(void)
     {
         return;
     }
+
+    Serial.print("connectToWifi - ssid: ");
+    Serial.println(ssid);
 
     // not connected to wifi yet, try to connect
     WiFi.mode(WIFI_STA);
@@ -116,11 +125,15 @@ void ceDiscoverySend(void)
     uint32_t mask32inv = ~mask32;
 
     uint32_t ip32broadcast = ip32 | mask32inv; // create broadcast addr by setting all subnet bits to 1
-    IPAddress addrBroadcast(ip32broadcast);    // from uint32_t to object
+
+    IPAddress addrBroadcast((uint8_t) (ip32broadcast >> 24), (uint8_t) (ip32broadcast >> 16), (uint8_t) (ip32broadcast >> 8), (uint8_t) ip32broadcast);    // from uint32_t to object
 
     // send upd broadcast
     uint8_t updPacket[4];
     strcpy((char *)updPacket, "CELC");
+
+    Serial.print("ceDiscoverySend to ");
+    Serial.println(addrBroadcast.toString().c_str());
 
     // broadcast to subnet devices (e.g. 192.168.1.255)
     udp.beginPacket(addrBroadcast.toString().c_str(), SERVER_UDP_PORT);
@@ -196,6 +209,15 @@ void ceDiscoveryReceive(void)
         hostPortHdd = getWord(buffer + 4);
         hostPortFdd = getWord(buffer + 6);
         hostPortIkbd = getWord(buffer + 8);
+
+        Serial.print("ceDiscoveryReceive - got host ip: ");
+        Serial.print(hostIpString);
+        Serial.print(", ports: ");
+        Serial.print(hostPortHdd);
+        Serial.print(", ");
+        Serial.print(hostPortFdd);
+        Serial.print(", ");
+        Serial.println(hostPortIkbd);
     }
 }
 
@@ -222,6 +244,9 @@ void connectToCEhost(void)
     {
         return;
     }
+
+    Serial.print("connectToCEhost - IP: ");
+    Serial.println(hostIpString.c_str());
 
     // start connection attempt
     clientHdd.connect(hostIpString.c_str(), hostPortHdd);
@@ -294,6 +319,10 @@ void handleAcsiConfig(uint32_t len)
             // check if new config different from previous, then write settings
             if(enabledIDs != newAcsiIds) {
                 enabledIDs = newAcsiIds;
+
+                Serial.print("handleAcsiConfig - storing new ids: ");
+                Serial.print(newAcsiIds, HEX);
+                Serial.println("");
 
                 preferences.begin("acsi", PREFERENCES_RW_MODE);
                 preferences.putUChar("ids", newAcsiIds);
