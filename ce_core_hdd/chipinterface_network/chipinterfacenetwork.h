@@ -62,11 +62,11 @@ private:
     void acceptSocketIfNeededAndPossible(void);
     void closeClientSocket(void);
     uint32_t recvFromClient(uint8_t* buf, int maxLen);
+
     void createServerReportSocket(void);
     void sendReportToMainServerSocket(void);
 
     bool waitForAtn(int atnIdWant, uint8_t atnCode, uint32_t timeoutMs, uint8_t *inBuf);
-    void handleZerosAndIkbd(int atnId);
 
     bool sendHeaderToChip(uint16_t cmdCode, uint32_t futureDatalen);                // send header to chip
     bool sendDataToChip(uint8_t* data, uint32_t len);                               // send data to chip  
