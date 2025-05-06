@@ -24,6 +24,7 @@ extern "C" volatile sig_atomic_t sigintReceived;
 class Utils {
 public:
     static uint32_t getCurrentMs(void);
+    static void sleepMs(uint32_t ms);
 
     static void mergeHostPaths(std::string &dest, const std::string &tail);                 // this modifies dest
     static std::string mergeHostPaths2(const std::string& head, const std::string& tail);   // this doesn't modify head

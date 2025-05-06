@@ -68,8 +68,8 @@ const char *serverStatusAsString(int status)
     switch(status)
     {
         case SERVER_STATUS_NOT_RUNNING: return "NOT RUNNNING";
-        case SERVER_STATUS_FREE: return "RUNNING AND FREE";
-        case SERVER_STATUS_OCCUPIED: return "RUNNING BUT OCCUPIED";
+        case SERVER_STATUS_FREE: return "RUNNING, FREE";
+        case SERVER_STATUS_OCCUPIED: return "RUNNING, IN USE";
         default: return "UNKNOWN";
     }
 }
@@ -96,6 +96,9 @@ void checkForDeadCores(void)
                 char cmd[64];
                 snprintf(cmd, sizeof(cmd), "kill %d &", serverStatus[i].pid);
                 system(cmd);
+
+                Utils::sleepMs(500);
+                startHddCoreAtIndex(i);
             } else {
                 Debug::out(LOG_WARNING, "No status report from server #%d, but has pid 0 (wrong), not terminating, just clearing struct", i);
             }
@@ -169,19 +172,14 @@ void networkServerMain(void)
             socklen_t slen = sizeof(clientAddr);
             memset(&clientAddr, 0, sizeof(clientAddr));
 
-            ssize_t n = recvfrom(udpSocket, recvData, sizeof(recvData), 0, (struct sockaddr *) &clientAddr, &slen);
+            ssize_t cnt = recvfrom(udpSocket, recvData, sizeof(recvData), 0, (struct sockaddr *) &clientAddr, &slen);
 
-            if(n < 8) {                                     // packet not big enough or error?
-                Debug::out(LOG_DEBUG, "rejecting short UDP packet (%d bytes)", n);
-                continue;
-            }
-
-            if(memcmp(recvData, "CELS", 4) == 0) {          // CE Lite Server tells us his status?
-                onServerStatus(recvData, n);
-            } else if(memcmp(recvData, "CELC", 4) == 0) {   // CE Lite Client wants something?
-                onClientRequest(&clientAddr, recvData, n);
+            if(cnt >= 11 && memcmp(recvData, "CELS", 4) == 0) {          // CE Lite Server tells us his status?
+                onServerStatus(recvData, cnt);
+            } else if(cnt >= 4 && memcmp(recvData, "CELC", 4) == 0) {   // CE Lite Client wants something?
+                onClientRequest(&clientAddr, recvData, cnt);
             } else {
-                Debug::out(LOG_INFO, "ignoring unknown request %02X %02X %02X %02X", recvData[0], recvData[1], recvData[2], recvData[3]);
+                Debug::out(LOG_INFO, "ignoring unknown request %02X %02X %02X %02X, packet length: ", recvData[0], recvData[1], recvData[2], recvData[3], cnt);
             }
         }
     }
@@ -277,6 +275,8 @@ void startHddCoreAtIndex(int serverIndex)
     int clientPort = SERVER_TCP_PORT_HDD_FIRST + serverIndex;
     snprintf(cmd, sizeof(cmd), "./ce_hdd.elf ll%d p%d r%d &", logLevel, clientPort, SERVER_UDP_PORT);
     system(cmd);
+
+    Debug::out(LOG_INFO, "startHddCoreAtIndex - serverIndex: %d, clientPort: %d", serverIndex, clientPort);
 }
 
 void udpSend(uint32_t ip, uint16_t port, uint8_t* data, uint16_t len)

@@ -91,6 +91,7 @@ void setupAtnBuffers(void)
 void loop(void)
 {
     uint32_t lastSendFwTime = millis();
+    uint32_t lastYield = millis();
 
     while(1)
     {
@@ -99,6 +100,14 @@ void loop(void)
 
         // handle any data incoming
         handleIncommingData();
+
+        // keep yielding now and then to let other tasks run
+        uint32_t now = millis();
+        if(now - lastYield > 10)
+        {
+            lastYield = now;
+            yield();
+        }
 
         // get the command from ACSI and send it to host
         // IN  STATE: STATE_GET_COMMAND

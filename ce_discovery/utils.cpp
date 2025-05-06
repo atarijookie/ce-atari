@@ -365,3 +365,11 @@ void Utils::textToFile(const char* text, const char* filePath)
     fputs(text, f);                     // write text to file
     fclose(f);                          // close file
 }
+
+void Utils::sleepMs(uint32_t ms)
+{
+    uint32_t us = ms * 1000;
+
+    usleep(us);
+}
+

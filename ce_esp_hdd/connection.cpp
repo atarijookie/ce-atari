@@ -224,11 +224,18 @@ void ceDiscoveryReceive(void)
 void connectToCEhost(void)
 {
     static uint32_t lastAttempt = 0xffff0000; // -65k
+    static bool loggedOnce = false;
 
     if (clientHdd.connected())  // && clientIkbd.connected())
     { // already connected? quit
+        if(!loggedOnce) {
+            Serial.println("connectToCEhost - connected!");
+            loggedOnce = true;
+        }
+
         return;
     }
+    loggedOnce = false;
 
     // if last attempt was less than a moment ago, don't try
     if ((millis() - lastAttempt) < 3000)
@@ -246,7 +253,9 @@ void connectToCEhost(void)
     }
 
     Serial.print("connectToCEhost - IP: ");
-    Serial.println(hostIpString.c_str());
+    Serial.print(hostIpString.c_str());
+    Serial.print(", port: ");
+    Serial.println(hostPortHdd);
 
     // start connection attempt
     clientHdd.connect(hostIpString.c_str(), hostPortHdd);
