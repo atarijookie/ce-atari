@@ -161,7 +161,7 @@ void ChipInterfaceNetwork::sendReportToMainServerSocket(void)
         return;
     }
 
-    uint8_t data[8];
+    uint8_t data[12];
     memset(data, 0, sizeof(data));      // clear data buffer
     memcpy(data, "CELS", 4);            // 0..3: message tag
 
@@ -169,6 +169,9 @@ void ChipInterfaceNetwork::sendReportToMainServerSocket(void)
 
     uint8_t status = (fdClient > 0) ? SERVER_STATUS_OCCUPIED : SERVER_STATUS_FREE;  // got client socket? we're occupied, otherwise free
     data[6] = status;                   // 6: status
+
+    int pid = getpid();
+    Utils::storeDword(data + 7, pid);   // 7..10: this server's port
 
     // send report to main server report port
     sendto(fdReport, data, sizeof(data), 0, (sockaddr*) &addressReport, sizeof(addressReport));

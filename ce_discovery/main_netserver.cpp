@@ -63,6 +63,51 @@ int netServerOpenSocket(void)
     return sockfd;
 }
 
+const char *serverStatusAsString(int status)
+{
+    switch(status)
+    {
+        case SERVER_STATUS_NOT_RUNNING: return "NOT RUNNNING";
+        case SERVER_STATUS_FREE: return "RUNNING AND FREE";
+        case SERVER_STATUS_OCCUPIED: return "RUNNING BUT OCCUPIED";
+        default: return "UNKNOWN";
+    }
+}
+
+void checkForDeadCores(void)
+{
+    // Debug::out(LOG_DEBUG, "Checking for dead cores.");
+
+    for(int i=0; i<MAX_SERVER_COUNT; i++) {
+        // don't check not running instances
+        if(serverStatus[i].status == SERVER_STATUS_NOT_RUNNING)
+        {
+            continue;
+        }
+
+        // no status update for a while? probably stuck or not running
+        uint32_t now = Utils::getCurrentMs();
+        if((now - serverStatus[i].lastUpdate) > 15000)
+        {
+            if(serverStatus[i].pid)
+            {
+                Debug::out(LOG_WARNING, "No status report from server #%d, terminating it by pid: %d", i, serverStatus[i].pid);
+
+                char cmd[64];
+                snprintf(cmd, sizeof(cmd), "kill %d &", serverStatus[i].pid);
+                system(cmd);
+            } else {
+                Debug::out(LOG_WARNING, "No status report from server #%d, but has pid 0 (wrong), not terminating, just clearing struct", i);
+            }
+
+            serverStatus[i].clientIp = 0;
+            serverStatus[i].status = SERVER_STATUS_NOT_RUNNING;
+            serverStatus[i].lastUpdate = 0;
+            serverStatus[i].pid = 0;
+        }
+    }
+}
+
 void networkServerMain(void)
 {
     // register signal handlers
@@ -90,6 +135,7 @@ void networkServerMain(void)
         serverStatus[i].clientIp = 0;
         serverStatus[i].status = SERVER_STATUS_NOT_RUNNING;
         serverStatus[i].lastUpdate = Utils::getCurrentMs();
+        serverStatus[i].pid = 0;
     }
 
     // start one server on index 0
@@ -98,7 +144,7 @@ void networkServerMain(void)
 
     struct timeval timeout;
     fd_set readfds;
-    uint8_t recvData[64];
+    uint8_t recvData[256];
     struct sockaddr_in clientAddr;
 
     // This is main network server loop, which does the following:
@@ -106,6 +152,8 @@ void networkServerMain(void)
     // - holds the list of running servers and their status
     // - checks if any running servers is free and spawns a new one if it isn't
     while(sigintReceived == 0) {
+        checkForDeadCores();
+
         memset(&timeout, 0, sizeof(timeout));
         timeout.tv_sec = 1;
         timeout.tv_usec = 0;
@@ -156,9 +204,9 @@ void onServerStatus(uint8_t* recvData, int len)
     TCEServerStatus *ss = &serverStatus[index];     // get pointer to status struct
     ss->status = recvData[6];                       // 5: status
     ss->lastUpdate = Utils::getCurrentMs();         // updated time: now
-    // don't modify clientIp here, it's not the IP of client but rather IP of server itself
+    ss->pid = (int) Utils::getDword(recvData + 7);  // process pid on index 7..10
 
-    Debug::out(LOG_DEBUG, "onServerStatus at index: %d, status: %d", index, ss->status);
+    Debug::out(LOG_DEBUG, "onServerStatus at index: %d, status: %d (%s)", index, ss->status, serverStatusAsString(ss->status));
 }
 
 void onClientRequest(sockaddr_in *clientAddr, uint8_t *recvData, int len)

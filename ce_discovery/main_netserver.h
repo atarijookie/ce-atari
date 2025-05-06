@@ -17,6 +17,7 @@ typedef struct {
     uint8_t     status;         // one of the SERVER_STATUS_* values
     uint32_t    clientIp;       // IP of client that is connected to this server
     uint32_t    lastUpdate;     // time when this struct was last updated
+    int         pid;            // pid of server's process
 } TCEServerStatus;
 
 #define MAX_SERVER_COUNT    8
