@@ -121,6 +121,7 @@ void ChipInterfaceNetwork::acceptSocketIfNeededAndPossible(void)
     // got the new client socket now
     fdClient = newSock;
     bufReader.setFd(newSock);
+    lastTimeRecv = Utils::getCurrentMs();
 
     Debug::out(LOG_DEBUG, "acceptSocketIfNeededAndPossible() - client connected");
 
@@ -211,24 +212,19 @@ bool ChipInterfaceNetwork::actionNeeded(uint8_t *inBuf)
     int bytesAvailable;
     int rv = ioctl(fdClient, FIONREAD, &bytesAvailable);    // how many bytes we can read?
 
+    uint32_t now = Utils::getCurrentMs();
+
     if(rv < 0 || bytesAvailable <= 0) {                     // ioctl fail or nothing to read? no action needed
-        // Debug::out(LOG_DEBUG, "actionNeeded() - nothing comming from fdClient");
-
-        if(rv == 0 && bytesAvailable == 0) {    // ioctl() succeeded, but can't read anything
-            uint32_t now = Utils::getCurrentMs();
-            uint32_t diff = now - lastTimeRecv;
-
-            if(diff > 3000) {                   // if some time passed since we got some data from client, try to read anyway, to detect client disconnect
-                uint8_t buf[2];
-                recvFromClient(buf, 2);         // if this read fails with 0, it will automatically close socket
-            }
+        if((now - lastTimeRecv) > 5000) {
+            Utils::closeFdIfOpen(fdClient);
+            Debug::out(LOG_INFO, "actionNeeded() - no client data for some time, disconnecting");
         }
 
         return false;
     }
     Debug::out(LOG_DEBUG, "actionNeeded() - bytesAvailable: %d", bytesAvailable);
 
-    lastTimeRecv = Utils::getCurrentMs();       // last time we've something received - now
+    lastTimeRecv = now;       // last time we've something received - now
 
     // if waitForAtn() succeeds, it fills 8 bytes of data in buffer
     // ...but then we might need some little more, so let's determine what it was
@@ -470,14 +466,7 @@ uint32_t ChipInterfaceNetwork::recvFromClient(uint8_t* buf, int maxLen)
             readSize -= bytes;
         }
 
-        if(bytes == 0)      // recv() return 0 on disconnected
-        {
-            Debug::out(LOG_DEBUG, "recvFromClient() - recv() returned 0");
-            closeClientSocket();
-            break;
-        }
-
-        if(readSize < 0)    // nothing to read anymore?
+        if(readSize <= 0)   // nothing to read anymore?
         {
             break;
         }
