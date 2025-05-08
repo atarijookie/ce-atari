@@ -23,33 +23,22 @@ extern TFlags   flags;
 
 DebugVars dbgVars;
 
-std::map<std::string, std::string> logPaths;
+std::string coreLogFileName;
+
+const char* Debug::getCoreLogFileName(bool forceCreate)
+{
+    if(coreLogFileName.length() > 0 && !forceCreate) {
+        return coreLogFileName.c_str();
+    }
+
+    std::string logDir = Utils::dotEnvValue("LOG_DIR", LOG_DIR_DEFAULT, false);
+    coreLogFileName = logDir + std::string("/core_hdd_") + std::to_string(flags.portClient) + std::string(".log");
+    return coreLogFileName.c_str();
+}
 
 void Debug::setOutputToConsole(void)
 {
     g_outToConsole = 1;
-}
-
-void Debug::setDefaultLogFile(void)
-{
-    std::string filename = CORE_HDD_LOG_FILENAME;
-    std::map<std::string, std::string>::iterator i = logPaths.find(filename);
-
-    if(i != logPaths.end()) {   // got this log file? erase it from map
-        logPaths.erase(i);
-    }
-
-    FILE* f = logFileOpen(CORE_HDD_LOG_FILENAME);   // call this to update map, then just close the file
-    
-    if(f) {
-        fclose(f);
-    }
-}
-
-void Debug::setLogFile(const char *path)
-{
-    std::string pathStr = path;
-    logPaths[CORE_HDD_LOG_FILENAME] = pathStr;
 }
 
 const char* Debug::logLevelString(int ll)
@@ -205,61 +194,13 @@ void Debug::logRotateIfNeeded(const char *logFilePath)
     }
 }
 
-void Debug::chipLog(const char* bfr)
-{
-    Debug::chipLog(strlen(bfr), (char*) bfr);
-}
-
-// chipLog() will receive incomplete lines stored in bfr, terminated by '\n'.
-// It should write only complete lines to file, so it will try to gather chars until '\n' char and do write to file then.
-void Debug::chipLog(uint16_t cnt, char* bfr)
-{
-    static std::string oneLine;
-    static uint32_t prevLogOutChips = 0;
-
-    uint32_t now = Utils::getCurrentMs();
-    uint32_t diff = now - prevLogOutChips;
-    prevLogOutChips = now;
-
-    FILE* f = logFileOpen(CHIP_LOG_FILENAME);
-
-    if(!f) {                    // no file? quit
-        return;
-    }
-
-    for(int i=0; i<cnt; i++) {  // for cnt of characters
-        char val = bfr[i];      // get from buffer
-        oneLine += val;         // append to string
-
-        if(val == '\n') {       // if last char was new line, dump it to file
-            fprintf(f, "%08d\t ", diff);
-            fputs(oneLine.c_str(), f);
-            oneLine.clear();    // clear gathered line
-        }
-    }
-
-    fclose(f);      // close file at the end
-}
-
 FILE* Debug::logFileOpen(const char* logFileName)
 {
     static std::string path;
 
-    std::string logFileStdStr = logFileName;
-    std::map<std::string, std::string>::iterator i = logPaths.find(logFileStdStr);
-    std::string logPath;
+    Debug::logRotateIfNeeded(getCoreLogFileName());   // rotate log file if too big
 
-    if(i == logPaths.end()) {   // don't have path for this file, create it, store it
-        logPath = Utils::dotEnvValue("LOG_DIR", LOG_DIR_DEFAULT);   // path to logs dir
-        Utils::mergeHostPaths(logPath, logFileStdStr);              // merge filename into path
-        logPaths[logFileStdStr] = logPath;                          // store to map for next time
-    } else {                    // have path, use value
-        logPath = i->second;
-    }
-
-    Debug::logRotateIfNeeded(logPath.c_str());   // rotate log file if too big
-
-    FILE *f = fopen(logPath.c_str(), "a+t");
+    FILE *f = fopen(getCoreLogFileName(), "a+t");
     return f;
 }
 

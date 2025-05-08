@@ -56,7 +56,6 @@ int main(int argc, char *argv[])
     system("mkdir -p /tmp/ce/log");
     system("mkdir -p /tmp/ce/data");
 
-    Debug::setDefaultLogFile();                // set log file before env vars available
     initializeFlags();                                          // initialize flags
     Debug::out(LOG_INFO, "\n\n"); Debug::out(LOG_INFO, "---------------------------------------------------");
 
@@ -64,7 +63,7 @@ int main(int argc, char *argv[])
     Debug::printfLogLevelString();
 
     Utils::loadDotEnv();                                        // load dotEnv before setting default log file
-    Debug::setDefaultLogFile();                // set log file after env vars available
+    Debug::getCoreLogFileName(true);        // call this with force=true to re-create the log file name
 
     ldp_setParam(1, (uint64_t) flags.logLevel);                         // libDOSpath - set log level to file
     std::string logDir = Utils::dotEnvValue("LOG_DIR", LOG_DIR_DEFAULT);  // path to logs dir
@@ -194,8 +193,8 @@ void initializeFlags(void)
 {
     flags.justShowHelp = false;
     Debug::setLogLevel(LOG_ERROR);      // init current log level to LOG_ERROR
-    flags.portServerReport = 9001;
-    flags.portClient = 9100;
+    flags.portServerReport = 7200;
+    flags.portClient = 7300;
 }
 
 void parseCmdLineArguments(int argc, char *argv[])

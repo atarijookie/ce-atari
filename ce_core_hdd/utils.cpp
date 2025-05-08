@@ -823,7 +823,7 @@ void Utils::loadDotEnv(void)
     }
 }
 
-std::string Utils::dotEnvValue(std::string key, const char* defValue)
+std::string Utils::dotEnvValue(std::string key, const char* defValue, bool logOnError)
 {
     /* get value from dotEnv map for specified key */
 
@@ -832,7 +832,9 @@ std::string Utils::dotEnvValue(std::string key, const char* defValue)
         return value;
     }
     catch (const std::out_of_range&) {
-        Debug::out(LOG_DEBUG, "Utils::dotEnvValue - no value for key '%s' !", key.c_str());
+        if(logOnError) {
+            Debug::out(LOG_DEBUG, "Utils::dotEnvValue - no value for key '%s' !", key.c_str());
+        }
     }
 
     // if got here, the value wasn't found in map, but it still could be a real env var, so try getting it
@@ -841,7 +843,10 @@ std::string Utils::dotEnvValue(std::string key, const char* defValue)
     if(envVar) {    // some real env var was found with this name?
         static std::string retValueFromEnv;
         retValueFromEnv = envVar;
-        Debug::out(LOG_DEBUG, "Utils::dotEnvValue - ...but found env var '%s' with value '%s'", key.c_str(), retValueFromEnv.c_str());
+
+        if(logOnError) {
+            Debug::out(LOG_DEBUG, "Utils::dotEnvValue - ...but found env var '%s' with value '%s'", key.c_str(), retValueFromEnv.c_str());
+        }
         return retValueFromEnv;
     }
 

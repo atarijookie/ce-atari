@@ -83,9 +83,17 @@ uint8_t onGetCommandAcsi(void)
     cmd[0] = PIO_writeFirst(); // get byte from ST (waiting for the 1st byte)
     id = (cmd[0] >> 5) & 0x07; // get only device ID
 
+    // Serial.print("onGetCommandAcsi - cmd[0]: ");
+    // Serial.print(cmd[0], HEX);
+    // Serial.print(", id: ");
+    // Serial.print(id);
+
     //----------------------
     if (!idIsEnabled(id)) // if this ID is not enabled, quit
     {
+        resetBridge();
+        timeoutClear();
+        // Serial.println(" NOT ENABLED");
         return 0;
     }
 
@@ -97,6 +105,9 @@ uint8_t onGetCommandAcsi(void)
 
         if (brStat != E_OK)
         { // if something was wrong, quit, failed
+            // Serial.print(" failed on cmd #");
+            // Serial.println(i);
+            timeoutClear();
             resetBridge();
             return 0;
         }
@@ -106,6 +117,12 @@ uint8_t onGetCommandAcsi(void)
             getCmdLengthFromCmdBytesAcsi(); // we set up the length of command, etc.
         }
     }
+
+    // for(i=1; i<cmdLen; i++) {
+    //     Serial.print(" ");
+    //     Serial.print(cmd[i], HEX);
+    // }
+    // Serial.println("");
 
     return 1;
 }
