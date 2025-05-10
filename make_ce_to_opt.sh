@@ -47,4 +47,7 @@ echo "copying .env file"
 cp ./.env /opt/ce/bin
 ln -sf /opt/ce/bin/.env /opt/ce/bin/webserver/.env
 
+echo "copying shell scripts"
+cp ./shellscripts/ce_start.sh /opt/ce/bin
+
 echo "done"

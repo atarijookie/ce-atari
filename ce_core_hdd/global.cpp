@@ -29,8 +29,7 @@ void preloadGlobalsFromDotEnv(void)
     PATH_CE_DD_BS_L2 = Utils::mergeHostPaths3(driversPath, "ce_dd_l2.bs");
     PATH_CE_DD_PRG_PATH_AND_FILENAME = Utils::mergeHostPaths3(driversPath, "ce_dd.prg");
 
-    std::string dataDir = Utils::dotEnvValue("DATA_DIR");
-    CONFIG_DRIVE_PATH = Utils::mergeHostPaths3(dataDir, "configdrive");     // where the copy of configdrive is
+    CONFIG_DRIVE_PATH = Utils::dotEnvValue("CONFIG_DRIVE_PATH");     // where the copy of configdrive is
 
     Debug::out(LOG_DEBUG, "CORE_PATH        : %s", corePath.c_str());
     Debug::out(LOG_DEBUG, "driversPath      : %s", driversPath.c_str());

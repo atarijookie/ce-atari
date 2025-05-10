@@ -52,10 +52,6 @@ int main(int argc, char *argv[])
 
     printf("\033[H\033[2J\n");
 
-    // create dirs for logs and other temporary data
-    system("mkdir -p /tmp/ce/log");
-    system("mkdir -p /tmp/ce/data");
-
     initializeFlags();                                          // initialize flags
     Debug::out(LOG_INFO, "\n\n"); Debug::out(LOG_INFO, "---------------------------------------------------");
 
@@ -73,10 +69,6 @@ int main(int argc, char *argv[])
 
     Utils::screenShotVblEnabled(false);                         // screenshot vbl not enabled by default
     preloadGlobalsFromDotEnv();
-
-    // make copy of config drive
-    std::string cmdCopyConfigDrive = std::string("cp -r ") + Utils::mergeHostPaths3(corePath, "configdrive") + std::string(" ") + CONFIG_DRIVE_PATH;
-    system(cmdCopyConfigDrive.c_str());
 
     //------------------------------------
     // if should only show help and quit
