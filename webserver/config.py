@@ -3,6 +3,7 @@ import re
 import math
 import json
 import stat
+import logging
 from os import listdir
 from os.path import isfile, isdir, join
 
@@ -10,6 +11,7 @@ from flask import Blueprint, request, current_app as app, abort
 from utils import get_setting, set_setting, is_blockdev, send_to_core_hdd
 
 config = Blueprint('config', __name__)
+app_log = logging.getLogger()
 
 
 @config.route('/get_ids', methods=['GET'])
@@ -87,7 +89,7 @@ def get_drives():
         if drive_letter == conf_drive_letter:   # if this is a config drive letter, it's a config drive
             drive_type = 2
         else:                                   # get path, if path present then drive is GEM drive, otherwise off
-            path = get_setting("PATH_GEM_" + str(i), "")
+            path = get_setting("PATH_GEM_" + drive_letter, "")
             drive_type = 0 if not path else 1
 
         resp['paths'].append(path)
@@ -106,11 +108,14 @@ def set_drives():
 
     # set path and device type for each raw drive
     for i in range(16):
+        drive_letter = chr(65 + i)
+
         if i < 2:                       # ignore drives A and B, don't store them
             continue
 
         path = paths[i] if drive_types[i] == 1 else ""        # path valid only for drive_types 1, otherwise store empty path
-        set_setting("PATH_GEM_" + str(i), path)
+        setting_name = "PATH_GEM_" + drive_letter
+        set_setting(setting_name, path)
 
         if drive_types[i] == 2:         # if this is the config drive, store it's letter
             config_drive_letter = chr(65 + i)

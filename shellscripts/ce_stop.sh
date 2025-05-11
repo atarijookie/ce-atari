@@ -30,4 +30,7 @@ for pidfile in $( find "${PID_DIR}" -name *.pid ); do
 
 done
 
+# delete all sock files that might be present
+rm -f $DATA_DIR/*sock*
+
 echo "All processes terminated."
