@@ -40,10 +40,7 @@ ChipInterface*      chipInterface;
 ExternalServices    externalServices;
 
 bool otherInstanceIsRunning(void);
-
-void showOnDisplay(int argc, char *argv[]);
 int  runCore(void);
-void networkServerMain(void);
 
 int main(int argc, char *argv[])
 {
@@ -112,8 +109,8 @@ void pthread_kill_join(const char* threadName, pthread_t& threadInfo)
 // return path and filename to pid file for this core's instance, include port to distinguish between instances
 std::string pidFileName(void)
 {
-    std::string dataDir = Utils::dotEnvValue("DATA_DIR", DATA_DIR_DEFAULT);
-    std::string pidFilePath = dataDir + std::string("/ce_hdd_") + std::to_string(flags.portClient) + std::string(".pid");
+    std::string pidDir = Utils::dotEnvValue("PID_DIR", PID_DIR_DEFAULT);
+    std::string pidFilePath = pidDir + std::string("/ce_hdd_") + std::to_string(flags.portClient) + std::string(".pid");
     return pidFilePath;
 }
 

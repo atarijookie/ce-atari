@@ -145,10 +145,8 @@ extern std::string PATH_CE_DD_BS_L2;
 extern std::string PATH_CE_DD_PRG_PATH_AND_FILENAME;
 extern std::string CONFIG_DRIVE_PATH;
 
-
 #define LOG_DIR_DEFAULT     "/tmp/ce/log"
 #define DATA_DIR_DEFAULT    "/tmp/ce/data"
-
+#define PID_DIR_DEFAULT     "/tmp/ce/pid"
 
 #endif // GLOBAL_H
-

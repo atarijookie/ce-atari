@@ -273,7 +273,7 @@ void startHddCoreAtIndex(int serverIndex)
     serverStatus[serverIndex].status = SERVER_STATUS_OCCUPIED;
     char cmd[256];
     int clientPort = SERVER_TCP_PORT_HDD_FIRST + serverIndex;
-    snprintf(cmd, sizeof(cmd), "./ce_hdd.elf ll%d p%d r%d &", logLevel, clientPort, SERVER_UDP_PORT);
+    snprintf(cmd, sizeof(cmd), "./ce_hdd.elf ll%d p%d r%d > /dev/null 2>&1 &", logLevel, clientPort, SERVER_UDP_PORT);
     system(cmd);
 
     Debug::out(LOG_INFO, "startHddCoreAtIndex - serverIndex: %d, clientPort: %d", serverIndex, clientPort);

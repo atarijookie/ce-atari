@@ -22,10 +22,11 @@ check_if_pid_running()
 
 . ./.env                                                # source env variables
 
-mkdir -p "${DATA_DIR}"                                  # make this var folder if it doesn't exist
-pid_file=${DATA_DIR}/webserver.pid
-
+mkdir -p "$DATA_DIR"                                    # make this var folder if it doesn't exist
+mkdir -p "$PID_DIR"
 mkdir -p "${SETTINGS_DIR}"
+
+pid_file="${PID_DIR}/webserver.pid"
 
 app_running=$( check_if_pid_running $pid_file )         # check if PID is still running
 

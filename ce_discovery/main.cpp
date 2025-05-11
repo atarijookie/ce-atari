@@ -51,8 +51,8 @@ bool otherInstanceIsRunning(void)
     char self_exe[PATH_MAX];
 
     self_pid = getpid();
-    std::string dataDir = Utils::dotEnvValue("DATA_DIR", DATA_DIR_DEFAULT);
-    std::string pidFilePath = Utils::mergeHostPaths3(dataDir, "ce_discovery.pid");
+    std::string pidDir = Utils::dotEnvValue("PID_DIR", PID_DIR_DEFAULT);
+    std::string pidFilePath = Utils::mergeHostPaths3(pidDir, "ce_discovery.pid");
 
     f = fopen(pidFilePath.c_str(), "r");
     if(!f) {    // can't open file? other instance probably not running (or is, but can't figure out, so screw it)
