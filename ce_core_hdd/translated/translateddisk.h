@@ -113,6 +113,7 @@ public:
     static TranslatedDisk * getInstance(void);
     static void deleteInstance(void);
 
+    void loadSettings(void);
     void findAttachedDisks(void);
 
     void mutexLock(void);
@@ -161,8 +162,6 @@ private:
 
 	TFindStorage tempFindStorage;
     TFindStorage *findStorages[MAX_FIND_STORAGES];
-
-    void loadSettings(void);
 
     uint16_t getDrivesBitmap(void);
     static void removeDoubleDots(std::string &path);

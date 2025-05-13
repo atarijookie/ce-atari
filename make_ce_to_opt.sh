@@ -32,6 +32,7 @@ cd ce_core_hdd
 echo "building ce_core_hdd"
 make -j4
 cp ./ce_hdd.elf "$BIN_DIR"
+cp ./ce_logo.bin "$BIN_DIR"
 cp -r ./configdrive "$BIN_DIR"
 cd - > /dev/null 2>&1
 

@@ -84,9 +84,7 @@ TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt)
         files[i].hostPath       = "";
     }
 
-    Settings s;
-    configDriveLetter = s.getChar("DRIVELETTER_CONFDRIVE", 'C');
-    configDriveIndex = configDriveLetter - 65;
+    loadSettings();
 
     findAttachedDisks();                // find all the currently mounted disks
     initFindStorages();
@@ -114,6 +112,13 @@ TranslatedDisk::~TranslatedDisk()
     destroyFindStorages();
 }
 
+void TranslatedDisk::loadSettings(void)
+{
+    Settings s;
+    configDriveLetter = s.getChar("DRIVELETTER_CONFDRIVE", 'C');
+    configDriveIndex = configDriveLetter - 65;
+}
+
 void TranslatedDisk::setSettingsReloadProxy(SettingsReloadProxy *rp)
 {
     reloadProxy = rp;
@@ -130,6 +135,21 @@ void TranslatedDisk::findAttachedDisks(void)
         std::string settingPath = std::string("PATH_GEM_") + driveLetter;   // create a setting name, under which the path to translated drive i is stored
         std::string drivePath = s.getString(settingPath.c_str(), "");          // get the setting value
 
+        // is this the config drive?
+        if(configDriveIndex == i) {
+            std::string diskLabel = std::string("Config Drive ") + driveLetter;
+
+            // fill in device info accordingly
+            conf[i].enabled = true;
+            conf[i].hostRootPath = CONFIG_DRIVE_PATH;
+            conf[i].currentAtariPath = HOSTPATH_SEPAR_STRING;
+            conf[i].mediaChanged = true;
+            conf[i].label = diskLabel;              // store disk description
+
+            Debug::out(LOG_DEBUG, "TranslatedDisk::findAttachedDisks: [%d] %c: -> %s", i, driveLetter, conf[i].hostRootPath.c_str());
+            continue;
+        }
+
         if(drivePath.length() == 0 || !Utils::dirExists(drivePath)) {          // dir doesn't exist? skip rest
             conf[i].enabled = false;                // not enabled
             continue;
@@ -144,7 +164,7 @@ void TranslatedDisk::findAttachedDisks(void)
         conf[i].mediaChanged = true;
         conf[i].label = diskLabel;              // store disk description
 
-        Debug::out(LOG_DEBUG, "TranslatedDisk::findAttachedDisks: [%d] %c: -> %s", i, driveLetter, drivePath.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::findAttachedDisks: [%d] %c: -> %s", i, driveLetter, conf[i].hostRootPath.c_str());
     }
 }
 

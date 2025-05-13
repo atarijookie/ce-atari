@@ -364,6 +364,7 @@ void handleDisksAction(std::string& action, json& data)
     if(action == "reload_trans") {              // reload translated disks
         pthread_mutex_lock(&shared.mtxHdd);
         TranslatedDisk* translated = TranslatedDisk::getInstance();
+        translated->loadSettings();
         translated->findAttachedDisks();
         pthread_mutex_unlock(&shared.mtxHdd);
     } else if(action == "reload_raw") {         // reload raw disks
