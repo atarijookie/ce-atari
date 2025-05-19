@@ -73,8 +73,6 @@ void setup(void)
     Serial.print("setup() done, enabledIDs: ");
     Serial.print(enabledIDs, HEX);
     Serial.println("");
-
-    timeoutClear();
 }
 
 void setupAtnBuffers(void)
@@ -178,7 +176,7 @@ void loop(void)
         // IN  STATE: any
         // OUT STATE: STATE_DATA_WRITE, STATE_DATA_READ_WITH_STATUS, STATE_DATA_READ_WITHOUT_STATUS, or unchanged
 
-        if (timeout())      // if the data from host doesn't come within timeout, quit
+        if (hasTimedOut)      // if the data from host doesn't come within timeout, quit
         {
             timeoutClear();
             Serial.println("timeout!");

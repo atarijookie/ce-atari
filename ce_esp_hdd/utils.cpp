@@ -1,9 +1,8 @@
 #include "defs.h"
 
-uint32_t timeoutStartMillis;
-uint32_t timeoutDuration;
-bool hasTimedOut;
-bool timeOutRunning;
+hw_timer_t *timer = NULL;
+volatile uint8_t hasTimedOut = false;
+uint8_t timerRunning = false;
 
 uint16_t getWord(uint8_t *bfr)
 {
@@ -71,59 +70,48 @@ void store24bits(uint8_t *bfr, uint32_t val)
     bfr[2] = val;
 }
 
+void ARDUINO_ISR_ATTR onTimer()
+{
+    hasTimedOut = 1;
+}
+
+void timeoutStart(uint32_t durationMs)
+{
+    if(timerRunning)                                // if timer running, stop it first
+    {
+        timerEnd(timer);
+    }
+
+    timerRunning = false;
+    hasTimedOut = false;
+    timer = timerBegin(1000);                       // Set timer frequency to 1 kHz
+    timerAttachInterrupt(timer, &onTimer);          // Attach onTimer function to our timer.
+    timerAlarm(timer, durationMs, false, 0);        // Set alarm to call onTimer function after specified timeout time (value in ms)
+
+    timerRunning = true;
+}
+
+void timeoutClear(void)
+{
+    hasTimedOut = false;
+    timerRunning = false;
+    timerEnd(timer);
+}
+
+void cmdTimeoutChangeLength(uint32_t newPeriod)
+{
+    timeoutClear();
+    timeoutStart(newPeriod);
+}
+
 void longTimeout_basedOnSectorCount(uint16_t sectorCount)
 {
     uint32_t mbCount       = (sectorCount >> 11) + 1;                  // convert sector count into megabytes (rounded up)
     uint32_t timeoutSecs   = mbCount       * CMD_TIMEOUT_SECS_PER_MB;  // convert MBs into seconds
     uint32_t timeoutPeriod = timeoutSecs   * CMD_TIMEOUT_ONESECOND;    // and convert seconds into ms
 
-    hasTimedOut = false;
-    timeOutRunning = true;
-    timeoutStartMillis = millis();
-    timeoutDuration = MIN(timeoutPeriod, 30000);        // Now limit the timeout period to 30 s
-}
-
-void timeoutStart(void)
-{
-    hasTimedOut = false;
-    timeOutRunning = true;
-    timeoutStartMillis = millis();
-    timeoutDuration = CMD_TIMEOUT_SHORT;
-}
-
-bool timeout(void)
-{
-    if(hasTimedOut)
-    {
-        return true;
-    }
-
-    if(!timeOutRunning) {
-        return false;
-    }
-
-    uint32_t now = millis();
-
-    if ((now - timeoutStartMillis) > timeoutDuration)
-    {
-        timeOutRunning = false;
-        hasTimedOut = true;
-        return true;
-    }
-
-    return false;
-}
-
-void timeoutClear(void)
-{
-    hasTimedOut = false;
-    timeOutRunning = false;
-}
-
-void cmdTimeoutChangeLength(uint32_t newPeriod)
-{
-    timeoutStartMillis = millis();
-    timeoutDuration = newPeriod;
+    uint32_t timeoutDuration = MIN(timeoutPeriod, 30000);        // Now limit the timeout period to 30 s
+    cmdTimeoutChangeLength(timeoutDuration);
 }
 
 void storeHeader(uint8_t *bfr, uint16_t atnCode, uint32_t txLen)
@@ -132,4 +120,3 @@ void storeHeader(uint8_t *bfr, uint16_t atnCode, uint32_t txLen)
     storeWord(bfr + 4, atnCode); //  4..5: ATN code (2 bytes)
     storeDword(bfr + 6, txLen);  //  6..9: txLen (4 bytes)
 }
-

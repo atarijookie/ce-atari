@@ -224,7 +224,7 @@ uint8_t waitForEOT(void)
             return TRUE;
         }
 
-        if (timeout())
+        if (hasTimedOut)
         { // timeout? fail
             return FALSE;
         }

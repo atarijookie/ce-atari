@@ -231,7 +231,7 @@ void onDataRead(uint8_t withStatus)
 
         clientHdd.read(data, cntNow);
 
-        // if (timeout())
+        // if (hasTimedOut)
         // {                               // if the data from host doesn't come within timeout, quit
         //     setDataDirection(DIR_RECV); // data direction for writing, and quit
         //     return;
