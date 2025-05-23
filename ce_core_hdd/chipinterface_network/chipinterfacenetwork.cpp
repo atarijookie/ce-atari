@@ -242,8 +242,6 @@ bool ChipInterfaceNetwork::actionNeeded(uint8_t *inBuf)
         //Debug::out(LOG_DEBUG, "actionNeeded() - gotAtnId=%d, gotAtnCode=%d", gotAtnId, gotAtnCode);
 
         if(gotAtnId == NET_ATN_HANS_ID) {                   // for Hans
-            Debug::cmdMarkStartTime();
-
             if(gotAtnCode == ATN_ACSI_COMMAND) {            // for this command read all ACSI command bytes
                 recvFromClient(inBuf + 8, 14);
             }

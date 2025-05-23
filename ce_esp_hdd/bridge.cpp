@@ -252,22 +252,15 @@ uint8_t dataIn(void)
 {
     uint8_t data = 0;
 
-    for (int i = 0; i < 8; i++)
-    {
-        if (digitalRead(dataPins[i]) == HIGH)
-        {
-            data |= (1 << i);
-        }
-    }
+    uint32_t gpioValue = REG_READ(GPIO_IN_REG);     // read all GPIO pins
+    data = (gpioValue >> 1);                        // shift 1 bit down to get data in the right place
 
     return data;
 }
 
 void dataOut(uint8_t data)
 {
-    for (int i = 0; i < 8; i++)
-    {
-        int pinLevel = (data & (1 << i)) ? HIGH : LOW;
-        digitalWrite(dataPins[i], pinLevel);
-    }
+    uint32_t data32 = ((uint32_t) data) << 1;
+    REG_WRITE(GPIO_OUT_W1TC_REG, 0x1fe);        // clear GPIO1–8
+    REG_WRITE(GPIO_OUT_W1TS_REG, data32);       // set the bits of GPIO1-8
 }

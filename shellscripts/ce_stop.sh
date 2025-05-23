@@ -20,11 +20,10 @@ for pidfile in $( find "${PID_DIR}" -name *.pid ); do
   pid=$(cat "$pidfile" 2>/dev/null)
 
   # Kill the process
-  if kill -9 "$pid" 2>/dev/null; then
-    echo "Killed process $pid from $pidfile"
-  else
-    echo "Failed to kill PID $pid from $pidfile (maybe not running)"
-  fi
+  kill -2 "$pid" 2>/dev/null    # SIGINT
+  sleep 0.3
+  kill -9 "$pid" 2>/dev/null    # SIGKILL
+  echo "Killed process $pid from $pidfile"
 
   rm -f "$pidfile"
 

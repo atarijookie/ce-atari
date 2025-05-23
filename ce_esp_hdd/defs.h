@@ -85,9 +85,9 @@
 #define PIN_CMD1ST      9       // input
 #define PIN_EOT         10      // input
 #define PIN_OUT_OE      11      // output
-#define PIN_FF12D       12      // output
-#define PIN_INT_TRIG    13      // output
-#define PIN_DRQ_TRIG    14      // output
+#define PIN_DRQ_TRIG    12      // output
+#define PIN_FF12D       13      // output
+#define PIN_INT_TRIG    14      // output
 
 #define PIN_SCL         15      // output
 #define PIN_SDA         16      // input/output

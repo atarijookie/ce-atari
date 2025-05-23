@@ -258,8 +258,6 @@ void CCoreThread::handleAcsiCommand(uint8_t *bufIn)
 
     uint8_t acsiId = bufIn[0] >> 5;                            // get just ACSI ID
     if(acsiIdInfo.acsiIDdevType[acsiId] == DEVTYPE_OFF) {    // if this ACSI ID is off, reply with error and quit
-        Debug::cmdStart(bufIn, "DEV OFF");
-
         Debug::out(LOG_WARNING, "CCoreThread::handleAcsiCommand - acsiId %d is OFF, sending CHECK CONDITION", acsiId);
         dataTrans->setStatus(SCSI_ST_CHECK_CONDITION);
         dataTrans->sendDataAndStatus();
@@ -286,8 +284,6 @@ void CCoreThread::handleAcsiCommand(uint8_t *bufIn)
     // if it's the retry module (highest bit in HOSTMOD is set), let it go before the big switch for modules,
     // because it will change the command and let it possibly run trough the correct module
     if(justCmd == 0 && tag1 == 'C' && tag2 == 'E' && (module & 0x80) != 0) {                         // if it's a RETRY attempt...
-        Debug::cmdStart(bufIn, "CE_RETRY");
-
         module = module & 0x7f;                 // remove RETRY bit from module
 
         if(!isIcd) {                            // short command?
@@ -327,7 +323,6 @@ void CCoreThread::handleAcsiCommand(uint8_t *bufIn)
         switch(module) {
 
         case HOSTMOD_TRANSLATED_DISK:                   // translated disk command?
-            Debug::cmdStart(bufIn, "CE_TRANS");
             wasHandled = true;
 
             {
@@ -341,7 +336,6 @@ void CCoreThread::handleAcsiCommand(uint8_t *bufIn)
             break;
 
         case HOSTMOD_MISC:
-            Debug::cmdStart(bufIn, "CE_MISC");
             wasHandled = true;
             misc.processCommand(pCmd);
             break;
@@ -350,13 +344,11 @@ void CCoreThread::handleAcsiCommand(uint8_t *bufIn)
 
     // if this command belongs to extensions, let it to ExtensionHandler
     if(extensionHandler->isExtensionCall(justCmd)) {
-        Debug::cmdStart(bufIn, "CE_EXT");
         extensionHandler->processCommand(pCmd);
         wasHandled = true;
     }
 
     if(!wasHandled) {           // if the command was not previously handled, it's probably just some SCSI command
-        Debug::cmdStart(bufIn, "RAW");
         pthread_mutex_lock(&shared.mtxHdd);
         shared.scsi->processCommand(bufIn);                    // process the command
         pthread_mutex_unlock(&shared.mtxHdd);

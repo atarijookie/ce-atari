@@ -94,6 +94,7 @@ void connectToWifi(void)
 void ceDiscoverySend(void)
 {
     static uint32_t lastAttempt = 0xffff0000; // -65k
+    static bool whichBroadcastAddr = false;
 
     // already got hostIp and port? don't do discovery
     if (hostIp[0] != 0 && hostPortHdd != 0)
@@ -116,34 +117,43 @@ void ceDiscoverySend(void)
         udpInitialized = true;
     }
 
-    // get local ip and mask, create broadcast ip
-    IPAddress ip = WiFi.localIP();
-    uint32_t ip32 = (((uint32_t)ip[0]) << 24) | (((uint32_t)ip[1]) << 16) | (((uint32_t)ip[2]) << 8) | (((uint32_t)ip[3]));
-
-    IPAddress mask = WiFi.subnetMask();
-    uint32_t mask32 = (((uint32_t)mask[0]) << 24) | (((uint32_t)mask[1]) << 16) | (((uint32_t)mask[2]) << 8) | (((uint32_t)mask[3]));
-    uint32_t mask32inv = ~mask32;
-
-    uint32_t ip32broadcast = ip32 | mask32inv; // create broadcast addr by setting all subnet bits to 1
-
-    IPAddress addrBroadcast((uint8_t) (ip32broadcast >> 24), (uint8_t) (ip32broadcast >> 16), (uint8_t) (ip32broadcast >> 8), (uint8_t) ip32broadcast);    // from uint32_t to object
-
     // send upd broadcast
     uint8_t updPacket[4];
     strcpy((char *)updPacket, "CELC");
 
-    Serial.print("ceDiscoverySend to ");
-    Serial.println(addrBroadcast.toString().c_str());
+    whichBroadcastAddr = !whichBroadcastAddr;   // toggle this flag
 
-    // broadcast to subnet devices (e.g. 192.168.1.255)
-    udp.beginPacket(addrBroadcast.toString().c_str(), SERVER_UDP_PORT);
-    udp.write(updPacket, 4);
-    udp.endPacket();
+    if(whichBroadcastAddr)      // send to subnet broadcast addr?
+    {
+        // get local ip and mask, create broadcast ip
+        IPAddress ip = WiFi.localIP();
+        uint32_t ip32 = (((uint32_t)ip[0]) << 24) | (((uint32_t)ip[1]) << 16) | (((uint32_t)ip[2]) << 8) | (((uint32_t)ip[3]));
 
-    // broadcast to all possible devices (255.255.255.255)
-    udp.beginPacket("255.255.255.255", SERVER_UDP_PORT);
-    udp.write(updPacket, 4);
-    udp.endPacket();
+        IPAddress mask = WiFi.subnetMask();
+        uint32_t mask32 = (((uint32_t)mask[0]) << 24) | (((uint32_t)mask[1]) << 16) | (((uint32_t)mask[2]) << 8) | (((uint32_t)mask[3]));
+        uint32_t mask32inv = ~mask32;
+
+        uint32_t ip32broadcast = ip32 | mask32inv; // create broadcast addr by setting all subnet bits to 1
+
+        IPAddress addrBroadcast((uint8_t) (ip32broadcast >> 24), (uint8_t) (ip32broadcast >> 16), (uint8_t) (ip32broadcast >> 8), (uint8_t) ip32broadcast);    // from uint32_t to object
+
+        Serial.print("ceDiscoverySend to ");
+        Serial.println(addrBroadcast.toString().c_str());
+
+        // broadcast to subnet devices (e.g. 192.168.1.255)
+        udp.beginPacket(addrBroadcast.toString().c_str(), SERVER_UDP_PORT);
+        udp.write(updPacket, 4);
+        udp.endPacket();
+    } 
+    else        // send to generic broadcast addr
+    {
+        Serial.println("ceDiscoverySend to 255.255.255.255");
+
+        // broadcast to all possible devices (255.255.255.255)
+        udp.beginPacket("255.255.255.255", SERVER_UDP_PORT);
+        udp.write(updPacket, 4);
+        udp.endPacket();
+    }
 }
 
 // Receive response from server if there is any and store it if it's valid.

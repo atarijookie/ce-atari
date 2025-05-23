@@ -206,17 +206,13 @@ void onDataRead(uint8_t withStatus)
     }
 
     uint32_t start = millis();
-    while(true)
+    while(!dataReceived)
     {
         handleIncommingData();      // receive data and wait for dataReceived flag
 
-        if((millis() - start) > 1000) {
+        if(hasTimedOut) {
             PIO_read(SCSI_ST_CHECK_CONDITION);
             return;
-        }
-
-        if(dataReceived) {
-            break;
         }
     }
 
@@ -230,12 +226,6 @@ void onDataRead(uint8_t withStatus)
         dataCnt -= cntNow;
 
         clientHdd.read(data, cntNow);
-
-        // if (hasTimedOut)
-        // {                               // if the data from host doesn't come within timeout, quit
-        //     setDataDirection(DIR_RECV); // data direction for writing, and quit
-        //     return;
-        // }
 
         for(int i=0; i<cntNow; i++) {
             DMA_read(data[i]);

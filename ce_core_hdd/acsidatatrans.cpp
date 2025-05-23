@@ -183,11 +183,7 @@ void AcsiDataTrans::sendDataAndStatus(bool fromRetryModule)
 
     // for DATA write transmit just the status in a different way (on separate ATN)
     if(dataDirection == DATA_DIRECTION_WRITE) {
-        Debug::cmdMid(false, receivedDataCount);
-
-        bool success = sendStatusToHans(status);
-
-        Debug::cmdEnd(status, success);
+        sendStatusToHans(status);
         return;
     }
 
@@ -206,15 +202,10 @@ void AcsiDataTrans::sendDataAndStatus(bool fromRetryModule)
     res = sendData_start(count, status, true);      // try to start the read data transfer, with status
 
     if(!res) {
-        Debug::cmdMid(true, 0);
-        Debug::cmdEnd(status, false);
         return;
     }
 
-    bool success = sendData_transferBlock(buffer, count);    // transfer this block
-
-    Debug::cmdMid(true, sentDataCount);
-    Debug::cmdEnd(status, success);
+    sendData_transferBlock(buffer, count);    // transfer this block
 }
 
 bool AcsiDataTrans::sendData_start(uint32_t totalDataCount, uint8_t scsiStatus, bool withStatus)
