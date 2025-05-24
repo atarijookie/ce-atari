@@ -10,9 +10,9 @@ uint8_t onGetCommandScsi(void);
 void getCmdLengthFromCmdBytesAcsi(void);
 void getCmdLengthFromCmdBytesScsi(uint8_t cmd);
 
-void onGetCommand(void);
-void onDataRead(uint8_t withStatus);
-void onDataWrite(void);
+uint8_t onGetCommand(void);
+uint8_t onDataRead(uint8_t withStatus);
+uint8_t onDataWrite(void);
 void onReadStatus(void);
 
 #endif

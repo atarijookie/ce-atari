@@ -35,44 +35,26 @@ extern uint8_t isAcsiNotScsi;
 extern uint8_t busIdle;
 extern bool dataReceived;
 
-void onGetCommand(void)
+uint8_t onGetCommand(void)
 {
-    uint8_t i, id;
-
     //---------
     // retrieve the command. There are some slight differences between ACSI and SCSI part,
     // but the resulting commands should be the same (to make the rest of app work without further changes).
-    uint8_t good;
+    uint8_t good = isAcsiNotScsi ? onGetCommandAcsi() : onGetCommandScsi();
 
-    if (isAcsiNotScsi)
-    { // for ACSI
-        good = onGetCommandAcsi();
-    }
-    else
-    { // for SCSI
-        good = onGetCommandScsi();
-    }
-
-    if (!good)
-    { // if failed to get the cmd, quit
-        return;
-    }
-
-    id = (cmd[0] >> 5) & 0x07; // get only device ID
-
-    //-----
-    if (!idIsEnabled(id)) // this ID not enabled, ignore command
+    if (!good)  // if failed to get the cmd, quit
     {
-        return;
+        timeoutClear();
+        return STATE_GET_COMMAND;
     }
 
     //----------------
-    // if we got here, we should handle this in host
+    // command received, send it to host
     timeoutStart(); // start the timeout timer to give the rest of code full timeout time
 
     sendHeaderAndDataToHost(SOCK_HDD, atnSendACSIcommand, ATN_SENDACSICOMMAND_LEN_TX - TX_HEADER_SIZE);
 
-    state = STATE_WAIT_COMMAND_RESPONSE;
+    return STATE_WAIT_COMMAND_RESPONSE;
 }
 
 uint8_t onGetCommandAcsi(void)
@@ -92,7 +74,6 @@ uint8_t onGetCommandAcsi(void)
     if (!idIsEnabled(id)) // if this ID is not enabled, quit
     {
         resetBridge();
-        timeoutClear();
         // Serial.println(" NOT ENABLED");
         return 0;
     }
@@ -107,7 +88,6 @@ uint8_t onGetCommandAcsi(void)
         { // if something was wrong, quit, failed
             // Serial.print(" failed on cmd #");
             // Serial.println(i);
-            timeoutClear();
             resetBridge();
             return 0;
         }
@@ -149,12 +129,7 @@ uint8_t onGetCommandScsi(void)
         }
     }
 
-    if (id == 0xff)
-    { // ID not found? quit
-        return 0;
-    }
-    //----------------------
-    if (!idIsEnabled(id)) // if this ID is not enabled, quit
+    if (id == 0xff || !idIsEnabled(id))     // id not found or id not enabled? quit
     {
         return 0;
     }
@@ -194,15 +169,13 @@ uint8_t onGetCommandScsi(void)
     return 1;
 }
 
-void onDataRead(uint8_t withStatus)
+uint8_t onDataRead(uint8_t withStatus)
 {
-    state = STATE_GET_COMMAND; // this will be the next state once this function finishes with fail
-
     // nothing to send AND should send status? then just quit with status byte
     if (dataCnt == 0 && withStatus)
     {
         PIO_read(statusByte);
-        return;
+        return STATE_GET_COMMAND;   // next state: get next command
     }
 
     uint32_t start = millis();
@@ -212,7 +185,7 @@ void onDataRead(uint8_t withStatus)
 
         if(hasTimedOut) {
             PIO_read(SCSI_ST_CHECK_CONDITION);
-            return;
+            return STATE_GET_COMMAND;   // next state: get next command
         }
     }
 
@@ -233,23 +206,23 @@ void onDataRead(uint8_t withStatus)
             if (brStat == E_TimeOut)
             {
                 setDataDirection(DIR_RECV); // data direction for writing, and quit
-                return;
+                return STATE_GET_COMMAND;   // next state: get next command
             }
         }
     }
 
-    if (withStatus)     // if should send status, then send status and go to STATE_GET_COMMAND
+    // if should send status, then send status and go to STATE_GET_COMMAND
+    if (withStatus)
     {
-        state = STATE_GET_COMMAND;
-        PIO_read(statusByte);   // send the status to Atari
+        PIO_read(statusByte);       // send the status to Atari
+        return STATE_GET_COMMAND;   // next state: get next command
     }
-    else                // if shouldn't send status here, switch to state STATE_READ_STATUS, which will retrieve status from host and send it to ST
-    {
-        state = STATE_READ_STATUS;
-    }
+
+    // if shouldn't send status here, switch to state STATE_READ_STATUS, which will retrieve status from host and send it to ST
+    return STATE_READ_STATUS;       // next state: read status
 }
 
-void onDataWrite(void)
+uint8_t onDataWrite(void)
 {
     // create and send one header at the start
     uint8_t header[TX_HEADER_SIZE];
@@ -272,15 +245,14 @@ void onDataWrite(void)
 
             if (brStat == E_TimeOut)
             {                              // if timeout occured
-                state = STATE_GET_COMMAND; // transfer failed, don't send status, just get next command
-                return;
+                return STATE_GET_COMMAND; // transfer failed, don't send status, just get next command
             }
         }
 
         sendDataToHost(SOCK_HDD, data, cntNow);     // send to host
     }
 
-    state = STATE_WAIT_FOR_STATUS_ARRIVAL;  // continue with sending the status
+    return STATE_WAIT_FOR_STATUS_ARRIVAL;  // continue with sending the status
 }
 
 void onReadStatus(void)

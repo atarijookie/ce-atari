@@ -101,7 +101,7 @@ void loop(void)
 
         // keep yielding now and then to let other tasks run
         uint32_t now = millis();
-        if(now - lastYield > 10)
+        if(now - lastYield > 100)
         {
             lastYield = now;
             yield();
@@ -114,7 +114,7 @@ void loop(void)
         {
             if(PIO_gotFirstCmdByte())       // if 1st CMD byte was received
             {
-                onGetCommand();
+                state = onGetCommand();
             }
             else                // in command waiting state, nothing to do and should send FW version?
             {
@@ -129,19 +129,17 @@ void loop(void)
         }
 
         // transfer the data - read (to ST)
-        // IN  STATE: STATE_DATA_READ_WITH_STATUS
-        // OUT STATE: always STATE_GET_COMMAND, but if everything is well, it also does PIO_read()
-        // ...or...
-        // IN  STATE: STATE_DATA_READ_WITHOUT_STATUS
-        // OUT STATE: STATE_READ_STATUS on success, STATE_GET_COMMAND on FAIL (just like STATE_DATA_WRITE)
+        // IN  STATE: STATE_DATA_READ_WITH_STATUS or STATE_DATA_READ_WITHOUT_STATUS
+        // OUT STATE: STATE_READ_STATUS or STATE_GET_COMMAND
         if (state == STATE_DATA_READ_WITH_STATUS || state == STATE_DATA_READ_WITHOUT_STATUS)
         {
             longTimeout_basedOnSectorCount(dataCnt >> 9); // set timeout time based on how many sectors are transfered
 
-            onDataRead(state == STATE_DATA_READ_WITH_STATUS);
-            // at this point it's either success or fail, but we're finished here
+            bool withStatus = state == STATE_DATA_READ_WITH_STATUS;
+            state = onDataRead(withStatus);     // read data to Atari
 
-            cmdTimeoutChangeLength(CMD_TIMEOUT_SHORT); // after data transfer restore short timeout value
+            // if going to get command state, clear timeout, for other states use short timeout
+            (state == STATE_GET_COMMAND) ? timeoutClear() : cmdTimeoutChangeLength(CMD_TIMEOUT_SHORT);
         }
 
         // transfer the data - write (from ST)
@@ -151,32 +149,32 @@ void loop(void)
         {
             longTimeout_basedOnSectorCount(dataCnt >> 9); // set timeout time based on how many sectors are transfered
 
-            onDataWrite();
+            state = onDataWrite();
 
-            cmdTimeoutChangeLength(CMD_TIMEOUT_SHORT); // after data transfer restore short timeout value
+            // if going to get command state, clear timeout, for other states use short timeout
+            (state == STATE_GET_COMMAND) ? timeoutClear() : cmdTimeoutChangeLength(CMD_TIMEOUT_SHORT);
         }
 
         // after write, we will wait for STATUS arrival from host
         // IN  STATE: STATE_WAIT_FOR_STATUS_ARRIVAL
         // OUT STATE: STATE_READ_STATUS
+        // { no code needed here }
 
-        // this happens after WRITE - wait for status byte, send it to ST (read)
+        // this happens after READ - wait for status byte, send it to ST (read)
         // IN  STATE: STATE_READ_STATUS
-        // OUT STATE: always STATE_GET_COMMAND
+        // OUT STATE: STATE_GET_COMMAND
         if (state == STATE_READ_STATUS)
         {
             timeoutStart(); // start the timeout timer to give the rest of code full timeout time
 
             onReadStatus();
-            state = STATE_GET_COMMAND; // get the next command
-            // at this point it's either success or fail, but we're finished here
+
+            state = STATE_GET_COMMAND;  // get the next command
+            timeoutClear();             // clear timeout, no need for it
         }
 
-        // sending and receiving data over SPI using DMA
-        // IN  STATE: any
-        // OUT STATE: STATE_DATA_WRITE, STATE_DATA_READ_WITH_STATUS, STATE_DATA_READ_WITHOUT_STATUS, or unchanged
-
-        if (hasTimedOut)      // if the data from host doesn't come within timeout, quit
+        // if the data from host doesn't come within timeout, quit
+        if (hasTimedOut)
         {
             timeoutClear();
             Serial.println("timeout!");
