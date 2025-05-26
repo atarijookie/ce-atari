@@ -6,6 +6,7 @@
 #include "command_handling.h"
 #include "connection.h"
 #include "scsi.h"
+#include "rw_tasks.h"
 
 extern NetworkClient clientHdd;
 extern NetworkClient clientIkbd;
@@ -249,23 +250,38 @@ uint8_t onDataWrite(void)
 #endif
 
     // create and send one header at the start
-    uint8_t header[TX_HEADER_SIZE];
+    // uint8_t header[TX_HEADER_SIZE];
+    // storeHeader(header, ATN_WRITE_MORE_DATA, dataCnt);
+    // sendDataToHost(SOCK_HDD, header, TX_HEADER_SIZE);
 
-    storeHeader(header, ATN_WRITE_MORE_DATA, dataCnt);
-    sendDataToHost(SOCK_HDD, header, TX_HEADER_SIZE);
+    int idx = getEmptyBuffer();
+    if(idx < 0) {
+        Serial.println("onDataWrite failed to get empty buffer for header");
+        return STATE_GET_COMMAND;
+    }
+
+    storeHeader(writeBuffers[idx].data, ATN_WRITE_MORE_DATA, dataCnt);  // store this ATN in a header
+    submitBufferForWrite(idx, TX_HEADER_SIZE);  // this buffer can be written to socket
 
     // get data from Atari and send it to host by sector sized chunks
-    uint8_t data[512];
+    // uint8_t data[512];
     setDataDirection(DIR_RECV);     // data direction for reading
 
     while (dataCnt > 0)             // something to write?
     {
-        uint32_t cntNow = MIN(dataCnt, 512);
+        idx = getEmptyBuffer();
+        if(idx < 0) {
+            Serial.println("onDataWrite failed to get empty buffer for data");
+            return STATE_GET_COMMAND;
+        }
+        uint8_t* pData = writeBuffers[idx].data;        // the data should be stored here before sending
+
+        uint32_t cntNow = MIN(dataCnt, RW_BUFFER_SIZE);
         dataCnt -= cntNow;
 
         for(int i = 0; i < cntNow; i++)
         {
-            data[i] = DMA_write();          // get data from Atari
+            pData[i] = DMA_write();          // get data from Atari
 
             if (brStat == E_TimeOut)
             {                              // if timeout occured
@@ -276,7 +292,8 @@ uint8_t onDataWrite(void)
             }
         }
 
-        sendDataToHost(SOCK_HDD, data, cntNow);     // send to host
+        // sendDataToHost(SOCK_HDD, data, cntNow);     // send to host
+        submitBufferForWrite(idx, cntNow);             // this buffer can be written to socket
     }
 
     return STATE_WAIT_FOR_STATUS_ARRIVAL;  // continue with sending the status

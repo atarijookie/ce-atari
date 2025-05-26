@@ -269,6 +269,8 @@ void connectToCEhost(void)
 
     // start connection attempt
     clientHdd.connect(hostIpString.c_str(), hostPortHdd);
+    clientHdd.setNoDelay(true);
+
     // clientIkbd.connect(hostIpString.c_str(), hostPortIkbd);
 }
 

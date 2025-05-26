@@ -7,6 +7,8 @@
 #include "../chipinterface.h"
 #include "bufferedreader.h"
 
+#define SYNC_TAG_HDD    0xc050d1c5
+
 class ChipInterfaceNetwork: public ChipInterface
 {
 public:

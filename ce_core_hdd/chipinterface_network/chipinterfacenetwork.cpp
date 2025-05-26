@@ -412,7 +412,7 @@ bool ChipInterfaceNetwork::waitForAtn(int atnIdWant, uint8_t atnCode, uint32_t t
 
 void ChipInterfaceNetwork::storeHeaderToBuffer(uint16_t cmdCode, uint32_t futureDatalen, uint8_t* buffer)
 {
-    Utils::storeDword(buffer + 0, 0xc050d1c5);    // 0..3: 0xc050d1c5 [COSmODICS] (4 bytes)
+    Utils::storeDword(buffer + 0, SYNC_TAG_HDD);  // 0..3: 0xc050d1c5 [COSmODICS] (4 bytes)
     Utils::storeWord(buffer + 4, cmdCode);        // 4..5: ATN code (2 bytes)
     Utils::storeDword(buffer + 6, futureDatalen); // 6..9: futureDatalen (4 bytes)
 }

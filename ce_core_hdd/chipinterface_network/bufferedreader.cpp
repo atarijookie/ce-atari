@@ -143,7 +143,7 @@ int BufferedReader::readHeaderFromBuffer(uint8_t atnCodeWant)
     }
 
     uint32_t syncDword = Utils::getDword(&buffer[0]);
-    if(syncDword != 0xc050d1c5) {                       // sync bytes wrong?
+    if(syncDword != SYNC_TAG_HDD) {                       // sync bytes wrong?
         Debug::out(LOG_DEBUG, "readHeaderFromBuffer() - bad syncDword: %08x", syncDword);
         return NET_ATN_NONE_ID;
     }

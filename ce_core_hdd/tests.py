@@ -21,7 +21,7 @@ def get_response(socket, expectCmd, expectLen):
     # print(f"sync: {sync:08x}, cmd: {cmd:04x}, len: {len:08x}")
 
     # validate sync, cmd, len
-    if sync != 0xc050d1c5:
+    if sync != SYNC_TAG_HDD:
         print("failed to get correct sync dword")
         exit(0)
 

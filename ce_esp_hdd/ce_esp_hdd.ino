@@ -7,6 +7,7 @@
 #include "command_handling.h"
 #include "connection.h"
 #include "captive_portal.h"
+#include "rw_tasks.h"
 
 Preferences preferences;
 
@@ -73,6 +74,9 @@ void setup(void)
     Serial.print("setup() done, enabledIDs: ");
     Serial.print(enabledIDs, HEX);
     Serial.println("");
+
+    // now create the read / write tasks
+    createTasks();
 }
 
 void setupAtnBuffers(void)

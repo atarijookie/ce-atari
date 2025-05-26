@@ -3,6 +3,7 @@
 hw_timer_t *timer = NULL;
 volatile uint8_t hasTimedOut = false;
 uint8_t timerRunning = false;
+uint32_t timerEndMillis = 0;
 
 uint16_t getWord(uint8_t *bfr)
 {
@@ -94,6 +95,8 @@ void timeoutStart(uint32_t durationMs)
     timer = timerBegin(1000);                       // Set timer frequency to 1 kHz
     timerAttachInterrupt(timer, &onTimer);          // Attach onTimer function to our timer.
     timerAlarm(timer, durationMs, false, 0);        // Set alarm to call onTimer function after specified timeout time (value in ms)
+
+    timerEndMillis = millis() + durationMs;         // this is the time when the time out will happen
 
     timerRunning = true;
 }
