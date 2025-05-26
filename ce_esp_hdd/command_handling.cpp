@@ -65,10 +65,12 @@ uint8_t onGetCommandAcsi(void)
     cmd[0] = PIO_writeFirst(); // get byte from ST (waiting for the 1st byte)
     id = (cmd[0] >> 5) & 0x07; // get only device ID
 
-    // Serial.print("onGetCommandAcsi - cmd[0]: ");
-    // Serial.print(cmd[0], HEX);
-    // Serial.print(", id: ");
-    // Serial.print(id);
+#ifdef LOG_MORE
+    Serial.print("\n\nonGetCommandAcsi - cmd[0]: ");
+    Serial.print(cmd[0], HEX);
+    Serial.print(", id: ");
+    Serial.println(id);
+#endif
 
     //----------------------
     if (!idIsEnabled(id)) // if this ID is not enabled, quit
@@ -84,10 +86,12 @@ uint8_t onGetCommandAcsi(void)
     {                         // receive the next command bytes
         cmd[i] = PIO_write(); // drop down IRQ, get byte
 
-        if (brStat != E_OK)
-        { // if something was wrong, quit, failed
-            // Serial.print(" failed on cmd #");
-            // Serial.println(i);
+        if (brStat != E_OK)     // if something was wrong, quit, failed
+        {
+#ifdef LOG_MORE
+            Serial.print(" failed on cmd #");
+            Serial.println(i);
+#endif
             resetBridge();
             return 0;
         }
@@ -98,11 +102,13 @@ uint8_t onGetCommandAcsi(void)
         }
     }
 
-    // for(i=1; i<cmdLen; i++) {
-    //     Serial.print(" ");
-    //     Serial.print(cmd[i], HEX);
-    // }
-    // Serial.println("");
+#ifdef LOG_MORE
+    for(i=1; i<cmdLen; i++) {
+        Serial.print(" ");
+        Serial.print(cmd[i], HEX);
+    }
+    Serial.println("");
+#endif
 
     return 1;
 }
@@ -171,6 +177,13 @@ uint8_t onGetCommandScsi(void)
 
 uint8_t onDataRead(uint8_t withStatus)
 {
+#ifdef LOG_MORE
+    Serial.print("onDataRead withStatus ");
+    Serial.print(withStatus);
+    Serial.print(" dataCnt ");
+    Serial.println(dataCnt);
+#endif
+
     // nothing to send AND should send status? then just quit with status byte
     if (dataCnt == 0 && withStatus)
     {
@@ -184,6 +197,9 @@ uint8_t onDataRead(uint8_t withStatus)
         handleIncommingData();      // receive data and wait for dataReceived flag
 
         if(hasTimedOut) {
+#ifdef LOG_MORE
+    Serial.println("onDataRead timeout on wait for data received");
+#endif
             PIO_read(SCSI_ST_CHECK_CONDITION);
             return STATE_GET_COMMAND;   // next state: get next command
         }
@@ -205,6 +221,9 @@ uint8_t onDataRead(uint8_t withStatus)
 
             if (brStat == E_TimeOut)
             {
+#ifdef LOG_MORE
+    Serial.println("onDataRead timeout on DMA_read");
+#endif
                 setDataDirection(DIR_RECV); // data direction for writing, and quit
                 return STATE_GET_COMMAND;   // next state: get next command
             }
@@ -224,6 +243,11 @@ uint8_t onDataRead(uint8_t withStatus)
 
 uint8_t onDataWrite(void)
 {
+#ifdef LOG_MORE
+    Serial.print("onDataWrite dataCnt ");
+    Serial.println(dataCnt);
+#endif
+
     // create and send one header at the start
     uint8_t header[TX_HEADER_SIZE];
 
@@ -245,6 +269,9 @@ uint8_t onDataWrite(void)
 
             if (brStat == E_TimeOut)
             {                              // if timeout occured
+#ifdef LOG_MORE
+    Serial.println("onDataWrite timeout on DMA_write");
+#endif
                 return STATE_GET_COMMAND; // transfer failed, don't send status, just get next command
             }
         }

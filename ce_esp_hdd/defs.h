@@ -3,6 +3,8 @@
 
 #include <arduino.h>
 
+// #define LOG_MORE    1
+
 #ifndef TRUE
     #define TRUE 1
 #endif
@@ -19,8 +21,6 @@
     #define MAX(X,Y)    ((X > Y) ? X : Y)
 #endif
 
-#define TX_HEADER_SIZE          10
-
 #define PREFERENCES_RW_MODE false
 #define PREFERENCES_RO_MODE true
 
@@ -32,9 +32,9 @@
 // commands sent from device to host
 #define ATN_FW_VERSION                      0x01                                // followed by string with FW version (length: 4 uint16_ts - cmd, v[0], v[1], 0)
 #define ATN_ACSI_COMMAND                    0x02
-#define ATN_READ_MORE_DATA                  0x03
+// #define ATN_READ_MORE_DATA                  0x03
 #define ATN_WRITE_MORE_DATA                 0x04
-#define ATN_GET_STATUS                      0x05
+// #define ATN_GET_STATUS                      0x05
 
 // commands sent from host to device
 #define CMD_ACSI_CONFIG                     0x10
@@ -48,28 +48,22 @@
 
 // these states define if the device should get command or transfer data
 #define STATE_GET_COMMAND                       0
-#define STATE_SEND_COMMAND                      1
+// #define STATE_SEND_COMMAND                   1
 #define STATE_WAIT_COMMAND_RESPONSE             2
 #define STATE_DATA_READ_WITH_STATUS             3
 #define STATE_DATA_READ_WITHOUT_STATUS          4
 #define STATE_DATA_WRITE                        5
 #define STATE_WAIT_FOR_STATUS_ARRIVAL           6
 #define STATE_READ_STATUS                       7
-#define STATE_SEND_FW_VER                       10
-
-#define CMD_BUFFER_LENGTH                       16
+// #define STATE_SEND_FW_VER                       10
 
 ///////////////////////////
-// The following definitions are definitions of how many uint16_ts are TXed and RXed for each different ATN.
-// Note that ATN_VARIABLE_LEN shouldn't be used, and is replaced by some value.
 
 #define ATN_VARIABLE_LEN                0xffff
 
-#define ATN_SENDFWVERSION_LEN_TX        20
-#define ATN_SENDACSICOMMAND_LEN_TX      24
-#define ATN_READMOREDATA_LEN_TX         12
-#define ATN_WRITEMOREDATA_LEN_TX        ATN_VARIABLE_LEN
-#define ATN_GETSTATUS_LEN_TX            10
+#define TX_HEADER_SIZE                  10
+#define ATN_SENDFWVERSION_LEN_TX        (TX_HEADER_SIZE + 10)
+#define ATN_SENDACSICOMMAND_LEN_TX      (TX_HEADER_SIZE + 14)
 
 ///////////////////////////
 

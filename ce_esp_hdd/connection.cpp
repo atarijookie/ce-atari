@@ -274,12 +274,12 @@ void connectToCEhost(void)
 
 void connectToHost(void)
 {
-    // not connected to wifi? try to connect, skip the rest
-    if (WiFi.status() != WL_CONNECTED)
-    {
-        connectToWifi();
+    // socket connected, wifi connected? just quit
+    if(clientHdd.connected() && WiFi.status() == WL_CONNECTED) {
         return;
     }
+
+    connectToWifi();
 
     // device connected to wifi, do discovery if needed
     ceDiscoverySend();
@@ -298,7 +298,29 @@ bool getIncommingHeader(NetworkClient* client, uint32_t expectedSyncTag, THeader
 
     while(true)
     {
-        if(client->available() < 10)    // not enough data for full header, no header received
+        // Determine how many bytes are needed to be received, if we want to get 10 bytes of header.
+        // If we already got some bytes in the syncTag, we need less than 10 bytes.
+        int needed = 10;
+        if((header->syncTag & 0xffffff) == (expectedSyncTag >> 8))      // got c050d1 (3 bytes) already? need only 7 more
+        {
+            needed = 7;
+        }
+        else if((header->syncTag & 0xffff) == (expectedSyncTag >> 16))  // got c050 (2 bytes) already? need only 8 more
+        {
+            needed = 8;
+        }
+        else if((header->syncTag & 0xff) == (expectedSyncTag >> 24))    // got c0 (1 bytes) already? need only 9 more
+        {
+            needed = 9;
+        }
+        else                // in other cases, expect to have all 10 bytes available before trying to read header
+        {
+            needed = 10;
+        }
+
+        // not enough data for full header, no header received
+        int available = client->available();
+        if(available < needed)
         {
             return false;
         }
@@ -392,6 +414,7 @@ void handleIncommingData(void)
     if(getIncommingHeader(&clientHdd, SYNC_TAG_HDD, &hddHeader))   // if got valid hdd header
     {
         dataReceived = false;
+        hddHeader.syncTag = 0;      // clear sync tag
 
         switch(hddHeader.cmdCode) {
             case CMD_ACSI_CONFIG: handleAcsiConfig(hddHeader.len); break;
@@ -400,6 +423,7 @@ void handleIncommingData(void)
             case CMD_DATA_MARKER: handleReadDataReceived(); break;
             case CMD_DATA_WRITE: handleWriteStart(); break;
             case CMD_SEND_STATUS: handleSendStatus(); break;
+            default: Serial.print("unknown cmdCode "); Serial.println(hddHeader.cmdCode); break;
         }
     }
 }

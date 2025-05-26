@@ -77,6 +77,13 @@ void ARDUINO_ISR_ATTR onTimer()
 
 void timeoutStart(uint32_t durationMs)
 {
+// #ifdef LOG_MORE
+//     Serial.print("timeoutStart ");
+//     Serial.print(durationMs);
+//     Serial.print(" at ");
+//     Serial.println(millis());
+// #endif
+
     if(timerRunning)                                // if timer running, stop it first
     {
         timerEnd(timer);
@@ -93,6 +100,10 @@ void timeoutStart(uint32_t durationMs)
 
 void timeoutClear(void)
 {
+// #ifdef LOG_MORE
+//     Serial.println("timeoutClear");
+// #endif
+
     hasTimedOut = false;
     timerRunning = false;
     timerEnd(timer);

@@ -71,6 +71,9 @@ private:
     bool sendHeaderToChip(uint16_t cmdCode, uint32_t futureDatalen);                // send header to chip
     bool sendDataToChip(uint8_t* data, uint32_t len);                               // send data to chip  
     bool sendHeaderAndDataToChip(uint16_t cmdCode, uint8_t* data, uint32_t len);    // send header and data to chip
+
+    void storeHeaderToBuffer(uint16_t cmdCode, uint32_t futureDatalen, uint8_t* buffer);
+
 };
 
 #endif // __CHIPINTERFACENETWORK_H__

@@ -177,10 +177,22 @@ void loop(void)
         if (hasTimedOut)
         {
             timeoutClear();
-            Serial.println("timeout!");
+
+#ifdef LOG_MORE
+            Serial.print("State: ");
+            Serial.print(state);
+            Serial.print(", cmd: ");
+            for(int i=0; i<12; i++) {
+                Serial.print(cmd[i], HEX);
+                Serial.print(" ");
+            }
+
+            Serial.print("timeout at ");
+            Serial.println(millis());
+#endif
 
             state = STATE_GET_COMMAND;
-            
+
             // if something was wrong, reset XILINX so it won't get stuck
             if (brStat != E_OK)
             {

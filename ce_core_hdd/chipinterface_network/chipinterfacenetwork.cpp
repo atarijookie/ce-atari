@@ -350,6 +350,8 @@ bool ChipInterfaceNetwork::hdd_recvData_transferBlock(uint8_t *pData, uint32_t d
 
 bool ChipInterfaceNetwork::hdd_sendStatusToHans(uint8_t statusByte)
 {
+    Debug::out(LOG_DEBUG, "hdd_sendStatusToHans - statusByte: %02x", statusByte);
+
     bufOut[0] = statusByte;                          // set the command and the statusByte
     sendHeaderAndDataToChip(CMD_SEND_STATUS, bufOut, 1);
 
@@ -408,6 +410,13 @@ bool ChipInterfaceNetwork::waitForAtn(int atnIdWant, uint8_t atnCode, uint32_t t
     return false;
 }
 
+void ChipInterfaceNetwork::storeHeaderToBuffer(uint16_t cmdCode, uint32_t futureDatalen, uint8_t* buffer)
+{
+    Utils::storeDword(buffer + 0, 0xc050d1c5);    // 0..3: 0xc050d1c5 [COSmODICS] (4 bytes)
+    Utils::storeWord(buffer + 4, cmdCode);        // 4..5: ATN code (2 bytes)
+    Utils::storeDword(buffer + 6, futureDatalen); // 6..9: futureDatalen (4 bytes)
+}
+
 bool ChipInterfaceNetwork::sendHeaderToChip(uint16_t cmdCode, uint32_t futureDatalen)        // send header to chip
 {
     if(fdClient < 0) {                      // no client socket? quit
@@ -415,9 +424,7 @@ bool ChipInterfaceNetwork::sendHeaderToChip(uint16_t cmdCode, uint32_t futureDat
     }
 
     uint8_t head[10];
-    Utils::storeDword(head + 0, 0xc050d1c5);    // 0..3: 0xc050d1c5 [COSmODICS] (4 bytes)
-    Utils::storeWord(head + 4, cmdCode);        // 4..5: ATN code (2 bytes)
-    Utils::storeDword(head + 6, futureDatalen); // 6..9: futureDatalen (4 bytes)
+    storeHeaderToBuffer(cmdCode, futureDatalen, head);
 
     int res = write(fdClient, head, 10);        // send header
     return (res == 10);
@@ -435,12 +442,34 @@ bool ChipInterfaceNetwork::sendDataToChip(uint8_t* data, uint32_t len)        //
 
 bool ChipInterfaceNetwork::sendHeaderAndDataToChip(uint16_t cmdCode, uint8_t* data, uint32_t len)        // send header and data to chip
 {
-    if(!sendHeaderToChip(cmdCode, len))
+    bool good;
+
+    if(len > 512)       // for larger data send using separate write() commands
     {
-        return false;
+        if(!sendHeaderToChip(cmdCode, len))
+        {
+            Debug::out(LOG_DEBUG, "sendHeaderAndDataToChip failed!");
+            return false;
+        }
+
+        good = sendDataToChip(data, len);
+        Debug::out(LOG_DEBUG, "sendHeaderAndDataToChip - good: %d", good);
+    } 
+    else                // for small data first copy data into buffers, then send with one write() command
+    {
+        if(fdClient < 0) {                      // no client socket? quit
+            return false;
+        }
+
+        uint8_t bfr[522];
+        storeHeaderToBuffer(cmdCode, len, bfr);     // store header at start
+        memcpy(bfr + 10, data, len);                // copy data after the header
+
+        int res = write(fdClient, bfr, len + 10);   // send header and data
+        good = (res == ((int) (len + 10)));
     }
 
-    return sendDataToChip(data, len);
+    return good;
 }
 
 /*
