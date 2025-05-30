@@ -5,6 +5,10 @@
 
 // #define LOG_MORE    1
 
+// #define RW_TASKS
+
+#define DELAY_NS   asm("nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop;");
+
 #ifndef TRUE
     #define TRUE 1
 #endif
@@ -93,6 +97,43 @@
 #define PIN_RXD_DEBUG   44
 
 #define PIN_BOOT_BTN    0       // input
+
+#define BIT_CMD1ST      (1 << PIN_CMD1ST)
+#define BIT_EOT         (1 << PIN_EOT)
+#define BIT_OUT_OE      (1 << PIN_OUT_OE)
+#define BIT_DRQ_TRIG    (1 << PIN_DRQ_TRIG)
+#define BIT_FF12D       (1 << PIN_FF12D)
+#define BIT_INT_TRIG    (1 << PIN_INT_TRIG)
+
+/*
+// USE THESE WHEN ARGUMENT IS PIN_*
+#define BIT_IS_H(PIN)   (digitalRead(PIN) == HIGH)
+#define BIT_IS_L(PIN)   (digitalRead(PIN) == LOW)
+#define BIT_LEVEL(PIN)  digitalRead(PIN)
+
+#define BIT_SET(PIN)    digitalWrite(PIN, HIGH)
+#define BIT_CLR(PIN)    digitalWrite(PIN, LOW)
+*/
+
+
+// USE THESE WHEN ARGUMENT IS PIN_*
+#define BIT_IS_H(PIN)   ((REG_READ(GPIO_IN_REG) & (1 << PIN)) == (1 << PIN))
+#define BIT_IS_L(PIN)   ((REG_READ(GPIO_IN_REG) & (1 << PIN)) == 0)
+#define BIT_LEVEL(PIN)  (BIT_IS_L(PIN) ? LOW : HIGH)
+
+#define BIT_SET(PIN)    REG_WRITE(GPIO_OUT_W1TS_REG, (1 << PIN))
+#define BIT_CLR(PIN)    REG_WRITE(GPIO_OUT_W1TC_REG, (1 << PIN))
+
+
+/*
+// USE THESE WHEN ARGUMENT IS BIT_*
+#define BIT_IS_H(BIT)   ((REG_READ(GPIO_IN_REG) & BIT) == BIT)
+#define BIT_IS_L(BIT)   ((REG_READ(GPIO_IN_REG) & BIT) == 0)
+#define BIT_LEVEL(BIT)  (BIT_IS_L(BIT) ? LOW : HIGH)
+
+#define BIT_SET(BIT)    REG_WRITE(GPIO_OUT_W1TS_REG, BIT)
+#define BIT_CLR(BIT)    REG_WRITE(GPIO_OUT_W1TC_REG, BIT)
+*/
 
 #define HDD_ACSI    1
 

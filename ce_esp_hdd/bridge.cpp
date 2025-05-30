@@ -13,7 +13,7 @@ const int dataPins[8] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6,
 
 uint8_t PIO_gotFirstCmdByte(void)
 {
-    return (digitalRead(PIN_CMD1ST) == HIGH);
+    return BIT_IS_H(PIN_CMD1ST);
 }
 
 // get 1st CMD byte from ST  -- without setting INT
@@ -21,7 +21,7 @@ uint8_t PIO_writeFirst(void)
 {
     uint8_t val;
 
-    digitalWrite(PIN_FF12D, LOW); // FF12D must be L for generating INT / DRQ signals
+    BIT_CLR(PIN_FF12D);         // FF12D must be L for generating INT / DRQ signals
 
     timeoutStart();             // start the timeout timer
     setDataDirection(DIR_RECV); // data as inputs (write)
@@ -34,9 +34,9 @@ uint8_t PIO_writeFirst(void)
 // get next CMD byte from ST -- with setting INT to LOW and waiting for CS
 uint8_t PIO_write(void)
 {
-    digitalWrite(PIN_INT_TRIG, HIGH); // do CLK pulse
-    waitForEOTlevel(LOW);             // wait until INT is L
-    digitalWrite(PIN_INT_TRIG, LOW);  // CLK back to L
+    BIT_SET(PIN_INT_TRIG);          // do CLK pulse
+    DELAY_NS;
+    BIT_CLR(PIN_INT_TRIG);          // CLK back to L
 
     if (!waitForEOT())
     {                       // EOT didn't come?
@@ -80,9 +80,9 @@ void PIO_read_solely(uint8_t val)
     setDataDirection(DIR_SEND); // finish with send status
     dataOut(val);               // output data to GPIO pins
 
-    digitalWrite(PIN_INT_TRIG, HIGH); // do CLK pulse
-    waitForEOTlevel(LOW);             // wait until INT is L
-    digitalWrite(PIN_INT_TRIG, LOW);  // CLK back to L
+    BIT_SET(PIN_INT_TRIG);      // do CLK pulse
+    DELAY_NS;
+    BIT_CLR(PIN_INT_TRIG);      // CLK back to L
 
     uint8_t ok = waitForEOT(); // try to wait for EOT and return success / failure
 
@@ -101,12 +101,11 @@ void MSG_read(uint8_t val)
 
 void DMA_read(uint8_t val)
 {
-    setDataDirection(DIR_SEND); // finish with send status
     dataOut(val);               // output data to GPIO pins
 
-    digitalWrite(PIN_DRQ_TRIG, HIGH); // do CLK pulse
-    waitForEOTlevel(LOW);             // wait until INT is L
-    digitalWrite(PIN_DRQ_TRIG, LOW);  // CLK back to L
+    BIT_SET(PIN_DRQ_TRIG);      // do CLK pulse
+    DELAY_NS;
+    BIT_CLR(PIN_DRQ_TRIG);      // CLK back to L
 
     uint8_t ok = waitForEOT(); // try to wait for EOT and return success / failure
 
@@ -118,9 +117,9 @@ void DMA_read(uint8_t val)
 
 uint8_t DMA_write(void)
 {
-    digitalWrite(PIN_DRQ_TRIG, HIGH); // do CLK pulse
-    waitForEOTlevel(LOW);             // wait until INT is L
-    digitalWrite(PIN_DRQ_TRIG, LOW);  // CLK back to L
+    BIT_SET(PIN_DRQ_TRIG);      // do CLK pulse
+    DELAY_NS;
+    BIT_CLR(PIN_DRQ_TRIG);      // CLK back to L
 
     if (!waitForEOT())
     {                       // EOT didn't come?
@@ -137,17 +136,17 @@ void resetBridge(void)
     brStat = E_OK; // set bridge status to OK
 
     // disable all data driving (in and out), also reset CMD1ST
-    digitalWrite(PIN_FF12D, HIGH); // FF12D must be H to allow capturing of CMD1ST
+    BIT_SET(PIN_FF12D);             // FF12D must be H to allow capturing of CMD1ST
 
     // reset INT and DRQ if needed
-    if (digitalRead(PIN_EOT) == LOW)
+    if (BIT_IS_L(PIN_EOT))
     {                                     // if DRQ or INT is L
-        digitalWrite(PIN_INT_TRIG, HIGH); // do CLK pulse
-        digitalWrite(PIN_DRQ_TRIG, HIGH);
+        BIT_SET(PIN_INT_TRIG);          // do CLK pulse
+        BIT_SET(PIN_DRQ_TRIG);
 
-        waitForEOTlevel(HIGH); // wait a while until INT and DRQ come back to H again
+        DELAY_NS;
 
-        // const char* eotLevel = (bdigitalRead(PIN_EOT) == LOW) ? "LOW" : "HIGH";
+        // const char* eotLevel = BIT_IS_L(PIN_EOT) ? "LOW" : "HIGH";
         // Debug::out(LOG_DEBUG, "GpioAcsi::reset - did RESET INT/DRQ, now it's %s", eotLevel);
     }
     else
@@ -155,8 +154,8 @@ void resetBridge(void)
         // Debug::out(LOG_DEBUG, "GpioAcsi::reset - skipped the RESET of INT/DRQ as it was HIGH");
     }
 
-    digitalWrite(PIN_INT_TRIG, LOW); // CLK back to L
-    digitalWrite(PIN_DRQ_TRIG, LOW);
+    BIT_CLR(PIN_INT_TRIG);      // CLK back to L
+    BIT_CLR(PIN_DRQ_TRIG);
 }
 
 void getBridgeStatus(void)
@@ -192,7 +191,7 @@ void setDataDirection(uint8_t sendNotRecv)
     // if output from esp, set OUT_OE to L before switching esp pins directions
     if (sendNotRecv == DIR_SEND)
     {
-        digitalWrite(PIN_OUT_OE, LOW);
+        BIT_CLR(PIN_OUT_OE);
     }
 
     // set esp GPIO pins as outputs / inputs
@@ -206,7 +205,7 @@ void setDataDirection(uint8_t sendNotRecv)
     // if input to esp, set OUT_OE to H after switching esp pins directions
     if (sendNotRecv == DIR_RECV)
     {
-        digitalWrite(PIN_OUT_OE, HIGH);
+        BIT_SET(PIN_OUT_OE);
     }
 }
 
@@ -217,18 +216,15 @@ void setDataDirection(uint8_t sendNotRecv)
 */
 uint8_t waitForEOT(void)
 {
-    while (TRUE)
+    while(!hasTimedOut)
     {
-        if (digitalRead(PIN_EOT) == HIGH)
-        { // EOT is H? success
+        if (BIT_IS_H(PIN_EOT))  // EOT is H? success
+        {
             return TRUE;
         }
-
-        if (hasTimedOut)
-        { // timeout? fail
-            return FALSE;
-        }
     }
+
+    return FALSE;               // timeout? fail
 }
 
 /*
@@ -241,7 +237,7 @@ void waitForEOTlevel(int level)
 {
     for (int i = 0; i < 1000; i++)
     {
-        if (digitalRead(PIN_EOT) == level)
+        if (BIT_LEVEL(PIN_EOT) == level)
         {
             break;
         }

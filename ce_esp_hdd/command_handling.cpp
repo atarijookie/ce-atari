@@ -198,9 +198,8 @@ uint8_t onDataRead(uint8_t withStatus)
         handleIncommingData();      // receive data and wait for dataReceived flag
 
         if(hasTimedOut) {
-#ifdef LOG_MORE
-    Serial.println("onDataRead timeout on wait for data received");
-#endif
+            Serial.println("onDataRead TO 1");
+
             PIO_read(SCSI_ST_CHECK_CONDITION);
             return STATE_GET_COMMAND;   // next state: get next command
         }
@@ -208,28 +207,58 @@ uint8_t onDataRead(uint8_t withStatus)
 
     // now start the double buffered transfer to ST
     setDataDirection(DIR_SEND); // data direction for reading
+
+#ifdef RW_TASKS
+    readerStart(dataCnt);       // tell reader to start receiving this much data
+#else
     uint8_t data[512];
+#endif
 
     while(dataCnt > 0)
     {
+#ifdef RW_TASKS
+        RWBuffer* buf = getNextFullReadBuffer();
+
+        if(!buf) {  // failed to get buffer?
+            Serial.println("onDataRead TO 2");
+
+            readerStop();               // stop the reader, no futher data will be needed
+            setDataDirection(DIR_RECV); // data direction for writing, and quit
+            return STATE_GET_COMMAND;   // next state: get next command
+        }
+
+        uint8_t* data = buf->data;              // get pointer to data
+        uint32_t cntNow = buf->len;
+        dataCnt -= cntNow;
+#else
         uint32_t cntNow = MIN(512, dataCnt);
         dataCnt -= cntNow;
-
         clientHdd.read(data, cntNow);
+#endif
 
-        for(int i=0; i<cntNow; i++) {
+        for(uint16_t i=0; i<cntNow; i++) {    // send all the data from buffer to Atari
             DMA_read(data[i]);
 
             if (brStat == E_TimeOut)
             {
-#ifdef LOG_MORE
-    Serial.println("onDataRead timeout on DMA_read");
+                Serial.println("onDataRead TO 3");
+
+#ifdef RW_TASKS
+                readerStop();               // stop the reader, no futher data will be needed
 #endif
                 setDataDirection(DIR_RECV); // data direction for writing, and quit
                 return STATE_GET_COMMAND;   // next state: get next command
             }
         }
+
+#ifdef RW_TASKS
+        markReadBufferAsEmpty(buf);     // clear this buffer so it can be reused, will also unblock reader
+#endif
     }
+
+#ifdef RW_TASKS
+    readerStop();   // stop the reader, the read is over
+#endif
 
     // if should send status, then send status and go to STATE_GET_COMMAND
     if (withStatus)
@@ -249,42 +278,54 @@ uint8_t onDataWrite(void)
     Serial.println(dataCnt);
 #endif
 
+#ifdef RW_TASKS
     // create and send one header at the start
-    // uint8_t header[TX_HEADER_SIZE];
-    // storeHeader(header, ATN_WRITE_MORE_DATA, dataCnt);
-    // sendDataToHost(SOCK_HDD, header, TX_HEADER_SIZE);
+    writerStart();
+    RWBuffer* buf;
 
-    int idx = getEmptyBuffer();
-    if(idx < 0) {
-        Serial.println("onDataWrite failed to get empty buffer for header");
-        return STATE_GET_COMMAND;
-    }
+    buf = getNextEmptyWriteBuffer();
+    storeHeader(buf->data, ATN_WRITE_MORE_DATA, dataCnt);  // store this ATN in a header
+    submitBufferForWrite(buf, TX_HEADER_SIZE);      // this buffer can be written to socket
+#else
+    // create and send one header at the start
+    uint8_t header[TX_HEADER_SIZE];
+    storeHeader(header, ATN_WRITE_MORE_DATA, dataCnt);
+    sendDataToHost(SOCK_HDD, header, TX_HEADER_SIZE);
 
-    storeHeader(writeBuffers[idx].data, ATN_WRITE_MORE_DATA, dataCnt);  // store this ATN in a header
-    submitBufferForWrite(idx, TX_HEADER_SIZE);  // this buffer can be written to socket
+    uint8_t data[512];
+#endif
 
     // get data from Atari and send it to host by sector sized chunks
-    // uint8_t data[512];
     setDataDirection(DIR_RECV);     // data direction for reading
 
     while (dataCnt > 0)             // something to write?
     {
-        idx = getEmptyBuffer();
-        if(idx < 0) {
+#ifdef RW_TASKS
+        buf = getNextEmptyWriteBuffer();
+
+        if(!buf) {      // failed to get write buffer?
+            writerEnd();
             Serial.println("onDataWrite failed to get empty buffer for data");
             return STATE_GET_COMMAND;
         }
-        uint8_t* pData = writeBuffers[idx].data;        // the data should be stored here before sending
-
+        uint8_t* data = buf->data;     // the data should be stored here before sending
         uint32_t cntNow = MIN(dataCnt, RW_BUFFER_SIZE);
+#else
+        uint32_t cntNow = MIN(dataCnt, 512);
+#endif
+
         dataCnt -= cntNow;
 
         for(int i = 0; i < cntNow; i++)
         {
-            pData[i] = DMA_write();          // get data from Atari
+            data[i] = DMA_write();          // get data from Atari
 
             if (brStat == E_TimeOut)
             {                              // if timeout occured
+#ifdef RW_TASKS
+               writerEnd();
+#endif
+
 #ifdef LOG_MORE
     Serial.println("onDataWrite timeout on DMA_write");
 #endif
@@ -292,8 +333,11 @@ uint8_t onDataWrite(void)
             }
         }
 
-        // sendDataToHost(SOCK_HDD, data, cntNow);     // send to host
-        submitBufferForWrite(idx, cntNow);             // this buffer can be written to socket
+#ifdef RW_TASKS
+        submitBufferForWrite(buf, cntNow);  // this buffer can be written to socket
+#else
+        sendDataToHost(SOCK_HDD, data, cntNow);     // send to host
+#endif
     }
 
     return STATE_WAIT_FOR_STATUS_ARRIVAL;  // continue with sending the status

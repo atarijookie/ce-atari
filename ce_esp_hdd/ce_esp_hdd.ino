@@ -75,8 +75,9 @@ void setup(void)
     Serial.print(enabledIDs, HEX);
     Serial.println("");
 
-    // now create the read / write tasks
-    createTasks();
+#ifdef RW_TASKS
+    createTasks();      // create the read / write tasks
+#endif
 }
 
 void setupAtnBuffers(void)
@@ -126,6 +127,9 @@ void loop(void)
 
                 if ((now - lastSendFwTime) >= 1000)
                 {
+#ifdef LOG_MORE
+                    Serial.println("Sending FW ver");
+#endif
                     lastSendFwTime = now;
                     sendHeaderAndDataToHost(SOCK_HDD, atnSendFwVersion, ATN_SENDFWVERSION_LEN_TX - TX_HEADER_SIZE);
                 }
