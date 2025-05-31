@@ -178,7 +178,7 @@ uint8_t onGetCommandScsi(void)
     return 1;
 }
 
-uint8_t onDataRead(uint8_t withStatus)
+uint8_t IRAM_ATTR onDataRead(uint8_t withStatus)
 {
 #ifdef LOG_MORE
     Serial.print("onDataRead withStatus ");
@@ -286,7 +286,7 @@ uint8_t onDataRead(uint8_t withStatus)
     return STATE_READ_STATUS;       // next state: read status
 }
 
-uint8_t onDataWrite(void)
+uint8_t IRAM_ATTR onDataWrite(void)
 {
 #ifdef LOG_MORE
     Serial.print("onDataWrite dataCnt ");

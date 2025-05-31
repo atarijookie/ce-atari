@@ -4,6 +4,7 @@
 #include <arduino.h>
 
 #define LOG_MORE    1
+#define ALWAYS_INLINE inline __attribute__((always_inline))
 
 #define WIFI_CAPTIVE_AP_NAME    "CosmosEx AP"
 

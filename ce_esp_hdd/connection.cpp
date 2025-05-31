@@ -39,6 +39,25 @@ bool connected;
 
 THeader hddHeader;      // keep the header global to preserve syncTag between calls
 
+void showRunningStateOnDisplay(void)
+{
+    char msg1[128];
+    sprintf(msg1, "ssid: %s", ssid.c_str());
+
+    char msg2[64];
+    sprintf(msg2, "host: %s", hostIpString.c_str());
+
+    String msg3 = "ids: ";
+    for(int i=0; i<8; i++) {
+        if(enabledIDs & (1 << i)) {     // if ID bit enabled, add to string
+            msg3 += i;
+            msg3 += " ";
+        }
+    }
+
+    displayMessage(msg1, msg2, msg3.c_str());
+}
+
 // Read wifi settings, connect to wifi if not connected, don't try too often.
 void connectToWifi(void)
 {
@@ -290,7 +309,18 @@ void connectToCEhost(void)
 
 void connectToHost(void)
 {
+    static bool prevConnected = false;
     connected = clientHdd.connected() && WiFi.status() == WL_CONNECTED;
+
+    // on connected state changed
+    if(prevConnected != connected)
+    {
+        prevConnected = connected;
+
+        if(connected) {     // now in connected state, display state on display
+            showRunningStateOnDisplay();
+        }
+    }
 
     // socket connected, wifi connected? just quit
     if(connected)
@@ -387,6 +417,8 @@ void handleAcsiConfig(uint32_t len)
                 preferences.begin("acsi", PREFERENCES_RW_MODE);
                 preferences.putUChar("ids", newAcsiIds);
                 preferences.end();
+
+                showRunningStateOnDisplay();
             }
         }
     }

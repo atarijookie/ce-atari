@@ -99,7 +99,7 @@ void MSG_read(uint8_t val)
 {
 }
 
-void DMA_read(uint8_t val)
+void IRAM_ATTR DMA_read(uint8_t val)
 {
     dataOut(val);               // output data to GPIO pins
 
@@ -115,7 +115,7 @@ void DMA_read(uint8_t val)
     }
 }
 
-uint8_t DMA_write(void)
+uint8_t IRAM_ATTR DMA_write(void)
 {
     BIT_SET(PIN_DRQ_TRIG);      // do CLK pulse
     DELAY_NS;
@@ -215,7 +215,7 @@ void setDataDirection(uint8_t sendNotRecv)
     will be reset back to H by Atari after each transfered byte. It's waiting up to the timeout time
     and can fail if Atari doesn't transfer the current byte.
 */
-uint8_t waitForEOT(void)
+uint8_t IRAM_ATTR waitForEOT(void)
 {
     while(!hasTimedOut)
     {
