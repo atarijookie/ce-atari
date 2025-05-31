@@ -77,8 +77,7 @@ void connectToWifi(void)
 
     // no ssid and no passowrd? run captive portal
     if(ssid.length() == 0 && password.length() == 0) {
-        sprintf(msg, "wifi setup\nAP: %s", WIFI_CAPTIVE_AP_NAME);
-        displayMessage(msg);
+        displayMessage("wifi creds needed", "Connect to this AP:", WIFI_CAPTIVE_AP_NAME);
 
         Serial.println("connectToWifi - no wifi settings, starting captive portal");
         runCaptivePortal();
@@ -90,8 +89,8 @@ void connectToWifi(void)
         return;
     }
 
-    sprintf(msg, "wifi connect\nssid: %s", ssid.c_str());
-    displayMessage(msg);
+    sprintf(msg, "ssid: %s", ssid.c_str());
+    displayMessage("wifi connecting", msg);
 
     Serial.print("connectToWifi - ssid: ");
     Serial.println(ssid);
@@ -128,7 +127,7 @@ void ceDiscoverySend(void)
         udpInitialized = true;
     }
 
-    displayMessage("CE host discovery");
+    displayMessage("wifi connected", "CE host discovery");
 
     // send upd broadcast
     uint8_t updPacket[4];
@@ -275,9 +274,7 @@ void connectToCEhost(void)
         return;
     }
 
-    char msg[128];
-    sprintf(msg, "TCP connect\nIP: %s", hostIpString.c_str());
-    displayMessage(msg);
+    displayMessage("wifi connected", "connecting to host:", hostIpString.c_str());
 
     Serial.print("connectToCEhost - IP: ");
     Serial.print(hostIpString.c_str());

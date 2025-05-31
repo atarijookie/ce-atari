@@ -32,6 +32,7 @@ uint8_t enabledIDs;
 uint8_t isAcsiNotScsi;
 uint8_t busIdle;
 
+extern String ssid;
 extern String hostIpString;
 extern bool connected;
 bool prevConnected;
@@ -100,9 +101,21 @@ void setupAtnBuffers(void)
 
 void showRunningStateOnDisplay(void)
 {
-    char msg[128];
-    sprintf(msg, "host: %s", hostIpString.c_str());
-    displayMessage(msg);
+    char msg1[128];
+    sprintf(msg1, "ssid: %s", ssid.c_str());
+
+    char msg2[64];
+    sprintf(msg2, "host: %s", hostIpString.c_str());
+
+    String msg3 = "ids: ";
+    for(int i=0; i<8; i++) {
+        if(enabledIDs & (1 << i)) {     // if ID bit enabled, add to string
+            msg3 += i;
+            msg3 += " ";
+        }
+    }
+
+    displayMessage(msg1, msg2, msg3.c_str());
 }
 
 void loop(void)
