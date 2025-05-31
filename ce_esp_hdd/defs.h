@@ -5,6 +5,8 @@
 
 #define LOG_MORE    1
 
+#define WIFI_CAPTIVE_AP_NAME    "CosmosEx AP"
+
 // #define RW_TASKS
 
 #define DELAY_NS   asm("nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop;");

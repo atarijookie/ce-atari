@@ -106,7 +106,7 @@ void runCaptivePortal(void)
 
     // switch to access point mode
     WiFi.mode(WIFI_AP);
-    WiFi.softAP("CosmosEx AP");
+    WiFi.softAP(WIFI_CAPTIVE_AP_NAME);
 
     // start dns and web server
     dnsServer.setErrorReplyCode(DNSReplyCode::NoError);

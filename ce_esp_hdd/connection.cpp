@@ -5,8 +5,7 @@
 #include "connection.h"
 #include "utils.h"
 #include "captive_portal.h"
-
-#include "settings_for_development.h"
+#include "display.h"
 
 extern Preferences preferences;
 extern uint8_t enabledIDs;
@@ -36,6 +35,8 @@ extern uint32_t dataCnt;
 extern uint8_t statusByte;
 extern bool dataReceived;
 
+bool connected;
+
 THeader hddHeader;      // keep the header global to preserve syncTag between calls
 
 // Read wifi settings, connect to wifi if not connected, don't try too often.
@@ -52,6 +53,10 @@ void connectToWifi(void)
     // we're connecting now
     lastAttempt = millis();
 
+    if(WiFi.status() == WL_CONNECTED) {     // already connected to wifi? quit
+        return;
+    }
+
     // read wifi settings if they aren't loaded yet
     if (!wifiSettingsLoaded)
     {
@@ -61,8 +66,6 @@ void connectToWifi(void)
         ssid = preferences.getString("ssid", "");
         password = preferences.getString("password", "");
         preferences.end();
-
-        // SET_SETTINGS_FOR_DEVELOPMENT(ssid, password, hostIp, hostIpString, hostPortHdd, hostPortFdd, hostPortIkbd);
     }
 
     Serial.print("connectToWifi - ssid: ");
@@ -70,8 +73,13 @@ void connectToWifi(void)
     Serial.print(", password: ");
     Serial.println(password);
 
+    char msg[128];
+
     // no ssid and no passowrd? run captive portal
     if(ssid.length() == 0 && password.length() == 0) {
+        sprintf(msg, "wifi setup\nAP: %s", WIFI_CAPTIVE_AP_NAME);
+        displayMessage(msg);
+
         Serial.println("connectToWifi - no wifi settings, starting captive portal");
         runCaptivePortal();
     }
@@ -81,6 +89,9 @@ void connectToWifi(void)
     {
         return;
     }
+
+    sprintf(msg, "wifi connect\nssid: %s", ssid.c_str());
+    displayMessage(msg);
 
     Serial.print("connectToWifi - ssid: ");
     Serial.println(ssid);
@@ -116,6 +127,8 @@ void ceDiscoverySend(void)
         udp.begin(WiFi.localIP(), CLIENT_UDP_PORT);
         udpInitialized = true;
     }
+
+    displayMessage("CE host discovery");
 
     // send upd broadcast
     uint8_t updPacket[4];
@@ -262,6 +275,10 @@ void connectToCEhost(void)
         return;
     }
 
+    char msg[128];
+    sprintf(msg, "TCP connect\nIP: %s", hostIpString.c_str());
+    displayMessage(msg);
+
     Serial.print("connectToCEhost - IP: ");
     Serial.print(hostIpString.c_str());
     Serial.print(", port: ");
@@ -276,8 +293,11 @@ void connectToCEhost(void)
 
 void connectToHost(void)
 {
+    connected = clientHdd.connected() && WiFi.status() == WL_CONNECTED;
+
     // socket connected, wifi connected? just quit
-    if(clientHdd.connected() && WiFi.status() == WL_CONNECTED) {
+    if(connected)
+    {
         return;
     }
 

@@ -1,3 +1,6 @@
+#ifndef __BRIGDE_H__
+#define __BRIGDE_H__
+
 #include "defs.h"
 
 // bridge functions return value
@@ -35,3 +38,5 @@ uint8_t dataIn(void);
 void dataOut(uint8_t data);
 
 void dumpPinStates(void);
+
+#endif

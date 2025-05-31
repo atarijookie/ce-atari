@@ -1,3 +1,5 @@
+#include <splash.h>
+
 #include "WiFi.h"
 
 #include "defs.h"

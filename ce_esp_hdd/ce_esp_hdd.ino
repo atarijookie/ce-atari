@@ -8,6 +8,7 @@
 #include "connection.h"
 #include "captive_portal.h"
 #include "rw_tasks.h"
+#include "display.h"
 
 Preferences preferences;
 
@@ -30,6 +31,10 @@ uint8_t enabledIDs;
 
 uint8_t isAcsiNotScsi;
 uint8_t busIdle;
+
+extern String hostIpString;
+extern bool connected;
+bool prevConnected;
 
 void handleButton(void);
 
@@ -78,6 +83,8 @@ void setup(void)
 #ifdef RW_TASKS
     createTasks();      // create the read / write tasks
 #endif
+
+    displayInit();
 }
 
 void setupAtnBuffers(void)
@@ -89,6 +96,13 @@ void setupAtnBuffers(void)
     storeWord(atnSendFwVersion + TX_HEADER_SIZE, version[0]);
     storeWord(atnSendFwVersion + TX_HEADER_SIZE + 2, version[1]);
     atnSendFwVersion[TX_HEADER_SIZE + 5] = 0x41;                    // v.4, ACSI
+}
+
+void showRunningStateOnDisplay(void)
+{
+    char msg[128];
+    sprintf(msg, "host: %s", hostIpString.c_str());
+    displayMessage(msg);
 }
 
 void loop(void)
@@ -104,12 +118,11 @@ void loop(void)
         // handle any data incoming
         handleIncommingData();
 
-        // keep yielding now and then to let other tasks run
-        uint32_t now = millis();
-        if(now - lastYield > 100)
+        // on connected change, display state on display
+        if(prevConnected != connected)
         {
-            lastYield = now;
-            yield();
+            prevConnected = connected;
+            showRunningStateOnDisplay();
         }
 
         // get the command from ACSI and send it to host
@@ -128,7 +141,7 @@ void loop(void)
                 if ((now - lastSendFwTime) >= 1000)
                 {
 #ifdef LOG_MORE
-                    dumpPinStates();        // instead of message about fw, dump pin states
+                    // dumpPinStates();        // instead of message about fw, dump pin states
 #endif
                     lastSendFwTime = now;
                     sendHeaderAndDataToHost(SOCK_HDD, atnSendFwVersion, ATN_SENDFWVERSION_LEN_TX - TX_HEADER_SIZE);
