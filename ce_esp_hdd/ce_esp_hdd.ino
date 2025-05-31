@@ -128,7 +128,7 @@ void loop(void)
                 if ((now - lastSendFwTime) >= 1000)
                 {
 #ifdef LOG_MORE
-                    Serial.println("Sending FW ver");
+                    dumpPinStates();        // instead of message about fw, dump pin states
 #endif
                     lastSendFwTime = now;
                     sendHeaderAndDataToHost(SOCK_HDD, atnSendFwVersion, ATN_SENDFWVERSION_LEN_TX - TX_HEADER_SIZE);
@@ -198,20 +198,13 @@ void loop(void)
             Serial.print("timeout at ");
             Serial.println(millis());
 #endif
-
             state = STATE_GET_COMMAND;
 
-            // if something was wrong, reset XILINX so it won't get stuck
-            if (brStat != E_OK)
+            if (!isBusIdle())
             {
-                resetBridge();
-            }
-
-            // The following goes only for SCSI interface, because current getBridgeStatus() (which is called from isBusIdle())
-            // triggers INT going low, and thus blocks FDD. The issue is somewhere in the Xilinx code or in the idea to use
-            // both XPIO & XDMA going high for this getBridgeStatus().
-            if (!isAcsiNotScsi && !isBusIdle())
-            { // only for SCSI interface!
+#ifdef LOG_MORE
+                Serial.println("resetBridge!");
+#endif
                 resetBridge();
             }
         }

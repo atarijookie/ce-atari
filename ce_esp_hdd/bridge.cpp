@@ -163,7 +163,8 @@ void getBridgeStatus(void)
     setDataDirection(DIR_RECV);
 
 #ifdef HDD_ACSI
-    busIdle = TRUE;
+    // ACSI bus is idle if FF12D is 1, OUT_OE is 1 (== RECV, input to esp), INT_TRIG and DRQ_TRIG are L
+    busIdle = BIT_IS_H(PIN_FF12D) && BIT_IS_H(PIN_OUT_OE) && BIT_IS_L(PIN_INT_TRIG) && BIT_IS_H(PIN_DRQ_TRIG);
     isAcsiNotScsi = 1;
 #else
     busIdle = TRUE; // TODO: check if bus idle
@@ -259,4 +260,25 @@ void dataOut(uint8_t data)
     uint32_t data32 = ((uint32_t) data) << 1;
     REG_WRITE(GPIO_OUT_W1TC_REG, 0x1fe);        // clear GPIO1–8
     REG_WRITE(GPIO_OUT_W1TS_REG, data32);       // set the bits of GPIO1-8
+}
+
+void dumpPinStates(void)
+{
+    Serial.print("CMD1ST: ");
+    Serial.print(BIT_IS_H(PIN_CMD1ST));
+
+    Serial.print(", EOT: ");
+    Serial.print(BIT_IS_H(PIN_EOT));
+
+    Serial.print(", OUT_OE: ");
+    Serial.print(BIT_IS_H(PIN_OUT_OE));
+
+    Serial.print(", DRQ_TRIG: ");
+    Serial.print(BIT_IS_H(PIN_DRQ_TRIG));
+
+    Serial.print(", FF12D: ");
+    Serial.print(BIT_IS_H(PIN_FF12D));
+
+    Serial.print(", INT_TRIG: ");
+    Serial.println(BIT_IS_H(PIN_INT_TRIG));
 }

@@ -33,3 +33,5 @@ uint8_t waitForEOT(void);
 void waitForEOTlevel(int level);
 uint8_t dataIn(void);
 void dataOut(uint8_t data);
+
+void dumpPinStates(void);

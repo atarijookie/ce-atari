@@ -211,7 +211,9 @@ uint8_t onDataRead(uint8_t withStatus)
 #ifdef RW_TASKS
     readerStart(dataCnt);       // tell reader to start receiving this much data
 #else
-    uint8_t data[512];
+    #define BFR_SIZE    4096
+    int rSize = 512;
+    uint8_t data[BFR_SIZE];
 #endif
 
     while(dataCnt > 0)
@@ -231,9 +233,20 @@ uint8_t onDataRead(uint8_t withStatus)
         uint32_t cntNow = buf->len;
         dataCnt -= cntNow;
 #else
-        uint32_t cntNow = MIN(512, dataCnt);
-        dataCnt -= cntNow;
-        clientHdd.read(data, cntNow);
+        uint32_t cntNow = MIN(rSize, dataCnt);
+        int actualCnt = clientHdd.read(data, cntNow);   // try to read desired cntNow to buffer
+
+        if(actualCnt <= 0) {        // nothing read? do delay so other tasks can run
+            vTaskDelay(1);
+            continue;
+        }
+
+        dataCnt -= actualCnt;       // decrease total size by actual read count
+        cntNow = actualCnt;
+
+        if(rSize < BFR_SIZE) {      // the requested read size not at the buffer size? increase it
+            rSize = MIN(rSize * 2, BFR_SIZE);
+        }
 #endif
 
         for(uint16_t i=0; i<cntNow; i++) {    // send all the data from buffer to Atari
