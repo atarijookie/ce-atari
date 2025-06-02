@@ -53,7 +53,6 @@ public:
     Ikbd();
 
     void loadSettings(void);
-    void fillDisplayLine(void);
 
     void findDevices(void);
     void findVirtualDevices();

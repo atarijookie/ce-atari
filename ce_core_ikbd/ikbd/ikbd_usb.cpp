@@ -54,8 +54,6 @@ void Ikbd::deinitDev(int index)
     if(index == INTYPE_JOYSTICK2) {         // for joy2 - init it
         initJoystickState(&joystick[1]);
     }
-
-    fillDisplayLine();                      // fill IKBD line for showing it on display
 }
 
 void Ikbd::initJoystickState(TJoystickState *joy)
@@ -82,41 +80,6 @@ void Ikbd::closeDevs(void)
             ikbdDevs[i].fd = -1;          // mark it as closed
         }
     }
-}
-
-void Ikbd::fillDisplayLine(void)
-{
-    char tmp[64];
-    bool has = false;
-
-    strcpy(tmp, "IKBD: ");
-
-    if(gotUsbKeyboard()) {
-        strcat(tmp, "Keyb ");
-        has = true;
-    }
-
-    if(gotUsbMouse()) {
-        strcat(tmp, "Mou ");
-        has = true;
-    }
-
-    if(gotUsbJoy1()) {
-        strcat(tmp, "J1 ");
-        has = true;
-    }
-
-    if(gotUsbJoy2()) {
-        strcat(tmp, "J2 ");
-        has = true;
-    }
-
-    if(!has) {      // no IKBD stuff present?
-        strcat(tmp, "-");
-    }
-
-    // TODO: store display data elsewhere
-    // display_setLine(DISP_LINE_IKDB, tmp);
 }
 
 void Ikbd::findDevices(void)
@@ -174,8 +137,6 @@ void Ikbd::findDevices(void)
     }
 
     closedir(dir);
-
-    fillDisplayLine();      // fill it for showing it on display
 }
 
 void Ikbd::findVirtualDevices(void)
@@ -224,14 +185,14 @@ void Ikbd::processFoundDev(const char *linkName, const char *fullPath)
     std::string vdevMouse = Utils::dotEnvValue("IKBD_VIRTUAL_MOUSE_FILE");
     std::string vdevKbd = Utils::dotEnvValue("IKBD_VIRTUAL_KEYBOARD_FILE");
 
-    Debug::out(LOG_DEBUG, "Ikbd::processFoundDev(%s, %s)", linkName, fullPath);
+    Debug::out(LOG_INFO, "Ikbd::processFoundDev(%s, %s)", linkName, fullPath);
     if(vdevMouse == linkName) {                         // it's a VIRTUAL mouse
         if(ikbdDevs[INTYPE_VDEVMOUSE].fd == -1) {       // don't have mouse?
             in = &ikbdDevs[INTYPE_VDEVMOUSE];
             what = linkName;
             virtualDevice = true;
         } else {                                        // already have a mouse?
-            Debug::out(LOG_DEBUG, "%s: already have a mouse", fullPath);
+            Debug::out(LOG_INFO, "%s: already have a mouse", fullPath);
             return;
         }
     } else if(vdevKbd == linkName) {                    // it's a VIRTUAL keyboard?
@@ -240,7 +201,7 @@ void Ikbd::processFoundDev(const char *linkName, const char *fullPath)
             what = linkName;
             virtualDevice = true;
         } else {                                        // already have a keyboard?
-            Debug::out(LOG_DEBUG, "%s: already have a keyboard", fullPath);
+            Debug::out(LOG_INFO, "%s: already have a keyboard", fullPath);
             return;
         }
     } else if(strstr(linkName, "mouse") != NULL) {             // it's a mouse
@@ -248,7 +209,7 @@ void Ikbd::processFoundDev(const char *linkName, const char *fullPath)
             in = &ikbdDevs[INTYPE_MOUSE];
             what = "mouse";
         } else {                                        // already have a mouse?
-            Debug::out(LOG_DEBUG, "%s: already have a mouse", fullPath);
+            Debug::out(LOG_INFO, "%s: already have a mouse", fullPath);
             return;
         }
     } else if(strstr(linkName, "kbd") != NULL) {               // it's a keyboard?
@@ -256,13 +217,13 @@ void Ikbd::processFoundDev(const char *linkName, const char *fullPath)
             in = &ikbdDevs[INTYPE_KEYBOARD];
             what = "keyboard";
         } else {                                        // already have a keyboard?
-            Debug::out(LOG_DEBUG, "%s: already have a keyboard", fullPath);
+            Debug::out(LOG_INFO, "%s: already have a keyboard", fullPath);
             return;
         }
     } else if(strstr(linkName, "joystick") != NULL) {                  // it's a joystick?
         if(ikbdDevs[joy1st].fd == -1) {                                       // don't have joystick 1?
             if(strcmp(fullPath, ikbdDevs[joy2nd].devPath) == 0) {             // if this device is already connected as joystick 2, skip it
-                Debug::out(LOG_DEBUG, "%s: already connected as joystick 2", fullPath);
+                Debug::out(LOG_INFO, "%s: already connected as joystick 2", fullPath);
                 return;
             }
 
@@ -270,14 +231,14 @@ void Ikbd::processFoundDev(const char *linkName, const char *fullPath)
             what = "joystick1";
         } else if(ikbdDevs[joy2nd].fd == -1) {                                // don't have joystick 2?
             if(strcmp(fullPath, ikbdDevs[joy1st].devPath) == 0) {             // if this device is already connected as joystick 1, skip it
-                Debug::out(LOG_DEBUG, "%s: already cannected as joystick 1", fullPath);
+                Debug::out(LOG_INFO, "%s: already cannected as joystick 1", fullPath);
                 return;
             }
 
             in = &ikbdDevs[joy2nd];
             what = "joystick2";
         } else {                                                            // already have a joystick?
-            Debug::out(LOG_DEBUG, "%s: already have both joysticks", fullPath);
+            Debug::out(LOG_INFO, "%s: already have both joysticks", fullPath);
             return;
         }
     } else {
@@ -296,7 +257,7 @@ void Ikbd::processFoundDev(const char *linkName, const char *fullPath)
 
     in->fd = fd;
     strcpy(in->devPath, fullPath);
-    Debug::out(LOG_DEBUG, "Got device (%s): %s", what, fullPath);
+    Debug::out(LOG_INFO, "Got device (%s): %s", what, fullPath);
 
     if(!virtualDevice) {
         grabExclusiveAccess(fd);

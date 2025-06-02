@@ -207,7 +207,7 @@ void printfPossibleCmdLineArgs(void)
     printf("\nPossible command line args:\n");
     printf("llx      - set log level to x (default is 1, max is 4)\n");
     printf("pXXXX    - set listening port to XXXX\n");
-    printf("rXXXX    - set port for status reporting to XXXX\n");
+    printf("nocap    - don't capture USB mouse and keyboard\n");
 }
 
 void handlePthreadCreate(const char* threadName, pthread_t* pThreadInfo, void* threadCode)
