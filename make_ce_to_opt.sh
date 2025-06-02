@@ -42,11 +42,11 @@ cd - > /dev/null 2>&1
 # cp ./ce_fdd.elf "$BIN_DIR"
 # cd - > /dev/null 2>&1
 
-# cd ce_core_ikbd
-# echo "building ce_core_ikbd"
-# make -j4
-# cp ./ce_ikbd.elf "$BIN_DIR"
-# cd - > /dev/null 2>&1
+cd ce_core_ikbd
+echo "building ce_core_ikbd"
+make -j4
+cp ./ce_ikbd.elf "$BIN_DIR"
+cd - > /dev/null 2>&1
 
 echo "copying webserver"
 cp -r ./webserver "$BIN_DIR"

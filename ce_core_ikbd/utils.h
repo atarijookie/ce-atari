@@ -8,6 +8,7 @@
 #include <stdint.h>
 
 extern "C" volatile sig_atomic_t sigintReceived;
+#define FD_EMPTY    -1
 
 #ifndef MIN
     #define MIN(x, y)   (((x) < (y)) ? (x) : (y))

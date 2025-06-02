@@ -12,10 +12,8 @@
 
 extern ChipInterfaceNetwork* chipInterface;
 
-void Ikbd::processReceivedCommands(bool skipKeyboardTranslation)
+void Ikbd::processReceivedCommands(bool skipKeyboardTranslation, int fdUartRead)
 {
-    int fdUartRead = chipInterface->ikbdUartReadFd();           // get FD for reading from IKBD
-
     if(fdUartRead == -1) {                                      // uart not open? quit
         return;
     }
@@ -105,8 +103,7 @@ void Ikbd::dumpBuffer(bool fromStNotKeyboard)
         text += bfr;
 
         if(!fromStNotKeyboard) {                // if it's from keyboard, send it to ST
-            int fdUartWrite = chipInterface->ikbdUartWriteFd();     // get FD for writing to IKBD
-            fdWrite(fdUartWrite, &val, 1);
+            chipInterface->ikbdUartWriteToAll(&val, 1);
         }
     }
 
@@ -492,8 +489,7 @@ void Ikbd::processGetCommand(uint8_t getCmd)
 	}
 
 	if(send) {										// if command was handled
-        int fdUartWrite = chipInterface->ikbdUartWriteFd();     // get FD for writing to IKBD
-		fdWrite(fdUartWrite, bfr, 8);
+		chipInterface->ikbdUartWriteToAll(bfr, 8);
 	}
 }
 
@@ -523,8 +519,6 @@ void Ikbd::processKeyboardData(bool skipKeyboardTranslation)
     if(cbKeyboardData.count <= 0) {                             // no data? quit
         return;
     }
-
-    int fdUartWrite = chipInterface->ikbdUartWriteFd();     // get FD for writing to IKBD
 
     while(cbKeyboardData.count > 0) {                           // while there are some data, process
         uint8_t val = cbKeyboardData.peek();                       // get the data, but don't move the get pointer, because we might fail later
@@ -608,7 +602,7 @@ void Ikbd::processKeyboardData(bool skipKeyboardTranslation)
 			}
 
 			if(resendTheseData) {								    // if we should resend this data
-				fdWrite(fdUartWrite, bfr, len);                          // send the whole sequence to ST
+				chipInterface->ikbdUartWriteToAll(bfr, len);                          // send the whole sequence to ST
             }
 
 			continue;
@@ -624,7 +618,7 @@ void Ikbd::processKeyboardData(bool skipKeyboardTranslation)
             }
 
             if(!wasHandled) {                              // if not handled as keyb joy, send it to ST
-                fdWrite(fdUartWrite, &val, 1);             // send byte to ST
+                chipInterface->ikbdUartWriteToAll(&val, 1);             // send byte to ST
             }
         }
     }
@@ -633,9 +627,8 @@ void Ikbd::processKeyboardData(bool skipKeyboardTranslation)
 void Ikbd::sendBothJoyReport(void)
 {
 	uint8_t bfr[3];
-    int res;
 
-	uint8_t joy0state = joystick[0].lastDir | joystick[0].lastBtn;	// get state
+    uint8_t joy0state = joystick[0].lastDir | joystick[0].lastBtn;	// get state
 	uint8_t joy1state = joystick[1].lastDir | joystick[1].lastBtn;	// get state
 
 	bfr[0] = KEYBDATA_JOY_BOTH;
@@ -643,19 +636,13 @@ void Ikbd::sendBothJoyReport(void)
     bfr[1] = !firstJoyIs0 ? joy0state : joy1state;
     bfr[2] = !firstJoyIs0 ? joy1state : joy0state;
 
-    int fdUartWrite = chipInterface->ikbdUartWriteFd();     // get FD for writing to IKBD
-	res = fdWrite(fdUartWrite, bfr, 3);
-
-    if(res < 0) {
-        Debug::out(LOG_ERROR, "write to uart failed, errno: %d", errno);
-    }
+	chipInterface->ikbdUartWriteToAll(bfr, 3);
 }
 
 // the following works when joystick event reporting is enabled
 void Ikbd::sendJoyState(int joyNumber, int dirTotal)
 {
     uint8_t bfr[2];
-    int res;
 
     // first set the joystick 0 / 1 tag
     if(joyNumber == 0) {        // joy 0
@@ -666,12 +653,7 @@ void Ikbd::sendJoyState(int joyNumber, int dirTotal)
 
     bfr[1] = dirTotal;
 
-    int fdUartWrite = chipInterface->ikbdUartWriteFd();           // get FD for writing to IKBD
-    res = fdWrite(fdUartWrite, bfr, 2);
-
-    if(res < 0) {
-        Debug::out(LOG_ERROR, "write to uart (0) failed, errno: %d", errno);
-    }
+    chipInterface->ikbdUartWriteToAll(bfr, 2);
 }
 
 // this can be used to send joystick button states when joystick event reporting is not enabled (it reports joy buttons as mouse buttons)
@@ -690,12 +672,7 @@ void Ikbd::sendJoyButtonsInMouseMode(void)
     bfr[1] = 0;
     bfr[2] = 0;
 
-    int fdUartWrite = chipInterface->ikbdUartWriteFd();     // get FD for writing to IKBD
-    int res = fdWrite(fdUartWrite, bfr, 3);
-
-    if(res < 0) {
-        Debug::out(LOG_ERROR, "write to uart (1) failed, errno: %d", errno);
-    }
+    chipInterface->ikbdUartWriteToAll(bfr, 3);
 }
 
 void Ikbd::fillStCommandsLengthTable(void)
@@ -746,12 +723,6 @@ void Ikbd::fillSpecialCodeLengthTable(void)
 
 void Ikbd::sendMousePosAbsolute(uint8_t absButtons)
 {
-    int fdUartWrite = chipInterface->ikbdUartWriteFd();           // get FD for writing to IKBD
-
-    if(fdUartWrite == -1) {                      // no UART open?
-        return;
-    }
-
     if(!mouseEnabled) {                 // if mouse not enabled, don't send anything
         return;
     }
@@ -770,21 +741,11 @@ void Ikbd::sendMousePosAbsolute(uint8_t absButtons)
 	bfr[4] = absMouse.y >> 8;
 	bfr[5] = (uint8_t) absMouse.y;
 
-	int res = fdWrite(fdUartWrite, bfr, 6);
-
-	if(res < 0) {
-		Debug::out(LOG_ERROR, "sendMousePosAbsolute failed, errno: %d", errno);
-	}
+	chipInterface->ikbdUartWriteToAll(bfr, 6);
 }
 
 void Ikbd::sendMousePosRelative(uint8_t buttons, uint8_t xRel, uint8_t yRel)
 {
-    int fdUartWrite = chipInterface->ikbdUartWriteFd();           // get FD for writing to IKBD
-
-    if(fdUartWrite == -1) {                      // no UART open? quit
-        return;
-    }
-
     if(!mouseEnabled) {                 // if mouse not enabled, don't send anything
         return;
     }
@@ -805,11 +766,7 @@ void Ikbd::sendMousePosRelative(uint8_t buttons, uint8_t xRel, uint8_t yRel)
 	bfr[1] = xRel;
     bfr[2] = yRelVal;
 
-	int res = fdWrite(fdUartWrite, bfr, 3);
-
-	if(res < 0) {
-		Debug::out(LOG_ERROR, "sendMousePosRelative failed, errno: %d", errno);
-	}
+	chipInterface->ikbdUartWriteToAll(bfr, 3);
 }
 
 bool Ikbd::handleStKeyAsKeybJoy(uint8_t val)

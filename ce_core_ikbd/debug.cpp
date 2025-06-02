@@ -30,7 +30,7 @@ const char* Debug::getCoreLogFileName(bool forceCreate)
     }
 
     std::string logDir = Utils::dotEnvValue("LOG_DIR", LOG_DIR_DEFAULT, false);
-    coreLogFileName = logDir + std::string("/core_ikbd_") + std::to_string(flags.portClient) + std::string(".log");
+    coreLogFileName = logDir + std::string("/core_ikbd.log");
     return coreLogFileName.c_str();
 }
 

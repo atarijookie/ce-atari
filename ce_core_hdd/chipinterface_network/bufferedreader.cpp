@@ -7,6 +7,7 @@
 #include "../debug.h"
 #include <stdint.h>
 #include "bufferedreader.h"
+#include "chipinterfacenetwork.h"
 
 BufferedReader::BufferedReader()
 {

@@ -9,7 +9,6 @@ typedef struct {
     bool justShowHelp;          // show possible command line arguments and quit
     int  logLevel;              // init current log level to LOG_ERROR
     bool noCapture;
-    int  portServerReport;
     int  portClient;
 } TFlags;
 

@@ -47,8 +47,6 @@ void *ikbdThreadCode(void *ptr)
     Debug::out(LOG_DEBUG, "----------------------------------------------------------");
     Debug::out(LOG_DEBUG, "ikbdThreadCode will enter loop...");
 
-    chipInterface->ikbdUartEnable(true);        // enable UART for IKDB via some hardware magic
-
     inotifyFd = inotify_init();
     if(inotifyFd < 0) {
         Debug::out(LOG_ERROR, "inotify_init() failed");
@@ -85,12 +83,7 @@ void *ikbdThreadCode(void *ptr)
             }
         }
 
-        int fdUart = chipInterface->ikbdUartReadFd();       // get FD for reading from IKBD
-
-        if(fdUart >= 0) {                                   // if fdUart is valid (open)
-            FD_SET(fdUart, &readfds);
-            if(fdUart > max_fd) max_fd = fdUart;
-        }
+        max_fd = MAX(max_fd, chipInterface->setAllClientFds(&readfds));     // all valid client fds will be set to readfds, and highest fd into max_fd
 
         if(inotifyFd >= 0) {
             FD_SET(inotifyFd, &readfds);
@@ -135,12 +128,9 @@ void *ikbdThreadCode(void *ptr)
             }
         }
 
+        // process the incoming data from original keyboard and from ST
         bool clientConnected = false;
-
-        if(fdUart >= 0 && FD_ISSET(fdUart, &readfds)) {
-            // process the incoming data from original keyboard and from ST
-            ikbd.processReceivedCommands(clientConnected);
-        }
+        chipInterface->handleAllReadyClients(clientConnected, &readfds, &ikbd);
 
         // process events from attached input devices
         struct input_event  ev;
@@ -196,8 +186,6 @@ void *ikbdThreadCode(void *ptr)
         close(inotifyFd);
     }
     ikbd.closeDevs();
-
-    chipInterface->ikbdUartEnable(false);        // disable UART for IKDB via some hardware magic, so Atari keyboard and mouse will work even if ce_main_app doesn't run
 
     Debug::out(LOG_DEBUG, "ikbdThreadCode has quit");
     return 0;
@@ -283,18 +271,4 @@ void Ikbd::resetInternalIkbdVars(void)
     f11sPressed        = 0;
     f12sPressed        = 0;
     waitingForHotkeyRelease = false;
-}
-
-int Ikbd::fdWrite(int fd, uint8_t *bfr, int cnt)
-{
-    if(fd == -1) {                                  // no fd? quit
-        return 0;
-    }
-
-    if(!outputEnabled) {                            // output not enabled? Pretend that it was sent...
-        return cnt;
-    }
-
-    int res = write(fd, bfr, cnt);                  // send content
-    return res;
 }

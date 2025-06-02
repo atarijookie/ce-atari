@@ -67,7 +67,7 @@ public:
     void processJoystick(js_event *jse, int joyNumber);
     void markVirtualMouseEvenTime(void);
 
-    void processReceivedCommands(bool skipKeyboardTranslation);
+    void processReceivedCommands(bool skipKeyboardTranslation, int fdUartRead);
 
 private:
     enum JoystickState {
@@ -168,8 +168,6 @@ private:
     bool handleStKeyAsKeybJoy(uint8_t val);
     void handleKeyAsKeybJoy  (bool pcNotSt, int joyNumber, int pcKey, bool keyDown);
     bool handleHotkeys(int pcKey, bool pressed, bool skipKeyboardTranslation);
-
-    int fdWrite(int fd, uint8_t *bfr, int cnt);
 
     void toggleKeyboardExclusiveAccess(void);
     void grabExclusiveAccess(int fd);

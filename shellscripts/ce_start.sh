@@ -23,9 +23,13 @@ cp -rf "${BIN_DIR}/configdrive" "$CONFIG_DRIVE_PATH"
 
 echo "Starting processes."
 
-# run the services
+# run the service discovery
 ./ce_discovery.elf > /dev/null 2>&1 &
 
+# run ikbd server
+./ce_ikbd.elf > /dev/null  2>&1 &
+
+# run web server
 cd webserver
 ./ce_web.sh > /dev/null 2>&1 &
 cd - > /dev/null 2>&1

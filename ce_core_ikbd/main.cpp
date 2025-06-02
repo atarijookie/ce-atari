@@ -144,8 +144,7 @@ void initializeFlags(void)
     Debug::setLogLevel(LOG_ERROR);      // init current log level to LOG_ERROR
     flags.justShowHelp = false;
     flags.noCapture    = false;         // if true, don't do exclusive mouse and keyboard capture
-    flags.portServerReport = 7200;
-    flags.portClient = 7300;
+    flags.portClient = 7401;
 }
 
 void parseCmdLineArguments(int argc, char *argv[])
@@ -181,15 +180,6 @@ void parseCmdLineArguments(int argc, char *argv[])
             if(res != 1) {
                 printf(">>> BAD CLIENT PORT VALUE: '%s' <<<\n", argv[i] + 1);
                 Debug::out(LOG_ERROR, ">>> BAD CLIENT PORT VALUE: '%s' <<<\n", argv[i] + 1);
-            }
-        }
-
-        if(argv[i][0] == 'r') {
-            isKnownTag = true;                                      // this is a known tag
-            int res = sscanf(argv[i] + 1, "%d", &flags.portServerReport);
-            if(res != 1) {
-                printf(">>> BAD REPORT PORT VALUE: '%s' <<<\n", argv[i] + 1);
-                Debug::out(LOG_ERROR, ">>> BAD REPORT PORT VALUE: '%s' <<<\n", argv[i] + 1);
             }
         }
 

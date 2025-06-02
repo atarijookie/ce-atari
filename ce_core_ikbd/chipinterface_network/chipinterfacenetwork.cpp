@@ -18,6 +18,7 @@
 #include "../debug.h"
 #include "../global.h"
 #include "chipinterfacenetwork.h"
+#include "../ikbd/ikbd.h"
 
 extern TFlags    flags;                 // global flags from command line
 
@@ -27,8 +28,11 @@ extern TFlags    flags;                 // global flags from command line
 
 ChipInterfaceNetwork::ChipInterfaceNetwork()
 {
-    fdListen = -1;
-    fdClient = -1;
+    fdListen = FD_EMPTY;
+
+    for(int i=0; i<MAX_CLIENTS; i++) {
+        fdClients[i] = FD_EMPTY;
+    }
 
     lastTimeRecv = Utils::getCurrentMs();
 }
@@ -36,6 +40,17 @@ ChipInterfaceNetwork::ChipInterfaceNetwork()
 ChipInterfaceNetwork::~ChipInterfaceNetwork()
 {
 
+}
+
+int ChipInterfaceNetwork::getEmptyClientIndex(void)
+{
+    for(int i=0; i<MAX_CLIENTS; i++) {
+        if(fdClients[i] == FD_EMPTY) {
+            return i;
+        }
+    }
+
+    return -1;
 }
 
 void ChipInterfaceNetwork::createListeningSocket(void)
@@ -63,7 +78,7 @@ void ChipInterfaceNetwork::createListeningSocket(void)
 
     addressListen.sin_family = AF_INET;
     addressListen.sin_addr.s_addr = INADDR_ANY;
-    addressListen.sin_port = htons( flags.portClient );
+    addressListen.sin_port = htons(flags.portClient);
 
     // bind to address
     if (bind(fdListen, (struct sockaddr *) &addressListen, sizeof(addressListen)) < 0) {
@@ -82,8 +97,10 @@ void ChipInterfaceNetwork::createListeningSocket(void)
 
 void ChipInterfaceNetwork::acceptSocketIfNeededAndPossible(void)
 {
-    // if already got client socket, no need to do anything here
-    if(fdClient >= 0) {
+    int idx = getEmptyClientIndex();
+
+    // out of empty indexes, don't accept
+    if(idx < 0 || idx >= MAX_CLIENTS) {
         return;
     }
 
@@ -102,7 +119,7 @@ void ChipInterfaceNetwork::acceptSocketIfNeededAndPossible(void)
     setsockopt(newSock, SOL_SOCKET, SO_RCVTIMEO, (const char*) &tv, sizeof(tv));
 
     // got the new client socket now
-    fdClient = newSock;
+    fdClients[idx] = newSock;
     lastTimeRecv = Utils::getCurrentMs();
 
     Debug::out(LOG_DEBUG, "acceptSocketIfNeededAndPossible() - client connected");
@@ -110,7 +127,7 @@ void ChipInterfaceNetwork::acceptSocketIfNeededAndPossible(void)
 
 void ChipInterfaceNetwork::closeClientSocket(void)
 {
-    Utils::closeFdIfOpen(fdClient);            // close socket
+    // Utils::closeFdIfOpen(fdClient);            // close socket
 
     Debug::out(LOG_DEBUG, "closeClientSocket() - client disconnected");
 }
@@ -126,20 +143,48 @@ void ChipInterfaceNetwork::ciClose(void)
 {
     // close sockets
     Utils::closeFdIfOpen(fdListen);
-    Utils::closeFdIfOpen(fdClient);
+
+    for(int i=0; i<MAX_CLIENTS; i++) {
+        Utils::closeFdIfOpen(fdClients[i]);
+    }
 }
 
-void ChipInterfaceNetwork::ikbdUartEnable(bool enable)
+int ChipInterfaceNetwork::setAllClientFds(fd_set* readfds)
 {
-    // nothing needed to be done here
+    int maxFd = -1;
+
+    for(int i=0; i<MAX_CLIENTS; i++) {
+        if(fdClients[i] != FD_EMPTY) {      // got this client? add his fd
+            FD_SET(fdClients[i], readfds);
+
+            maxFd = MAX(fdClients[i], maxFd);
+        }
+    }
+
+    return maxFd;
 }
 
-int ChipInterfaceNetwork::ikbdUartReadFd(void)
+void ChipInterfaceNetwork::handleAllReadyClients(bool skipKeyboardTranslation, fd_set* readfds, Ikbd* ikbd)
 {
-    return fdClient;
+    for(int i=0; i<MAX_CLIENTS; i++) {
+        if(fdClients[i] == FD_EMPTY) {      // no client here? skip it
+            continue;
+        }
+
+        if(FD_ISSET(fdClients[i], readfds)) {      // this fd read for read?
+            // process the incoming data from original keyboard and from ST
+            ikbd->processReceivedCommands(skipKeyboardTranslation, fdClients[i]);
+        }
+    }
 }
 
-int ChipInterfaceNetwork::ikbdUartWriteFd(void)
+void ChipInterfaceNetwork::ikbdUartWriteToAll(uint8_t* bfr, int len)
 {
-    return fdClient;
+    for(int i=0; i<MAX_CLIENTS; i++) {
+        if(fdClients[i] == FD_EMPTY) {      // client not connected here? skip it
+            continue;
+        }
+
+        write(fdClients[i], bfr, len);    // send it
+    }
 }
