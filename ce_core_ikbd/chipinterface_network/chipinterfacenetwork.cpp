@@ -13,6 +13,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/ioctl.h>
+#include <netinet/tcp.h>  // For TCP_NODELAY
 
 #include "../utils.h"
 #include "../debug.h"
@@ -32,9 +33,8 @@ ChipInterfaceNetwork::ChipInterfaceNetwork()
 
     for(int i=0; i<MAX_CLIENTS; i++) {
         fdClients[i] = FD_EMPTY;
+        clientLastMs[i] = 0;
     }
-
-    lastTimeRecv = Utils::getCurrentMs();
 }
 
 ChipInterfaceNetwork::~ChipInterfaceNetwork()
@@ -87,12 +87,17 @@ void ChipInterfaceNetwork::createListeningSocket(void)
     }
 
     // mark the socket as a passive socket
-    if (listen(fdListen, 1) < 0) {
+    if (listen(fdListen, 5) < 0) {      // listen with backlog of this many connections
         Debug::out(LOG_ERROR, "netServer - listen() failed");
         return;
     }
 
     Debug::out(LOG_INFO, "netServer - listening on tcp port: %d", flags.portClient);
+}
+
+int ChipInterfaceNetwork::getFdListen(void)
+{
+    return fdListen;
 }
 
 void ChipInterfaceNetwork::acceptSocketIfNeededAndPossible(void)
@@ -105,9 +110,10 @@ void ChipInterfaceNetwork::acceptSocketIfNeededAndPossible(void)
     }
 
     // don't have client socket, try accept()
-    socklen_t addrSize = sizeof(addressListen);
+    struct sockaddr_in addressClient;
+    socklen_t addrSize = sizeof(addressClient);
 
-    int newSock = accept(fdListen, (struct sockaddr *) &addressListen, &addrSize);
+    int newSock = accept(fdListen, (struct sockaddr *) &addressClient, &addrSize);
 
     if(newSock < 0) {       // nothing to accept, would block? quit
         return;
@@ -118,18 +124,18 @@ void ChipInterfaceNetwork::acceptSocketIfNeededAndPossible(void)
     tv.tv_usec = 500000;    // 500 ms timeout on blocking reads
     setsockopt(newSock, SOL_SOCKET, SO_RCVTIMEO, (const char*) &tv, sizeof(tv));
 
+    // turn off Nagle's algorithm
+    int flag = 1;
+    setsockopt(newSock, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
+
     // got the new client socket now
     fdClients[idx] = newSock;
-    lastTimeRecv = Utils::getCurrentMs();
+    clientLastMs[idx] = Utils::getCurrentMs();
 
-    Debug::out(LOG_DEBUG, "acceptSocketIfNeededAndPossible() - client connected");
-}
+    char clientIp[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &addressClient.sin_addr, clientIp, sizeof(clientIp));
 
-void ChipInterfaceNetwork::closeClientSocket(void)
-{
-    // Utils::closeFdIfOpen(fdClient);            // close socket
-
-    Debug::out(LOG_DEBUG, "closeClientSocket() - client disconnected");
+    Debug::out(LOG_INFO, "acceptSocketIfNeededAndPossible() - client #%d connected from %s", idx, clientIp);
 }
 
 bool ChipInterfaceNetwork::ciOpen(void)
@@ -149,14 +155,36 @@ void ChipInterfaceNetwork::ciClose(void)
     }
 }
 
+int ChipInterfaceNetwork::disconnectInactiveClients(void)
+{
+    int maxFd = -1;
+    uint32_t now = Utils::getCurrentMs();
+
+    for(int i=0; i<MAX_CLIENTS; i++) {
+        if(fdClients[i] == FD_EMPTY) {      // no client at this index? skip
+            continue;
+        }
+
+        // there hasn't been any data from this client for some time? close connection
+        uint32_t diff = now - clientLastMs[i];
+
+        if(diff > 15000) {
+            Utils::closeFdIfOpen(fdClients[i]);
+            clientLastMs[i] = 0;
+            Debug::out(LOG_INFO, "disconnected inactive client #%i", i);
+        }
+    }
+
+    return maxFd;
+}
+
 int ChipInterfaceNetwork::setAllClientFds(fd_set* readfds)
 {
     int maxFd = -1;
 
     for(int i=0; i<MAX_CLIENTS; i++) {
-        if(fdClients[i] != FD_EMPTY) {      // got this client? add his fd
+        if(fdClients[i] != FD_EMPTY) {      // got this client?
             FD_SET(fdClients[i], readfds);
-
             maxFd = MAX(fdClients[i], maxFd);
         }
     }
@@ -171,9 +199,13 @@ void ChipInterfaceNetwork::handleAllReadyClients(bool skipKeyboardTranslation, f
             continue;
         }
 
-        if(FD_ISSET(fdClients[i], readfds)) {      // this fd read for read?
+        if(FD_ISSET(fdClients[i], readfds)) {           // this fd read for read?
             // process the incoming data from original keyboard and from ST
-            ikbd->processReceivedCommands(skipKeyboardTranslation, fdClients[i]);
+            int bytesRead = ikbd->processReceivedCommands(skipKeyboardTranslation, fdClients[i]);
+
+            if(bytesRead > 0) {     // something was read, mark client as active
+                clientLastMs[i] = Utils::getCurrentMs();
+            }
         }
     }
 }

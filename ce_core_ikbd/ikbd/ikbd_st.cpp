@@ -12,24 +12,24 @@
 
 extern ChipInterfaceNetwork* chipInterface;
 
-void Ikbd::processReceivedCommands(bool skipKeyboardTranslation, int fdUartRead)
+int Ikbd::processReceivedCommands(bool skipKeyboardTranslation, int fdUartRead)
 {
     if(fdUartRead == -1) {                                      // uart not open? quit
-        return;
+        return 0;
     }
 
     //-----------------
     // receive if there is something to receive
     uint8_t bfr[128];
-    int res = read(fdUartRead, bfr, 128);                       // try to read data from uart
+    int bytesRead = read(fdUartRead, bfr, 128);                       // try to read data from uart
 
     // no data was received, nothing to resend
-    if(res <= 0) {
-        return;
+    if(bytesRead <= 0) {
+        return 0;
     }
 
     // if some data arrived, split it into
-    for(int i=0; i<res; i++) {                              // add all the received data into cyclic buffer (in case it comes in pieces)
+    for(int i=0; i<bytesRead; i++) {                        // add all the received data into cyclic buffer (in case it comes in pieces)
         cbReceivedData.add(bfr[i]);
     }
 
@@ -38,10 +38,10 @@ void Ikbd::processReceivedCommands(bool skipKeyboardTranslation, int fdUartRead)
             break;
         }
 
-        uint8_t tag = cbReceivedData.peek();                   // peek current value, don't move just yet
+        uint8_t tag = cbReceivedData.peek();                // peek current value, don't move just yet
         uint8_t val;
 
-        if(tag != UARTMARK_STCMD && tag != UARTMARK_KEYBDATA) {    // not a valid tag?
+        if(tag != UARTMARK_STCMD && tag != UARTMARK_KEYBDATA && tag != UARTMARK_ALIVE) {    // not a valid tag?
             tag = cbReceivedData.get();                     // remove byte from buffer and try again
             continue;
         }
@@ -56,6 +56,13 @@ void Ikbd::processReceivedCommands(bool skipKeyboardTranslation, int fdUartRead)
                 cbKeyboardData.add(val);
             }
 
+            continue;
+        }
+
+        // this is just alive sign from device, remove it twice from buffer (tag + val)
+        if(tag == UARTMARK_ALIVE) {
+            cbReceivedData.get();
+            cbReceivedData.get();
             continue;
         }
     }
@@ -79,6 +86,8 @@ void Ikbd::processReceivedCommands(bool skipKeyboardTranslation, int fdUartRead)
             dumpBuffer(false);
         }
     #endif
+
+    return bytesRead;
 }
 
 void Ikbd::dumpBuffer(bool fromStNotKeyboard)

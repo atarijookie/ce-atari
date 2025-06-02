@@ -67,11 +67,15 @@ void *ikbdThreadCode(void *ptr)
     ikbd.findVirtualDevices();
 
     while(sigintReceived == 0) {
+        Utils::sleepMs(1);      // intentional sleep to not utilize cpu to max when looping too much before client disconnect
+
         // reload config if needed
         if(do_loadIkbdConfig) {
             do_loadIkbdConfig = false;
             ikbd.loadSettings();
         }
+
+        chipInterface->disconnectInactiveClients();
 
         max_fd = -1;
         FD_ZERO(&readfds);
@@ -83,15 +87,25 @@ void *ikbdThreadCode(void *ptr)
             }
         }
 
+        // get listening socket from chip interface, add it to readfds
+        int fdListen = chipInterface->getFdListen();
+        FD_SET(fdListen, &readfds);
+        max_fd = MAX(max_fd, fdListen);
+
+        // get all connected client fds, add them to readfds
         max_fd = MAX(max_fd, chipInterface->setAllClientFds(&readfds));     // all valid client fds will be set to readfds, and highest fd into max_fd
 
         if(inotifyFd >= 0) {
             FD_SET(inotifyFd, &readfds);
             if(inotifyFd > max_fd) max_fd = inotifyFd;
         }
-        //memset(&timeout, 0, sizeof(timeout));
-        //timeout.tv_sec = 3;
-        if(select(max_fd + 1, &readfds, NULL, NULL, NULL/*&timeout*/) < 0) {
+
+        // add timeout to select(), so we can check for connection status, settings reload, etc.
+        timeval timeout;
+        memset(&timeout, 0, sizeof(timeout));
+        timeout.tv_sec = 2;
+
+        if(select(max_fd + 1, &readfds, NULL, NULL, &timeout) < 0) {
             if(errno == EINTR) {
                 continue;   // a signal was delivered
             } else {
@@ -126,6 +140,11 @@ void *ikbdThreadCode(void *ptr)
                     ikbd.findVirtualDevices();
                 }
             }
+        }
+
+        // if listening socket is set, handle it
+        if(FD_ISSET(fdListen, &readfds)) {
+            chipInterface->acceptSocketIfNeededAndPossible();
         }
 
         // process the incoming data from original keyboard and from ST

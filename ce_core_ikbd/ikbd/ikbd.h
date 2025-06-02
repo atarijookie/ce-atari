@@ -31,6 +31,7 @@ typedef struct {
 
 #define UARTMARK_STCMD      0xAA
 #define UARTMARK_KEYBDATA   0xBB
+#define UARTMARK_ALIVE      0xEE
 
 typedef struct {
     int axis[JOYAXIS];
@@ -67,7 +68,7 @@ public:
     void processJoystick(js_event *jse, int joyNumber);
     void markVirtualMouseEvenTime(void);
 
-    void processReceivedCommands(bool skipKeyboardTranslation, int fdUartRead);
+    int processReceivedCommands(bool skipKeyboardTranslation, int fdUartRead);
 
 private:
     enum JoystickState {

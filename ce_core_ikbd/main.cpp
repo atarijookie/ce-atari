@@ -101,14 +101,15 @@ int runCore(void)
 
     Debug::out(LOG_INFO, "runCore as network server");
     chipInterface = new ChipInterfaceNetwork();     // create network chip interface
+    chipInterface->ciOpen();                    // listen for connections
 
     //------------------------------------
     // normal app run follows
     Debug::printfLogLevelString();
 
-    char appVersion[16];
-    Debug::out(LOG_INFO, "CosmosEx IKBD core starting at port %d, version: %s", flags.portClient, appVersion);
-    printf("\nCosmosEx IKBD core starting at port %d, version: %s\n", flags.portClient, appVersion);
+    Debug::out(LOG_INFO, "CosmosEx IKBD core starting at port %d", flags.portClient);
+    printf("\nCosmosEx IKBD core starting at port %d\n", flags.portClient);
+    printf("\nlog file: %s\n", Debug::getCoreLogFileName(false));
 
     Utils::setTimezoneVariable_inThisContext();
 
