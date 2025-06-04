@@ -8,6 +8,7 @@
 // tags to distinguish keyboard data from ST commands
 #define UARTMARK_STCMD      0xAA
 #define UARTMARK_KEYBDATA   0xBB
+#define UARTMARK_ALIVE      0xEE
 
 void setup() {
   Serial.begin(19200);    // TX and RX are connected to ESP32         -- PORTMUX - default setup of UART0 is on PA[3:0]
@@ -28,8 +29,17 @@ void setup() {
 
 void loop() {
   uint8_t data;
+  uint32_t lastAlive = 0xffff0000;
 
   while(true) {
+    uint32_t now = millis();
+
+    if((now - lastAlive) >= 1000) { // 1 second passed since last alive sing sent?
+      lastAlive = now;
+      Serial.write(UARTMARK_ALIVE); // send this mark twice - 1st will be detected as tag, the 2nd will be used as value and just read to be ignored
+      Serial.write(UARTMARK_ALIVE);
+    }
+
     if(Serial.available() > 0) {    // got data from ESP32?
       data = Serial.read();
       Serial1.write(data);
