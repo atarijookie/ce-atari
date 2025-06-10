@@ -59,8 +59,9 @@ int main(int argc, char *argv[])
     parseCmdLineArguments(argc, argv);                          // then parse cmd line arguments and set global variables
     Debug::printfLogLevelString();
 
-    Utils::loadDotEnv();                                        // load dotEnv before setting default log file
-    Debug::setDefaultLogFile();                // set log file after env vars available
+    Utils::loadDotEnv();            // load dotEnv before setting default log file
+    Debug::setDefaultLogFile();     // set log file after env vars available
+    Debug::logLevelFromDotEnv();
 
     ldp_setParam(1, (uint64_t) flags.logLevel);                         // libDOSpath - set log level to file
     std::string logDir = Utils::dotEnvValue("LOG_DIR", LOG_DIR_DEFAULT);  // path to logs dir

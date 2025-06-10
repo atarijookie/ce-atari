@@ -56,7 +56,8 @@ int main(int argc, char *argv[])
     Debug::printfLogLevelString();
 
     Utils::loadDotEnv();                                        // load dotEnv before setting default log file
-    Debug::getCoreLogFileName(true);        // call this with force=true to re-create the log file name
+    Debug::getCoreLogFileName(true);    // call this with force=true to re-create the log file name
+    Debug::logLevelFromDotEnv();        // set log level from .env value of LOG_LEVEL
 
     ldp_setParam(1, (uint64_t) flags.logLevel);                         // libDOSpath - set log level to file
     std::string logDir = Utils::dotEnvValue("LOG_DIR", LOG_DIR_DEFAULT);  // path to logs dir

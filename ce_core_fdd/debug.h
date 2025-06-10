@@ -23,6 +23,8 @@ typedef struct {
 class Debug
 {
 public:
+    static void logLevelFromDotEnv(void);
+
     static void out(int logLevel, const char *format, ...);
     static void outBfr(uint8_t *bfr, int count);
 

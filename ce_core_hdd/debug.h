@@ -22,6 +22,7 @@ typedef struct {
 class Debug
 {
 public:
+    static void logLevelFromDotEnv(void);
     static const char* getCoreLogFileName(bool forceCreate=false);
 
     static void out(int logLevel, const char *format, ...);

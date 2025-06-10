@@ -175,6 +175,8 @@ void Debug::setLogLevel(int newLogLevel)
     }
 
     Debug::out(LOG_INFO, "Switching LOG LEVEL from %d to %d", flags.logLevel, newLogLevel);
+    printf("Switching LOG LEVEL from %d to %d\n", flags.logLevel, newLogLevel);
+
     flags.logLevel = newLogLevel;                               // new value to struct
     ldp_setParam(1, (uint64_t) flags.logLevel);                 // libDOSpath - set new log level to file
 
@@ -202,4 +204,17 @@ FILE* Debug::logFileOpen(const char* logFileName)
 
     FILE *f = fopen(getCoreLogFileName(), "a+t");
     return f;
+}
+
+void Debug::logLevelFromDotEnv(void)
+{
+    std::string logLevelStr = Utils::dotEnvValue("LOG_LEVEL", "1");
+    int ll;
+
+    ll = (int) logLevelStr.c_str()[0];
+
+    if(ll >= 48 && ll <= 57) {                              // if it's a number between 0 and 9
+        ll = ll - 48;
+        Debug::setLogLevel(ll);                             // store log level
+    }
 }

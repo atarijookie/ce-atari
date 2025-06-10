@@ -45,8 +45,9 @@ int main(int argc, char *argv[])
     parseCmdLineArguments(argc, argv);                          // then parse cmd line arguments and set global variables
     Debug::printfLogLevelString();
 
-    Utils::loadDotEnv();                                        // load dotEnv before setting default log file
+    Utils::loadDotEnv();                    // load dotEnv before setting default log file
     Debug::getCoreLogFileName(true);        // call this with force=true to re-create the log file name
+    Debug::logLevelFromDotEnv();            // set log level from .env value of LOG_LEVEL
 
     preloadGlobalsFromDotEnv();
 
