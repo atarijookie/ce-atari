@@ -9,6 +9,7 @@
 #include "captive_portal.h"
 #include "rw_tasks.h"
 #include "display.h"
+#include "ikbd.h"
 
 Preferences preferences;
 
@@ -32,12 +33,15 @@ uint8_t enabledIDs;
 uint8_t isAcsiNotScsi;
 uint8_t busIdle;
 
+extern volatile bool ikbdEnabled;   // if true, should send data to host; otherwise just loopback ikdb data back
+extern volatile bool ikbdAlive;     // if true, data is comming from ikdb
+
 void handleButton(void);
 
 void setup(void)
 {
-    Serial.begin(115200);       // uart0 for debug strings
-    Serial1.begin(19200);       // uart1 for IKBD / eeprom chip
+    Serial.begin(115200);   // uart0 for debug strings
+    Serial1.begin(19200, SERIAL_8N1, PIN_RXD_IKBD, PIN_TXD_IKBD);   // uart1 for IKBD
 
     Serial.println("setup() starting");
 
@@ -64,6 +68,10 @@ void setup(void)
     enabledIDs = preferences.getUChar("ids", 0);
     preferences.end();
 
+    preferences.begin("ikbd", PREFERENCES_RO_MODE);
+    ikbdEnabled = preferences.getUChar("enabled", 1);
+    preferences.end();
+
     cmd = atnSendACSIcommand + TX_HEADER_SIZE;      // place command beyond the header
     state = STATE_GET_COMMAND;
 
@@ -79,6 +87,8 @@ void setup(void)
 #ifdef RW_TASKS
     createTasks();      // create the read / write tasks
 #endif
+
+    createIkbdTask();   // this task sends ikdb data to host and back
 
     displayInit();
 }
@@ -210,6 +220,72 @@ void loop(void)
     }
 }
 
+#define BTN_PRESS_SHORT     500
+#define BTN_PRESS_SAVE      2000
+#define BTN_PRESS_CAPTIVE   5000
+
+// This gets called on button pressed (current button state LOW) or released (current button state HIGH)
+void onButtonStateChanged(int buttonState, uint32_t now, uint32_t& buttonPressTime)
+{
+    // button state change to low, so button just pressed - store time, nothing more to do
+    if(buttonState == LOW)
+    {
+        buttonPressTime = now;
+        return;
+    }
+
+    //-------
+    // button state change to high, so button released
+    uint32_t pressDuration = now - buttonPressTime;
+
+    if(pressDuration < BTN_PRESS_SHORT)     // on short press, ikbd enable / disable
+    {
+        ikbdEnabled = !ikbdEnabled;
+    }
+
+    // on longer press, save ikbd enabled flag
+    if(pressDuration >= BTN_PRESS_SAVE && pressDuration < BTN_PRESS_CAPTIVE)
+    {
+        preferences.begin("ikbd", PREFERENCES_RW_MODE);
+        preferences.putUChar("enabled", ikbdEnabled);
+        preferences.end();
+    }
+
+    // on longest press, run captive portal
+    if(pressDuration >= BTN_PRESS_CAPTIVE)
+    {
+        runCaptivePortal();
+    }
+
+    showRunningStateOnDisplay();
+}
+
+// Gets called during the button is pressed down, used to show stuff on display for long press.
+void duringButtonPressed(uint32_t now, uint32_t& buttonPressTime)
+{
+    uint32_t pressDuration = now - buttonPressTime;
+
+    // press too short? nothing to show on display
+    if(pressDuration < BTN_PRESS_SAVE)
+    {
+        return;
+    }
+
+    // longer press? ask about saving ikbd settings
+    if(pressDuration >= BTN_PRESS_SAVE && pressDuration < BTN_PRESS_CAPTIVE)
+    {
+        displayMessage(NULL, "Store IKDB enabled?", NULL);
+    }
+
+    // longest press? ask about running captive portal
+    if(pressDuration >= BTN_PRESS_CAPTIVE)
+    {
+        displayMessage(NULL, "Run captive portal?", NULL);
+    }
+}
+
+// Check the button pressed / released state, check if button has been just pressed, released, 
+// or is being held down. Show stuff on display, handle button actions.
 void handleButton(void)
 {
     static uint32_t lastCheck = millis();
@@ -226,28 +302,18 @@ void handleButton(void)
 
     int buttonState = digitalRead(PIN_BOOT_BTN);    // read button
 
-    if(lastButtonState == buttonState)      // no change in button state? quit
-    {
-        return;
-    }
+    bool buttonStateChanged = (lastButtonState != buttonState);
     lastButtonState = buttonState;
 
-    if(buttonState == LOW)  // button now low, so button pressed
+    if(buttonStateChanged)      // button state changed? (e.g. pressed, released)
     {
-        buttonPressTime = now;
+        onButtonStateChanged(buttonState, now, buttonPressTime);
     }
-    else                    // button now high, so button released
+    else        // button state not changed (stayed released, stayed pressed)
     {
-        uint32_t pressDuration = now - buttonPressTime;
-
-        if(pressDuration < 500)     // on short press
+        if(buttonState == LOW)
         {
-
+            duringButtonPressed(now, buttonPressTime);
         }
-
-        if(pressDuration > 5000)    // on long press, run captive portal
-        {
-            runCaptivePortal();
-        }
-    }    
+    }
 }

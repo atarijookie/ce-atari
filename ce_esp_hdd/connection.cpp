@@ -37,6 +37,9 @@ extern bool dataReceived;
 
 bool connected;
 
+extern volatile bool ikbdEnabled;   // if true, should send data to host; otherwise just loopback ikdb data back
+extern volatile bool ikbdAlive;     // if true, data is comming from ikdb
+
 THeader hddHeader;      // keep the header global to preserve syncTag between calls
 
 void showRunningStateOnDisplay(void)
@@ -47,12 +50,16 @@ void showRunningStateOnDisplay(void)
     char msg2[64];
     sprintf(msg2, "host: %s", hostIpString.c_str());
 
-    String msg3 = "ids: ";
+    String msg3 = "devs: ";
     for(int i=0; i<8; i++) {
         if(enabledIDs & (1 << i)) {     // if ID bit enabled, add to string
             msg3 += i;
             msg3 += " ";
         }
+    }
+
+    if(ikbdEnabled && ikbdAlive) {      // if ikbd is working and enabled
+        msg3 += "IKBD";
     }
 
     displayMessage(msg1, msg2, msg3.c_str());
@@ -96,8 +103,6 @@ void connectToWifi(void)
 
     // no ssid and no passowrd? run captive portal
     if(ssid.length() == 0 && password.length() == 0) {
-        displayMessage("wifi creds needed", "Connect to this AP:", WIFI_CAPTIVE_AP_NAME);
-
         Serial.println("connectToWifi - no wifi settings, starting captive portal");
         runCaptivePortal();
     }

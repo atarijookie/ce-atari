@@ -4,6 +4,7 @@
 #include <WebServer.h>
 #include <DNSServer.h>
 
+#include "display.h"
 #include "defs.h"
 
 DNSServer dnsServer;
@@ -103,6 +104,7 @@ void handleNotFound(void)
 void runCaptivePortal(void)
 {
     Serial.println("runCaptivePortal() - now starting");
+    displayMessage("Captive portal running", "Connect to this AP:", WIFI_CAPTIVE_AP_NAME);
 
     // switch to access point mode
     WiFi.mode(WIFI_AP);
