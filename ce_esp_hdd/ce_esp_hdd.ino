@@ -34,14 +34,14 @@ uint8_t isAcsiNotScsi;
 uint8_t busIdle;
 
 extern volatile bool ikbdEnabled;   // if true, should send data to host; otherwise just loopback ikdb data back
-extern volatile bool ikbdAlive;     // if true, data is comming from ikdb
 
 void handleButton(void);
 
 void setup(void)
 {
     Serial.begin(115200);   // uart0 for debug strings
-    Serial1.begin(19200, SERIAL_8N1, PIN_RXD_IKBD, PIN_TXD_IKBD);   // uart1 for IKBD
+    Serial1.begin(7812, SERIAL_8N1, /* rxd pin */ PIN_KEYB_TX_ORIG, /* txd pin */ PIN_KEYB_TX); // uart1 for IKBD
+    Serial2.begin(7812, SERIAL_8N1, /* rxd pin */ PIN_KEYB_RX, /* txd pin */ PIN_TXD2);         // uart2 for IKBD
 
     Serial.println("setup() starting");
 

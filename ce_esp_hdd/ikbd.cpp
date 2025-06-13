@@ -11,51 +11,87 @@ extern NetworkClient clientIkbd;
 
 extern String hostIpString;
 extern uint16_t hostPortIkbd;
-extern bool connected;          // if true, wifi is connected
+extern bool connected;              // if true, wifi is connected
 
 volatile bool ikbdEnabled = true;   // if true, should send data to host; otherwise just loopback ikdb data back
-volatile bool ikbdAlive = false;    // if true, data is comming from ikdb
 
 TaskHandle_t xIkbdTask;
 
-void onIkdbDisabled(int availableSerial)
+#define IKBD_BFR_SIZE 128
+uint8_t buffer[IKBD_BFR_SIZE];
+
+void onIkdbDisabled(void)
 {
-    // data comes in as pairs (mark + value), so read it by pairs, when there is at least a pair of data available
-    while(availableSerial >= 2)
+    // ikbd not sending data (chip not present) or ikbd not enabled, but the ikbd socket is connected, then disconnect
+    // if any data comming from host via socket is available, read and and drop it
+    while(clientIkbd.available() > 0)
     {
-        uint8_t mark = Serial1.read();
-        uint8_t value = Serial1.read();
-        availableSerial -= 2;
+        int available = clientIkbd.available();
+        int readSize = MIN(available, IKBD_BFR_SIZE);
+        clientIkbd.read(buffer, readSize);
+    }
 
-        if(mark != UARTMARK_KEYBDATA) {     // ignore anything that's not the data from keyboard
-            continue;
-        }
+    while(Serial1.available() > 0)  // got data from KEYB_TX_ORIG? just send it back to KEYB_TX
+    {
+        uint8_t data = Serial1.read();
+        Serial1.write(data);
+    }
 
-        Serial1.write(value);               // write keyboard data back to serial
+    while(Serial2.available() > 0) {    // got data from Atari? Just read it and ignore it
+        Serial2.read();
     }
 }
 
-void onIkbdEnabled(int availableSerial)
+void onIkbdEnabled(void)
 {
-    #define IKBD_BFR_SIZE 128
-    uint8_t buffer[IKBD_BFR_SIZE];
     int readSize;
+    uint8_t data;
 
-    // got at least 2 bytes? read from serial, send to socket
-    if(availableSerial >= 2)
+    // keep sending forwarding data around until all the sources are empty
+    while(Serial1.available() || Serial2.available() || clientIkbd.available())
     {
-        readSize = MIN(availableSerial, IKBD_BFR_SIZE);
-        Serial1.read(buffer, readSize);
-        clientIkbd.write(buffer, readSize);
+        if(Serial1.available() > 0)     // got data from KEYB_TX_ORIG? send it to host with tag
+        {
+            data = Serial1.read();
+            clientIkbd.write(UARTMARK_KEYBDATA);
+            clientIkbd.write(data);
+        }
+
+        if(Serial2.available() > 0)     // got data from KEYB_RX? send it to host with tag
+        {
+            data = Serial2.read();
+            clientIkbd.write(UARTMARK_STCMD);
+            clientIkbd.write(data);
+        }
+
+        if(clientIkbd.available() > 0)  // got data from host? send it to Atari
+        {
+            data = clientIkbd.read();
+            Serial1.write(data);
+        }
     }
+}
 
-    // got something available from socket? read from socket, send to serial
-    int availableSock = clientIkbd.available();
-    if(availableSock > 0)
+void ikbdConnectDisconnect(void)
+{
+    if(ikbdEnabled)
     {
-        int readSize = MIN(availableSock, IKBD_BFR_SIZE);
-        readSize = clientIkbd.read(buffer, readSize);
-        Serial1.write(buffer, readSize);
+        // ikbd is enabled, ikdb chip is sending data (chip present), wifi is connected, but our ikbd socket is NOT connected, connect now
+        if(connected && !clientIkbd.connected())
+        {
+            Serial.println("I connect");
+            clientIkbd.connect(hostIpString.c_str(), hostPortIkbd);
+            clientIkbd.setNoDelay(true);
+        }
+    }
+    else
+    {
+        // ikbd not sending data (chip not present) or ikbd not enabled, but the ikbd socket is connected, then disconnect
+        if(clientIkbd.connected())
+        {
+            Serial.println("I disconnect");
+            clientIkbd.stop();
+        }
     }
 }
 
@@ -71,63 +107,30 @@ void taskIkbd(void* pvParameters)
         vTaskDelay(20);          // intentionally process only once a while
 
         uint32_t now = millis();
-        int availableSerial = Serial1.available();
 
-        if(availableSerial > 0)       // data available? mark current time as time when data was received
-        {
-            lastReceivedTime = now;
-        }
-
-        if((now - lastStatus) >= 1000)
+        if((now - lastStatus) >= 1000)  // once per second
         {
             lastStatus = now;
-/*
-            Serial.print("I alive ");
-            Serial.print(ikbdAlive);
-            Serial.print(" enabled ");
-            Serial.print(ikbdEnabled);
-            Serial.print(" connected ");
-            Serial.print(clientIkbd.connected());
-            Serial.print(" available ");
-            Serial.println(availableSerial);
-*/
+
+            if(clientIkbd.connected())  // if connected, send ALIVE mark and value every second
+            {
+                clientIkbd.write(UARTMARK_ALIVE);
+                clientIkbd.write(UARTMARK_ALIVE);
+            }
+
+            // Serial.print("I enabled "); Serial.print(ikbdEnabled); Serial.print(" connected "); Serial.println(clientIkbd.connected());
         }
 
-        ikbdAlive = (now - lastReceivedTime) < 5000;  // ikdb is alive when received data recently
-
-        // ikbd is enabled, ikdb chip is sending data (chip present), wifi is connected, but our ikbd socket is NOT connected, connect now
-        if(ikbdEnabled && ikbdAlive && connected && !clientIkbd.connected())
-        {
-            Serial.println("I connect");
-            clientIkbd.connect(hostIpString.c_str(), hostPortIkbd);
-            clientIkbd.setNoDelay(true);
-        }
-
-        // ikbd not sending data (chip not present) or ikbd not enabled, but the ikbd socket is connected, then disconnect
-        if((!ikbdAlive || !ikbdEnabled) && clientIkbd.connected())
-        {
-            Serial.println("I disconnect");
-            clientIkbd.stop();
-        }
-
-        // check what is the 1st byte in the received data, if it's not a know mark, just read it and ignore it
-        uint8_t firstByte = Serial1.peek();
-
-        if(firstByte != UARTMARK_STCMD && firstByte != UARTMARK_KEYBDATA && firstByte != UARTMARK_ALIVE) {
-            Serial1.read();
-            availableSerial--;
-        }
-
-        availableSerial = availableSerial & 0xfffffffe;     // remove lowest bit, turning available into even number
+        ikbdConnectDisconnect();
 
         // ikbd enabled and ikbd socket is connected? send and get data to/from host
         if(ikbdEnabled && clientIkbd.connected())
         {
-            onIkbdEnabled(availableSerial);
+            onIkbdEnabled();
         } 
         else    // ikbd disabled or just socket not connected to host? send data directly to Atari
         {
-            onIkdbDisabled(availableSerial);
+            onIkdbDisabled();
         }
     }
 }

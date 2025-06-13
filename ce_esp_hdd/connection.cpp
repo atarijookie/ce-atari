@@ -38,7 +38,6 @@ extern bool dataReceived;
 bool connected;
 
 extern volatile bool ikbdEnabled;   // if true, should send data to host; otherwise just loopback ikdb data back
-extern volatile bool ikbdAlive;     // if true, data is comming from ikdb
 
 THeader hddHeader;      // keep the header global to preserve syncTag between calls
 
@@ -58,7 +57,7 @@ void showRunningStateOnDisplay(void)
         }
     }
 
-    if(ikbdEnabled && ikbdAlive) {      // if ikbd is working and enabled
+    if(ikbdEnabled) {       // if ikbd is enabled
         msg3 += "IKBD";
     }
 
