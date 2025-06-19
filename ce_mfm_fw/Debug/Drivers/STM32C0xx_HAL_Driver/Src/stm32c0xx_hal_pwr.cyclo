@@ -1,0 +1,10 @@
+stm32c0xx_hal_pwr.c:73:6:HAL_PWR_DeInit	1
+stm32c0xx_hal_pwr.c:205:6:HAL_PWR_EnableWakeUpPin	1
+stm32c0xx_hal_pwr.c:226:6:HAL_PWR_DisableWakeUpPin	1
+stm32c0xx_hal_pwr.c:251:6:HAL_PWR_EnterSLEEPMode	2
+stm32c0xx_hal_pwr.c:300:6:HAL_PWR_EnterSTOPMode	2
+stm32c0xx_hal_pwr.c:344:6:HAL_PWR_EnterSTANDBYMode	1
+stm32c0xx_hal_pwr.c:371:6:HAL_PWR_EnableSleepOnExit	1
+stm32c0xx_hal_pwr.c:385:6:HAL_PWR_DisableSleepOnExit	1
+stm32c0xx_hal_pwr.c:399:6:HAL_PWR_EnableSEVOnPend	1
+stm32c0xx_hal_pwr.c:412:6:HAL_PWR_DisableSEVOnPend	1

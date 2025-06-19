@@ -1,0 +1,6 @@
+stm32c0xx_it.c:70:6:NMI_Handler	1
+stm32c0xx_it.c:85:6:HardFault_Handler	1
+stm32c0xx_it.c:100:6:SVC_Handler	1
+stm32c0xx_it.c:113:6:PendSV_Handler	1
+stm32c0xx_it.c:126:6:SysTick_Handler	1
+stm32c0xx_it.c:147:6:TIM1_BRK_UP_TRG_COM_IRQHandler	1

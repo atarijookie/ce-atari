@@ -1,0 +1,15 @@
+../Drivers/STM32C0xx_HAL_Driver/Src/stm32c0xx_hal_dma.c:151:19:HAL_DMA_Init	16	static
+../Drivers/STM32C0xx_HAL_Driver/Src/stm32c0xx_hal_dma.c:242:19:HAL_DMA_DeInit	16	static
+../Drivers/STM32C0xx_HAL_Driver/Src/stm32c0xx_hal_dma.c:346:19:HAL_DMA_Start	32	static
+../Drivers/STM32C0xx_HAL_Driver/Src/stm32c0xx_hal_dma.c:393:19:HAL_DMA_Start_IT	32	static
+../Drivers/STM32C0xx_HAL_Driver/Src/stm32c0xx_hal_dma.c:467:19:HAL_DMA_Abort	16	static
+../Drivers/STM32C0xx_HAL_Driver/Src/stm32c0xx_hal_dma.c:528:19:HAL_DMA_Abort_IT	24	static
+../Drivers/STM32C0xx_HAL_Driver/Src/stm32c0xx_hal_dma.c:593:19:HAL_DMA_PollForTransfer	32	static
+../Drivers/STM32C0xx_HAL_Driver/Src/stm32c0xx_hal_dma.c:725:6:HAL_DMA_IRQHandler	24	static
+../Drivers/STM32C0xx_HAL_Driver/Src/stm32c0xx_hal_dma.c:819:19:HAL_DMA_RegisterCallback	32	static
+../Drivers/STM32C0xx_HAL_Driver/Src/stm32c0xx_hal_dma.c:871:19:HAL_DMA_UnRegisterCallback	24	static
+../Drivers/STM32C0xx_HAL_Driver/Src/stm32c0xx_hal_dma.c:949:22:HAL_DMA_GetState	16	static
+../Drivers/STM32C0xx_HAL_Driver/Src/stm32c0xx_hal_dma.c:961:10:HAL_DMA_GetError	16	static
+../Drivers/STM32C0xx_HAL_Driver/Src/stm32c0xx_hal_dma.c:987:13:DMA_SetConfig	24	static
+../Drivers/STM32C0xx_HAL_Driver/Src/stm32c0xx_hal_dma.c:1030:13:DMA_CalcDMAMUXChannelBaseAndMask	24	static
+../Drivers/STM32C0xx_HAL_Driver/Src/stm32c0xx_hal_dma.c:1050:13:DMA_CalcDMAMUXRequestGenBaseAndMask	24	static
