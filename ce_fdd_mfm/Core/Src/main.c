@@ -80,8 +80,8 @@ TIM_HandleTypeDef htim16;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_TIM3_Init(void);
 static void MX_SPI1_Init(void);
+static void MX_TIM3_Init(void);
 static void MX_TIM16_Init(void);
 /* USER CODE BEGIN PFP */
 
@@ -133,7 +133,7 @@ void updateWriteData(uint32_t duration)
     if(bits >= 8) {         // got 8 bits?
         // tx buffer not full? add streamByte to tx buffer
         if(txCnt < BFR_SIZE) {
-            TX_ADD(streamByte);
+            TX_PUT(streamByte);
         }
         bits = 0;           // don't have bits now
     }
@@ -169,16 +169,13 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_TIM3_Init();
   MX_SPI1_Init();
+  MX_TIM3_Init();
   MX_TIM16_Init();
   /* USER CODE BEGIN 2 */
 
   TX_CLEAR();
   RX_CLEAR();
-
-  uint8_t writingNow = (GPIOA->IDR & PIN_WGATE) == 0;     // true if now writing data
-  uint8_t data;
 
   /* USER CODE END 2 */
 
@@ -186,11 +183,11 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    writingNow = (GPIOA->IDR & PIN_WGATE) == 0;     // true if now writing data (0.3 us)
+    uint8_t writingNow = (GPIOA->IDR & PIN_WGATE) == 0;     // true if now writing data (0.3 us)
 
     if(writingNow)  // when writing to floppy
     {
-        RX_CLEAR();     // clear RX buffer (0.3 us)
+        RX_CLEAR();
 
         // CC1IF bit set? input capture happened
         /* Takes 2.61 us when also storing byte to circular buffer,
@@ -203,11 +200,7 @@ int main(void)
             updateWriteData(captured);            // send the input WDATA to buffer
         }
 
-        if(SPI1->SR & SPI_SR_RXNE) {             // if RXNE, just read it to avoid overflow
-            data = SPI1->DR;
-        }
-
-        GPIOA->BSRR = (txCnt > 32) ? PIN_HALF_EMPTY : (PIN_HALF_EMPTY << 16);    // H if something in TX fifo, L when TX fifo empty
+        GPIOA->BSRR = (txCnt >= BFR_SIZE_HALF) ? PIN_HALF_EMPTY : (PIN_HALF_EMPTY << 16);    // H if a bunch of data can be read from RX buffer
     }
     else    // when reading from floppy
     {
@@ -221,23 +214,22 @@ int main(void)
            updateReadTimer();
         }
 
-        // RXNE? read data, place it in RX buffer if have space
-        /* takes 1.29 us, happens every 8 us */
-        if(SPI1->SR & SPI_SR_RXNE) {
-            data = SPI1->DR;
-            if(rxCnt < BFR_SIZE) {
-                RX_ADD(data);
-            }
-        }
+        GPIOA->BSRR = (rxCnt <= BFR_SIZE_HALF) ? PIN_HALF_EMPTY : (PIN_HALF_EMPTY << 16);    // H if read buffer getting low
+    }
 
-        GPIOA->BSRR = (rxCnt < 32) ? PIN_HALF_EMPTY : (PIN_HALF_EMPTY << 16);    // H if something in RX fifo, L when RX fifo empty
+    // RXNE? read data, place it in RX buffer if have space
+    /* takes 1.29 us, happens every 8 us */
+    if(SPI1->SR & SPI_SR_RXNE) {
+        uint8_t data = SPI1->DR;
+        if(rxCnt < BFR_SIZE) {
+            RX_PUT(data);
+        }
     }
 
     // TXE? if have TX data in TX buffer, place it in DR
     /* takes 1.05 us, happens every 8 us */
     if(SPI1->SR & SPI_SR_TXE) {
-        data = (txCnt > 0) ? TX_GET() : 0;
-        SPI1->DR = data;
+        SPI1->DR = (txCnt > 0) ? TX_GET() : 0;
     }
 
     /* USER CODE END WHILE */
