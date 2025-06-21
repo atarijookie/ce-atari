@@ -174,67 +174,72 @@ int main(void)
   MX_TIM16_Init();
   /* USER CODE BEGIN 2 */
 
+  TX_CLEAR();
+  RX_CLEAR();
+
+  uint8_t writingNow = (GPIOA->IDR & PIN_WGATE) == 0;     // true if now writing data
+  uint8_t data;
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    uint8_t writingNow = (GPIOA->IDR & PIN_WGATE) == 0;     // true if now writing data
+    writingNow = (GPIOA->IDR & PIN_WGATE) == 0;     // true if now writing data (0.3 us)
 
-    // CC1IF bit set? input capture happened
-    /* Takes 2.61 us when also storing byte to circular buffer,
-     * takes 1.81 us when just storing bits, not adding to circular buffer.
-     * Can happen in 4 us intervals (min), but up to 6 us or 8 us also.
-     */
-    if (TIM16->SR & TIM_SR_CC1IF) {
-      TIM16->SR = ~TIM_SR_CC1IF;          // Clear the flag
-      uint32_t captured = TIM16->CCR1;
+    if(writingNow)  // when writing to floppy
+    {
+        RX_CLEAR();     // clear RX buffer (0.3 us)
 
-      // only if WGATE is L, send the input WDATA to buffer
-      if(writingNow) {
-          updateWriteData(captured);
-      }
-    }
-
-    // overflow of TIM3 occurred (UIF flag set)? stream next mfm symbol
-    /* Takes 2.16 us when getting byte from circular buffer
-     * takes 0.86 us when just using previously fetched byte.
-     * Can happen in 4 us intervals (min), but up to 6 us or 8 us also.
-     */
-    if((TIM3->SR & TIM_SR_UIF) != 0) {
-       TIM3->SR = ~TIM_SR_UIF;             // clear UIF flag
-       updateReadTimer();
-
-       // if now writing and we updated read stream, jump back to start of loop
-       // to handle potential write again
-       if(writingNow) {
-         continue;
-       }
-    }
-
-    // RXNE? read data, place it in RX buffer if have space
-    /* takes 1.29 us, happens every 8 us */
-    if(SPI1->SR & SPI_SR_RXNE) {
-        uint8_t data = SPI1->DR;
-        if(rxCnt < BFR_SIZE) {
-            RX_ADD(data);
+        // CC1IF bit set? input capture happened
+        /* Takes 2.61 us when also storing byte to circular buffer,
+         * takes 1.81 us when just storing bits, not adding to circular buffer.
+         * Can happen in 4 us intervals (min), but up to 6 us or 8 us also.
+         */
+        if (TIM16->SR & TIM_SR_CC1IF) {
+            TIM16->SR = ~TIM_SR_CC1IF;            // Clear the flag
+            uint32_t captured = TIM16->CCR1;
+            updateWriteData(captured);            // send the input WDATA to buffer
         }
 
-        // the buffer contains less data than half of its size, we can receive more
-        if(rxCnt < BFR_SIZE_HALF) {
-            GPIOA->BSRR = PIN_HALF_EMPTY;       // pin to H
-        } else {    // the buffer is half full, don't receive more
-            GPIOA->BRR = PIN_HALF_EMPTY;        // pin to L
+        if(SPI1->SR & SPI_SR_RXNE) {             // if RXNE, just read it to avoid overflow
+            data = SPI1->DR;
         }
+
+        GPIOA->BSRR = (txCnt > 32) ? PIN_HALF_EMPTY : (PIN_HALF_EMPTY << 16);    // H if something in TX fifo, L when TX fifo empty
+    }
+    else    // when reading from floppy
+    {
+        // overflow of TIM3 occurred (UIF flag set)? stream next mfm symbol
+        /* Takes 2.16 us when getting byte from circular buffer
+         * takes 0.86 us when just using previously fetched byte.
+         * Can happen in 4 us intervals (min), but up to 6 us or 8 us also.
+         */
+        if((TIM3->SR & TIM_SR_UIF) != 0) {
+           TIM3->SR = ~TIM_SR_UIF;             // clear UIF flag
+           updateReadTimer();
+        }
+
+        // RXNE? read data, place it in RX buffer if have space
+        /* takes 1.29 us, happens every 8 us */
+        if(SPI1->SR & SPI_SR_RXNE) {
+            data = SPI1->DR;
+            if(rxCnt < BFR_SIZE) {
+                RX_ADD(data);
+            }
+        }
+
+        GPIOA->BSRR = (rxCnt < 32) ? PIN_HALF_EMPTY : (PIN_HALF_EMPTY << 16);    // H if something in RX fifo, L when RX fifo empty
     }
 
     // TXE? if have TX data in TX buffer, place it in DR
     /* takes 1.05 us, happens every 8 us */
     if(SPI1->SR & SPI_SR_TXE) {
-        uint8_t data = (txCnt > 0) ? TX_GET() : 0;
+        data = (txCnt > 0) ? TX_GET() : 0;
         SPI1->DR = data;
     }
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
