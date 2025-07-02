@@ -33,6 +33,13 @@
 #define CMD_FRANZ_SOUND_ON          0xc1        // do floppy seek sound
 #define CMD_FRANZ_SOUND_OFF         0xc2        // don't make the floppy seek sound
 
+typedef struct {
+    int         fdClient;           // tcp socket fd
+    uint32_t    ipAddr;             // client's IP addr
+    int         floppySlotindex;    // which floppy slot this IP is using
+    uint32_t    lastMs;             // value of getCurrentMs() when was last time anything was received from this client
+} ClientInfo;
+
 class ChipInterfaceNetwork
 {
 public:
@@ -62,8 +69,7 @@ private:
     uint32_t lastTimeRecv;
 
     int fdListen;                       // socket for listen()
-    int fdClients[MAX_CLIENTS];         // socket received on accept()
-    uint32_t clientLastMs[MAX_CLIENTS]; // value of getCurrentMs() when was last time anything was received from this client
+    ClientInfo clients[MAX_CLIENTS];
 
     struct sockaddr_in addressListen;
 
@@ -81,7 +87,6 @@ private:
 
     int setAllClientFds(fd_set* readfds);
     void handleAllReadyClients(fd_set* readfds);
-    int disconnectInactiveClients(void);
 
     bool waitForAtn(int& fdClient, int atnIdWant, uint8_t atnCode, uint32_t timeoutMs, uint8_t *inBuf);
 
@@ -89,7 +94,15 @@ private:
     bool sendDataToChip(int& fdClient, uint8_t* data, uint32_t len);                               // send data to chip  
     bool sendHeaderAndDataToChip(int& fdClient, uint16_t cmdCode, uint8_t* data, uint32_t len);    // send header and data to chip
     void storeHeaderToBuffer(uint16_t cmdCode, uint32_t futureDatalen, uint8_t* buffer);
-    int getEmptyClientIndex(void);
+
+    //-----------
+    void clientsClearOne(ClientInfo* info);     // clear data structure of one clients
+    void clientsClearAll(void);                 // clear data structure of all clients
+    void clientsCloseOne(ClientInfo* info);     // closes socket if open, then does clientsClearOne()
+    int  clientsGetEmptyIndex(void);
+    int  clientsGetFloppySlotIndexForIp(uint32_t ipAddr);
+    void clientsStoreOne(ClientInfo* info, int newSock, uint32_t ipAddr);
+    void clientsDisconnectInactive(void);
 };
 
 #endif // __CHIPINTERFACENETWORK_H__

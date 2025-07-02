@@ -37,10 +37,7 @@ ChipInterfaceNetwork::ChipInterfaceNetwork()
 {
     fdListen = FD_EMPTY;
 
-    for(int i=0; i<MAX_CLIENTS; i++) {
-        fdClients[i] = FD_EMPTY;
-        clientLastMs[i] = 0;
-    }
+    clientsClearAll();
 
     bufOut = new uint8_t[MFM_STREAM_SIZE];
     bufIn = new uint8_t[MFM_STREAM_SIZE];
@@ -55,17 +52,6 @@ ChipInterfaceNetwork::~ChipInterfaceNetwork()
 {
     delete []bufOut;
     delete []bufIn;
-}
-
-int ChipInterfaceNetwork::getEmptyClientIndex(void)
-{
-    for(int i=0; i<MAX_CLIENTS; i++) {
-        if(fdClients[i] == FD_EMPTY) {
-            return i;
-        }
-    }
-
-    return FD_EMPTY;
 }
 
 void ChipInterfaceNetwork::createListeningSocket(void)
@@ -112,12 +98,14 @@ void ChipInterfaceNetwork::createListeningSocket(void)
 
 void ChipInterfaceNetwork::acceptSocketIfNeededAndPossible(void)
 {
-    int idx = getEmptyClientIndex();
+    int idx = clientsGetEmptyIndex();
 
     // out of empty indexes, don't accept
     if(idx < 0 || idx >= MAX_CLIENTS) {
         return;
     }
+
+    ClientInfo* clientInfo = &clients[idx];
 
     // don't have client socket, try accept()
     struct sockaddr_in addressClient;
@@ -138,14 +126,14 @@ void ChipInterfaceNetwork::acceptSocketIfNeededAndPossible(void)
     int flag = 1;
     setsockopt(newSock, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
 
-    // got the new client socket now
-    fdClients[idx] = newSock;
-    clientLastMs[idx] = Utils::getCurrentMs();
-
     char clientIp[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &addressClient.sin_addr, clientIp, sizeof(clientIp));
+    uint32_t clientIpInt = ntohl(addressClient.sin_addr.s_addr);
 
-    Debug::out(LOG_INFO, "acceptSocketIfNeededAndPossible() - client #%d connected from %s", idx, clientIp);
+    // got the new client socket now
+    clientsStoreOne(clientInfo, newSock, clientIpInt);
+
+    Debug::out(LOG_INFO, "acceptSocketIfNeededAndPossible() - client #%d connected from %s, will use floppy slot #%d", idx, clientIp, clientInfo->floppySlotindex);
 }
 
 void ChipInterfaceNetwork::closeClientSocket(int& fdClient)
@@ -167,31 +155,8 @@ void ChipInterfaceNetwork::ciClose(void)
     Utils::closeFdIfOpen(fdListen);
 
     for(int i=0; i<MAX_CLIENTS; i++) {
-        Utils::closeFdIfOpen(fdClients[i]);
+       clientsCloseOne(&clients[i]);
     }
-}
-
-int ChipInterfaceNetwork::disconnectInactiveClients(void)
-{
-    int maxFd = FD_EMPTY;
-    uint32_t now = Utils::getCurrentMs();
-
-    for(int i=0; i<MAX_CLIENTS; i++) {
-        if(fdClients[i] == FD_EMPTY) {      // no client at this index? skip
-            continue;
-        }
-
-        // there hasn't been any data from this client for some time? close connection
-        uint32_t diff = now - clientLastMs[i];
-
-        if(diff > 15000) {
-            Utils::closeFdIfOpen(fdClients[i]);
-            clientLastMs[i] = 0;
-            Debug::out(LOG_INFO, "disconnected inactive client #%i", i);
-        }
-    }
-
-    return maxFd;
 }
 
 int ChipInterfaceNetwork::setAllClientFds(fd_set* readfds)
@@ -199,9 +164,10 @@ int ChipInterfaceNetwork::setAllClientFds(fd_set* readfds)
     int maxFd = FD_EMPTY;
 
     for(int i=0; i<MAX_CLIENTS; i++) {
-        if(fdClients[i] != FD_EMPTY) {      // got this client?
-            FD_SET(fdClients[i], readfds);
-            maxFd = MAX(fdClients[i], maxFd);
+        int fdClient = clients[i].fdClient;
+        if(fdClient != FD_EMPTY) {      // got this client?
+            FD_SET(fdClient, readfds);
+            maxFd = MAX(fdClient, maxFd);
         }
     }
 
@@ -211,18 +177,17 @@ int ChipInterfaceNetwork::setAllClientFds(fd_set* readfds)
 void ChipInterfaceNetwork::handleAllReadyClients(fd_set* readfds)
 {
     for(int i=0; i<MAX_CLIENTS; i++) {
-        if(fdClients[i] == FD_EMPTY) {      // no client here? skip it
+        if(clients[i].fdClient == FD_EMPTY) {           // no client here? skip it
             continue;
         }
 
-        if(FD_ISSET(fdClients[i], readfds)) {           // this fd read for read?
-            // fdClients[i]
+        if(FD_ISSET(clients[i].fdClient, readfds)) {           // this fd read for read?
             int bytesRead = 0;
 
             // TODO: handle data
 
             if(bytesRead > 0) {     // something was read, mark client as active
-                clientLastMs[i] = Utils::getCurrentMs();
+                clients[i].lastMs = Utils::getCurrentMs();
             }
         }
     }
@@ -486,3 +451,88 @@ void ChipInterfaceNetwork::setFDDconfig(bool setFloppyConfig, FloppyConfig* fddC
     // }
 }
 
+void ChipInterfaceNetwork::clientsClearOne(ClientInfo* info)
+{
+    info->fdClient = FD_EMPTY;
+    info->ipAddr = 0;
+    info->floppySlotindex = FD_EMPTY;
+    info->lastMs = 0;
+}
+
+void ChipInterfaceNetwork::clientsClearAll(void)
+{
+    for(int i=0; i<MAX_CLIENTS; i++) {
+        clientsClearOne(&clients[i]);
+    }
+}
+
+// closes socket if open, then does clientsClearOne()
+void ChipInterfaceNetwork::clientsCloseOne(ClientInfo* info)
+{
+    Utils::closeFdIfOpen(info->fdClient);
+    clientsClearOne(info);
+}
+
+int ChipInterfaceNetwork::clientsGetEmptyIndex(void)
+{
+    for(int i=0; i<MAX_CLIENTS; i++) {
+        if(clients[i].fdClient == FD_EMPTY) {   // if this slot is empty, return it's index
+            return i;
+        }
+    }
+
+    return FD_EMPTY;        // nothing is empty
+}
+
+int ChipInterfaceNetwork::clientsGetFloppySlotIndexForIp(uint32_t ipAddr)
+{
+    uint32_t usedSlots = 0;
+
+    // check if this ip is already using some slot and build usedSlots bits
+    for(int i=0; i<MAX_CLIENTS; i++) {
+        if(clients[i].ipAddr == ipAddr) {   // if this slot is already using this ipAddress, return the floppy slot
+            return clients[i].floppySlotindex;
+        }
+
+        if(clients[i].floppySlotindex != FD_EMPTY) {        // this client has a floppy slot, add its bit to usedSlots
+            usedSlots |= (1 << clients[i].floppySlotindex);
+        }
+    }
+
+    // find a floppy slot that is not used
+    for(int i=0; i<MAX_CLIENTS; i++) {
+        if((usedSlots & (1 << i)) == 0) {       // floppy slot i not used, return it
+            return i;
+        }
+    }
+
+    // no empty floppy slot found
+    return FD_EMPTY;
+}
+
+void ChipInterfaceNetwork::clientsStoreOne(ClientInfo* info, int newSock, uint32_t ipAddr)
+{
+    info->fdClient = newSock;
+    info->lastMs = Utils::getCurrentMs();
+    info->ipAddr = ipAddr;
+    info->floppySlotindex = clientsGetFloppySlotIndexForIp(ipAddr);
+}
+
+void ChipInterfaceNetwork::clientsDisconnectInactive(void)
+{
+    uint32_t now = Utils::getCurrentMs();
+
+    for(int i=0; i<MAX_CLIENTS; i++) {
+        if(clients[i].fdClient == FD_EMPTY) {      // no client at this index? skip
+            continue;
+        }
+
+        // there hasn't been any data from this client for some time? close connection
+        uint32_t diff = now - clients[i].lastMs;
+
+        if(diff > 15000) {
+            clientsCloseOne(&clients[i]);
+            Debug::out(LOG_INFO, "disconnected inactive client #%i", i);
+        }
+    }
+}

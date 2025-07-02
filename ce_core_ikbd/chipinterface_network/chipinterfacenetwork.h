@@ -35,7 +35,6 @@ private:
     uint32_t clientLastMs[MAX_CLIENTS]; // value of getCurrentMs() when was last time anything was received from this client
 
     struct sockaddr_in addressListen;
-    struct sockaddr_in addressReport;
 
     void createListeningSocket(void);
     int getEmptyClientIndex(void);
