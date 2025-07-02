@@ -20,6 +20,7 @@
 #include "../debug.h"
 #include "../global.h"
 #include "../update.h"
+#include "../ccorethread.h"
 
 extern TFlags    flags;                 // global flags from command line
 
@@ -44,8 +45,6 @@ ChipInterfaceNetwork::ChipInterfaceNetwork()
 
     gotAtnId = 0;
     gotAtnCode = 0;
-
-    lastTimeRecv = Utils::getCurrentMs();
 }
 
 ChipInterfaceNetwork::~ChipInterfaceNetwork()
@@ -174,19 +173,17 @@ int ChipInterfaceNetwork::setAllClientFds(fd_set* readfds)
     return maxFd;
 }
 
-void ChipInterfaceNetwork::handleAllReadyClients(fd_set* readfds)
+void ChipInterfaceNetwork::handleAllReadyClients(fd_set* readfds, CCoreThread* core)
 {
     for(int i=0; i<MAX_CLIENTS; i++) {
         if(clients[i].fdClient == FD_EMPTY) {           // no client here? skip it
             continue;
         }
 
-        if(FD_ISSET(clients[i].fdClient, readfds)) {           // this fd read for read?
-            int bytesRead = 0;
+        if(FD_ISSET(clients[i].fdClient, readfds)) {    // this fd read for read?
+            bool hadData = core->handleOneClient(clients[i].fdClient, clients[i].floppySlotindex);
 
-            // TODO: handle data
-
-            if(bytesRead > 0) {     // something was read, mark client as active
+            if(hadData) {       // something was read, mark client as active
                 clients[i].lastMs = Utils::getCurrentMs();
             }
         }
@@ -205,19 +202,11 @@ bool ChipInterfaceNetwork::actionNeeded(int& fdClient, uint8_t *inBuf)
     int bytesAvailable;
     int rv = ioctl(fdClient, FIONREAD, &bytesAvailable);    // how many bytes we can read?
 
-    uint32_t now = Utils::getCurrentMs();
-
     if(rv < 0 || bytesAvailable <= 0) {                     // ioctl fail or nothing to read? no action needed
-        if((now - lastTimeRecv) > 5000) {
-            Utils::closeFdIfOpen(fdClient);
-            Debug::out(LOG_INFO, "actionNeeded() - no client data for some time, disconnecting");
-        }
-
         return false;
     }
-    Debug::out(LOG_DEBUG, "actionNeeded() - bytesAvailable: %d", bytesAvailable);
 
-    lastTimeRecv = now;       // last time we've something received - now
+    Debug::out(LOG_DEBUG, "actionNeeded() - bytesAvailable: %d", bytesAvailable);
 
     // if waitForAtn() succeeds, it fills 8 bytes of data in buffer
     // ...but then we might need some little more, so let's determine what it was
@@ -536,3 +525,9 @@ void ChipInterfaceNetwork::clientsDisconnectInactive(void)
         }
     }
 }
+
+int ChipInterfaceNetwork::getFdListen(void)
+{
+    return fdListen;
+}
+

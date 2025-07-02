@@ -5,7 +5,6 @@
 #include <cstdio>
 
 #define CORE_IKBD_LOG_FILENAME   "core_ikbd.log"
-#define IKBD_LOG_FILENAME        "ikbd.log"
 
 #define LOG_OFF         0
 #define LOG_INFO        1       // info         - info which can be displayed when running at user's place

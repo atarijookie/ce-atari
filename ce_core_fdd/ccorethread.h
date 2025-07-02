@@ -16,7 +16,7 @@ class ScreencastService;
 class RetryModule;
 class ExtensionHandler;
 
-#define INBUF_SIZE  32
+#define INBUF_SIZE  16384
 
 class CCoreThread: public ISettingsUser
 {
@@ -24,13 +24,12 @@ public:
     CCoreThread();
     virtual ~CCoreThread();
 
-    void resetHansAndFranz(void);
     void run(void);
 
-    void sendHalfWord(void);
     virtual void reloadSettings(int type);                                  // from ISettingsUser
 
     void setFloppyImageLed(int ledNo);
+    bool handleOneClient(int fdClient, int floppySlotindex);
 
 private:
     bool shouldRun;
@@ -43,23 +42,6 @@ private:
     SettingsReloadProxy     settingsReloadProxy;
 
     void loadSettings(void);
-
-    //-----------------------------------
-    // hard disk stuff
-    bool            setEnabledIDbits;
-    AcsiIDinfo      acsiIdInfo;
-    RetryModule     *retryMod;
-
-    bool handleHdd(uint8_t* inBuff);
-    void handleAcsiCommand(uint8_t *bufIn);
-
-    //-----------------------------------
-    // handle FW version
-    void handleFwVersion_hans(void);
-    void handleFwVersion_franz(void);
-
-    void saveHwConfig(void);
-    void getIdBits(uint8_t &enabledIDbits, uint8_t &sdCardAcsiId);
 
     //-----------------------------------
     // floppy stuff
@@ -76,27 +58,21 @@ private:
     int                 newFloppyImageLed;
     int                 newFloppyImageLedAfterEncode;
 
-    bool handleFdd(uint8_t* inBuff);
-    void handleSendTrack(uint8_t *inBuf);
-    void handleSectorWritten(void);
+    bool handleFdd(int fdClient, uint8_t* inBuff);
+    void handleFwVersion_franz(int fdClient);
+    void handleSendTrack(int fdClient, uint8_t *inBuf);
+    void handleSectorWritten(int fdClient);
 
     //----------------------------------
     // recovery stuff
-    void handleRecoveryCommands(int recoveryLevel);
-    void deleteSetting(void);
     void insertSpecialFloppyImage(int specialImageId);
 
     //----------------------------------
     // other
-    void showHwVersion(void);
-
     void sharedObjects_create(void);
     void sharedObjects_destroy(void);
 
-    void fillDisplayLines(void);
     void displayStatusToConsole(uint32_t now);
-
-    void handleOtherStuff(void);
 };
 
 class LoadTracker {

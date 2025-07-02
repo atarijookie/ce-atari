@@ -5,6 +5,9 @@
 #include <stdint.h>
 #include <pthread.h>
 
+#define SERVER_TCP_PORT_FDD         7400        // port used by FDD core
+#define SERVER_TCP_PORT_IKBD        7401        // port used by IKBD core
+
 typedef struct {
     bool justShowHelp;          // show possible command line arguments and quit
     int  logLevel;              // init current log level to LOG_ERROR

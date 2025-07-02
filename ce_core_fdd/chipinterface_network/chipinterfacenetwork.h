@@ -40,16 +40,20 @@ typedef struct {
     uint32_t    lastMs;             // value of getCurrentMs() when was last time anything was received from this client
 } ClientInfo;
 
+class CCoreThread;
+
 class ChipInterfaceNetwork
 {
 public:
-    ChipInterfaceNetwork();
-    virtual ~ChipInterfaceNetwork();
+ChipInterfaceNetwork();
+virtual ~ChipInterfaceNetwork();
 
     //----------------
     // chip interface initialization and deinitialization - e.g. open GPIO, or open socket, ...
     bool ciOpen(void);
     void ciClose(void);
+
+    int getFdListen(void);
 
     //----------------
     // if following function returns true, some command is waiting for action in the inBuf and hardNotFloppy flag distiguishes hard-drive or floppy-drive command
@@ -65,9 +69,13 @@ public:
 
     void setFDDconfig(bool setFloppyConfig, FloppyConfig* fddConfig, bool setDiskChanged, bool diskChanged);
 
-private:
-    uint32_t lastTimeRecv;
+    // the following ones are called from CCoreThread
+    void clientsDisconnectInactive(void);
+    int setAllClientFds(fd_set* readfds);
+    void handleAllReadyClients(fd_set* readfds, CCoreThread* core);
+    void acceptSocketIfNeededAndPossible(void);
 
+private:
     int fdListen;                       // socket for listen()
     ClientInfo clients[MAX_CLIENTS];
 
@@ -81,12 +89,8 @@ private:
     BufferedReader bufReader;
 
     void createListeningSocket(void);
-    void acceptSocketIfNeededAndPossible(void);
     void closeClientSocket(int& fdClient);
     uint32_t recvFromClient(int& fdClient, uint8_t* buf, int maxLen);
-
-    int setAllClientFds(fd_set* readfds);
-    void handleAllReadyClients(fd_set* readfds);
 
     bool waitForAtn(int& fdClient, int atnIdWant, uint8_t atnCode, uint32_t timeoutMs, uint8_t *inBuf);
 
@@ -102,7 +106,6 @@ private:
     int  clientsGetEmptyIndex(void);
     int  clientsGetFloppySlotIndexForIp(uint32_t ipAddr);
     void clientsStoreOne(ClientInfo* info, int newSock, uint32_t ipAddr);
-    void clientsDisconnectInactive(void);
 };
 
 #endif // __CHIPINTERFACENETWORK_H__

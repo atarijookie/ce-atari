@@ -37,10 +37,6 @@ public:
     static void mergeFilenameAndExtension(const std::string& shortFn, const std::string& shortExt, bool extendWithSpaces, std::string& merged);
     static void extendWithSpaces(const char *normalFname, char *extendedFn);
 
-    static void resetHansAndFranz(void);
-    static void resetHans(void);
-    static void resetFranz(void);
-
     static bool copyFile(std::string &src, std::string &dst);
     static bool copyFile(FILE *from, std::string &dst);
     static int  mkpath(const char *dir, int mode);

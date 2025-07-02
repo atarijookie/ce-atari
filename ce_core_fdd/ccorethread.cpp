@@ -44,7 +44,6 @@ CCoreThread::CCoreThread()
 {
     Update::initialize();
 
-    setEnabledIDbits        = false;
     setEnabledFloppyImgs    = false;
     setNewFloppyImageLed    = false;
     setFloppyConfig         = false;
@@ -87,122 +86,85 @@ void CCoreThread::sharedObjects_destroy(void)
 
 void CCoreThread::run(void)
 {
-    // inBuff might contain whole written floppy sector + header size
-    uint8_t inBuff[INBUF_SIZE], outBuf[INBUF_SIZE];
-
-    memset(outBuf, 0, INBUF_SIZE);
-    memset(inBuff, 0, INBUF_SIZE);
-
     loadSettings();
-
-    bool needsAction;
 
     load.clear();                               // clear load counter
 
-    // The loop count and no-sleep-loops-count will allow us to avoid handling other stuff and sleeping
-    // when there was a command from HDD or FDD, which we want to handle without further delays.
-    #define NO_SLEEP_LOOPS_AFTER_COMMAND    10000
-    int loopCount = 0;
+    int max_fd;
+    fd_set readfds;
 
     while(sigintReceived == 0) {
-        bool gotFddCommand = false;
+        Utils::sleepMs(1);      // intentional sleep to not utilize cpu to max when looping too much before client disconnect
 
-        load.busy.markStart();                  // mark the start of the busy part of the code
+        chipInterface->clientsDisconnectInactive();
 
-        int fdClient = -1;  // TODO: real fd
-        needsAction = chipInterface->actionNeeded(fdClient, inBuff);
+        max_fd = -1;
+        FD_ZERO(&readfds);
 
-        if(needsAction) {   // floppy drive needs action?
-            gotFddCommand = handleFdd(inBuff);
-        }
+        // get listening socket from chip interface, add it to readfds
+        int fdListen = chipInterface->getFdListen();
+        FD_SET(fdListen, &readfds);
+        max_fd = MAX(max_fd, fdListen);
 
-        load.busy.markEnd();                    // mark the end of the busy part of the code
+        // get all connected client fds, add them to readfds
+        max_fd = MAX(max_fd, chipInterface->setAllClientFds(&readfds));     // all valid client fds will be set to readfds, and highest fd into max_fd
 
-        // If HDD or FDD command was received, w're restarting the loop count to zero.
-        if(gotFddCommand) {
-            loopCount = 0;
-        }
+        // add timeout to select(), so we can check for connection status, settings reload, etc.
+        timeval timeout;
+        memset(&timeout, 0, sizeof(timeout));
+        timeout.tv_sec = 2;
 
-        // If we're in this period after last command, just increase the loop count and don't sleep.
-        // We're doing this to avoid running the other stuff and sleeping when we need low latency to respond to sequence of commands.
-        if(loopCount < NO_SLEEP_LOOPS_AFTER_COMMAND) {
-            loopCount++;
-        } else {        // There was no command in the last few loops, so we can now hande other stuff and sleep a little.
-            handleOtherStuff();         // handle the other stuff, which doesn't need to be called when we're transferring data
-            Utils::sleepMs(1);          // wait 1 ms...
-        }
-    }
-}
-
-void CCoreThread::handleOtherStuff(void)
-{
-    static bool initialized = false;
-    static uint32_t nextFloppyEncodingCheck = 0;
-
-    if(!initialized) {          // timers and flags not initialized yet?
-        initialized = true;
-        nextFloppyEncodingCheck = Utils::getEndTime(1000);
-    }
-
-    uint32_t now = Utils::getCurrentMs();
-
-    if(events.insertSpecialFloppyImageId != 0) {            // very stupid way of letting web IF to insert special image
-        insertSpecialFloppyImage(events.insertSpecialFloppyImageId);
-        events.insertSpecialFloppyImageId = 0;
-    }
-
-    if(now >= nextFloppyEncodingCheck) {
-        nextFloppyEncodingCheck = Utils::getEndTime(1000);
-
-        //if(prevFloppyEncodingRunning && !ImageSilo::getFloppyEncodingRunning()) {   // if floppy encoding was running, but not it's not running
-            if(newFloppyImageLedAfterEncode != -2) {                                // if we should set the new newFloppyImageLed after encoding is done
-                setEnabledFloppyImgs    = true;
-                setNewFloppyImageLed    = true;
-                newFloppyImageLed       = newFloppyImageLedAfterEncode;
-
-                newFloppyImageLedAfterEncode = -2;
+        if(select(max_fd + 1, &readfds, NULL, NULL, &timeout) < 0) {
+            if(errno == EINTR) {
+                continue;   // a signal was delivered
+            } else {
+                Debug::out(LOG_ERROR, "CCoreThread::run() select: %s", strerror(errno));
+                continue;
             }
-        //}
-        //prevFloppyEncodingRunning = ImageSilo::getFloppyEncodingRunning();
+        }
+
+        // if listening socket is set, handle it
+        if(FD_ISSET(fdListen, &readfds)) {
+            chipInterface->acceptSocketIfNeededAndPossible();
+        }
+
+        // check which fds are ready to be handled and handle them
+        chipInterface->handleAllReadyClients(&readfds, this);
     }
 }
 
-bool CCoreThread::handleFdd(uint8_t* inBuff)
+bool CCoreThread::handleOneClient(int fdClient, int floppySlotindex)
+{
+    uint8_t inBuff[INBUF_SIZE];
+    memset(inBuff, 0, INBUF_SIZE);
+
+    bool needsAction = chipInterface->actionNeeded(fdClient, inBuff);
+
+    if(needsAction) {   // floppy drive needs action?
+        handleFdd(fdClient, inBuff);
+    }
+
+    return needsAction;
+}
+
+bool CCoreThread::handleFdd(int fdClient, uint8_t* inBuff)
 {
     bool isFddCommand = false;
-    // uint32_t now = Utils::getCurrentMs();
 
     switch(inBuff[3]) {
     case ATN_FW_VERSION:                    // device has sent FW version
-        // statuses.franz.aliveTime = now;
-        // statuses.franz.aliveSign = ALIVE_FWINFO;
-
         lastFwInfoTime.franz = Utils::getCurrentMs();
-        handleFwVersion_franz();
+        handleFwVersion_franz(fdClient);
         break;
 
     case ATN_SECTOR_WRITTEN:                // device has sent written sector data
         isFddCommand = true;
-
-        // statuses.fdd.aliveTime   = now;
-        // statuses.fdd.aliveSign   = ALIVE_WRITE;
-
-        // statuses.franz.aliveTime = now;
-        // statuses.franz.aliveSign = ALIVE_WRITE;
-
-        handleSectorWritten();
+        handleSectorWritten(fdClient);
         break;
 
     case ATN_SEND_TRACK:                    // device requests data of a whole track
         isFddCommand = true;
-
-        // statuses.franz.aliveTime = now;
-        // statuses.franz.aliveSign = ALIVE_READ;
-
-        // statuses.fdd.aliveTime   = now;
-        // statuses.fdd.aliveSign   = ALIVE_READ;
-
-        handleSendTrack(inBuff + 8);
+        handleSendTrack(fdClient, inBuff + 8);
         break;
 
     default:
@@ -267,12 +229,11 @@ void CCoreThread::loadSettings(void)
     setFloppyConfig     = true;
 }
 
-void CCoreThread::handleFwVersion_franz(void)
+void CCoreThread::handleFwVersion_franz(int fdClient)
 {
     uint8_t fwVer[14];
     memset(fwVer,  0, 14);
 
-    int fdClient = -1;  // TODO: real fd
     chipInterface->setFDDconfig(setFloppyConfig, &floppyConfig, setDiskChanged, diskChanged);
     chipInterface->getFWversion(fdClient, fwVer);
 
@@ -315,7 +276,7 @@ void CCoreThread::setFloppyImageLed(int ledNo)
     }
 }
 
-void CCoreThread::handleSendTrack(uint8_t *inBuf)
+void CCoreThread::handleSendTrack(int fdClient, uint8_t *inBuf)
 {
     static int prevTrack = 0;
 
@@ -338,7 +299,6 @@ void CCoreThread::handleSendTrack(uint8_t *inBuf)
         encodedTrack = shared.imageSilo->getEncodedTrack(track, side, countInTrack);
     }
 
-    int fdClient = -1;      // TODO: real fd
     int remaining = MFM_STREAM_SIZE - (4*2) - 2;    // this much bytes remain to send after the received ATN
     chipInterface->fdd_sendTrackToChip(fdClient, remaining, encodedTrack);
 
@@ -348,10 +308,9 @@ void CCoreThread::handleSendTrack(uint8_t *inBuf)
     }
 }
 
-void CCoreThread::handleSectorWritten(void)
+void CCoreThread::handleSectorWritten(int fdClient)
 {
     int side, track, sector, byteCount;
-    int fdClient = -1;      // TODO: real fd
     uint8_t *writtenSector = chipInterface->fdd_sectorWritten(fdClient, side, track, sector, byteCount); // get side + track + sector number, byte count, and pointer to buffer where the written data is
 
     if(!floppyConfig.writeProtected) {  // not write protected? write

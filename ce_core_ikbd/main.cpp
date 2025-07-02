@@ -146,7 +146,7 @@ void initializeFlags(void)
     Debug::setLogLevel(LOG_ERROR);      // init current log level to LOG_ERROR
     flags.justShowHelp = false;
     flags.noCapture    = false;         // if true, don't do exclusive mouse and keyboard capture
-    flags.portClient = 7401;
+    flags.portClient = SERVER_TCP_PORT_IKBD;
 }
 
 void parseCmdLineArguments(int argc, char *argv[])
