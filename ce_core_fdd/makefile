@@ -11,7 +11,7 @@ DEPFLAGS = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
 
 VPATH = ./lib
 LDFLAGS	= -Llib $(CPU_FLAGS)
-LDLIBS = -ldospath -lrt -lanl -lpthread -ldl -lutil
+LDLIBS = -lrt -lanl -lpthread -ldl -lutil
 OBJDIR = obj
 TARGET = ce_core_fdd.elf
 
@@ -47,7 +47,6 @@ SRCS += $(wildcard $(SUBDIR18)/*.cpp)
 HDRS  = $(wildcard *.h)
 HDRS += $(wildcard $(SUBDIR4)/*.h)
 HDRS += $(wildcard $(SUBDIR18)/*.h)
-HDRS += ../libdospath/libdospath.h
 
 OBJS = $(addprefix $(OBJDIR)/, $(patsubst %.cpp,%.o,$(SRCS:.c=.o)))
 DEPS = $(patsubst %.o,%.d,$(OBJS))
@@ -60,14 +59,6 @@ $(TARGET): $(LDLIBS) $(OBJS) $(HDRS)
 	@ln -sf $(CURDIR)/$(TARGET) ./core/cosmosex.elf		# create symlink from whatever the output target is to just cosmosex.elf
 
 print-%:	; @echo $* = $($*)
-
--ldospath:	lib/libdospath.a
-
-lib/libdospath.a:
-	@echo "-> Entering libdospath and making libdospath"
-	cd ../libdospath && $(MAKE) all
-	cp ../libdospath/libdospath.a lib/
-	@echo "<- Leaving libdospath"
 
 .PHONY:	clean depclean
 

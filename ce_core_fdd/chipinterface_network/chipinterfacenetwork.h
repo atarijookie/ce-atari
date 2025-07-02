@@ -4,23 +4,40 @@
 #include <stdint.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include "../chipinterface.h"
+#include "chipinterfacenetwork.h"
+#include "../settings.h"
 #include "bufferedreader.h"
 
-// tags that are being sent from RPi to chip to mark start of data
-#define NET_TAG_HANS_STR    "TGHA"
-#define NET_TAG_FRANZ_STR   "TGFR"
-#define NET_TAG_IKBD_STR    "TGIK"
-#define NET_TAG_ZEROS_STR   "TGZE"
+#define SYNC_TAG_FDD    0xc0500fdd
 
-class ChipInterfaceNetwork: public ChipInterface
+#define MAX_CLIENTS     8
+
+#define MFM_STREAM_SIZE             13800
+
+// defines for Floppy part
+// commands sent from device to host
+#define ATN_FW_VERSION              0x01            // followed by string with FW version (length: 4 WORDs - cmd, v[0], v[1], 0)
+#define ATN_SECTOR_WRITTEN          0x03            // sent: 3, side (highest bit) + track #, current sector #
+#define ATN_SEND_TRACK              0x04            // send the whole track
+#define ATN_ANY                     0xff            // this is used only on host to wait for any ATN
+
+// Franz: commands sent from host to device
+#define CMD_WRITE_PROTECT_OFF       0x10
+#define CMD_WRITE_PROTECT_ON        0x20
+#define CMD_DISK_CHANGE_OFF         0x30
+#define CMD_DISK_CHANGE_ON          0x40
+#define CMD_SET_DRIVE_ID_0          0x70
+#define CMD_SET_DRIVE_ID_1          0x80
+#define CMD_DRIVE_ENABLED           0xa0
+#define CMD_DRIVE_DISABLED          0xb0
+#define CMD_FRANZ_SOUND_ON          0xc1        // do floppy seek sound
+#define CMD_FRANZ_SOUND_OFF         0xc2        // don't make the floppy seek sound
+
+class ChipInterfaceNetwork
 {
 public:
     ChipInterfaceNetwork();
     virtual ~ChipInterfaceNetwork();
-
-    // this return CHIP_IF_V1_V2 or some other
-    int chipInterfaceType(void);
 
     //----------------
     // chip interface initialization and deinitialization - e.g. open GPIO, or open socket, ...
@@ -28,68 +45,27 @@ public:
     void ciClose(void);
 
     //----------------
-    // call this with true to enable ikdb UART communication
-    void ikbdUartEnable(bool enable);
-    int  ikbdUartReadFd(void);
-    int  ikbdUartWriteFd(void);
-
-    //----------------
-    // reset both or just one of the parts
-    void resetHDDandFDD(void);
-    void resetHDD(void);
-    void resetFDD(void);
-
-    //----------------
     // if following function returns true, some command is waiting for action in the inBuf and hardNotFloppy flag distiguishes hard-drive or floppy-drive command
-    bool actionNeeded(bool &hardNotFloppy, uint8_t *inBuf);
+    bool actionNeeded(uint8_t *inBuf);
 
-    // to handle FW version, first call setHDDconfig() / setFDDconfig() to fill config into bufOut, then call getFWversion to get the FW version from chip
-    void getFWversion(bool hardNotFloppy, uint8_t *inFwVer);
-
-    //----------------
-    // HDD: READ/WRITE functions for large (>1 MB) block transfers (Scsi::readSectors(), Scsi::writeSectors()) and also by the convenient functions above
-
-    bool hdd_sendData_start(uint32_t totalDataCount, uint8_t scsiStatus, bool withStatus);
-    bool hdd_sendData_transferBlock(uint8_t *pData, uint32_t dataCount);
-
-    bool hdd_recvData_start(uint8_t *recvBuffer, uint32_t totalDataCount);
-    bool hdd_recvData_transferBlock(uint8_t *pData, uint32_t dataCount);
-
-    bool hdd_sendStatusToHans(uint8_t statusByte);
+    // to handle FW version, first call setHDDconfig() to fill config into bufOut, then call getFWversion to get the FW version from chip
+    void getFWversion(uint8_t *inFwVer);
 
     //----------------
     // FDD: all you need for handling the floppy interface
     void fdd_sendTrackToChip(int byteCount, uint8_t *encodedTrack);    // send encodedTrack to chip for MFM streaming
     uint8_t* fdd_sectorWritten(int &side, int &track, int &sector, int &byteCount);
 
-    //----------------
-    // button, beeper and display handling
-    void handleButton(int& btnDownTime, uint32_t& nextScreenTime);
-    void handleBeeperCommand(int beeperCommand, bool floppySoundEnabled);
-    bool handlesDisplay(void);                              // returns true if should handle i2c display from RPi
-    void displayBuffer(uint8_t *bfr, uint16_t size);        // send this display buffer data to remote display
+    void setFDDconfig(bool setFloppyConfig, FloppyConfig* fddConfig, bool setDiskChanged, bool diskChanged);
 
 private:
     uint32_t lastTimeRecv;
-    int serverIndex;    // on which server index we're running
 
-    int fdListen;       // socket for listen()
-    int fdClient;       // socket received on accept()
-    int fdReport;       // socket for reporting status to main server thread
+    int fdListen;                       // socket for listen()
+    int fdClients[MAX_CLIENTS];         // socket received on accept()
+    uint32_t clientLastMs[MAX_CLIENTS]; // value of getCurrentMs() when was last time anything was received from this client
 
     struct sockaddr_in addressListen;
-    struct sockaddr_in addressReport;
-
-    int ikbdReadFd;     // fd used for IKBD read
-    int ikbdWriteFd;    // fd used for IKDB write
-
-    // got 2 pipes, with 2 ends...
-    // pipefd[0] refers to the read end of the pipe.
-    // pipefd[1] refers to the write end of the pipe.
-    int pipeFromAtariToRPi[2];
-    int pipeFromRPiToAtari[2];
-
-    uint32_t nextReportTime;    // when should we send next report to main server socket
 
     uint8_t *bufOut;
     uint8_t *bufIn;
@@ -101,18 +77,19 @@ private:
     void createListeningSocket(void);
     void acceptSocketIfNeededAndPossible(void);
     void closeClientSocket(void);
-    int  recvFromClient(uint8_t* buf, int len, bool byteSwap=true);
-    void createServerReportSocket(void);
-    void sendReportToMainServerSocket(void);
+    uint32_t recvFromClient(uint8_t* buf, int maxLen);
+
+    int setAllClientFds(fd_set* readfds);
+    void handleAllReadyClients(fd_set* readfds);
+    int disconnectInactiveClients(void);
 
     bool waitForAtn(int atnIdWant, uint8_t atnCode, uint32_t timeoutMs, uint8_t *inBuf);
-    void handleZerosAndIkbd(int atnId);
 
-    void serialSetup(void);                             // open IKDB serial port
-    void sendIkbdDataToAtari(void);
-
-    void sendDataToChip(const char* tag, uint8_t* data, uint16_t len);    // send data to chip with specified tag
-    void byteSwapBfr(uint8_t* buf, int len);
+    bool sendHeaderToChip(uint16_t cmdCode, uint32_t futureDatalen);                // send header to chip
+    bool sendDataToChip(uint8_t* data, uint32_t len);                               // send data to chip  
+    bool sendHeaderAndDataToChip(uint16_t cmdCode, uint8_t* data, uint32_t len);    // send header and data to chip
+    void storeHeaderToBuffer(uint16_t cmdCode, uint32_t futureDatalen, uint8_t* buffer);
+    int getEmptyClientIndex(void);
 };
 
 #endif // __CHIPINTERFACENETWORK_H__

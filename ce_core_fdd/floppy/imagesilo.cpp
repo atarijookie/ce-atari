@@ -12,9 +12,7 @@
 #include "../utils.h"
 #include "../debug.h"
 #include "../settings.h"
-#include "acsidatatrans.h"
 #include "imagesilo.h"
-#include "floppysetup.h"
 #include "floppyencoder.h"
 
 extern pthread_mutex_t floppyEncoderMutex;
@@ -66,7 +64,7 @@ ImageSilo::ImageSilo()
     floppyImageSelected = -1;
     //-----------
     // create empty image and encode it (will be used when no slot is selected)
-    bool res = FloppySetup::createNewImage(EMPTY_IMAGE_PATH);                   // create empty image in /tmp/ directory
+    bool res = createNewImage(EMPTY_IMAGE_PATH);                   // create empty image in /tmp/ directory
 
     if(res) {                                                                   // if succeeded, encode this empty image
         Debug::out(LOG_DEBUG, "ImageSilo created empty image (for no selected image)");
@@ -82,6 +80,41 @@ ImageSilo::ImageSilo()
 ImageSilo::~ImageSilo()
 {
     delete []emptyTrack;
+}
+
+bool ImageSilo::createNewImage(std::string pathAndFile)
+{
+    // open the file
+    FILE *f = fopen((char *) pathAndFile.c_str(), "wb");
+
+    if(!f) {                                            // failed to open file?
+        Debug::out(LOG_ERROR, "FloppySetup::newImage - failed to open file %s", (char *) pathAndFile.c_str());
+        return false;
+    }
+
+    // create default boot sector (copied from blank .st image created in Steem)
+    uint8_t sect0start[]   = {0xeb, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc8, 0x82, 0x75, 0x00, 0x02, 0x02, 0x01, 0x00, 0x02, 0x70, 0x00, 0xa0, 0x05, 0xf9, 0x05, 0x00, 0x09, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00};
+    uint8_t sect0end[]     = {0x00, 0x97, 0xc7};
+
+    uint8_t bfr[512];
+    memset(bfr, 0, 512);
+
+    memcpy(bfr, sect0start, sizeof(sect0start));                        // copy the start of default boot sector to start of buffer
+    memcpy(bfr + 512 - sizeof(sect0end), sect0end, sizeof(sect0end));   // copy the end of default boot sector to end of buffer
+
+    fwrite(bfr, 1, 512, f);
+
+    // create the empty rest of the file
+    memset(bfr, 0, 512);
+
+    int totalSectorCount = (9*80*2) - 1;                                // calculate the count of sectors on a floppy - 2 sides, 80 tracks, 9 spt, minus the already written boot sector
+
+    for(int i=0; i<totalSectorCount; i++) {
+        fwrite(bfr, 1, 512, f);
+    }
+
+    fclose(f);
+    return true;
 }
 
 uint8_t *ImageSilo::getEmptyTrack(void)
@@ -101,13 +134,6 @@ void ImageSilo::loadSettings(void)
 
         std::string pathAndFile, path, file;
         pathAndFile = img;
-
-        //-----------------------------
-        // if we're in the testing mode
-        if(flags.test) {
-            pathAndFile = CE_CONF_FDD_IMAGE_PATH_AND_FILENAME;
-        }
-        //-----------------------------
 
         if(pathAndFile.empty()) {                   // nothing stored? skip it
             continue;
@@ -228,12 +254,6 @@ void ImageSilo::remove(int index)                   // remove image at specified
 
     if(slots[index].imageFile.empty()) {            // no image in this slot? skip the rest
         return;
-    }
-
-    // if this file is not from translated drive, but it was uploaded in floppy upload path from ST, delete it
-    if(slots[index].hostPath.compare(0, strlen(FLOPPY_UPLOAD_PATH), std::string(FLOPPY_UPLOAD_PATH)) == 0) {
-        // delete the file from /tmp
-        unlink(slots[index].hostPath.c_str());
     }
 
     clearSlot(index);
@@ -382,19 +402,6 @@ bool ImageSilo::containsImage(const char *filename)    // check if image with th
     return false;
 }
 
-// check if image with this filename exists in silo and fill buffer with ROW_OBJ_VISIBLE / ROW_OBJ_SELECTED if it's inserted
-void ImageSilo::containsImageInSlots(std::string &filenameWExt, char *bfr)
-{
-    std::string filename, ext;
-    Utils::splitFilenameFromExt(filenameWExt, filename, ext);   // create filename without extension (ZIPed image in list might be extracted under different extension)
-
-    for(int i=0; i<3; i++) {
-        bool isInSlot = (slots[i].imageFileNoExt == filename);  // if this file is in this slot
-        //bool isSlotSelected = (i == currentSlot);             // if this slot is selecter
-
-        bfr[i] = isInSlot ? ROW_OBJ_SELECTED : ROW_OBJ_VISIBLE; // if in slot - selected, not in slot - visible
-    }
-}
 
 // check if image with this filename exists in silo and eject it from each slot it is in
 void ImageSilo::removeByFileName(std::string &filenameWExt)

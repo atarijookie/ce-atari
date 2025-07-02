@@ -71,7 +71,6 @@ public:
     void remove(int index);
 
     bool containsImage(const char *filename);
-    void containsImageInSlots(std::string &filenameWExt, char *bfr);
     void removeByFileName(std::string &filenameWExt);
     bool currentSlotHasNewContent(void);
 
@@ -84,6 +83,7 @@ public:
     //static bool getFloppyEncodingRunning(void);
 
     void siloToSlotsFile(void);
+    bool createNewImage(std::string pathAndFile);
 
 private:
     void clearSlot(int index);

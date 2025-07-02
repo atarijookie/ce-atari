@@ -7,17 +7,16 @@
 #include "settingsreloadproxy.h"
 #include "isettingsuser.h"
 
-#include "floppy/floppysetup.h"
-
 #include "version.h"
 #include "utils.h"
 
 class ConfigService;
 class FloppyService;
 class ScreencastService;
-class AcsiDataTrans;
 class RetryModule;
 class ExtensionHandler;
+
+#define INBUF_SIZE  32
 
 class CCoreThread: public ISettingsUser
 {
@@ -37,8 +36,7 @@ private:
     bool shouldRun;
     bool running;
 
-    AcsiDataTrans       *dataTrans;
-    ExtensionHandler    *extensionHandler;
+    ExtensionHandler *extensionHandler;
 
     //-----------------------------------
     // settings and config stuff
@@ -65,7 +63,6 @@ private:
 
     //-----------------------------------
     // floppy stuff
-    FloppySetup         floppySetup;
     bool                setEnabledFloppyImgs;
     int                 lastFloppyImageLed;
 

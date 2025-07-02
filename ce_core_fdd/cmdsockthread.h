@@ -2,7 +2,6 @@
 #ifndef _CMDSOCKTHREAD_H_
 #define _CMDSOCKTHREAD_H_
 
-class AcsiDataTrans;
 class Scsi;
 class ImageStorage;
 class ImageSilo;

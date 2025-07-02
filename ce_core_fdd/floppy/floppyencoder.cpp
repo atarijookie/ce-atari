@@ -14,7 +14,6 @@
 #include "../debug.h"
 #include "../settings.h"
 #include "imagesilo.h"
-#include "floppysetup.h"
 #include "floppyencoder.h"
 
 pthread_mutex_t floppyEncoderMutex = PTHREAD_MUTEX_INITIALIZER;

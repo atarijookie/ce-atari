@@ -4,9 +4,7 @@
 #include <stdint.h>
 #include <cstdio>
 
-#define CORE_LOG_FILENAME   "core.log"
-#define CHIP_LOG_FILENAME   "chip.log"
-#define HDD_LOG_FILENAME    "hdd.log"
+#define CORE_FDD_LOG_FILENAME   "core_fdd.log"
 
 #define LOG_OFF         0
 #define LOG_INFO        1       // info         - info which can be displayed when running at user's place
@@ -41,7 +39,8 @@ public:
     static void chipLog(uint16_t cnt, char* bfr);
 
     static void setDefaultLogFile(void);
-    static FILE* logFileOpen(const char* logFileName);
+    static FILE* logFileOpen(void);
+    static const char* getCoreLogFileName(bool forceCreate = false);
 
     static void cmdMarkStartTime(void);
     static void cmdStart(uint8_t* cmd, const char* tag);

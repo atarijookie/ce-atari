@@ -10,7 +10,6 @@
 #include <net/if.h>
 
 #include "global.h"
-#include "acsidatatrans.h"
 #include "debug.h"
 #include "ccorethread.h"
 #include "update.h"
@@ -27,20 +26,14 @@
 #define UPDATE_SCRIPTS_TIME     10000
 
 extern TFlags       flags;
-extern ChipInterface* chipInterface;
+extern ChipInterfaceNetwork* chipInterface;
 
 extern DebugVars    dbgVars;
 
 extern SharedObjects shared;
 
 struct TLastFwInfoTime {
-    uint32_t hans;
     uint32_t franz;
-    uint32_t nextDisplay;
-
-    uint32_t hansResetTime;
-    uint32_t franzResetTime;
-
     int     progress;
 };
 
@@ -61,19 +54,12 @@ CCoreThread::CCoreThread()
     lastFloppyImageLed = -1;
     newFloppyImageLedAfterEncode = -2;
 
-    dataTrans = new AcsiDataTrans();
-    dataTrans->setCommunicationObject(chipInterface);
-
     sharedObjects_create();
 
     // now register all the objects which use some settings in the proxy
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this, SETTINGSUSER_FLOPPYIMGS);
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this, SETTINGSUSER_FLOPPYCONF);
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this, SETTINGSUSER_FLOPPY_SLOT);
-
-    // give floppy setup everything it needs
-    floppySetup.setAcsiDataTrans(dataTrans);
-    floppySetup.setSettingsReloadProxy(&settingsReloadProxy);
 
     // the floppy image silo might change settings (when images are changes), add settings reload proxy
     shared.imageSilo->setSettingsReloadProxy(&settingsReloadProxy);
@@ -82,8 +68,6 @@ CCoreThread::CCoreThread()
 
 CCoreThread::~CCoreThread()
 {
-    delete dataTrans;
-
     sharedObjects_destroy();
 }
 
@@ -112,14 +96,7 @@ void CCoreThread::run(void)
 
     loadSettings();
 
-    //------------------------------
-
-    lastFwInfoTime.nextDisplay = Utils::getEndTime(1000);
-    lastFwInfoTime.hansResetTime = Utils::getCurrentMs();
-    lastFwInfoTime.franzResetTime = Utils::getCurrentMs();
-
     bool needsAction;
-    bool hardNotFloppy;
 
     load.clear();                               // clear load counter
 
@@ -133,9 +110,9 @@ void CCoreThread::run(void)
 
         load.busy.markStart();                  // mark the start of the busy part of the code
 
-        needsAction = chipInterface->actionNeeded(hardNotFloppy, inBuff);
+        needsAction = chipInterface->actionNeeded(inBuff);
 
-        if(needsAction && !hardNotFloppy) {   // not running without Franz & floppy drive needs action?
+        if(needsAction) {   // floppy drive needs action?
             gotFddCommand = handleFdd(inBuff);
         }
 
@@ -174,11 +151,6 @@ void CCoreThread::handleOtherStuff(void)
         events.insertSpecialFloppyImageId = 0;
     }
 
-    if(now >= lastFwInfoTime.nextDisplay) {
-        lastFwInfoTime.nextDisplay  = Utils::getEndTime(1000);
-        displayStatusToConsole(now);
-    }
-
     if(now >= nextFloppyEncodingCheck) {
         nextFloppyEncodingCheck = Utils::getEndTime(1000);
 
@@ -198,7 +170,7 @@ void CCoreThread::handleOtherStuff(void)
 bool CCoreThread::handleFdd(uint8_t* inBuff)
 {
     bool isFddCommand = false;
-    uint32_t now = Utils::getCurrentMs();
+    // uint32_t now = Utils::getCurrentMs();
 
     switch(inBuff[3]) {
     case ATN_FW_VERSION:                    // device has sent FW version
@@ -252,17 +224,8 @@ void CCoreThread::displayStatusToConsole(uint32_t now)
     if(load.suspicious) {                                       // load is suspiciously high?
         Debug::out(LOG_DEBUG, ">>> Suspicious core cycle load -- load: %3d %%", load.loadPercents);
         printf(">>> Suspicious core cycle load -- load: %3d %%\n", load.loadPercents);
-
-        lastFwInfoTime.hansResetTime    = now;
-        lastFwInfoTime.franzResetTime   = now;
-        }
+    }
     //-------------
-
-    float hansTime  = ((float)(now - lastFwInfoTime.hans))  / 1000.0f;
-    float franzTime = ((float)(now - lastFwInfoTime.franz)) / 1000.0f;
-
-    hansTime  = (hansTime  < 15.0f) ? hansTime  : 15.0f;
-    franzTime = (franzTime < 15.0f) ? franzTime : 15.0f;
 
     printf("\033[2K  [ %c ]  CE core is running\033[A\n", progChars[lastFwInfoTime.progress]);
     lastFwInfoTime.progress = (lastFwInfoTime.progress + 1) % 4;
@@ -310,7 +273,7 @@ void CCoreThread::handleFwVersion_franz(void)
     memset(fwVer,  0, 14);
 
     chipInterface->setFDDconfig(setFloppyConfig, &floppyConfig, setDiskChanged, diskChanged);
-    chipInterface->getFWversion(false, fwVer);
+    chipInterface->getFWversion(fwVer);
 
     if(setFloppyConfig) {                                       // did set floppy config? don't set again
         setFloppyConfig = false;

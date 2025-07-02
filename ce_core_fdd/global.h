@@ -5,7 +5,10 @@
 #include <stdint.h>
 #include <pthread.h>
 
-#define SCSI_ST_OK  0
+#define FD_EMPTY    -1
+
+#define SERVER_TCP_PORT_FDD         7400        // port used by FDD core
+#define SERVER_TCP_PORT_IKBD        7401        // port used by IKBD core
 
 // commands sent from host to device
 #define CMD_CURRENT_SECTOR          0x50                                // followed by sector #
@@ -17,90 +20,18 @@
 #define MFM_6US     2
 #define MFM_8US     3
 
-
-#define VERSION_STRING          "CosmosEx v3.00 (by Jookie)"
-#define VERSION_STRING_SHORT    "3.00"
-#define DATE_STRING             "05/09/21"
-                              // MM/DD/YY
-
-
-#define DEVTYPE_OFF                 0
-#define DEVTYPE_SD                  1
-#define DEVTYPE_RAW                 2
-#define DEVTYPE_TRANSLATED          3
-
-// types of devices / modules we support
-#define HOSTMOD_CONFIG              1
-#define HOSTMOD_LINUX_TERMINAL      2
-#define HOSTMOD_TRANSLATED_DISK     3
-#define HOSTMOD_NETWORK_ADAPTER     4
-#define HOSTMOD_FDD_SETUP           5
-#define HOSTMOD_MEDIA_STREAMING     6
-#define HOSTMOD_MISC                7
-
-//////////////////////////////////////////////////////
-// commands for HOSTMOD_TRANSLATED_DISK
-#define TRAN_CMD_IDENTIFY           0
-#define TRAN_CMD_GETDATETIME        1
-#define TRAN_CMD_SENDSCREENCAST     2
-#define TRAN_CMD_SCREENCASTPALETTE  3
-#define TRAN_CMD_SCREENSHOT_CONFIG  4
-// ...other commands are just function codes from gemdos.h
-
-
-//////////////////////////////////////////////////////
-// HDD interface types
-#define HDD_IF_ACSI     1
-#define HDD_IF_SCSI     2
-
-#define SCSI_MACHINE_UNKNOWN    0
-#define SCSI_MACHINE_TT         1
-#define SCSI_MACHINE_FALCON     2
-
-//////////////////////////////////////////////////////
-// chip interface types
-#define CHIPIF_UNKNOWN  -1
-#define CHIPIF_DUMMY    0
-#define CHIPIF_V1_V2    1       // Hans + CPLD, Franz, via SPI
-#define CHIPIF_V3       3       // Hosts via SPI
-#define CHIPIF_V4       4       // Franz via SPI, ACSI via GPIO
-#define CHIPIF_RASCSI   8
-#define CHIPIF_NETWORK  9
-
-//////////////////////////////////////////////////////
-
-typedef struct {
-    char serial  [20];
-    char revision[8];
-    char model   [40];
-
-    uint32_t revisionInt;
-} RPiConfig;
-
 typedef struct {
     bool justShowHelp;          // show possible command line arguments and quit
     int  logLevel;              // init current log level to LOG_ERROR
-    bool test;                  // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
-    bool ikbdLogs;              // if set to true, will generate ikbd logs file
-    bool fakeOldApp;            // if set to true, will always return old app version, so you can test app installation over and over
-    bool noCapture;             // if set to true, don't do exclusive USB mouse and keyboard capture
-
-    bool localNotNetwork;       // if true, this app runs handling localy connected device; if false then this core is part of the network server
-    bool instanceNo;            // number of core instance
-
-    bool deviceDoUpdate;        // if true, device should download update and write it to flash
+    int  portClient;    
 } TFlags;
 
 typedef struct {
     volatile uint8_t insertSpecialFloppyImageId;
-
-    volatile bool screenShotVblEnabled;
-    volatile bool doScreenShot;
 } InterProcessEvents;
 
 extern InterProcessEvents events;
 
-class Scsi;
 class ImageStorage;
 class ImageSilo;
 
@@ -111,14 +42,6 @@ typedef struct {
 } SharedObjects;
 
 extern SharedObjects shared;
-
-typedef struct {
-    int linuxTermFd;
-    int configFd;
-    int downloaderFd;
-} ExternalServices;
-
-extern ExternalServices externalServices;
 
 //////////////////////////////////////////////////////
 
@@ -133,29 +56,15 @@ void preloadGlobalsFromDotEnv(void);
 #define FDD_TEST_IMAGE_PATH_AND_FILENAME_TMP    "/tmp/fdd_test.st"
 #define FDD_TEST_IMAGE_JUST_FILENAME            "fdd_test.st"
 
-#define MAX_ZIPDIR_ZIPFILE_SIZE             (5*1024*1024)
-
-#define PATH_ATARI_CE_FDD_TTP               "CE_FDD.TTP"
-#define PATH_ATARI_CE_HDIMG_TTP             "CE_HDIMG.TTP"
-#define PATH_ATARI_CE_MEDIAPLAY             "CEMEDIAP.TTP"
-
-#define NETSERVER_WEBROOT                   "/tmp/ce_netserver_webroot"
-#define NETSERVER_WEBROOT_INDEX             NETSERVER_WEBROOT "/index.html"
-
 // These were global const string constants, but now they depend on .env content, so they are now
 // loaded on app start and used when needed.
 extern std::string corePath;
 extern std::string CE_CONF_FDD_IMAGE_PATH_AND_FILENAME;
 extern std::string FDD_TEST_IMAGE_PATH_AND_FILENAME;
-extern std::string PATH_CE_DD_BS_L1;
-extern std::string PATH_CE_DD_BS_L2;
-extern std::string PATH_CE_DD_PRG_PATH_AND_FILENAME;
 extern std::string CONFIG_DRIVE_PATH;
-
 
 #define LOG_DIR_DEFAULT     "/tmp/ce/log"
 #define DATA_DIR_DEFAULT    "/tmp/ce/data"
-
+#define PID_DIR_DEFAULT     "/tmp/ce/pid"
 
 #endif // GLOBAL_H
-

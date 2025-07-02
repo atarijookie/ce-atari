@@ -33,25 +33,6 @@ void Settings::storeDefaultValues(void)
 {
     Debug::out(LOG_DEBUG, "Settings::storeDefaultValues() - storing default settings, because it seems we miss those setting...");
 
-    char key[32];
-    for(int id=0; id<8; id++) {                         // read the list of device types from settings
-        sprintf(key, "ACSI_DEVTYPE_%d", id);            // create settings KEY, e.g. ACSI_DEVTYPE_0
-
-        if(id == 1) {                                   // ACSI id 0 enaled by defaul
-            setInt(key, DEVTYPE_TRANSLATED);
-        } else {                                        // other ACSI id's disabled
-            setInt(key, DEVTYPE_OFF);
-        }
-    }
-
-    setChar("DRIVELETTER_FIRST",      'C');
-    setChar("DRIVELETTER_SHARED",     'P');
-    setChar("DRIVELETTER_CONFDRIVE",  'O');
-
-    setBool("MOUNT_RAW_NOT_TRANS",     false);
-
-    setBool("SHARED_ENABLED",           false);
-    setBool("SHARED_NFS_NOT_SAMBA", false);
 }
 
 bool Settings::getBool(const char *key, bool defValue)
@@ -234,12 +215,6 @@ void Settings::binToHex(uint8_t *inBfr, int len, char *outBfr)
     }
 }
 //-------------------------
-void Settings::generateLicenseKeyName(uint8_t* hwSerial, char *keyName)
-{
-    strcpy(keyName, "HW_LICENSE_");                             // start with "HW_LICENSE_"
-    Settings::binToHex(hwSerial, 13, keyName + 11);    // take hwSerial and convert it from binary to hex string and append it to key name
-}
-//-------------------------
 void Settings::setBinaryString(const char *key, uint8_t *inBfr, int len)
 {
     char tmp[512];
@@ -280,67 +255,6 @@ void Settings::setChar(const char *key, char value)
 
     fputc(value, file);
     fclose(file);
-}
-//-------------------------
-void Settings::loadAcsiIDs(AcsiIDinfo *aii, bool useDefaultsIfNoSettings)
-{
-    aii->enabledIDbits = 0;                                 // no bits / IDs enabled yet
-
-    aii->gotDevTypeRaw          = false;                    // no raw and translated types found yet
-    aii->gotDevTypeTranslated   = false;
-    aii->gotDevTypeSd           = false;
-
-    aii->sdCardAcsiId = 0xff;                               // at start mark that we don't have SD card ID yet
-
-    char key[32];
-    for(int id=0; id<8; id++) {                         // read the list of device types from settings
-        sprintf(key, "ACSI_DEVTYPE_%d", id);            // create settings KEY, e.g. ACSI_DEVTYPE_0
-
-        int devType = getInt(key, DEVTYPE_OFF);
-
-        if(devType < 0) {
-            devType = DEVTYPE_OFF;
-        }
-
-        //-------------------------
-        // if we're in testing mode
-        if(flags.test) {
-            switch(id) {
-            case 0:     devType = DEVTYPE_TRANSLATED;   break;
-            case 1:     devType = DEVTYPE_SD;           break;
-            default:    devType = DEVTYPE_OFF;          break;
-            }
-        }
-        //-------------------------
-
-        aii->acsiIDdevType[id] = devType;
-
-        if(devType == DEVTYPE_SD) {                     // if on this ACSI ID we should have the native SD card, store this ID
-            aii->sdCardAcsiId = id;
-            aii->gotDevTypeSd = true;
-        }
-
-        if(devType != DEVTYPE_OFF) {                    // if ON
-            aii->enabledIDbits |= (1 << id);            // set the bit to 1
-        }
-
-        if(devType == DEVTYPE_RAW) {                    // found at least one RAW device?
-            aii->gotDevTypeRaw = true;
-        }
-
-        if(devType == DEVTYPE_TRANSLATED) {             // found at least one TRANSLATED device?
-            aii->ceddId = id;                           // ID of CE_DD device
-            aii->gotDevTypeTranslated = true;
-        }
-    }
-
-    // no ACSI ID was enabled? enable ACSI ID 0
-    if(!aii->gotDevTypeRaw && !aii->gotDevTypeTranslated && !aii->gotDevTypeSd) {
-        if(useDefaultsIfNoSettings) {                   // if should use defaults if no settings found, store those defaults and call this function again
-            storeDefaultValues();
-            loadAcsiIDs(aii, false);                    // ...but call this function without storing defaults next time - to avoid endless loop in some weird case
-        }
-    }
 }
 //-------------------------
 void Settings::loadFloppyConfig(FloppyConfig *fc)

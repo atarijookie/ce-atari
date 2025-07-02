@@ -13,7 +13,6 @@
 #include "global.h"
 #include "debug.h"
 #include "utils.h"
-#include "../libdospath/libdospath.h"
 
 uint32_t prevLogOut;
 
@@ -22,30 +21,22 @@ extern TFlags   flags;
 
 DebugVars dbgVars;
 
-std::map<std::string, std::string> logPaths;
+std::string coreLogFileName;
+
+const char* Debug::getCoreLogFileName(bool forceCreate)
+{
+    if(coreLogFileName.length() > 0 && !forceCreate) {
+        return coreLogFileName.c_str();
+    }
+
+    std::string logDir = Utils::dotEnvValue("LOG_DIR", LOG_DIR_DEFAULT, false);
+    coreLogFileName = logDir + std::string("/" CORE_FDD_LOG_FILENAME);
+    return coreLogFileName.c_str();
+}
 
 void Debug::setOutputToConsole(void)
 {
     g_outToConsole = 1;
-}
-
-void Debug::setDefaultLogFile(void)
-{
-    std::string filename = CORE_LOG_FILENAME;
-    std::map<std::string, std::string>::iterator i = logPaths.find(filename);
-
-    if(i != logPaths.end()) {   // got this log file? erase it from map
-        logPaths.erase(i);
-    }
-
-    FILE* f = logFileOpen(CORE_LOG_FILENAME);   // call this to update map, then just close the file
-    fclose(f);
-}
-
-void Debug::setLogFile(const char *path)
-{
-    std::string pathStr = path;
-    logPaths[CORE_LOG_FILENAME] = pathStr;
 }
 
 const char* Debug::logLevelString(int ll)
@@ -81,7 +72,7 @@ void Debug::out(int logLevel, const char *format, ...)
     if(g_outToConsole) {                    // should log to console? f is null
         f = NULL;
     } else {                                    // log to file? open the file
-        f = logFileOpen(CORE_LOG_FILENAME);
+        f = logFileOpen();
     }
 
     if(!f) {
@@ -106,13 +97,13 @@ void Debug::out(int logLevel, const char *format, ...)
     sprintf(humanTime, "%02d:%02d:%02d.%06ld", tm.tm_hour, tm.tm_min, tm.tm_sec, tv.tv_usec);
 
     if(logLevel == LOG_ERROR && dbgVars.isInHandleAcsiCommand) {    // it's an error, and we're debugging ACSI stuff
-        fprintf(f, "%08d %4d (%s) %s\n", now, diff, humanTime, ll); // CLOCK in ms, diff in ms, date/time in human readable format
+        fprintf(f, "%s %4d %s\n", humanTime, diff, ll); // diff in ms, date/time in human readable format
         fprintf(f, "     LOG_ERROR occurred\n");
         fprintf(f, "     Time since beginning of ACSI command handling: %d\n", now - dbgVars.thisAcsiCmdTime);
         fprintf(f, "     Time between this and previous ACSI command  : %d\n", dbgVars.thisAcsiCmdTime - dbgVars.prevAcsiCmdTime);
     }
 
-    fprintf(f, "%08d %4d (%s) %s\t", now, diff, humanTime, ll); // CLOCK in ms, diff in ms, date/time in human readable format
+    fprintf(f, "%s %4d %s\t", humanTime, diff, ll); // CLOCK in ms, diff in ms, date/time in human readable format
 
     vfprintf(f, format, args);
     fprintf(f, "\n");
@@ -127,7 +118,7 @@ void Debug::outBfr(uint8_t *bfr, int count)
         return;
     }
 
-    FILE* f = logFileOpen(CORE_LOG_FILENAME);
+    FILE* f = logFileOpen();
 
     if(!f) {
         return;
@@ -183,9 +174,8 @@ void Debug::setLogLevel(int newLogLevel)
 
     Debug::out(LOG_INFO, "Switching LOG LEVEL from %d to %d", flags.logLevel, newLogLevel);
     flags.logLevel = newLogLevel;                               // new value to struct
-    ldp_setParam(1, (uint64_t) flags.logLevel);                 // libDOSpath - set new log level to file
 
-    Utils::intToFileFromEnv(newLogLevel, "CORE_LOGLEVEL_FILE");        // new value to file
+    Utils::intToFileFromEnv(newLogLevel, "CORE_IKBD_LOGLEVEL_FILE");        // new value to file
 }
 
 void Debug::logRotateIfNeeded(const char *logFilePath)
@@ -201,61 +191,13 @@ void Debug::logRotateIfNeeded(const char *logFilePath)
     }
 }
 
-void Debug::chipLog(const char* bfr)
-{
-    Debug::chipLog(strlen(bfr), (char*) bfr);
-}
-
-// chipLog() will receive incomplete lines stored in bfr, terminated by '\n'.
-// It should write only complete lines to file, so it will try to gather chars until '\n' char and do write to file then.
-void Debug::chipLog(uint16_t cnt, char* bfr)
-{
-    static std::string oneLine;
-    static uint32_t prevLogOutChips = 0;
-
-    uint32_t now = Utils::getCurrentMs();
-    uint32_t diff = now - prevLogOutChips;
-    prevLogOutChips = now;
-
-    FILE* f = logFileOpen(CHIP_LOG_FILENAME);
-
-    if(!f) {                    // no file? quit
-        return;
-    }
-
-    for(int i=0; i<cnt; i++) {  // for cnt of characters
-        char val = bfr[i];      // get from buffer
-        oneLine += val;         // append to string
-
-        if(val == '\n') {       // if last char was new line, dump it to file
-            fprintf(f, "%08d\t%08d\t ", now, diff);
-            fputs(oneLine.c_str(), f);
-            oneLine.clear();    // clear gathered line
-        }
-    }
-
-    fclose(f);      // close file at the end
-}
-
-FILE* Debug::logFileOpen(const char* logFileName)
+FILE* Debug::logFileOpen(void)
 {
     static std::string path;
 
-    std::string logFileStdStr = logFileName;
-    std::map<std::string, std::string>::iterator i = logPaths.find(logFileStdStr);
-    std::string logPath;
+    Debug::logRotateIfNeeded(getCoreLogFileName());   // rotate log file if too big
 
-    if(i == logPaths.end()) {   // don't have path for this file, create it, store it
-        logPath = Utils::dotEnvValue("LOG_DIR", LOG_DIR_DEFAULT);   // path to logs dir
-        Utils::mergeHostPaths(logPath, logFileStdStr);              // merge filename into path
-        logPaths[logFileStdStr] = logPath;                          // store to map for next time
-    } else {                    // have path, use value
-        logPath = i->second;
-    }
-
-    Debug::logRotateIfNeeded(logPath.c_str());   // rotate log file if too big
-
-    FILE *f = fopen(logPath.c_str(), "a+t");
+    FILE *f = fopen(getCoreLogFileName(), "a+t");
     return f;
 }
 

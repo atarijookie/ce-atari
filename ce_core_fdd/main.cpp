@@ -28,22 +28,17 @@ void sigint_handler(int sig);
 void handlePthreadCreate(const char* threadName, pthread_t* pThreadInfo, void* threadCode);
 void parseCmdLineArguments(int argc, char *argv[]);
 void printfPossibleCmdLineArgs(void);
-void loadDefaultArgumentsFromFile(void);
 
 void initializeFlags(void);
 
 TFlags              flags;                              // global flags from command line
-RPiConfig           rpiConfig;                          // RPi model, revision, serial
 InterProcessEvents  events;
 SharedObjects       shared;
-ChipInterface*      chipInterface;
-ExternalServices    externalServices;
+ChipInterfaceNetwork* chipInterface;
 
 bool otherInstanceIsRunning(void);
-int  singleInstanceSocketFd;
-
-void showOnDisplay(int argc, char *argv[]);
-int  runCore(int instanceNo, bool localNotNetwork);
+std::string pidFileName(void);
+int runCore(void);
 
 int main(int argc, char *argv[])
 {
@@ -55,55 +50,35 @@ int main(int argc, char *argv[])
     initializeFlags();                                          // initialize flags
     Debug::out(LOG_INFO, "\n\n"); Debug::out(LOG_INFO, "---------------------------------------------------");
 
-    loadDefaultArgumentsFromFile();                             // first parse default arguments from file
     parseCmdLineArguments(argc, argv);                          // then parse cmd line arguments and set global variables
     Debug::printfLogLevelString();
 
-    Utils::loadDotEnv();            // load dotEnv before setting default log file
-    Debug::setDefaultLogFile();     // set log file after env vars available
-    Debug::logLevelFromDotEnv();
+    Utils::loadDotEnv();                    // load dotEnv before setting default log file
+    Debug::getCoreLogFileName(true);        // call this with force=true to re-create the log file name
+    Debug::logLevelFromDotEnv();            // set log level from .env value of LOG_LEVEL
 
-    ldp_setParam(1, (uint64_t) flags.logLevel);                         // libDOSpath - set log level to file
-    std::string logDir = Utils::dotEnvValue("LOG_DIR", LOG_DIR_DEFAULT);  // path to logs dir
-    Utils::mergeHostPaths(logDir, "libdospath.log");                    // full path = logs dir + filename
-    ldp_setParam(2, (uint64_t) logDir.c_str());                         // libDOSpath - set log file path
-    Debug::out(LOG_ERROR, "setting libdospath log file to: %s and log level to: %d", logDir.c_str(), flags.logLevel);
-
-    Utils::screenShotVblEnabled(false);                         // screenshot vbl not enabled by default
     preloadGlobalsFromDotEnv();
 
-    //------------------------------------
     // if should only show help and quit
     if(flags.justShowHelp) {
         printfPossibleCmdLineArgs();
         return 0;
     }
 
-    //------------------------------------
-    // before touching GPIO make sure that no other instance is running
+    // make sure that no other instance is running
     if(otherInstanceIsRunning()) {
         Debug::out(LOG_ERROR, "Other instance of CosmosEx is running, terminate it before starting a new one!");
         printf("\nOther instance of CosmosEx is running, terminate it before starting a new one!\n\n\n");
         return 0;
     }
 
-    Debug::out(LOG_INFO, "logLevel: %d, test: %d, noCapture: %d", flags.logLevel, flags.test, flags.noCapture);
+    Debug::out(LOG_INFO, "logLevel: %d", flags.logLevel);
 
     //------------------------------------------------------------
     // Opening of chip interface.
-
-    bool good = false;
-    chipInterface = NULL;
-
     Debug::out(LOG_INFO, "ChipInterface: starting NETWORK server");
 
-    good = chipInterface->ciOpen();                         // try to open chip interface v1/v2
-
-    // after the previous lines the good flag should contain if we were able to open the chip interface
-    if(!good) {
-        printf("\nHW_VER: UNKNOWN\n");
-        printf("\nHDD_IF: UNKNOWN\n");
-
+    if(!chipInterface->ciOpen()) {
         Debug::out(LOG_ERROR, "ChipInterface - failed to open chip Interface, terminating.");
         printf("\nChipInterface - failed to open chip Interface, terminating.\n");
         return 0;
@@ -121,7 +96,7 @@ int main(int argc, char *argv[])
 
     //------------------------------------------------------------
     // if came here, we should run this app as the main local core
-    return runCore(0, true);
+    return runCore();
 }
 
 void pthread_kill_join(const char* threadName, pthread_t& threadInfo)
@@ -131,39 +106,15 @@ void pthread_kill_join(const char* threadName, pthread_t& threadInfo)
     pthread_join(threadInfo, NULL);             // wait until thread finishes
 }
 
-// instanceNo: number of core instance, used for separating folders and ports
-// localNotNetwork: if true, will access local hardware for communication; if false then will use network interface
-int runCore(int instanceNo, bool localNotNetwork)
+int runCore(void)
 {
     CCoreThread *core;
-    pthread_t   floppyEncThreadInfo;
-    pthread_t   cmdSockThreadInfo;
+    pthread_t floppyEncThreadInfo;
+    pthread_t cmdSockThreadInfo;
 
-    flags.localNotNetwork = localNotNetwork;            // store if this core runs as local device or as network server
-    flags.instanceNo = instanceNo;
-
-    //------------------------------------
-    // if should run this core as network server
-    if(!localNotNetwork) {
-        Debug::out(LOG_INFO, "runCore as network server instance # %d", instanceNo);
-
-        chipInterface = new ChipInterfaceNetwork();     // create network chip interface
-        chipInterface->setInstanceIndex(instanceNo);    // set index of this instance
-        chipInterface->ciOpen();                        // try to open it
-    }
-
-    //------------------------------------
-    // normal app run follows
-    Debug::printfLogLevelString();
-
-    char appVersion[16];
-    Version::getAppVersion(appVersion);
-    Debug::out(LOG_INFO, "CosmosEx core starting, version: %s", appVersion);
-    printf("\nCosmosEx core starting, version: %s\n", appVersion);
-
-    Version::getRaspberryPiInfo();                                  // fetch model, revision, serial of RPi
-
-//  system("sudo echo none > /sys/class/leds/led0/trigger");        // disable usage of GPIO 23 (pin 16) by LED
+    Debug::out(LOG_INFO, "CosmosEx FDD core starting at port %d", flags.portClient);
+    printf("\nCosmosEx FDD core starting at port %d\n", flags.portClient);
+    printf("\nlog file: %s\n", Debug::getCoreLogFileName(false));
 
     Utils::setTimezoneVariable_inThisContext();
 
@@ -171,6 +122,7 @@ int runCore(int instanceNo, bool localNotNetwork)
     core = new CCoreThread();
 
     handlePthreadCreate("floppy encoder", &floppyEncThreadInfo, (void*) floppyEncodeThreadCode);
+    handlePthreadCreate("command socket", &cmdSockThreadInfo, (void*) cmdSockThreadCode);
 
     printf("Entering main loop...\n");
 
@@ -182,21 +134,14 @@ int runCore(int instanceNo, bool localNotNetwork)
 
     floppyEncoder_stop();
     pthread_kill_join("floppy encoder", floppyEncThreadInfo);
+    pthread_kill_join("command socket", cmdSockThreadInfo);
 
-    //---------------------------------------------------
-    // Closing of GPIO should be done after stopping IKBD thread and DISPLAY thread
-    // as they also use some GPIO pins and we want them to be able to use them until the end.
-    chipInterface->ciClose();                           // close gpio
+    chipInterface->ciClose();
     delete chipInterface;
     chipInterface = NULL;
-    //---------------------------------------------------
-
-    if(singleInstanceSocketFd > 0) {                    // if we got the single instance socket, close it
-        close(singleInstanceSocketFd);
-    }
 
     // remove PID file on termination
-    std::string pidFilePath = Utils::dotEnvValue("CORE_PID_FILE", DATA_DIR_DEFAULT "/core.pid");
+    std::string pidFilePath = pidFileName();
     unlink(pidFilePath.c_str());
 
     Debug::out(LOG_INFO, "CosmosEx terminated.");
@@ -207,59 +152,8 @@ int runCore(int instanceNo, bool localNotNetwork)
 void initializeFlags(void)
 {
     flags.justShowHelp = false;
+    flags.portClient = SERVER_TCP_PORT_FDD;
     Debug::setLogLevel(LOG_ERROR);      // init current log level to LOG_ERROR
-    flags.test         = false;         // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
-    flags.ikbdLogs     = false;         // no ikbd logs by default
-    flags.fakeOldApp   = false;         // don't fake old app by default
-    flags.noCapture    = false;         // if true, don't do exclusive mouse and keyboard capture
-
-    flags.localNotNetwork   = true;     // if true, this app runs handling localy connected device; if false then this core is part of the network server
-    flags.instanceNo        = 0;
-
-    flags.deviceDoUpdate    = false;    // if true, device should download update and write it to flash
-}
-
-void loadDefaultArgumentsFromFile(void)
-{
-    FILE *f = fopen("/ce/default_args", "rt");  // try to open default args file
-
-    if(!f) {
-        printf("No default app arguments.\n");
-        return;
-    }
-
-    char args[1024];
-    memset(args, 0, 1024);
-    fgets(args, 1024, f);                       // read line from file
-    fclose(f);
-
-    int argc = 0;
-    char *argv[64];
-    memset(argv, 0, 64 * 4);                    // clear the future argv field
-
-    argv[0] = (char *) "fake.exe";              // 0th argument is skipped, as it's usualy file name (when passed to main())
-    argc    = 1;
-    argv[1] = &args[0];                         // 1st argument starts at the start of the line
-
-    int len = strlen(args);
-    for(int i=0; i<len; i++) {                  // go through the arguments line
-        if(args[i] == ' ' || args[i]=='\n' || args[i] == '\r') {    // if found space or new line...
-            args[i] = 0;                        // convert space to string terminator
-
-            argc++;
-            if(argc >= 64) {                    // would be out of bondaries? quit
-                break;
-            }
-
-            argv[argc] = &args[i + 1];          // store pointer to next string, increment count
-        }
-    }
-
-    if(len > 0) {                               // the alg above can't detect last argument, so just increment argument count
-        argc++;
-    }
-
-    parseCmdLineArguments(argc, argv);
 }
 
 void parseCmdLineArguments(int argc, char *argv[])
@@ -295,30 +189,13 @@ void parseCmdLineArguments(int argc, char *argv[])
             continue;
         }
 
-        // for testing purposes: set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
-        if(strcmp(argv[i], "test") == 0) {
-            printf("Testing setup active!\n");
-            isKnownTag          = true;                             // this is a known tag
-            flags.test          = true;
-            continue;
-        }
-
-        // produce ikbd logs
-        if(strcmp(argv[i], "ikbdlogs") == 0) {
-            isKnownTag          = true;                             // this is a known tag
-            flags.ikbdLogs      = true;
-        }
-
-        // should fake old app version? (for reinstall tests)
-        if(strcmp(argv[i], "fakeold") == 0) {
-            isKnownTag          = true;                             // this is a known tag
-            flags.fakeOldApp    = true;
-        }
-
-        // don't capture USB mouse and keyboard
-        if(strcmp(argv[i], "nocap") == 0) {
-            isKnownTag          = true;                             // this is a known tag
-            flags.noCapture     = true;
+        if(argv[i][0] == 'p') {
+            isKnownTag = true;                                      // this is a known tag
+            int res = sscanf(argv[i] + 1, "%d", &flags.portClient);
+            if(res != 1) {
+                printf(">>> BAD CLIENT PORT VALUE: '%s' <<<\n", argv[i] + 1);
+                Debug::out(LOG_ERROR, ">>> BAD CLIENT PORT VALUE: '%s' <<<\n", argv[i] + 1);
+            }
         }
 
         if(!isKnownTag) {                                           // if tag unknown, show warning
@@ -330,16 +207,8 @@ void parseCmdLineArguments(int argc, char *argv[])
 void printfPossibleCmdLineArgs(void)
 {
     printf("\nPossible command line args:\n");
-    printf("reset    - reset Hans and Franz, release lines, quit\n");
-    printf("noreset  - when starting, don't reset Hans and Franz\n");
     printf("llx      - set log level to x (default is 1, max is 4)\n");
-    printf("cix      - set chip interface type to x (1 & 2 for old SPI, 3 for new SPI, 4 for HDD via logic chips + old SPI, 8 for RaSCSI, 9 for network server, 0 for dummy)\n");
-    printf("test     - some default config for device testing\n");
-    printf("ce_conf  - use this app as ce_conf on RPi (the app must be running normally, too)\n");
-    printf("hwinfo   - get HW version and HDD interface type\n");
-    printf("ikbdlogs - write IKBD logs to file\n");
-    printf("fakeold  - fake old app version for reinstall tests\n");
-    printf("nocap    - don't do exclusive USB mouse and keyboard capture\n");
+    printf("pXXXX    - set listening port to XXXX\n");
 }
 
 void handlePthreadCreate(const char* threadName, pthread_t* pThreadInfo, void* threadCode)
@@ -360,6 +229,13 @@ void sigint_handler(int sig)
     sigintReceived = 1;
 }
 
+std::string pidFileName(void)
+{
+    std::string pidDir = Utils::dotEnvValue("PID_DIR", PID_DIR_DEFAULT);
+    std::string pidFilePath = pidDir + std::string("/ce_fdd.pid");
+    return pidFilePath;
+}
+
 bool otherInstanceIsRunning(void)
 {
     FILE * f;
@@ -370,7 +246,7 @@ bool otherInstanceIsRunning(void)
     char self_exe[PATH_MAX];
 
     self_pid = getpid();
-    std::string pidFilePath = Utils::dotEnvValue("CORE_PID_FILE", DATA_DIR_DEFAULT "/core.pid");
+    std::string pidFilePath = pidFileName();
 
     f = fopen(pidFilePath.c_str(), "r");
     if(!f) {    // can't open file? other instance probably not running (or is, but can't figure out, so screw it)

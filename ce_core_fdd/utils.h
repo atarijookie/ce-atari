@@ -82,7 +82,7 @@ public:
 
     static int bcdToInt(int bcd);
 
-    static std::string dotEnvValue(std::string key, const char* defValue=NULL);
+    static std::string dotEnvValue(std::string key, const char* defValue=NULL, bool logOnError=true);
     static void loadDotEnv(void);
     static bool loadDotEnvFrom(const char* path);
     static int  dotEnvSubstituteVars(void);
@@ -98,7 +98,6 @@ public:
     static bool startsWith(const std::string& value, const char* head);
     static bool endsWith(const std::string& value, const char* tail);
 
-    static void screenShotVblEnabled(bool enabled);
     static void createFloppyTestImage(void);
 
     static void sendToMounter(const std::string& jsonString);
