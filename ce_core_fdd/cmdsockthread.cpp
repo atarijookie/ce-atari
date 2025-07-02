@@ -38,7 +38,7 @@ int createRecvSocket(const char* dotEnvKey)
 
 	if (sock < 0) {
 	    Debug::out(LOG_ERROR, "createRecvSocket - failed to create socket!");
-	    return -1;
+	    return FD_EMPTY;
 	}
 
     fchmod(sock, S_IRUSR | S_IWUSR);        // restrict permissions before bind
@@ -55,7 +55,7 @@ int createRecvSocket(const char* dotEnvKey)
     int res = bind(sock, (struct sockaddr *) &addr, strlen(addr.sun_path) + sizeof(addr.sun_family));
     if (res < 0) {
 	    Debug::out(LOG_ERROR, "createRecvSocket - failed to bind socket to %s - errno: %d", sockPath.c_str(), errno);
-	    return -1;
+	    return FD_EMPTY;
     }
 
     chmod(addr.sun_path, 0666);             // loosen permissions

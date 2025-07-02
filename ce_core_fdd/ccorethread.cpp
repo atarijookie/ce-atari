@@ -51,7 +51,6 @@ CCoreThread::CCoreThread()
     setDiskChanged          = false;
     diskChanged             = false;
 
-    lastFloppyImageLed = -1;
     newFloppyImageLedAfterEncode = -2;
 
     sharedObjects_create();
@@ -110,7 +109,8 @@ void CCoreThread::run(void)
 
         load.busy.markStart();                  // mark the start of the busy part of the code
 
-        needsAction = chipInterface->actionNeeded(inBuff);
+        int fdClient = -1;  // TODO: real fd
+        needsAction = chipInterface->actionNeeded(fdClient, inBuff);
 
         if(needsAction) {   // floppy drive needs action?
             gotFddCommand = handleFdd(inBuff);
@@ -272,8 +272,9 @@ void CCoreThread::handleFwVersion_franz(void)
     uint8_t fwVer[14];
     memset(fwVer,  0, 14);
 
+    int fdClient = -1;  // TODO: real fd
     chipInterface->setFDDconfig(setFloppyConfig, &floppyConfig, setDiskChanged, diskChanged);
-    chipInterface->getFWversion(fwVer);
+    chipInterface->getFWversion(fdClient, fwVer);
 
     if(setFloppyConfig) {                                       // did set floppy config? don't set again
         setFloppyConfig = false;
@@ -337,8 +338,9 @@ void CCoreThread::handleSendTrack(uint8_t *inBuf)
         encodedTrack = shared.imageSilo->getEncodedTrack(track, side, countInTrack);
     }
 
+    int fdClient = -1;      // TODO: real fd
     int remaining = MFM_STREAM_SIZE - (4*2) - 2;    // this much bytes remain to send after the received ATN
-    chipInterface->fdd_sendTrackToChip(remaining, encodedTrack);
+    chipInterface->fdd_sendTrackToChip(fdClient, remaining, encodedTrack);
 
     // now we should do some buzzing because of floppy seek
     if(prevTrack != track) {                        // track changed?
@@ -349,7 +351,8 @@ void CCoreThread::handleSendTrack(uint8_t *inBuf)
 void CCoreThread::handleSectorWritten(void)
 {
     int side, track, sector, byteCount;
-    uint8_t *writtenSector = chipInterface->fdd_sectorWritten(side, track, sector, byteCount); // get side + track + sector number, byte count, and pointer to buffer where the written data is
+    int fdClient = -1;      // TODO: real fd
+    uint8_t *writtenSector = chipInterface->fdd_sectorWritten(fdClient, side, track, sector, byteCount); // get side + track + sector number, byte count, and pointer to buffer where the written data is
 
     if(!floppyConfig.writeProtected) {  // not write protected? write
         Debug::out(LOG_DEBUG, "handleSectorWritten -- track %d, side %d, sector %d", track, side, sector);

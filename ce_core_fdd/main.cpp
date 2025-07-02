@@ -46,7 +46,6 @@ int main(int argc, char *argv[])
 
     printf("\033[H\033[2J\n");
 
-    Debug::setDefaultLogFile();                // set log file before env vars available
     initializeFlags();                                          // initialize flags
     Debug::out(LOG_INFO, "\n\n"); Debug::out(LOG_INFO, "---------------------------------------------------");
 

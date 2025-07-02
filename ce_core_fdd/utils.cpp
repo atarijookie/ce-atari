@@ -1128,8 +1128,8 @@ bool Utils::endsWith(const std::string& value, const char* tail)
 
 void Utils::closeFdIfOpen(int& fd)
 {
-    if(fd != -1) {    // got the fd?
+    if(fd != FD_EMPTY) {    // got the fd?
         close(fd);    // close it
-        fd = -1;      // set it to invalid value
+        fd = FD_EMPTY;      // set it to invalid value
     }
 }

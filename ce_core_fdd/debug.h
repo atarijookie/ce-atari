@@ -38,7 +38,6 @@ public:
     static void chipLog(const char* bfr);
     static void chipLog(uint16_t cnt, char* bfr);
 
-    static void setDefaultLogFile(void);
     static FILE* logFileOpen(void);
     static const char* getCoreLogFileName(bool forceCreate = false);
 

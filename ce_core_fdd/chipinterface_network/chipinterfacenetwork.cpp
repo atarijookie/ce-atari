@@ -65,7 +65,7 @@ int ChipInterfaceNetwork::getEmptyClientIndex(void)
         }
     }
 
-    return -1;
+    return FD_EMPTY;
 }
 
 void ChipInterfaceNetwork::createListeningSocket(void)
@@ -148,7 +148,7 @@ void ChipInterfaceNetwork::acceptSocketIfNeededAndPossible(void)
     Debug::out(LOG_INFO, "acceptSocketIfNeededAndPossible() - client #%d connected from %s", idx, clientIp);
 }
 
-void ChipInterfaceNetwork::closeClientSocket(void)
+void ChipInterfaceNetwork::closeClientSocket(int& fdClient)
 {
     // Utils::closeFdIfOpen(fdClient);            // close socket
 
@@ -173,7 +173,7 @@ void ChipInterfaceNetwork::ciClose(void)
 
 int ChipInterfaceNetwork::disconnectInactiveClients(void)
 {
-    int maxFd = -1;
+    int maxFd = FD_EMPTY;
     uint32_t now = Utils::getCurrentMs();
 
     for(int i=0; i<MAX_CLIENTS; i++) {
@@ -196,7 +196,7 @@ int ChipInterfaceNetwork::disconnectInactiveClients(void)
 
 int ChipInterfaceNetwork::setAllClientFds(fd_set* readfds)
 {
-    int maxFd = -1;
+    int maxFd = FD_EMPTY;
 
     for(int i=0; i<MAX_CLIENTS; i++) {
         if(fdClients[i] != FD_EMPTY) {      // got this client?
@@ -228,7 +228,7 @@ void ChipInterfaceNetwork::handleAllReadyClients(fd_set* readfds)
     }
 }
 
-bool ChipInterfaceNetwork::actionNeeded(uint8_t *inBuf)
+bool ChipInterfaceNetwork::actionNeeded(int& fdClient, uint8_t *inBuf)
 {
     acceptSocketIfNeededAndPossible();  // if don't have client connected, try to accept connection from client
 
@@ -261,7 +261,7 @@ bool ChipInterfaceNetwork::actionNeeded(uint8_t *inBuf)
     // we might need to wait for ATN multiple times, as there might be ZEROS packet or IKBD packet before we read wanted Hans or Franz packet
     while(sigintReceived == 0) {
         // check for any ATN code waiting from Hans
-        bool good = waitForAtn(NET_ATN_ANY_ID, ATN_ANY, 0, inBuf);    // which chip wants to communicate? (which chip's stream we should process?)
+        bool good = waitForAtn(fdClient, NET_ATN_ANY_ID, ATN_ANY, 0, inBuf);    // which chip wants to communicate? (which chip's stream we should process?)
 
         if(!good) {                                         // not good? break loop, no action needed
             break;
@@ -271,7 +271,7 @@ bool ChipInterfaceNetwork::actionNeeded(uint8_t *inBuf)
 
         if(gotAtnId == NET_ATN_FRANZ_ID) {                  // for Franz
             if(gotAtnCode == ATN_SEND_TRACK) {              // for this command read 2 more bytes: side + track
-                recvFromClient(inBuf + 8, 2);
+                recvFromClient(fdClient, inBuf + 8, 2);
             }
 
             return true;
@@ -286,29 +286,29 @@ bool ChipInterfaceNetwork::actionNeeded(uint8_t *inBuf)
     return false;
 }
 
-void ChipInterfaceNetwork::getFWversion(uint8_t *inFwVer)
+void ChipInterfaceNetwork::getFWversion(int& fdClient, uint8_t *inFwVer)
 {
     // fwResponseBfr should be filled with Franz config - by calling setFDDconfig() (and not calling anything else inbetween)
-    // sendDataToChip(fwResponseBfr, FDD_FW_RESPONSE_LEN);
+    // sendDataToChip(fdClient, fwResponseBfr, FDD_FW_RESPONSE_LEN);
 
-    recvFromClient(inFwVer, bufReader.dataSizeRest());
+    recvFromClient(fdClient, inFwVer, bufReader.dataSizeRest());
 
     int year = Utils::bcdToInt(inFwVer[1]) + 2000;
     Update::versions.franz.fromInts(year, Utils::bcdToInt(inFwVer[2]), Utils::bcdToInt(inFwVer[3]));              // store found FW version of Franz
 }
 
-void ChipInterfaceNetwork::fdd_sendTrackToChip(int byteCount, uint8_t *encodedTrack)
+void ChipInterfaceNetwork::fdd_sendTrackToChip(int& fdClient, int byteCount, uint8_t *encodedTrack)
 {
     // send encoded track out, read garbage into bufIn and don't care about it
-    sendDataToChip(encodedTrack, byteCount);
+    sendDataToChip(fdClient, encodedTrack, byteCount);
 }
 
-uint8_t* ChipInterfaceNetwork::fdd_sectorWritten(int &side, int &track, int &sector, int &byteCount)
+uint8_t* ChipInterfaceNetwork::fdd_sectorWritten(int& fdClient, int &side, int &track, int &sector, int &byteCount)
 {
     byteCount = bufReader.dataSizeRest();   // get how many data we still have
 
     // get all the remaining data
-    recvFromClient(bufIn, byteCount);
+    recvFromClient(fdClient, bufIn, byteCount);
 
     // get the written sector, side, track number
     sector  = bufIn[1];
@@ -318,7 +318,7 @@ uint8_t* ChipInterfaceNetwork::fdd_sectorWritten(int &side, int &track, int &sec
     return bufIn;                                           // return pointer to received written sector
 }
 
-bool ChipInterfaceNetwork::waitForAtn(int atnIdWant, uint8_t atnCode, uint32_t timeoutMs, uint8_t *inBuf)
+bool ChipInterfaceNetwork::waitForAtn(int& fdClient, int atnIdWant, uint8_t atnCode, uint32_t timeoutMs, uint8_t *inBuf)
 {
     gotAtnId = 0;
     gotAtnCode = 0;
@@ -332,7 +332,7 @@ bool ChipInterfaceNetwork::waitForAtn(int atnIdWant, uint8_t atnCode, uint32_t t
         if(atnIdGot == NET_ATN_DISCONNECTED) {         // if buffered reader detected client disconnect, close it and quit
             Debug::out(LOG_DEBUG, "waitForAtn() - DISCONNECTED!");
 
-            closeClientSocket();
+            closeClientSocket(fdClient);
             return false;
         }
 
@@ -377,7 +377,7 @@ void ChipInterfaceNetwork::storeHeaderToBuffer(uint16_t cmdCode, uint32_t future
     Utils::storeDword(buffer + 6, futureDatalen); // 6..9: futureDatalen (4 bytes)
 }
 
-bool ChipInterfaceNetwork::sendHeaderToChip(uint16_t cmdCode, uint32_t futureDatalen)        // send header to chip
+bool ChipInterfaceNetwork::sendHeaderToChip(int& fdClient, uint16_t cmdCode, uint32_t futureDatalen)        // send header to chip
 {
     if(fdClient < 0) {                      // no client socket? quit
         return false;
@@ -390,7 +390,7 @@ bool ChipInterfaceNetwork::sendHeaderToChip(uint16_t cmdCode, uint32_t futureDat
     return (res == 10);
 }
 
-bool ChipInterfaceNetwork::sendDataToChip(uint8_t* data, uint32_t len)        // send data to chip
+bool ChipInterfaceNetwork::sendDataToChip(int& fdClient, uint8_t* data, uint32_t len)        // send data to chip
 {
     if(fdClient < 0) {                      // no client socket? quit
         return false;
@@ -400,19 +400,19 @@ bool ChipInterfaceNetwork::sendDataToChip(uint8_t* data, uint32_t len)        //
     return (((uint32_t)res) == len);
 }
 
-bool ChipInterfaceNetwork::sendHeaderAndDataToChip(uint16_t cmdCode, uint8_t* data, uint32_t len)        // send header and data to chip
+bool ChipInterfaceNetwork::sendHeaderAndDataToChip(int& fdClient, uint16_t cmdCode, uint8_t* data, uint32_t len)        // send header and data to chip
 {
     bool good;
 
     if(len > 512)       // for larger data send using separate write() commands
     {
-        if(!sendHeaderToChip(cmdCode, len))
+        if(!sendHeaderToChip(fdClient, cmdCode, len))
         {
             Debug::out(LOG_DEBUG, "sendHeaderAndDataToChip failed!");
             return false;
         }
 
-        good = sendDataToChip(data, len);
+        good = sendDataToChip(fdClient, data, len);
         Debug::out(LOG_DEBUG, "sendHeaderAndDataToChip - good: %d", good);
     } 
     else                // for small data first copy data into buffers, then send with one write() command
@@ -436,7 +436,7 @@ bool ChipInterfaceNetwork::sendHeaderAndDataToChip(uint16_t cmdCode, uint8_t* da
     Receive data from client, up to rest of the data size specified in header,
     respecting maximum length of buffer (maxLen).
 */
-uint32_t ChipInterfaceNetwork::recvFromClient(uint8_t* buf, int maxLen)
+uint32_t ChipInterfaceNetwork::recvFromClient(int& fdClient, uint8_t* buf, int maxLen)
 {
     int received = 0;                       // total received count
 

@@ -5,13 +5,14 @@
 
 #include "../utils.h"
 #include "../debug.h"
+#include "../global.h"
 #include <stdint.h>
 #include "bufferedreader.h"
 #include "chipinterfacenetwork.h"
 
 BufferedReader::BufferedReader()
 {
-    fd = -1;
+    fd = FD_EMPTY;
     gotBytes = 0;
     dataSizeBytes = 0;
 }

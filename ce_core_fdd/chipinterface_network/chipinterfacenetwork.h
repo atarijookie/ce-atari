@@ -46,15 +46,15 @@ public:
 
     //----------------
     // if following function returns true, some command is waiting for action in the inBuf and hardNotFloppy flag distiguishes hard-drive or floppy-drive command
-    bool actionNeeded(uint8_t *inBuf);
+    bool actionNeeded(int& fdClient, uint8_t *inBuf);
 
     // to handle FW version, first call setHDDconfig() to fill config into bufOut, then call getFWversion to get the FW version from chip
-    void getFWversion(uint8_t *inFwVer);
+    void getFWversion(int& fdClient, uint8_t *inFwVer);
 
     //----------------
     // FDD: all you need for handling the floppy interface
-    void fdd_sendTrackToChip(int byteCount, uint8_t *encodedTrack);    // send encodedTrack to chip for MFM streaming
-    uint8_t* fdd_sectorWritten(int &side, int &track, int &sector, int &byteCount);
+    void fdd_sendTrackToChip(int& fdClient, int byteCount, uint8_t *encodedTrack);    // send encodedTrack to chip for MFM streaming
+    uint8_t* fdd_sectorWritten(int& fdClient, int &side, int &track, int &sector, int &byteCount);
 
     void setFDDconfig(bool setFloppyConfig, FloppyConfig* fddConfig, bool setDiskChanged, bool diskChanged);
 
@@ -76,18 +76,18 @@ private:
 
     void createListeningSocket(void);
     void acceptSocketIfNeededAndPossible(void);
-    void closeClientSocket(void);
-    uint32_t recvFromClient(uint8_t* buf, int maxLen);
+    void closeClientSocket(int& fdClient);
+    uint32_t recvFromClient(int& fdClient, uint8_t* buf, int maxLen);
 
     int setAllClientFds(fd_set* readfds);
     void handleAllReadyClients(fd_set* readfds);
     int disconnectInactiveClients(void);
 
-    bool waitForAtn(int atnIdWant, uint8_t atnCode, uint32_t timeoutMs, uint8_t *inBuf);
+    bool waitForAtn(int& fdClient, int atnIdWant, uint8_t atnCode, uint32_t timeoutMs, uint8_t *inBuf);
 
-    bool sendHeaderToChip(uint16_t cmdCode, uint32_t futureDatalen);                // send header to chip
-    bool sendDataToChip(uint8_t* data, uint32_t len);                               // send data to chip  
-    bool sendHeaderAndDataToChip(uint16_t cmdCode, uint8_t* data, uint32_t len);    // send header and data to chip
+    bool sendHeaderToChip(int& fdClient, uint16_t cmdCode, uint32_t futureDatalen);                // send header to chip
+    bool sendDataToChip(int& fdClient, uint8_t* data, uint32_t len);                               // send data to chip  
+    bool sendHeaderAndDataToChip(int& fdClient, uint16_t cmdCode, uint8_t* data, uint32_t len);    // send header and data to chip
     void storeHeaderToBuffer(uint16_t cmdCode, uint32_t futureDatalen, uint8_t* buffer);
     int getEmptyClientIndex(void);
 };
