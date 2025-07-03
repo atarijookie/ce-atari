@@ -111,8 +111,8 @@ int runCore(void)
     pthread_t floppyEncThreadInfo;
     pthread_t cmdSockThreadInfo;
 
-    logFdd(LOG_INFO, "CosmosEx FDD core starting at port %d", flags.portClient);
-    printf("\nCosmosEx FDD core starting at port %d\n", flags.portClient);
+    logFdd(LOG_INFO, "CosmosEx FDD core starting at port %d", SERVER_TCP_PORT_FDD);
+    printf("\nCosmosEx FDD core starting at port %d\n", SERVER_TCP_PORT_FDD);
     printf("\nlog file: %s\n", Debug::getCoreLogFileName(false));
 
     Utils::setTimezoneVariable_inThisContext();
@@ -151,7 +151,6 @@ int runCore(void)
 void initializeFlags(void)
 {
     flags.justShowHelp = false;
-    flags.portClient = SERVER_TCP_PORT_FDD;
     Debug::setLogLevel(LOG_ERROR);      // init current log level to LOG_ERROR
 }
 
@@ -188,15 +187,6 @@ void parseCmdLineArguments(int argc, char *argv[])
             continue;
         }
 
-        if(argv[i][0] == 'p') {
-            isKnownTag = true;                                      // this is a known tag
-            int res = sscanf(argv[i] + 1, "%d", &flags.portClient);
-            if(res != 1) {
-                printf(">>> BAD CLIENT PORT VALUE: '%s' <<<\n", argv[i] + 1);
-                logFdd(LOG_ERROR, ">>> BAD CLIENT PORT VALUE: '%s' <<<\n", argv[i] + 1);
-            }
-        }
-
         if(!isKnownTag) {                                           // if tag unknown, show warning
             printf(">>> UNKNOWN APP ARGUMENT: '%s' <<<\n", argv[i]);
         }
@@ -207,7 +197,6 @@ void printfPossibleCmdLineArgs(void)
 {
     printf("\nPossible command line args:\n");
     printf("llx      - set log level to x (default is 1, max is 4)\n");
-    printf("pXXXX    - set listening port to XXXX\n");
 }
 
 void handlePthreadCreate(const char* threadName, pthread_t* pThreadInfo, void* threadCode)

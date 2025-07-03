@@ -38,6 +38,8 @@ typedef struct {
     uint32_t    ipAddr;             // client's IP addr
     int         floppySlotindex;    // which floppy slot this IP is using
     uint32_t    lastMs;             // value of getCurrentMs() when was last time anything was received from this client
+    
+    BufferedReader bufReader;
 } ClientInfo;
 
 class FloppyThread;
@@ -57,15 +59,15 @@ virtual ~ChipInterfaceNetwork();
 
     //----------------
     // if following function returns true, some command is waiting for action in the inBuf and hardNotFloppy flag distiguishes hard-drive or floppy-drive command
-    bool actionNeeded(int& fdClient, uint8_t *inBuf);
+    bool actionNeeded(int clientIndex, uint8_t *inBuf);
 
     // to handle FW version, first call setHDDconfig() to fill config into bufOut, then call getFWversion to get the FW version from chip
-    void getFWversion(int& fdClient, uint8_t *inFwVer);
+    void getFWversion(int clientIndex);
 
     //----------------
     // FDD: all you need for handling the floppy interface
     void fdd_sendTrackToChip(int& fdClient, int byteCount, uint8_t *encodedTrack);    // send encodedTrack to chip for MFM streaming
-    uint8_t* fdd_sectorWritten(int& fdClient, int &side, int &track, int &sector, int &byteCount);
+    uint8_t* fdd_sectorWritten(int clientIndex, int &side, int &track, int &sector, int &byteCount);
 
     void setFDDconfig(bool setFloppyConfig, FloppyConfig* fddConfig, bool setDiskChanged, bool diskChanged);
 
@@ -86,13 +88,11 @@ private:
 
     uint8_t  gotAtnId;      // which chip wants to talk? Franz, Hans?
     uint8_t  gotAtnCode;    // which command code chips sends? 
-    BufferedReader bufReader;
 
     void createListeningSocket(void);
-    void closeClientSocket(int& fdClient);
-    uint32_t recvFromClient(int& fdClient, uint8_t* buf, int maxLen);
+    uint32_t recvFromClient(int clientIndex, uint8_t* buf, int maxLen);
 
-    bool waitForAtn(int& fdClient, int atnIdWant, uint8_t atnCode, uint32_t timeoutMs, uint8_t *inBuf);
+    bool waitForAtn(int clientIndex, int atnIdWant, uint8_t atnCode, uint32_t timeoutMs, uint8_t *inBuf);
 
     bool sendHeaderToChip(int& fdClient, uint16_t cmdCode, uint32_t futureDatalen);                // send header to chip
     bool sendDataToChip(int& fdClient, uint8_t* data, uint32_t len);                               // send data to chip  

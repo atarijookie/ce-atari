@@ -107,33 +107,33 @@ void FloppyThread::run(void)
     }
 }
 
-bool FloppyThread::handleOneClient(int fdClient, int floppySlotindex)
+bool FloppyThread::handleOneClient(int clientIndex, int fdClient, int floppySlotindex)
 {
     uint8_t inBuff[INBUF_SIZE];
     memset(inBuff, 0, INBUF_SIZE);
 
-    bool needsAction = chipInterface->actionNeeded(fdClient, inBuff);
+    bool needsAction = chipInterface->actionNeeded(clientIndex, inBuff);
 
     if(needsAction) {   // floppy drive needs action?
-        handleFdd(fdClient, floppySlotindex, inBuff);
+        handleFdd(clientIndex, fdClient, floppySlotindex, inBuff);
     }
 
     return needsAction;
 }
 
-bool FloppyThread::handleFdd(int fdClient, int floppySlotindex, uint8_t* inBuff)
+bool FloppyThread::handleFdd(int clientIndex, int fdClient, int floppySlotindex, uint8_t* inBuff)
 {
     bool isFddCommand = false;
 
     switch(inBuff[3]) {
     case ATN_FW_VERSION:                    // device has sent FW version
         lastFwInfoTime.franz = Utils::getCurrentMs();
-        handleFwVersion_franz(fdClient);
+        handleFwVersion_franz(clientIndex);
         break;
 
     case ATN_SECTOR_WRITTEN:                // device has sent written sector data
         isFddCommand = true;
-        handleSectorWritten(fdClient, floppySlotindex);
+        handleSectorWritten(clientIndex, floppySlotindex);
         break;
 
     case ATN_SEND_TRACK:                    // device requests data of a whole track
@@ -167,21 +167,16 @@ void FloppyThread::loadSettings(void)
     logFdd(LOG_DEBUG, "FloppyThread::loadSettings");
 }
 
-void FloppyThread::handleFwVersion_franz(int fdClient)
+void FloppyThread::handleFwVersion_franz(int clientIndex)
 {
-    uint8_t fwVer[14];
-    memset(fwVer,  0, 14);
-
     // chipInterface->setFDDconfig(setFloppyConfig, &floppyConfig, setDiskChanged, diskChanged);
-    chipInterface->getFWversion(fdClient, fwVer);
+    chipInterface->getFWversion(clientIndex);
 
     logFdd(LOG_DEBUG, "FW: Franz, %d-%02d-%02d", Update::versions.franz.getYear(), Update::versions.franz.getMonth(), Update::versions.franz.getDay());
 }
 
 void FloppyThread::handleSendTrack(int fdClient, int floppySlotindex, uint8_t *inBuf)
 {
-    static int prevTrack = 0;
-
     int side    = inBuf[0];                      // now read the current floppy position
     int track   = inBuf[1];
 
@@ -195,25 +190,21 @@ void FloppyThread::handleSendTrack(int fdClient, int floppySlotindex, uint8_t *i
         logFdd(LOG_ERROR, "handleSendTrack() -- side / track out of range, returning empty track. Franz wants: [track %d, side %d], but current image has %d tracks, %d sides, %d sectors/track", track, side, tr, si, spt);
 
         encodedTrack = shared.imageSilo->getEmptyTrack();
+        countInTrack = MFM_STREAM_SIZE;
     } else {                                                    // side + track within range? use encoded track
         logFdd(LOG_DEBUG, "handleSendTrack() -- Franz wants: [track %d, side %d]", track, side);
 
         encodedTrack = shared.imageSilo->getEncodedTrack(floppySlotindex, track, side, countInTrack);
+        countInTrack = MIN(countInTrack, MFM_STREAM_SIZE);
     }
 
-    int remaining = MFM_STREAM_SIZE - (4*2) - 2;    // this much bytes remain to send after the received ATN
-    chipInterface->fdd_sendTrackToChip(fdClient, remaining, encodedTrack);
-
-    // now we should do some buzzing because of floppy seek
-    if(prevTrack != track) {                        // track changed?
-        prevTrack = track;
-    }
+    chipInterface->fdd_sendTrackToChip(fdClient, countInTrack, encodedTrack);
 }
 
-void FloppyThread::handleSectorWritten(int fdClient, int floppySlotindex)
+void FloppyThread::handleSectorWritten(int clientIndex, int floppySlotindex)
 {
     int side, track, sector, byteCount;
-    uint8_t *writtenSector = chipInterface->fdd_sectorWritten(fdClient, side, track, sector, byteCount); // get side + track + sector number, byte count, and pointer to buffer where the written data is
+    uint8_t *writtenSector = chipInterface->fdd_sectorWritten(clientIndex, side, track, sector, byteCount); // get side + track + sector number, byte count, and pointer to buffer where the written data is
 
     logFdd(LOG_DEBUG, "handleSectorWritten -- track %d, side %d, sector %d", track, side, sector);
     floppyEncoder_decodeMfmWrittenSector(floppySlotindex, track, side, sector, writtenSector, byteCount); // let floppy encoder handle decoding, reencoding, saving
