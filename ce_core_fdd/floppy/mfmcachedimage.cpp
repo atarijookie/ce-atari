@@ -238,7 +238,7 @@ bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, 
     if(maxTotalSymbolsTime < tracks[index].totalSymbolsTime) {
         maxTotalSymbolsTime = tracks[index].totalSymbolsTime;
         float avgTimePerSymbol = ((float) tracks[index].totalSymbolsTime) / ((float) tracks[index].symbolsInStream);
-        Debug::out(LOG_DEBUG, "MfmCachedImage::findNotReadyTrackAndEncodeIt() - new longest track has %d ms total symbols time, has %d symbols in it, the average symbol time is %.2f us", tracks[index].totalSymbolsTime / 1000, tracks[index].symbolsInStream, avgTimePerSymbol);
+        logFdd(LOG_DEBUG, "MfmCachedImage::findNotReadyTrackAndEncodeIt() - new longest track has %d ms total symbols time, has %d symbols in it, the average symbol time is %.2f us", tracks[index].totalSymbolsTime / 1000, tracks[index].symbolsInStream, avgTimePerSymbol);
     }
 
     tracks[index].bytesInStream = bytesInBfr;   // store the data count
@@ -349,7 +349,7 @@ void MfmCachedImage::encodeSingleTrack(FloppyImage *img, int side, int track, in
 bool MfmCachedImage::encodedTrackIsReady(int track, int side)
 {
     if(!gotImage || track < 0 || track > 85 || side < 0 || side > 1) {  // invalid args?
-        //Debug::out(LOG_DEBUG, "MfmCachedImage::encodedTrackIsReady FALSE -- gotImage: %d, track: %d, side: %d", gotImage, track, side);
+        //logFdd(LOG_DEBUG, "MfmCachedImage::encodedTrackIsReady FALSE -- gotImage: %d, track: %d, side: %d", gotImage, track, side);
         return false;   // not ready
     }
 
@@ -357,11 +357,11 @@ bool MfmCachedImage::encodedTrackIsReady(int track, int side)
     trackAndSideToIndex(track, side, index);
 
     if(index == -1) {   // index out of bounds?
-        //Debug::out(LOG_DEBUG, "MfmCachedImage::encodedTrackIsReady FALSE -- index == 1");
+        //logFdd(LOG_DEBUG, "MfmCachedImage::encodedTrackIsReady FALSE -- index == 1");
         return false;   // not ready
     }
 
-    //Debug::out(LOG_DEBUG, "MfmCachedImage::encodedTrackIsReady [%d] = %d", index, tracks[index].isReady);
+    //logFdd(LOG_DEBUG, "MfmCachedImage::encodedTrackIsReady [%d] = %d", index, tracks[index].isReady);
     return tracks[index].isReady;   // return if ready
 }
 
@@ -652,11 +652,11 @@ void MfmCachedImage::handleDecodedByte(void)
             decoder.done = true;
             decoder.good = true;
             decoder.isFormatTrack = true;           // the track if being formatted
-            Debug::out(LOG_DEBUG, "MfmCachedImage::handleDecodedByte - found ID MARK, assuming track format");
+            logFdd(LOG_DEBUG, "MfmCachedImage::handleDecodedByte - found ID MARK, assuming track format");
         } else if(decoder.dByte != DAM_MARK) {      // not ID mark (FORMAT TRACK) and not DAM mark (SECTOR WRITE)? fail
             decoder.done = true;
             decoder.good = false;
-            Debug::out(LOG_DEBUG, "MfmCachedImage::handleDecodedByte - wrong DAM mark: %02X", decoder.dByte);
+            logFdd(LOG_DEBUG, "MfmCachedImage::handleDecodedByte - wrong DAM mark: %02X", decoder.dByte);
         }
     }
 
@@ -683,12 +683,12 @@ void MfmCachedImage::handleDecodedByte(void)
         // known issue handling - in some cases the received CRC is different from calculated CRC by 1, but the data is still valid (tested with write-read test on ST)
         // so in this case we pretend that the CRC is fine...
         if((decoder.recvedCrc - decoder.calcedCrc) == 1) {
-            Debug::out(LOG_DEBUG, "MfmCachedImage::handleDecodedByte - CRC is off by 1, faking good CRC");
+            logFdd(LOG_DEBUG, "MfmCachedImage::handleDecodedByte - CRC is off by 1, faking good CRC");
             decoder.good = true;
         }
 
         int logLevel = decoder.good ? LOG_DEBUG : LOG_ERROR;        // if good then show only on debug log level; if bad then show on error log level
-        Debug::out(logLevel, "MfmCachedImage::handleDecodedByte - received CRC: %02x, calculated CRC: %02x, good: %d", decoder.recvedCrc, decoder.calcedCrc, decoder.good);
+        logFdd(logLevel, "MfmCachedImage::handleDecodedByte - received CRC: %02x, calculated CRC: %02x, good: %d", decoder.recvedCrc, decoder.calcedCrc, decoder.good);
 
 // uncomment following lines for dumping decoded data to log on error - for manual data inspection
 //      if(!decoder.good) {
@@ -738,7 +738,7 @@ bool MfmCachedImage::decodeMfmBuffer(uint8_t *inBfr, int inCnt, uint8_t *outBfr)
     }
 
     if(!syncFound) {                // if sync not found, skip the rest
-        Debug::out(LOG_ERROR, "MfmCachedImage::decodeMfmBuffer - sync not found");
+        logFdd(LOG_ERROR, "MfmCachedImage::decodeMfmBuffer - sync not found");
         return false;
     }
 

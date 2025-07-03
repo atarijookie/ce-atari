@@ -19,19 +19,19 @@ Settings::Settings(void)
     int res = mkdir(SETTINGS_PATH, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);      // mod: 0x775
 
     if(res == 0) {                  // dir created
-        Debug::out(LOG_DEBUG, "Settings: directory %s was created.", SETTINGS_PATH);
+        logFdd(LOG_DEBUG, "Settings: directory %s was created.", SETTINGS_PATH);
 
         storeDefaultValues();
     } else {                        // dir not created
         if(errno != EEXIST) {       // and it's not because it already exists...
-            Debug::out(LOG_ERROR, "Settings: failed to create settings directory - %s", strerror(errno));
+            logFdd(LOG_ERROR, "Settings: failed to create settings directory - %s", strerror(errno));
         }
     }
 }
 
 void Settings::storeDefaultValues(void)
 {
-    Debug::out(LOG_DEBUG, "Settings::storeDefaultValues() - storing default settings, because it seems we miss those setting...");
+    logFdd(LOG_DEBUG, "Settings::storeDefaultValues() - storing default settings, because it seems we miss those setting...");
 
 }
 
@@ -39,7 +39,7 @@ bool Settings::getBool(const char *key, bool defValue)
 {
     FILE *file = sOpen(key, true);
     if(!file) {                                         // failed to open settings?
-//      Debug::out(LOG_DEBUG, "Settings::getBool -- returning default value for %s", key);
+//      logFdd(LOG_DEBUG, "Settings::getBool -- returning default value for %s", key);
         return defValue;
     }
 
@@ -48,7 +48,7 @@ bool Settings::getBool(const char *key, bool defValue)
     fclose(file);
 
     if(res != 1) {                                      // failed to read value?
-//      Debug::out(LOG_DEBUG, "Settings::getBool -- returning default value for %s", key);
+//      logFdd(LOG_DEBUG, "Settings::getBool -- returning default value for %s", key);
         return defValue;
     }
 
@@ -64,7 +64,7 @@ void Settings::setBool(const char *key, bool value)
 {
     FILE *file = sOpen(key, false);
     if(!file) {                                         // failed to open settings?
-        Debug::out(LOG_ERROR, "Settings::setBool -- could not write key %s", key);
+        logFdd(LOG_ERROR, "Settings::setBool -- could not write key %s", key);
         return;
     }
 
@@ -82,7 +82,7 @@ int Settings::getInt(const char *key, int defValue)
 {
     FILE *file = sOpen(key, true);
     if(!file) {                                         // failed to open settings?
-//      Debug::out(LOG_DEBUG, "Settings::getInt -- returning default value for %s", key);
+//      logFdd(LOG_DEBUG, "Settings::getInt -- returning default value for %s", key);
         return defValue;
     }
 
@@ -91,7 +91,7 @@ int Settings::getInt(const char *key, int defValue)
     fclose(file);
 
     if(res != 1) {                                      // failed to read value?
-//      Debug::out(LOG_DEBUG, "Settings::getInt -- returning default value for %s", key);
+//      logFdd(LOG_DEBUG, "Settings::getInt -- returning default value for %s", key);
         return defValue;
     }
 
@@ -102,7 +102,7 @@ void Settings::setInt(const char *key, int value)
 {
     FILE *file = sOpen(key, false);
     if(!file) {                                         // failed to open settings?
-        Debug::out(LOG_ERROR, "Settings::setInt -- could not write key %s", key);
+        logFdd(LOG_ERROR, "Settings::setInt -- could not write key %s", key);
         return;
     }
 
@@ -133,7 +133,7 @@ void Settings::setFloat(const char *key, float value)
 {
     FILE *file = sOpen(key, false);
     if(!file) {                                         // failed to open settings?
-        Debug::out(LOG_ERROR, "Settings::setFloat -- could not write key %s", key);
+        logFdd(LOG_ERROR, "Settings::setFloat -- could not write key %s", key);
         return;
     }
 
@@ -148,7 +148,7 @@ char *Settings::getString(const char *key, const char *defValue)
 
     FILE *file = sOpen(key, true);
     if(!file) {                                         // failed to open settings?
-//      Debug::out(LOG_DEBUG, "Settings::getString -- returning default value for %s", key);
+//      logFdd(LOG_DEBUG, "Settings::getString -- returning default value for %s", key);
         strcpy(buffer, defValue);
         return buffer;
     }
@@ -158,7 +158,7 @@ char *Settings::getString(const char *key, const char *defValue)
     fclose(file);
 
     if(res == NULL) {                                   // failed to read value?
-//      Debug::out(LOG_DEBUG, "Settings::getString -- returning default value for %s", key);
+//      logFdd(LOG_DEBUG, "Settings::getString -- returning default value for %s", key);
         strcpy(buffer, defValue);
         return buffer;
     }
@@ -170,7 +170,7 @@ void Settings::setString(const char *key, const char *value)
 {
     FILE *file = sOpen(key, false);
     if(!file) {                                         // failed to open settings?
-        Debug::out(LOG_ERROR, "Settings::setString -- could not write key %s", key);
+        logFdd(LOG_ERROR, "Settings::setString -- could not write key %s", key);
         return;
     }
 
@@ -228,7 +228,7 @@ char Settings::getChar(const char *key, char defValue)
 {
     FILE *file = sOpen(key, true);
     if(!file) {                                         // failed to open settings?
-//        Debug::out(LOG_DEBUG, "Settings::getChar -- returning default value for %s", key);
+//        logFdd(LOG_DEBUG, "Settings::getChar -- returning default value for %s", key);
         return defValue;
     }
 
@@ -238,7 +238,7 @@ char Settings::getChar(const char *key, char defValue)
     fclose(file);
 
     if(res != 1) {                                      // failed to read value?
-//        Debug::out(LOG_DEBUG, "Settings::getChar -- returning default value for %s", key);
+//        logFdd(LOG_DEBUG, "Settings::getChar -- returning default value for %s", key);
         return defValue;
     }
 
@@ -249,7 +249,7 @@ void Settings::setChar(const char *key, char value)
 {
     FILE *file = sOpen(key, false);
     if(!file) {                                         // failed to open settings?
-        Debug::out(LOG_ERROR, "Settings::setChar -- could not write key %s", key);
+        logFdd(LOG_ERROR, "Settings::setChar -- could not write key %s", key);
         return;
     }
 

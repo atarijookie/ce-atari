@@ -41,8 +41,8 @@ bool FloppyImageMsa::open(const char *fileName)
 
     loadedFlag = true;
 
-    Debug::out(LOG_DEBUG, "MSA Image opened: %s", fileName);
-    Debug::out(LOG_DEBUG, "MSA Image params - %d tracks, %d sides, %d sectors per track", params.tracksNo, params.sidesNo, params.sectorsPerTrack);
+    logFdd(LOG_DEBUG, "MSA Image opened: %s", fileName);
+    logFdd(LOG_DEBUG, "MSA Image params - %d tracks, %d sides, %d sectors per track", params.tracksNo, params.sidesNo, params.sectorsPerTrack);
 
     return true;
 }

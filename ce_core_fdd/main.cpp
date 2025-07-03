@@ -13,7 +13,7 @@
 
 #include "settings.h"
 #include "global.h"
-#include "ccorethread.h"
+#include "floppythread.h"
 #include "debug.h"
 #include "update.h"
 #include "version.h"
@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
     printf("\033[H\033[2J\n");
 
     initializeFlags();                                          // initialize flags
-    Debug::out(LOG_INFO, "\n\n"); Debug::out(LOG_INFO, "---------------------------------------------------");
+    logFdd(LOG_INFO, "\n\n"); logFdd(LOG_INFO, "---------------------------------------------------");
 
     parseCmdLineArguments(argc, argv);                          // then parse cmd line arguments and set global variables
     Debug::printfLogLevelString();
@@ -66,19 +66,19 @@ int main(int argc, char *argv[])
 
     // make sure that no other instance is running
     if(otherInstanceIsRunning()) {
-        Debug::out(LOG_ERROR, "Other instance of CosmosEx is running, terminate it before starting a new one!");
+        logFdd(LOG_ERROR, "Other instance of CosmosEx is running, terminate it before starting a new one!");
         printf("\nOther instance of CosmosEx is running, terminate it before starting a new one!\n\n\n");
         return 0;
     }
 
-    Debug::out(LOG_INFO, "logLevel: %d", flags.logLevel);
+    logFdd(LOG_INFO, "logLevel: %d", flags.logLevel);
 
     //------------------------------------------------------------
     // Opening of chip interface.
-    Debug::out(LOG_INFO, "ChipInterface: starting NETWORK server");
+    logFdd(LOG_INFO, "ChipInterface: starting NETWORK server");
 
     if(!chipInterface->ciOpen()) {
-        Debug::out(LOG_ERROR, "ChipInterface - failed to open chip Interface, terminating.");
+        logFdd(LOG_ERROR, "ChipInterface - failed to open chip Interface, terminating.");
         printf("\nChipInterface - failed to open chip Interface, terminating.\n");
         return 0;
     }
@@ -107,18 +107,18 @@ void pthread_kill_join(const char* threadName, pthread_t& threadInfo)
 
 int runCore(void)
 {
-    CCoreThread *core;
+    FloppyThread *core;
     pthread_t floppyEncThreadInfo;
     pthread_t cmdSockThreadInfo;
 
-    Debug::out(LOG_INFO, "CosmosEx FDD core starting at port %d", flags.portClient);
+    logFdd(LOG_INFO, "CosmosEx FDD core starting at port %d", flags.portClient);
     printf("\nCosmosEx FDD core starting at port %d\n", flags.portClient);
     printf("\nlog file: %s\n", Debug::getCoreLogFileName(false));
 
     Utils::setTimezoneVariable_inThisContext();
 
     //-------------
-    core = new CCoreThread();
+    core = new FloppyThread();
 
     handlePthreadCreate("floppy encoder", &floppyEncThreadInfo, (void*) floppyEncodeThreadCode);
     handlePthreadCreate("command socket", &cmdSockThreadInfo, (void*) cmdSockThreadCode);
@@ -143,7 +143,7 @@ int runCore(void)
     std::string pidFilePath = pidFileName();
     unlink(pidFilePath.c_str());
 
-    Debug::out(LOG_INFO, "CosmosEx terminated.");
+    logFdd(LOG_INFO, "CosmosEx terminated.");
     printf("Terminated\n");
     return 0;
 }
@@ -193,7 +193,7 @@ void parseCmdLineArguments(int argc, char *argv[])
             int res = sscanf(argv[i] + 1, "%d", &flags.portClient);
             if(res != 1) {
                 printf(">>> BAD CLIENT PORT VALUE: '%s' <<<\n", argv[i] + 1);
-                Debug::out(LOG_ERROR, ">>> BAD CLIENT PORT VALUE: '%s' <<<\n", argv[i] + 1);
+                logFdd(LOG_ERROR, ">>> BAD CLIENT PORT VALUE: '%s' <<<\n", argv[i] + 1);
             }
         }
 
@@ -215,16 +215,16 @@ void handlePthreadCreate(const char* threadName, pthread_t* pThreadInfo, void* t
     int res = pthread_create(pThreadInfo, NULL, (void* (*)(void*)) threadCode, NULL);
 
     if(res != 0) {
-        Debug::out(LOG_ERROR, "Failed to create %s thread, %s won't work...", threadName, threadName);
+        logFdd(LOG_ERROR, "Failed to create %s thread, %s won't work...", threadName, threadName);
     } else {
-        Debug::out(LOG_DEBUG, "%s thread created", threadName);
+        logFdd(LOG_DEBUG, "%s thread created", threadName);
         pthread_setname_np(*pThreadInfo, threadName);
     }
 }
 
 void sigint_handler(int sig)
 {
-    Debug::out(LOG_DEBUG, "Some SIGNAL received, terminating.");
+    logFdd(LOG_DEBUG, "Some SIGNAL received, terminating.");
     sigintReceived = 1;
 }
 
@@ -249,29 +249,29 @@ bool otherInstanceIsRunning(void)
 
     f = fopen(pidFilePath.c_str(), "r");
     if(!f) {    // can't open file? other instance probably not running (or is, but can't figure out, so screw it)
-        Debug::out(LOG_DEBUG, "otherInstanceIsRunning - couldn't open %s, returning false", pidFilePath.c_str());
+        logFdd(LOG_DEBUG, "otherInstanceIsRunning - couldn't open %s, returning false", pidFilePath.c_str());
     } else {
         int r = fscanf(f, "%d", &other_pid);
         fclose(f);
         if(r != 1) {
-            Debug::out(LOG_ERROR, "otherInstanceIsRunning - can't read pid in %s, returning false", pidFilePath.c_str());
+            logFdd(LOG_ERROR, "otherInstanceIsRunning - can't read pid in %s, returning false", pidFilePath.c_str());
         } else {
-            Debug::out(LOG_DEBUG, "otherInstanceIsRunning - %s pid=%d (own pid=%d)", pidFilePath.c_str(), other_pid, self_pid);
+            logFdd(LOG_DEBUG, "otherInstanceIsRunning - %s pid=%d (own pid=%d)", pidFilePath.c_str(), other_pid, self_pid);
             snprintf(proc_path, sizeof(proc_path), "/proc/%d/exe", other_pid);
             if(readlink("/proc/self/exe", self_exe, sizeof(self_exe)) < 0) {
-                Debug::out(LOG_ERROR, "otherInstanceIsRunning readlink(%s): %s", "/proc/self/exe", strerror(errno));
+                logFdd(LOG_ERROR, "otherInstanceIsRunning readlink(%s): %s", "/proc/self/exe", strerror(errno));
             } else if(readlink(proc_path, other_exe, sizeof(other_exe)) < 0) {
-                Debug::out(LOG_ERROR, "otherInstanceIsRunning readlink(%s): %s", proc_path, strerror(errno));
+                logFdd(LOG_ERROR, "otherInstanceIsRunning readlink(%s): %s", proc_path, strerror(errno));
             } else if(strcmp(other_exe, self_exe) == 0) {
                 // NOTE: is it needed to check the process status to discard zombies ???
-                Debug::out(LOG_DEBUG, "otherInstanceIsRunning - found another instance of %s with pid %d", other_exe, other_pid);
+                logFdd(LOG_DEBUG, "otherInstanceIsRunning - found another instance of %s with pid %d", other_exe, other_pid);
                 return true;
             }
         }
     }
 
     Utils::intToFile(self_pid, pidFilePath.c_str());
-    Debug::out(LOG_DEBUG, "otherInstanceIsRunning -- pid %d written to %s", self_pid, pidFilePath.c_str());
+    logFdd(LOG_DEBUG, "otherInstanceIsRunning -- pid %d written to %s", self_pid, pidFilePath.c_str());
 
     return false;
 }

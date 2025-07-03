@@ -239,7 +239,7 @@ bool Utils::copyFile(std::string &src, std::string &dst)
     from = fopen(src.c_str(), "rb");               // open source file
 
     if(!from) {
-        Debug::out(LOG_ERROR, "Utils::copyFile - failed to open source file %s", src.c_str());
+        logFdd(LOG_ERROR, "Utils::copyFile - failed to open source file %s", src.c_str());
         return false;
     }
 
@@ -248,7 +248,7 @@ bool Utils::copyFile(std::string &src, std::string &dst)
     if(!to) {
         fclose(from);
 
-        Debug::out(LOG_ERROR, "Utils::copyFile - failed to open destination file %s", dst.c_str());
+        logFdd(LOG_ERROR, "Utils::copyFile - failed to open destination file %s", dst.c_str());
         return false;
     }
 
@@ -267,7 +267,7 @@ bool Utils::copyFile(FILE *from, std::string &dst)
     to = fopen(dst.c_str(), "wb");                 // open destrination file
 
     if(!to) {
-        Debug::out(LOG_ERROR, "Utils::copyFile - failed to open destination file %s", dst.c_str());
+        logFdd(LOG_ERROR, "Utils::copyFile - failed to open destination file %s", dst.c_str());
         return false;
     }
 
@@ -521,7 +521,7 @@ void Utils::setTimezoneVariable_inProfileScript(void)
     char tzString[128];
     sprintf(tzString, "echo 'export TZ=\"%s\"' > /etc/profile.d/set_timezone.sh", utcOfsset);
 
-    Debug::out(LOG_DEBUG, "Utils::setTimezoneVariable_inProfileScript() -- creating timezone setting script like this: %s\n", tzString);
+    logFdd(LOG_DEBUG, "Utils::setTimezoneVariable_inProfileScript() -- creating timezone setting script like this: %s\n", tzString);
 
     system("mkdir -p /etc/profile.d");                          // if this dir doesn't exist, create it
     system(tzString);                                           // now create the script in the dir above
@@ -535,7 +535,7 @@ void Utils::setTimezoneVariable_inThisContext(void)
     char utcOfsset[64];
     createTimezoneString(utcOfsset);
 
-    Debug::out(LOG_DEBUG, "Utils::setTimezoneVariable_inThisContext() -- setting TZ variable to: %s\n", utcOfsset);
+    logFdd(LOG_DEBUG, "Utils::setTimezoneVariable_inThisContext() -- setting TZ variable to: %s\n", utcOfsset);
 
     setenv("TZ", utcOfsset, 1);
 }
@@ -632,7 +632,7 @@ bool Utils::unZIPfloppyImageAndReturnFirstImage(const char *inZipFilePath, std::
     DIR *dir = opendir("/tmp/zipedfloppy");         // try to open the dir
 
     if(dir == NULL) {                               // not found?
-        Debug::out(LOG_DEBUG, "Utils::unZIPfloppyImageAndReturnFirstImage -- opendir() failed");
+        logFdd(LOG_DEBUG, "Utils::unZIPfloppyImageAndReturnFirstImage -- opendir() failed");
         return false;
     }
 
@@ -673,7 +673,7 @@ bool Utils::unZIPfloppyImageAndReturnFirstImage(const char *inZipFilePath, std::
     closedir(dir);                                  // close the dir
 
     if(!found) {                                    // not found? return with a fail
-        Debug::out(LOG_DEBUG, "Utils::unZIPfloppyImageAndReturnFirstImage -- couldn't find an image inside of %s", inZipFilePath);
+        logFdd(LOG_DEBUG, "Utils::unZIPfloppyImageAndReturnFirstImage -- couldn't find an image inside of %s", inZipFilePath);
         return false;
     }
 
@@ -681,7 +681,7 @@ bool Utils::unZIPfloppyImageAndReturnFirstImage(const char *inZipFilePath, std::
     outImageFilePath = "/tmp/zipedfloppy/";
     outImageFilePath.append(de->d_name);
 
-    Debug::out(LOG_DEBUG, "Utils::unZIPfloppyImageAndReturnFirstImage -- this ZIP file: %s contains this floppy image file: %s", inZipFilePath, outImageFilePath.c_str());
+    logFdd(LOG_DEBUG, "Utils::unZIPfloppyImageAndReturnFirstImage -- this ZIP file: %s contains this floppy image file: %s", inZipFilePath, outImageFilePath.c_str());
     return true;
 }
 
@@ -816,7 +816,7 @@ std::string Utils::dotEnvValue(std::string key, const char* defValue, bool logOn
     }
     catch (const std::out_of_range&) {
         if(logOnError) {
-            Debug::out(LOG_DEBUG, "Utils::dotEnvValue - no value for key '%s' !", key.c_str());
+            logFdd(LOG_DEBUG, "Utils::dotEnvValue - no value for key '%s' !", key.c_str());
         }
     }
 
@@ -828,7 +828,7 @@ std::string Utils::dotEnvValue(std::string key, const char* defValue, bool logOn
         retValueFromEnv = envVar;
 
         if(logOnError) {
-            Debug::out(LOG_DEBUG, "Utils::dotEnvValue - ...but found env var '%s' with value '%s'", key.c_str(), retValueFromEnv.c_str());
+            logFdd(LOG_DEBUG, "Utils::dotEnvValue - ...but found env var '%s' with value '%s'", key.c_str(), retValueFromEnv.c_str());
         }
         return retValueFromEnv;
     }
@@ -842,12 +842,12 @@ void Utils::getDefaultValueFromVarName(std::string& varName, std::string& defVal
 {
     std::size_t varDef = varName.find(delim);    // check if this var name has also default value specified
 
-    //Debug::out(LOG_DEBUG, "Utils::getDefaultValueFromVarName - varName '%s'", varName.c_str());
+    //logFdd(LOG_DEBUG, "Utils::getDefaultValueFromVarName - varName '%s'", varName.c_str());
 
     if(varDef != std::string::npos) {           // if this variable name has also default value specified
         std::string newVarName = varName.substr(0, varDef); // get just var name without default value
         defValue = varName.substr(varDef + delim.length()); // get just the default value
-        //Debug::out(LOG_DEBUG, "Utils::getDefaultValueFromVarName - varName with default: '%s', varName '%s', defValue: '%s'", varName.c_str(), newVarName.c_str(), defValue.c_str());
+        //logFdd(LOG_DEBUG, "Utils::getDefaultValueFromVarName - varName with default: '%s', varName '%s', defValue: '%s'", varName.c_str(), newVarName.c_str(), defValue.c_str());
         varName = newVarName;                               // use the new var name
     }
 }
@@ -856,7 +856,7 @@ int Utils::dotEnvSubstituteVars(void)
 {
     /* go through the current dotEnv values and replace vars with values */
 
-    Debug::out(LOG_DEBUG, "Utils::dotEnvSubstituteVars starting");
+    logFdd(LOG_DEBUG, "Utils::dotEnvSubstituteVars starting");
 
     int found = 0;
 
@@ -878,20 +878,20 @@ int Utils::dotEnvSubstituteVars(void)
 
             std::size_t varDef = varName.find(":-");    // check if this var name has also default value specified
 
-            //Debug::out(LOG_DEBUG, "Utils::dotEnvSubstituteVars - varName '%s'", varName.c_str());
+            //logFdd(LOG_DEBUG, "Utils::dotEnvSubstituteVars - varName '%s'", varName.c_str());
 
             if(varDef != std::string::npos) {           // if this variable name has also default value specified
                 std::string newVarName = varName.substr(0, varDef); // get just var name without default value
                 defValue = varName.substr(varDef + 2);              // get just the default value
-                //Debug::out(LOG_DEBUG, "Utils::dotEnvSubstituteVars - varName with default: '%s', varName '%s', defValue: '%s'", varName.c_str(), newVarName.c_str(), defValue.c_str());
+                //logFdd(LOG_DEBUG, "Utils::dotEnvSubstituteVars - varName with default: '%s', varName '%s', defValue: '%s'", varName.c_str(), newVarName.c_str(), defValue.c_str());
                 varName = newVarName;                               // use the new var name
             }
 
             std::string varValue = Utils::dotEnvValue(varName, defValue.c_str());   // get variable value with possible default value
-            //Debug::out(LOG_DEBUG, "Utils::dotEnvSubstituteVars - for var '%s' found value '%s'", varName.c_str(), varValue.c_str());
+            //logFdd(LOG_DEBUG, "Utils::dotEnvSubstituteVars - for var '%s' found value '%s'", varName.c_str(), varValue.c_str());
 
             value.replace(varStart, varEnd - varStart + 1, varValue);   // replace variable in original value
-            //Debug::out(LOG_DEBUG, "Utils::dotEnvSubstituteVars - value after replacing var: '%s'", value.c_str());
+            //logFdd(LOG_DEBUG, "Utils::dotEnvSubstituteVars - value after replacing var: '%s'", value.c_str());
 
             dotEnv[key] = value;        // store new value back to map
             found++;
@@ -910,7 +910,7 @@ bool Utils::loadDotEnvFrom(const char* path)
     FILE *f = fopen(path, "rt");        // try to open file
 
     if(!f) {
-        Debug::out(LOG_ERROR, "Utils::loadDotEnv - failed to open file %s", path);
+        logFdd(LOG_ERROR, "Utils::loadDotEnv - failed to open file %s", path);
         return false;
     }
 
@@ -957,7 +957,7 @@ bool Utils::loadDotEnvFrom(const char* path)
         std::string key, value;
         key = line;                 // key   is on [0 : eqlPos-1]
         value = line + eqlPos + 1;  // value is on [eqlPos+1 : ...]
-        //Debug::out(LOG_DEBUG, "Utils::loadDotEnv - found %s -> %s", key.c_str(), value.c_str());
+        //logFdd(LOG_DEBUG, "Utils::loadDotEnv - found %s -> %s", key.c_str(), value.c_str());
 
         dotEnv[key] = value;        // store to map
     }
@@ -1052,7 +1052,7 @@ void Utils::sendToMounter(const std::string& jsonString)
 	int sockFd = socket(AF_UNIX, SOCK_DGRAM, 0);
 
 	if (sockFd < 0) {   // if failed to create socket
-	    Debug::out(LOG_ERROR, "sendToMounter: failed to create socket - errno: %d", errno);
+	    logFdd(LOG_ERROR, "sendToMounter: failed to create socket - errno: %d", errno);
 	    return;
 	}
 
@@ -1064,9 +1064,9 @@ void Utils::sendToMounter(const std::string& jsonString)
     int res = sendto(sockFd, jsonString.c_str(), jsonString.length() + 1, 0, (struct sockaddr *) &addr, sizeof(struct sockaddr_un));
 
     if(res < 0) {       // if failed to send
-	    Debug::out(LOG_ERROR, "sendToMounter: sendto failed - errno: %d", errno);
+	    logFdd(LOG_ERROR, "sendToMounter: sendto failed - errno: %d", errno);
     } else {
-        Debug::out(LOG_DEBUG, "sendToMounter: sent to mounter: %s", jsonString.c_str());
+        logFdd(LOG_DEBUG, "sendToMounter: sent to mounter: %s", jsonString.c_str());
     }
 
     close(sockFd);
@@ -1078,7 +1078,7 @@ void Utils::createFloppyTestImage(void)
     FILE *f = fopen(FDD_TEST_IMAGE_PATH_AND_FILENAME.c_str(), "wb");
 
     if(!f) {
-        Debug::out(LOG_ERROR, "Failed to create floppy test image!");
+        logFdd(LOG_ERROR, "Failed to create floppy test image!");
         printf("Failed to create floppy test image!\n");
         return;
     }

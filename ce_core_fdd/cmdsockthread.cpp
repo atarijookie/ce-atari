@@ -19,7 +19,7 @@
 
 #include "global.h"
 #include "floppy/imagesilo.h"
-#include "ccorethread.h"
+#include "floppythread.h"
 #include "update.h"
 #include "json.h"
 
@@ -37,14 +37,14 @@ int createRecvSocket(const char* dotEnvKey)
 	int sock = socket(AF_UNIX, SOCK_DGRAM, 0);
 
 	if (sock < 0) {
-	    Debug::out(LOG_ERROR, "createRecvSocket - failed to create socket!");
+	    logFdd(LOG_ERROR, "createRecvSocket - failed to create socket!");
 	    return FD_EMPTY;
 	}
 
     fchmod(sock, S_IRUSR | S_IWUSR);        // restrict permissions before bind
 
     std::string sockPath = Utils::dotEnvValue(dotEnvKey);
-    Debug::out(LOG_DEBUG, "createRecvSocket - %s = %s", dotEnvKey, sockPath.c_str());
+    logFdd(LOG_DEBUG, "createRecvSocket - %s = %s", dotEnvKey, sockPath.c_str());
 
     unlink(sockPath.c_str());               // delete sock file if exists
 
@@ -54,19 +54,19 @@ int createRecvSocket(const char* dotEnvKey)
 
     int res = bind(sock, (struct sockaddr *) &addr, strlen(addr.sun_path) + sizeof(addr.sun_family));
     if (res < 0) {
-	    Debug::out(LOG_ERROR, "createRecvSocket - failed to bind socket to %s - errno: %d", sockPath.c_str(), errno);
+	    logFdd(LOG_ERROR, "createRecvSocket - failed to bind socket to %s - errno: %d", sockPath.c_str(), errno);
 	    return FD_EMPTY;
     }
 
     chmod(addr.sun_path, 0666);             // loosen permissions
 
-    Debug::out(LOG_DEBUG, "createRecvSocket - %s created, sock: %d", sockPath.c_str(), sock);
+    logFdd(LOG_DEBUG, "createRecvSocket - %s created, sock: %d", sockPath.c_str(), sock);
     return sock;
 }
 
 void *cmdSockThreadCode(void *ptr)
 {
-    Debug::out(LOG_INFO, "Command Socket thread starting...");
+    logFdd(LOG_INFO, "Command Socket thread starting...");
     int sock = createRecvSocket("CORE_SOCK_PATH");
 
     if(sock < 0) {              // without socket this thread has no use
@@ -100,7 +100,7 @@ void *cmdSockThreadCode(void *ptr)
             continue;
         }
 
-        Debug::out(LOG_DEBUG, "cmdSockThreadCode: received: %s", bfr);
+        logFdd(LOG_DEBUG, "cmdSockThreadCode: received: %s", bfr);
 
         json data;
         try {
@@ -109,24 +109,24 @@ void *cmdSockThreadCode(void *ptr)
         catch(...)                          // on any exception - log it, don't crash
         {
             std::exception_ptr p = std::current_exception();
-            Debug::out(LOG_ERROR, "json::parse raised an exception: %s", (p ? p.__cxa_exception_type()->name() : "null"));
+            logFdd(LOG_ERROR, "json::parse raised an exception: %s", (p ? p.__cxa_exception_type()->name() : "null"));
         }
 
         if(data.contains("module") && data.contains("action")) {    // mandatory fields found?
             std::string module = data["module"].get<std::string>();
             std::string action = data["action"].get<std::string>();
 
-            Debug::out(LOG_DEBUG, "cmdSockThreadCode: module: %s, action: %s", module.c_str(), action.c_str());
+            logFdd(LOG_DEBUG, "cmdSockThreadCode: module: %s, action: %s", module.c_str(), action.c_str());
 
             if(module == "floppy") {                // for floppy module?
                 handleFloppyAction(action, data);
             } else if (module == "all") {           // generic / all modules?
                 handleGenericAction(action, data);
             } else {                                // for uknown module?
-                Debug::out(LOG_WARNING, "cmdSockThreadCode: uknown module '%s', ignoring message!", module.c_str());
+                logFdd(LOG_WARNING, "cmdSockThreadCode: uknown module '%s', ignoring message!", module.c_str());
             }
         } else {        // some mandatory field is missing?
-            Debug::out(LOG_WARNING, "cmdSockThreadCode: module or action is missing in the received data, ignoring message!");
+            logFdd(LOG_WARNING, "cmdSockThreadCode: module or action is missing in the received data, ignoring message!");
         }
     }
 
@@ -153,14 +153,14 @@ void handleFloppyAction(std::string& action, json& data)
 
             shared.imageSilo->add(slot, file, pathAndFile, empty, true);    // insert into slot
         } else {
-            Debug::out(LOG_WARNING, "handleFloppyAction: missing 'image' in message, ignoring message!");
+            logFdd(LOG_WARNING, "handleFloppyAction: missing 'image' in message, ignoring message!");
         }
     } else if(action == "eject") {              // for 'eject' action
         shared.imageSilo->remove(slot);
     } else if(action == "activate") {           // for 'activate' action
-        shared.imageSilo->setCurrentSlot(slot);
+        
     } else {
-        Debug::out(LOG_WARNING, "handleFloppyAction: unknown action '%s', ignoring message!", action.c_str());
+        logFdd(LOG_WARNING, "handleFloppyAction: unknown action '%s', ignoring message!", action.c_str());
     }
 
     pthread_mutex_unlock(&shared.mtxImages);    // unlock floppy images shared objects
@@ -177,9 +177,9 @@ void handleGenericAction(std::string& action, json& data)
             loglevel = data["loglevel"].get<int>();
             Debug::setLogLevel(loglevel);
         } else {
-            Debug::out(LOG_WARNING, "handleGenericAction: missing 'loglevel' in message, ignoring message!");
+            logFdd(LOG_WARNING, "handleGenericAction: missing 'loglevel' in message, ignoring message!");
         }
     } else {
-        Debug::out(LOG_WARNING, "handleGenericAction: unknown action '%s', ignoring message!", action.c_str());
+        logFdd(LOG_WARNING, "handleGenericAction: unknown action '%s', ignoring message!", action.c_str());
     }
 }

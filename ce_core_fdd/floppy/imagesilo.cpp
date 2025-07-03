@@ -17,22 +17,18 @@
 
 extern pthread_mutex_t floppyEncoderMutex;
 extern pthread_cond_t  floppyEncoderShouldWork;
-//extern volatile bool   floppyEncodingRunning;
 
 //-------------------------------
-// silo slots are global objects now, as CCoreThread needs to stream from them and
+// silo slots are global objects now, as FloppyThread needs to stream from them and
 // encoder thread needs to check all of them for tracks that need (re)encoding.
 // Access is protected by floppyEncoderMutex.
 // Individual tracks in slot can be streamed without using mutex when: slot.encImage.tracks[index].isReady
 // (that means we're not encoding that track at that moment).
 
-extern volatile int currentSlot;
-
 extern SiloSlot slots[SLOT_COUNT];
 //-------------------------------
 
 SiloSlotSimple  ImageSilo::floppyImages[3];
-int ImageSilo::floppyImageSelected = EMPTY_IMAGE_SLOT;
 
 extern TFlags flags;
 
@@ -57,20 +53,15 @@ ImageSilo::ImageSilo()
     }
 
     siloToSlotsFile();                  // silo content to file on disk
-
-    currentSlot = EMPTY_IMAGE_SLOT;
-    reloadProxy = NULL;
-
-    floppyImageSelected = -1;
     //-----------
     // create empty image and encode it (will be used when no slot is selected)
     bool res = createNewImage(EMPTY_IMAGE_PATH);                   // create empty image in /tmp/ directory
 
     if(res) {                                                                   // if succeeded, encode this empty image
-        Debug::out(LOG_DEBUG, "ImageSilo created empty image (for no selected image)");
+        logFdd(LOG_DEBUG, "ImageSilo created empty image (for no selected image)");
         floppyEncoder_addEncodeWholeImageRequest(EMPTY_IMAGE_SLOT, EMPTY_IMAGE_PATH);
     } else {
-        Debug::out(LOG_ERROR, "ImageSilo failed to create empty image! (for no selected image)");
+        logFdd(LOG_ERROR, "ImageSilo failed to create empty image! (for no selected image)");
     }
     //-----------
 
@@ -88,7 +79,7 @@ bool ImageSilo::createNewImage(std::string pathAndFile)
     FILE *f = fopen((char *) pathAndFile.c_str(), "wb");
 
     if(!f) {                                            // failed to open file?
-        Debug::out(LOG_ERROR, "FloppySetup::newImage - failed to open file %s", (char *) pathAndFile.c_str());
+        logFdd(LOG_ERROR, "FloppySetup::newImage - failed to open file %s", (char *) pathAndFile.c_str());
         return false;
     }
 
@@ -282,48 +273,6 @@ void ImageSilo::clearSlot(int index)
     }
 }
 
-uint8_t ImageSilo::getSlotBitmap(void)
-{
-    uint8_t bmp = 0;
-
-    for(int i=0; i<3; i++) {
-        if(!slots[i].imageFile.empty()) {        // if slot is used, set the bit
-            bmp |= (1 << i);
-        }
-    }
-
-    return bmp;
-}
-
-void ImageSilo::setCurrentSlot(int index)
-{
-    if(index >= 0 && index <= 2) {                      // index good? use it
-        currentSlot         = index;
-        floppyImageSelected = index;
-    } else {                                            // index bad? use slot with empty image
-        currentSlot         = EMPTY_IMAGE_SLOT;
-        floppyImageSelected = -1;
-    }
-
-    slots[currentSlot].encImage.newContent = false;     // current slot content not changed
-
-    // set the floppy line on display
-    char tmp[32];
-
-    if(currentSlot == EMPTY_IMAGE_SLOT) {       // empty floppy?
-        strcpy  (tmp,     "FDD : empty");
-    } else {                                    // something selected?
-        snprintf(tmp, 32, "FDD%d: %s", (int) currentSlot, slots[currentSlot].imageFile.c_str());
-    }
-
-    // TODO: store display data elsewhere
-    // display_setLine(DISP_LINE_FLOPPY, tmp);     // store the floppy display line
-    // display_showNow(DISP_SCREEN_HDD1_IDX);      // show it right now - floppy image changed
-
-    // active slot number to file
-    Utils::intToFileFromEnv(currentSlot, "FILE_FLOPPY_ACTIVE_SLOT");
-}
-
 void ImageSilo::siloToSlotsFile(void)
 {
     /* store current image silo content to file, so external components can pick them up */
@@ -344,27 +293,26 @@ void ImageSilo::siloToSlotsFile(void)
     Utils::textToFileFromEnv(fileContent.c_str(), "FILE_FLOPPY_SLOTS"); // silo content to this file
 }
 
-int ImageSilo::getCurrentSlot(void)
-{
-    return currentSlot;
-}
-
-uint8_t *ImageSilo::getEncodedTrack(int track, int side, int &bytesInBuffer)
+uint8_t *ImageSilo::getEncodedTrack(int floppySlotindex, int track, int side, int &bytesInBuffer)
 {
     uint8_t *pTrack;
 
-    //Debug::out(LOG_DEBUG, "ImageSilo::getEncodedTrack - track: %d, side: %d, currentSlot: %d, isReady: %d", track, side, currentSlot, slots[currentSlot].encImage.encodedTrackIsReady(track, side));
+    if(floppySlotindex < 0 || floppySlotindex >= SLOT_COUNT) {
+        return emptyTrack;
+    }
+
+    //logFdd(LOG_DEBUG, "ImageSilo::getEncodedTrack - track: %d, side: %d, currentSlot: %d, isReady: %d", track, side, currentSlot, slots[currentSlot].encImage.encodedTrackIsReady(track, side));
     //uint32_t start = Utils::getCurrentMs();
 
-    if(!slots[currentSlot].encImage.encodedTrackIsReady(track, side)) { // track not ready?
-        floppyEncoder_addReencodeTrackRequest(track, side);             // ask for reencoding
+    if(!slots[floppySlotindex].encImage.encodedTrackIsReady(track, side)) {     // track not ready?
+        floppyEncoder_addReencodeTrackRequest(floppySlotindex, track, side);    // ask for reencoding
 
         // wait short while to see if the image gets encoded
         uint32_t endTime = Utils::getEndTime(500);
         bool isReady = false;
 
         while(Utils::getCurrentMs() < endTime) {    // still should wait?
-            isReady = slots[currentSlot].encImage.encodedTrackIsReady(track, side); // check if it's ready
+            isReady = slots[floppySlotindex].encImage.encodedTrackIsReady(track, side); // check if it's ready
 
             if(isReady) {   // ready? quit loop
                 break;
@@ -372,21 +320,28 @@ uint8_t *ImageSilo::getEncodedTrack(int track, int side, int &bytesInBuffer)
         }
 
         if(!isReady) {      // not ready? return empty track
-            //Debug::out(LOG_DEBUG, "ImageSilo::getEncodedTrack - finishing with isReady: %d after %d ms", isReady, Utils::getCurrentMs() - start);
+            //logFdd(LOG_DEBUG, "ImageSilo::getEncodedTrack - finishing with isReady: %d after %d ms", isReady, Utils::getCurrentMs() - start);
             return emptyTrack;
         }
     }
 
-    //Debug::out(LOG_DEBUG, "ImageSilo::getEncodedTrack - finishing with isReady: %d after %d ms", true, Utils::getCurrentMs() - start);
+    //logFdd(LOG_DEBUG, "ImageSilo::getEncodedTrack - finishing with isReady: %d after %d ms", true, Utils::getCurrentMs() - start);
     
     // is ready? return that track
-    pTrack = slots[currentSlot].encImage.getEncodedTrack(track, side, bytesInBuffer);   // get data from current slot
+    pTrack = slots[floppySlotindex].encImage.getEncodedTrack(track, side, bytesInBuffer);   // get data from current slot
     return pTrack;
 }
 
-bool ImageSilo::getParams(int &tracks, int &sides, int &sectorsPerTrack)
+bool ImageSilo::getParams(int floppySlotindex, int &tracks, int &sides, int &sectorsPerTrack)
 {
-    return slots[currentSlot].encImage.getParams(tracks, sides, sectorsPerTrack);
+    if(floppySlotindex < 0 || floppySlotindex >= SLOT_COUNT) {
+        tracks = 0;
+        sides = 0;
+        sectorsPerTrack = 0;
+        return false;
+    }
+
+    return slots[floppySlotindex].encImage.getParams(tracks, sides, sectorsPerTrack);
 }
 
 bool ImageSilo::containsImage(const char *filename)    // check if image with this filename exists in silo
@@ -419,16 +374,6 @@ void ImageSilo::removeByFileName(std::string &filenameWExt)
     }
 }
 
-bool ImageSilo::currentSlotHasNewContent(void)
-{
-    if(slots[currentSlot].encImage.newContent) {            // if the current slot has new content
-        slots[currentSlot].encImage.newContent = false;     // set flag to false
-        return true;                                        // return that the content is new
-    }
-
-    return false;                                           // otherwise no new content
-}
-
 SiloSlot *ImageSilo::getSiloSlot(int index)
 {
     if(index < 0 || index > 2) {
@@ -438,21 +383,9 @@ SiloSlot *ImageSilo::getSiloSlot(int index)
     return &slots[index];
 }
 
-int ImageSilo::getFloppyImageSelectedId(void)
-{
-    return floppyImageSelected;
-}
-
 SiloSlotSimple * ImageSilo::getFloppyImageSimple(int index)
 {
     if(index < 0 || index >= 3)
         return NULL;
     return &floppyImages[index];
 }
-
-/*
-bool ImageSilo::getFloppyEncodingRunning(void)
-{
-    return floppyEncodingRunning;
-}
-*/

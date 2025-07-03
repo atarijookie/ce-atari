@@ -9,12 +9,13 @@
 
 #include <stdint.h>
 #include "../settingsreloadproxy.h"
+#include "../chipinterface_network/chipinterfacenetwork.h"
 
 #include "floppyimagefactory.h"
 #include "mfmdecoder.h"
 #include "mfmcachedimage.h"
 
-#define SLOT_COUNT          4
+#define SLOT_COUNT          MAX_CLIENTS
 
 #define EMPTY_IMAGE_SLOT    3
 #define EMPTY_IMAGE_PATH    "/tmp/emptyimage.st"
@@ -59,11 +60,8 @@ public:
     void saveSettings(void);
     void setSettingsReloadProxy(SettingsReloadProxy *rp);
 
-    uint8_t getSlotBitmap(void);
-    void setCurrentSlot(int index);
-    int  getCurrentSlot(void);
-    uint8_t *getEncodedTrack(int track, int side, int &bytesInBuffer);
-    bool getParams(int &tracks, int &sides, int &sectorsPerTrack);
+    uint8_t *getEncodedTrack(int floppySlotindex, int track, int side, int &bytesInBuffer);
+    bool getParams(int floppySlotindex, int &tracks, int &sides, int &sectorsPerTrack);
     uint8_t *getEmptyTrack(void);
 
     void add(int positionIndex, std::string &filename, std::string &hostPath, std::string &atariSrcPath, bool saveToSettings);
@@ -72,15 +70,12 @@ public:
 
     bool containsImage(const char *filename);
     void removeByFileName(std::string &filenameWExt);
-    bool currentSlotHasNewContent(void);
 
     void dumpStringsToBuffer(uint8_t *bfr);
 
     SiloSlot *getSiloSlot(int index);
 
-    static int getFloppyImageSelectedId(void);
     static SiloSlotSimple * getFloppyImageSimple(int index);
-    //static bool getFloppyEncodingRunning(void);
 
     void siloToSlotsFile(void);
     bool createNewImage(std::string pathAndFile);
@@ -93,7 +88,6 @@ private:
     uint8_t                    *emptyTrack;
 
     static SiloSlotSimple floppyImages[3];
-    static int floppyImageSelected;
 };
 
 #endif

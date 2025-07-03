@@ -22,8 +22,8 @@ bool FloppyImageSt::open(const char *fileName)
 
     loadedFlag = true;
 
-    Debug::out(LOG_DEBUG, "ST Image opened: %s", fileName);
-    Debug::out(LOG_DEBUG, "ST Image params - %d tracks, %d sides, %d sectors per track", params.tracksNo, params.sidesNo, params.sectorsPerTrack);
+    logFdd(LOG_DEBUG, "ST Image opened: %s", fileName);
+    logFdd(LOG_DEBUG, "ST Image params - %d tracks, %d sides, %d sectors per track", params.tracksNo, params.sidesNo, params.sectorsPerTrack);
 
     return true;
 }
@@ -66,7 +66,7 @@ bool FloppyImageSt::calcParams(void)
         }
     }
 
-    Debug::out(LOG_ERROR, "Couldn't guess the floppy params :(");
+    logFdd(LOG_ERROR, "Couldn't guess the floppy params :(");
     return false;
 }
 

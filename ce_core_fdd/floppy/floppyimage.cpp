@@ -82,12 +82,12 @@ bool FloppyImage::gotUnsavedChanges(void)
 bool FloppyImage::readNotWriteSector(bool readNotWrite, int track, int side, int sectorNo, uint8_t *buffer)
 {
     if(!loadedFlag) {   // not loaded?
-        Debug::out(LOG_DEBUG, "FloppyImage::readNotWriteSector -- not loadedFlag");
+        logFdd(LOG_DEBUG, "FloppyImage::readNotWriteSector -- not loadedFlag");
         return false;
     }
 
     if(sectorNo < 1 || sectorNo > params.sectorsPerTrack) {                 // sector # out of range?
-        Debug::out(LOG_DEBUG, "FloppyImage::readNotWriteSector -- sector # out of range");
+        logFdd(LOG_DEBUG, "FloppyImage::readNotWriteSector -- sector # out of range");
         return false;
     }
 
@@ -103,7 +103,7 @@ bool FloppyImage::readNotWriteSector(bool readNotWrite, int track, int side, int
         lastWriteTime = Utils::getCurrentMs();  // store when the writeSector() happened
         memcpy(&image.data[offset], buffer, 512);
 
-        Debug::out(LOG_DEBUG, "FloppyImage::readNotWriteSector -- sectorsWritten: %d, lastWriteTime: %08x", sectorsWritten, lastWriteTime);
+        logFdd(LOG_DEBUG, "FloppyImage::readNotWriteSector -- sectorsWritten: %d, lastWriteTime: %08x", sectorsWritten, lastWriteTime);
     }
 
     return true;
@@ -141,7 +141,7 @@ bool FloppyImage::open(const char *fileName)
     fajl = fopen(fileName, "rb");
 
     if(fajl == NULL) {
-        Debug::out(LOG_ERROR, "Failed to open image file: %s", fileName);
+        logFdd(LOG_ERROR, "Failed to open image file: %s", fileName);
         return false;
     }
 

@@ -31,7 +31,7 @@ void preloadGlobalsFromDotEnv(void)
 
     CONFIG_DRIVE_PATH = Utils::dotEnvValue("CONFIG_PATH_COPY");     // where the copy of configdrive is
 
-    Debug::out(LOG_DEBUG, "CORE_SERVICE_PATH: %s", corePath.c_str());
-    Debug::out(LOG_DEBUG, "driversPath      : %s", driversPath.c_str());
-    Debug::out(LOG_DEBUG, "CONFIG_DRIVE_PATH: %s", CONFIG_DRIVE_PATH.c_str());
+    logFdd(LOG_DEBUG, "CORE_SERVICE_PATH: %s", corePath.c_str());
+    logFdd(LOG_DEBUG, "driversPath      : %s", driversPath.c_str());
+    logFdd(LOG_DEBUG, "CONFIG_DRIVE_PATH: %s", CONFIG_DRIVE_PATH.c_str());
 }

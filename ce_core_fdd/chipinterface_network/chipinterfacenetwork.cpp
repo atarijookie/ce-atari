@@ -20,7 +20,7 @@
 #include "../debug.h"
 #include "../global.h"
 #include "../update.h"
-#include "../ccorethread.h"
+#include "../floppythread.h"
 
 extern TFlags    flags;                 // global flags from command line
 
@@ -61,7 +61,7 @@ void ChipInterfaceNetwork::createListeningSocket(void)
 
     // open socket
     if ((fdListen = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
-        Debug::out(LOG_ERROR, "netServer - failed to open socket");
+        logFdd(LOG_ERROR, "netServer - failed to open socket");
         return;
     }
 
@@ -69,7 +69,7 @@ void ChipInterfaceNetwork::createListeningSocket(void)
     int opt = 1;
 
     if (setsockopt(fdListen, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
-        Debug::out(LOG_ERROR, "netServer - setsockopt() failed");
+        logFdd(LOG_ERROR, "netServer - setsockopt() failed");
         return;
     }
 
@@ -82,17 +82,17 @@ void ChipInterfaceNetwork::createListeningSocket(void)
 
     // bind to address
     if (bind(fdListen, (struct sockaddr *) &addressListen, sizeof(addressListen)) < 0) {
-        Debug::out(LOG_ERROR, "netServer - bind() failed");
+        logFdd(LOG_ERROR, "netServer - bind() failed");
         return;
     }
 
     // mark the socket as a passive socket
     if (listen(fdListen, 5) < 0) {
-        Debug::out(LOG_ERROR, "netServer - listen() failed");
+        logFdd(LOG_ERROR, "netServer - listen() failed");
         return;
     }
 
-    Debug::out(LOG_INFO, "netServer - listening on tcp port: %d", flags.portClient);
+    logFdd(LOG_INFO, "netServer - listening on tcp port: %d", flags.portClient);
 }
 
 void ChipInterfaceNetwork::acceptSocketIfNeededAndPossible(void)
@@ -132,14 +132,14 @@ void ChipInterfaceNetwork::acceptSocketIfNeededAndPossible(void)
     // got the new client socket now
     clientsStoreOne(clientInfo, newSock, clientIpInt);
 
-    Debug::out(LOG_INFO, "acceptSocketIfNeededAndPossible() - client #%d connected from %s, will use floppy slot #%d", idx, clientIp, clientInfo->floppySlotindex);
+    logFdd(LOG_INFO, "acceptSocketIfNeededAndPossible() - client #%d connected from %s, will use floppy slot #%d", idx, clientIp, clientInfo->floppySlotindex);
 }
 
 void ChipInterfaceNetwork::closeClientSocket(int& fdClient)
 {
     // Utils::closeFdIfOpen(fdClient);            // close socket
 
-    Debug::out(LOG_DEBUG, "closeClientSocket() - client disconnected");
+    logFdd(LOG_DEBUG, "closeClientSocket() - client disconnected");
 }
 
 bool ChipInterfaceNetwork::ciOpen(void)
@@ -173,7 +173,7 @@ int ChipInterfaceNetwork::setAllClientFds(fd_set* readfds)
     return maxFd;
 }
 
-void ChipInterfaceNetwork::handleAllReadyClients(fd_set* readfds, CCoreThread* core)
+void ChipInterfaceNetwork::handleAllReadyClients(fd_set* readfds, FloppyThread* core)
 {
     for(int i=0; i<MAX_CLIENTS; i++) {
         if(clients[i].fdClient == FD_EMPTY) {           // no client here? skip it
@@ -195,7 +195,7 @@ bool ChipInterfaceNetwork::actionNeeded(int& fdClient, uint8_t *inBuf)
     acceptSocketIfNeededAndPossible();  // if don't have client connected, try to accept connection from client
 
     if(fdClient <= 0) {                 // (still) no client connected? no action needed
-        //Debug::out(LOG_DEBUG, "actionNeeded() - client not connected yet");
+        //logFdd(LOG_DEBUG, "actionNeeded() - client not connected yet");
         return false;
     }
 
@@ -206,7 +206,7 @@ bool ChipInterfaceNetwork::actionNeeded(int& fdClient, uint8_t *inBuf)
         return false;
     }
 
-    Debug::out(LOG_DEBUG, "actionNeeded() - bytesAvailable: %d", bytesAvailable);
+    logFdd(LOG_DEBUG, "actionNeeded() - bytesAvailable: %d", bytesAvailable);
 
     // if waitForAtn() succeeds, it fills 8 bytes of data in buffer
     // ...but then we might need some little more, so let's determine what it was
@@ -221,7 +221,7 @@ bool ChipInterfaceNetwork::actionNeeded(int& fdClient, uint8_t *inBuf)
             break;
         }
 
-        //Debug::out(LOG_DEBUG, "actionNeeded() - gotAtnId=%d, gotAtnCode=%d", gotAtnId, gotAtnCode);
+        //logFdd(LOG_DEBUG, "actionNeeded() - gotAtnId=%d, gotAtnCode=%d", gotAtnId, gotAtnCode);
 
         if(gotAtnId == NET_ATN_FRANZ_ID) {                  // for Franz
             if(gotAtnCode == ATN_SEND_TRACK) {              // for this command read 2 more bytes: side + track
@@ -232,7 +232,7 @@ bool ChipInterfaceNetwork::actionNeeded(int& fdClient, uint8_t *inBuf)
         }
 
         // if came here, probably weird situation, quit
-        Debug::out(LOG_DEBUG, "actionNeeded() - weird situation?");
+        logFdd(LOG_DEBUG, "actionNeeded() - weird situation?");
         break;
     }
 
@@ -284,7 +284,7 @@ bool ChipInterfaceNetwork::waitForAtn(int& fdClient, int atnIdWant, uint8_t atnC
         uint8_t atnCode = bufReader.getAtnCode();                           // what command does this chip wants us to handle?
 
         if(atnIdGot == NET_ATN_DISCONNECTED) {         // if buffered reader detected client disconnect, close it and quit
-            Debug::out(LOG_DEBUG, "waitForAtn() - DISCONNECTED!");
+            logFdd(LOG_DEBUG, "waitForAtn() - DISCONNECTED!");
 
             closeClientSocket(fdClient);
             return false;
@@ -295,13 +295,13 @@ bool ChipInterfaceNetwork::waitForAtn(int& fdClient, int atnIdWant, uint8_t atnC
             return false;
         }
 
-        //Debug::out(LOG_DEBUG, "waitForAtn() - atnIdGot=%d, atnCode=%d", atnIdGot, atnCode);
+        //logFdd(LOG_DEBUG, "waitForAtn() - atnIdGot=%d, atnCode=%d", atnIdGot, atnCode);
 
         // if we got here, it'z not ZEROS, IKDB or NONE, so it's FRANZ or HANS
         memcpy(inBuf, bufReader.getHeaderPointer(), 8); // copy in the header to start of buffer
         bufReader.clear();                              // clear buffered reader after reading data
 
-        //Debug::out(LOG_DEBUG, "waitForAtn() - %02X %02X %02X %02X %02X %02X %02X %02X", inBuf[0], inBuf[1], inBuf[2], inBuf[3], inBuf[4], inBuf[5], inBuf[6], inBuf[7]);
+        //logFdd(LOG_DEBUG, "waitForAtn() - %02X %02X %02X %02X %02X %02X %02X %02X", inBuf[0], inBuf[1], inBuf[2], inBuf[3], inBuf[4], inBuf[5], inBuf[6], inBuf[7]);
 
         // store which chip wants which command to be handled
         gotAtnId = atnIdGot;
@@ -362,12 +362,12 @@ bool ChipInterfaceNetwork::sendHeaderAndDataToChip(int& fdClient, uint16_t cmdCo
     {
         if(!sendHeaderToChip(fdClient, cmdCode, len))
         {
-            Debug::out(LOG_DEBUG, "sendHeaderAndDataToChip failed!");
+            logFdd(LOG_DEBUG, "sendHeaderAndDataToChip failed!");
             return false;
         }
 
         good = sendDataToChip(fdClient, data, len);
-        Debug::out(LOG_DEBUG, "sendHeaderAndDataToChip - good: %d", good);
+        logFdd(LOG_DEBUG, "sendHeaderAndDataToChip - good: %d", good);
     } 
     else                // for small data first copy data into buffers, then send with one write() command
     {
@@ -414,7 +414,7 @@ uint32_t ChipInterfaceNetwork::recvFromClient(int& fdClient, uint8_t* buf, int m
     }
 
     // if(received > 0) {
-    //     Debug::out(LOG_DEBUG, "recvFromClient(): %d bytes", received);
+    //     logFdd(LOG_DEBUG, "recvFromClient(): %d bytes", received);
     //     Debug::outBfr(buf, received);
     // }
 
@@ -521,7 +521,7 @@ void ChipInterfaceNetwork::clientsDisconnectInactive(void)
 
         if(diff > 15000) {
             clientsCloseOne(&clients[i]);
-            Debug::out(LOG_INFO, "disconnected inactive client #%i", i);
+            logFdd(LOG_INFO, "disconnected inactive client #%i", i);
         }
     }
 }

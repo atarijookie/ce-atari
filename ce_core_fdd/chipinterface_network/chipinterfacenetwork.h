@@ -40,7 +40,7 @@ typedef struct {
     uint32_t    lastMs;             // value of getCurrentMs() when was last time anything was received from this client
 } ClientInfo;
 
-class CCoreThread;
+class FloppyThread;
 
 class ChipInterfaceNetwork
 {
@@ -69,10 +69,10 @@ virtual ~ChipInterfaceNetwork();
 
     void setFDDconfig(bool setFloppyConfig, FloppyConfig* fddConfig, bool setDiskChanged, bool diskChanged);
 
-    // the following ones are called from CCoreThread
+    // the following ones are called from FloppyThread
     void clientsDisconnectInactive(void);
     int setAllClientFds(fd_set* readfds);
-    void handleAllReadyClients(fd_set* readfds, CCoreThread* core);
+    void handleAllReadyClients(fd_set* readfds, FloppyThread* core);
     void acceptSocketIfNeededAndPossible(void);
 
 private:

@@ -23,14 +23,20 @@ DebugVars dbgVars;
 
 std::string coreLogFileName;
 
-const char* Debug::getCoreLogFileName(bool forceCreate)
+const char* Debug::getCoreLogFileName(bool forceCreate, int whichLog)
 {
     if(coreLogFileName.length() > 0 && !forceCreate) {
         return coreLogFileName.c_str();
     }
 
     std::string logDir = Utils::dotEnvValue("LOG_DIR", LOG_DIR_DEFAULT, false);
-    coreLogFileName = logDir + std::string("/" CORE_FDD_LOG_FILENAME);
+
+    switch(whichLog) {
+        case LOGFILE_HDD: coreLogFileName = logDir + std::string("/" CORE_HDD_LOG_FILENAME); break;
+        case LOGFILE_FDD: coreLogFileName = logDir + std::string("/" CORE_FDD_LOG_FILENAME); break;
+        case LOGFILE_IKBD: coreLogFileName = logDir + std::string("/" CORE_IKBD_LOG_FILENAME); break;
+    }
+
     return coreLogFileName.c_str();
 }
 
@@ -58,7 +64,7 @@ void Debug::printfLogLevelString(void)
     printf("\n\n");
 }
 
-void Debug::out(int logLevel, const char *format, ...)
+void logHdd(int logLevel, const char *format, ...)
 {
     if(logLevel > flags.logLevel) {         // if this log is higher than allowed, don't do this
         return;
@@ -66,13 +72,58 @@ void Debug::out(int logLevel, const char *format, ...)
 
     va_list args;
     va_start(args, format);
+    Debug::outV(LOGFILE_HDD, logLevel, format, args);
+    va_end(args);
+}
+
+void logFdd(int logLevel, const char *format, ...)
+{
+    if(logLevel > flags.logLevel) {         // if this log is higher than allowed, don't do this
+        return;
+    }
+
+    va_list args;
+    va_start(args, format);
+    Debug::outV(LOGFILE_FDD, logLevel, format, args);
+    va_end(args);
+}
+
+void logIkbd(int logLevel, const char *format, ...)
+{
+    if(logLevel > flags.logLevel) {         // if this log is higher than allowed, don't do this
+        return;
+    }
+
+    va_list args;
+    va_start(args, format);
+    Debug::outV(LOGFILE_IKBD, logLevel, format, args);
+    va_end(args);
+}
+
+void Debug::out(int whichLog, int logLevel, const char *format, ...)
+{
+    if(logLevel > flags.logLevel) {         // if this log is higher than allowed, don't do this
+        return;
+    }
+
+    va_list args;
+    va_start(args, format);
+    outV(whichLog, logLevel, format, args);
+    va_end(args);
+}
+
+void Debug::outV(int whichLog, int logLevel, const char *format, va_list args)
+{
+    if(logLevel > flags.logLevel) {         // if this log is higher than allowed, don't do this
+        return;
+    }
 
     FILE *f;
 
     if(g_outToConsole) {                    // should log to console? f is null
         f = NULL;
     } else {                                    // log to file? open the file
-        f = logFileOpen();
+        f = logFileOpen(whichLog);
     }
 
     if(!f) {
@@ -108,17 +159,15 @@ void Debug::out(int logLevel, const char *format, ...)
     vfprintf(f, format, args);
     fprintf(f, "\n");
     fclose(f);
-
-    va_end(args);
 }
 
-void Debug::outBfr(uint8_t *bfr, int count)
+void Debug::outBfr(int whichLog, uint8_t *bfr, int count)
 {
     if(flags.logLevel < LOG_DEBUG) {            // if we're not in debug log level, don't do this
         return;
     }
 
-    FILE* f = logFileOpen();
+    FILE* f = logFileOpen(whichLog);
 
     if(!f) {
         return;
@@ -172,7 +221,7 @@ void Debug::setLogLevel(int newLogLevel)
         newLogLevel = LOG_DEBUG;
     }
 
-    Debug::out(LOG_INFO, "Switching LOG LEVEL from %d to %d", flags.logLevel, newLogLevel);
+    logFdd(LOG_INFO, "Switching LOG LEVEL from %d to %d", flags.logLevel, newLogLevel);
     flags.logLevel = newLogLevel;                               // new value to struct
 
     Utils::intToFileFromEnv(newLogLevel, "CORE_IKBD_LOGLEVEL_FILE");        // new value to file
@@ -191,13 +240,13 @@ void Debug::logRotateIfNeeded(const char *logFilePath)
     }
 }
 
-FILE* Debug::logFileOpen(void)
+FILE* Debug::logFileOpen(int whichLog)
 {
     static std::string path;
 
-    Debug::logRotateIfNeeded(getCoreLogFileName());   // rotate log file if too big
+    Debug::logRotateIfNeeded(getCoreLogFileName(false, whichLog));   // rotate log file if too big
 
-    FILE *f = fopen(getCoreLogFileName(), "a+t");
+    FILE *f = fopen(getCoreLogFileName(false, whichLog), "a+t");
     return f;
 }
 

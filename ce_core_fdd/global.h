@@ -32,11 +32,9 @@ typedef struct {
 
 extern InterProcessEvents events;
 
-class ImageStorage;
 class ImageSilo;
 
 typedef struct {
-    ImageStorage    *imageStorage;
     ImageSilo       *imageSilo;
     pthread_mutex_t  mtxImages;
 } SharedObjects;

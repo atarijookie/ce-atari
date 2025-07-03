@@ -161,7 +161,7 @@ Uint8 *MSA_UnCompress(Uint8 *pMSAFile, long *pImageSize)
 		                            * NUMBYTESPERSECTOR);
 		if (!pBuffer)
 		{
-			Debug::out(LOG_ERROR, "MSA_UnCompress");
+			logFdd(LOG_ERROR, "MSA_UnCompress");
 			return NULL;
 		}
 
@@ -206,7 +206,7 @@ Uint8 *MSA_UnCompress(Uint8 *pMSAFile, long *pImageSize)
 							/* Limit length to size of track, incorrect images may overflow */
 							if (RunLength+NumBytesUnCompressed > nBytesPerTrack)
 							{
-								Debug::out(LOG_ERROR, "MSA_UnCompress: Illegal run length -> corrupted disk image?\n");
+								logFdd(LOG_ERROR, "MSA_UnCompress: Illegal run length -> corrupted disk image?\n");
 								RunLength = nBytesPerTrack - NumBytesUnCompressed;
 							}
 							pMSAImageBuffer += sizeof(short int);
@@ -321,7 +321,7 @@ bool MSA_WriteDisk(const char *pszFileName, Uint8 *pBuffer, int ImageSize)
 	pMSAImageBuffer = (Uint8 *)malloc(MSA_WORKSPACE_SIZE);
 	if (!pMSAImageBuffer)
 	{
-		Debug::out(LOG_ERROR, "MSA_WriteDisk");
+		logFdd(LOG_ERROR, "MSA_WriteDisk");
 		return false;
 	}
 

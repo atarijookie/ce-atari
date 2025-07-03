@@ -3,7 +3,6 @@
 #define _CMDSOCKTHREAD_H_
 
 class Scsi;
-class ImageStorage;
 class ImageSilo;
 
 void *cmdSockThreadCode(void *ptr);
