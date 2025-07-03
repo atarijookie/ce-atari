@@ -36,8 +36,9 @@ private:
 
     bool handleFdd(int clientIndex, int fdClient, int floppySlotindex, uint8_t* inBuff);
     void handleFwVersion_franz(int clientIndex);
-    void handleSendTrack(int fdClient, int floppySlotindex, uint8_t *inBuf);
-    void handleSectorWritten(int clientIndex, int floppySlotindex);
+    void handleSendTrack(int clientIndex);
+    void handleSendImage(int clientIndex);
+    void handleSectorWritten(int clientIndex);
 
     //----------------------------------
     // recovery stuff

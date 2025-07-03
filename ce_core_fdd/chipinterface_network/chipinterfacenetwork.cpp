@@ -240,10 +240,13 @@ void ChipInterfaceNetwork::getFWversion(int clientIndex)
 
     #define FW_VER_SIZE     32
     uint8_t fwVer[FW_VER_SIZE];
-    memset(fwVer, 0, FW_VER_SIZE);
 
-    int readSize = MIN(clients[clientIndex].bufReader.dataSizeRest(), FW_VER_SIZE);
-    recvFromClient(clientIndex, fwVer, readSize);
+    int readCnt = readRestOfData(clientIndex, fwVer, FW_VER_SIZE);
+
+    if(readCnt < 4) {
+        logFdd(LOG_ERROR, "getFWversion() -- not enough data received: %d", readCnt);
+        return;
+    }
 
     int year = Utils::bcdToInt(fwVer[1]) + 2000;
     Update::versions.franz.fromInts(year, Utils::bcdToInt(fwVer[2]), Utils::bcdToInt(fwVer[3]));              // store found FW version of Franz
@@ -254,12 +257,20 @@ void ChipInterfaceNetwork::fdd_sendTrackToChip(int& fdClient, int byteCount, uin
     sendHeaderAndDataToChip(fdClient, ATN_SEND_TRACK, encodedTrack, byteCount);
 }
 
+void ChipInterfaceNetwork::fdd_sendImageParamsToChip(int& fdClient, int imgTracks, int imgSides, int imgSectorsPerTrack)
+{
+    uint8_t bfr[4];
+    bfr[0] = (uint8_t) imgTracks;
+    bfr[1] = (uint8_t) imgSides;
+    bfr[2] = (uint8_t) imgSectorsPerTrack;
+
+    sendHeaderAndDataToChip(fdClient, ATN_SEND_WHOLE_IMAGE, bfr, 3);
+}
+
 uint8_t* ChipInterfaceNetwork::fdd_sectorWritten(int clientIndex, int &side, int &track, int &sector, int &byteCount)
 {
-    byteCount = MIN(clients[clientIndex].bufReader.dataSizeRest(), MFM_STREAM_SIZE);   // get how many data we still have
-    
     // get all the remaining data
-    recvFromClient(clientIndex, bufIn, byteCount);
+    byteCount = readRestOfData(clientIndex, bufIn, MFM_STREAM_SIZE);
 
     // get the written sector, side, track number
     sector  = bufIn[1];
@@ -530,3 +541,18 @@ int ChipInterfaceNetwork::getFdListen(void)
     return fdListen;
 }
 
+ClientInfo* ChipInterfaceNetwork::clientsGetOne(int clientIndex)
+{
+    if(clientIndex < 0 || clientIndex >= MAX_CLIENTS) {
+        return NULL;
+    }
+
+    return &clients[clientIndex];
+}
+
+int ChipInterfaceNetwork::readRestOfData(int clientIndex, uint8_t* buffer, uint32_t bufferSize)
+{
+    memset(buffer, 0, bufferSize);
+    int readSize = MIN(clients[clientIndex].bufReader.dataSizeRest(), bufferSize);
+    return recvFromClient(clientIndex, buffer, readSize);
+}

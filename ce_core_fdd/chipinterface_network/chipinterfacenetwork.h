@@ -19,6 +19,7 @@
 #define ATN_FW_VERSION              0x01            // followed by string with FW version (length: 4 WORDs - cmd, v[0], v[1], 0)
 #define ATN_SECTOR_WRITTEN          0x03            // sent: 3, side (highest bit) + track #, current sector #
 #define ATN_SEND_TRACK              0x04            // send the whole track
+#define ATN_SEND_WHOLE_IMAGE        0x05            // send the whole image
 #define ATN_ANY                     0xff            // this is used only on host to wait for any ATN
 
 // Franz: commands sent from host to device
@@ -68,11 +69,15 @@ virtual ~ChipInterfaceNetwork();
     // FDD: all you need for handling the floppy interface
     void fdd_sendTrackToChip(int& fdClient, int byteCount, uint8_t *encodedTrack);    // send encodedTrack to chip for MFM streaming
     uint8_t* fdd_sectorWritten(int clientIndex, int &side, int &track, int &sector, int &byteCount);
+    void fdd_sendImageParamsToChip(int& fdClient, int imgTracks, int imgSides, int imgSectorsPerTrack);
 
     void setFDDconfig(bool setFloppyConfig, FloppyConfig* fddConfig, bool setDiskChanged, bool diskChanged);
 
     // the following ones are called from FloppyThread
     void clientsDisconnectInactive(void);
+    ClientInfo* clientsGetOne(int clientIndex);
+    int readRestOfData(int clientIndex, uint8_t* buffer, uint32_t bufferSize);
+
     int setAllClientFds(fd_set* readfds);
     void handleAllReadyClients(fd_set* readfds, FloppyThread* core);
     void acceptSocketIfNeededAndPossible(void);
