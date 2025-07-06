@@ -19,9 +19,6 @@ void preloadGlobalsFromDotEnv(void)
 {
     corePath = Utils::dotEnvValue("CORE_SERVICE_PATH");     // path to where the core service is stored
 
-    CE_CONF_FDD_IMAGE_PATH_AND_FILENAME = Utils::mergeHostPaths3(corePath, CE_CONF_FDD_IMAGE_JUST_FILENAME);
-    FDD_TEST_IMAGE_PATH_AND_FILENAME = Utils::mergeHostPaths3(corePath, FDD_TEST_IMAGE_JUST_FILENAME);
-
     // path to where the drivers inside the core service are stored
     std::string driversPath = Utils::mergeHostPaths3(corePath, "configdrive/drivers");
 

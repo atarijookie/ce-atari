@@ -8,7 +8,6 @@
 #include <queue>
 
 #include <stdint.h>
-#include "../settingsreloadproxy.h"
 
 #include "mfmdecoder.h"
 #include "mfmcachedimage.h"

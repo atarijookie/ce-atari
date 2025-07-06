@@ -33,7 +33,6 @@
 //--------
 
 #include "debug.h"
-#include "version.h"
 #include "settings.h"
 #include "global.h"
 

@@ -25,12 +25,6 @@ typedef struct {
     int  logLevel;              // init current log level to LOG_ERROR
 } TFlags;
 
-typedef struct {
-    volatile uint8_t insertSpecialFloppyImageId;
-} InterProcessEvents;
-
-extern InterProcessEvents events;
-
 class ImageSilo;
 
 typedef struct {
@@ -43,15 +37,6 @@ extern SharedObjects shared;
 //////////////////////////////////////////////////////
 
 void preloadGlobalsFromDotEnv(void);
-
-#define SPECIAL_FDD_IMAGE_CE_CONF       100
-#define SPECIAL_FDD_IMAGE_FDD_TEST      101
-
-#define CE_CONF_FDD_IMAGE_PATH_AND_FILENAME_TMP "/tmp/ce_conf.st"
-#define CE_CONF_FDD_IMAGE_JUST_FILENAME         "ce_conf.st"
-
-#define FDD_TEST_IMAGE_PATH_AND_FILENAME_TMP    "/tmp/fdd_test.st"
-#define FDD_TEST_IMAGE_JUST_FILENAME            "fdd_test.st"
 
 // These were global const string constants, but now they depend on .env content, so they are now
 // loaded on app start and used when needed.

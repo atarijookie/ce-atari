@@ -19,7 +19,6 @@
 #include "../utils.h"
 #include "../debug.h"
 #include "../global.h"
-#include "../update.h"
 #include "../floppythread.h"
 
 extern TFlags    flags;                 // global flags from command line
@@ -249,7 +248,10 @@ void ChipInterfaceNetwork::getFWversion(int clientIndex)
     }
 
     int year = Utils::bcdToInt(fwVer[1]) + 2000;
-    Update::versions.franz.fromInts(year, Utils::bcdToInt(fwVer[2]), Utils::bcdToInt(fwVer[3]));              // store found FW version of Franz
+    int month = Utils::bcdToInt(fwVer[2]);
+    int day = Utils::bcdToInt(fwVer[3]);
+
+    logFdd(LOG_DEBUG, "FW: Franz, %d-%02d-%02d", year, month, day);
 }
 
 void ChipInterfaceNetwork::fdd_sendTrackToChip(int& fdClient, int byteCount, uint8_t *encodedTrack)

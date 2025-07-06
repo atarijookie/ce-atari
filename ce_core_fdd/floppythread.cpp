@@ -12,7 +12,6 @@
 #include "global.h"
 #include "debug.h"
 #include "floppythread.h"
-#include "update.h"
 #include "utils.h"
 #include "chipinterface_network/chipinterfacenetwork.h"
 
@@ -40,7 +39,6 @@ TLastFwInfoTime lastFwInfoTime;
 
 FloppyThread::FloppyThread()
 {
-    Update::initialize();
     sharedObjects_create();
 }
 
@@ -176,8 +174,6 @@ void FloppyThread::handleFwVersion_franz(int clientIndex)
 {
     // chipInterface->setFDDconfig(setFloppyConfig, &floppyConfig, setDiskChanged, diskChanged);
     chipInterface->getFWversion(clientIndex);
-
-    logFdd(LOG_DEBUG, "FW: Franz, %d-%02d-%02d", Update::versions.franz.getYear(), Update::versions.franz.getMonth(), Update::versions.franz.getDay());
 }
 
 void FloppyThread::handleSendTrack(int clientIndex)

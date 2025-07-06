@@ -15,8 +15,6 @@
 #include "global.h"
 #include "floppythread.h"
 #include "debug.h"
-#include "update.h"
-#include "version.h"
 #include "cmdsockthread.h"
 #include "floppy/floppyencoder.h"
 #include "chipinterface_network/chipinterfacenetwork.h"
@@ -32,7 +30,6 @@ void printfPossibleCmdLineArgs(void);
 void initializeFlags(void);
 
 TFlags              flags;                              // global flags from command line
-InterProcessEvents  events;
 SharedObjects       shared;
 ChipInterfaceNetwork* chipInterface;
 
@@ -264,4 +261,3 @@ bool otherInstanceIsRunning(void)
 
     return false;
 }
-

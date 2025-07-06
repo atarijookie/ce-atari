@@ -18,17 +18,8 @@
 extern pthread_mutex_t floppyEncoderMutex;
 extern pthread_cond_t  floppyEncoderShouldWork;
 
-//-------------------------------
-// silo slots are global objects now, as FloppyThread needs to stream from them and
-// encoder thread needs to check all of them for tracks that need (re)encoding.
-// Access is protected by floppyEncoderMutex.
-// Individual tracks in slot can be streamed without using mutex when: slot.encImage.tracks[index].isReady
-// (that means we're not encoding that track at that moment).
-
 extern SiloSlot slots[SLOT_COUNT];
 //-------------------------------
-
-SiloSlotSimple  ImageSilo::floppyImages[3];
 
 extern TFlags flags;
 
@@ -51,17 +42,6 @@ ImageSilo::ImageSilo()
     for(int i=0; i<SLOT_COUNT; i++) {
         clearSlot(i);
     }
-    //-----------
-    // create empty image and encode it (will be used when no slot is selected)
-    bool res = createNewImage(EMPTY_IMAGE_PATH);                   // create empty image in /tmp/ directory
-
-    if(res) {                                                                   // if succeeded, encode this empty image
-        logFdd(LOG_DEBUG, "ImageSilo created empty image (for no selected image)");
-        floppyEncoder_addEncodeWholeImageRequest(EMPTY_IMAGE_SLOT, EMPTY_IMAGE_PATH);
-    } else {
-        logFdd(LOG_ERROR, "ImageSilo failed to create empty image! (for no selected image)");
-    }
-    //-----------
 
     loadSettings();
 }
@@ -125,16 +105,11 @@ void ImageSilo::loadSettings(void)
         pathAndFile = img;
 
         if(pathAndFile.empty()) {                   // nothing stored? skip it
+            // TODO: add() empty image
             continue;
         }
 
-        std::string empty;
-        add(slot, file, pathAndFile, empty);        // add this image
-    }
-
-    // now tell the core thread that floppy images have changed
-    if(reloadProxy) {
-        reloadProxy->reloadSettings(SETTINGSUSER_FLOPPYIMGS);
+        add(slot, file, pathAndFile);        // add this image
     }
 }
 
@@ -143,12 +118,7 @@ void ImageSilo::saveSettings(void)
 
 }
 
-void ImageSilo::setSettingsReloadProxy(SettingsReloadProxy *rp)
-{
-    reloadProxy = rp;
-}
-
-void ImageSilo::add(int positionIndex, std::string &filename, std::string &hostPath, std::string &atariSrcPath)
+void ImageSilo::add(int positionIndex, std::string &filename, std::string &hostPath)
 {
     if(positionIndex < 0 || positionIndex >= SLOT_COUNT) {
         return;
@@ -161,9 +131,6 @@ void ImageSilo::add(int positionIndex, std::string &filename, std::string &hostP
     slots[positionIndex].imageFile      = filename;         // just file name:                     bla.st
     slots[positionIndex].imageFileNoExt = filenameNoExt;    // just file name without extension:   bla
     slots[positionIndex].hostPath       = hostPath;         // where the file is stored on translated drive (/mnt/sda/gamez/bla.st) or where the image is uploaded from atari (/tmp/bla.st)
-    slots[positionIndex].atariSrcPath   = atariSrcPath;     // from where the file was uploaded:   C:\gamez\bla.st
-
-    floppyImages[positionIndex].imageFile = filename;
 
     // create and add floppy encode request
     floppyEncoder_addEncodeWholeImageRequest(positionIndex, hostPath.c_str());
@@ -174,8 +141,6 @@ void ImageSilo::remove(int index)                   // remove image at specified
     if(index < 0 || index >= SLOT_COUNT) {
         return;
     }
-
-    floppyImages[index].imageFile = "";
 
     if(slots[index].imageFile.empty()) {            // no image in this slot? skip the rest
         return;
@@ -199,11 +164,6 @@ void ImageSilo::clearSlot(int index)
     slots[index].imageFile.clear();
     slots[index].imageFileNoExt.clear();
     slots[index].hostPath.clear();
-    slots[index].atariSrcPath.clear();
-
-    if(index >= 0 && index < 3) {
-        floppyImages[index].imageFile.clear();
-    }
 }
 
 uint8_t *ImageSilo::getEncodedTrack(int floppySlotindex, int track, int side, int &bytesInBuffer)

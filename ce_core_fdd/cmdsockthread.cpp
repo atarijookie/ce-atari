@@ -20,7 +20,6 @@
 #include "global.h"
 #include "floppy/imagesilo.h"
 #include "floppythread.h"
-#include "update.h"
 #include "json.h"
 
 using json = nlohmann::json;
@@ -151,7 +150,7 @@ void handleFloppyAction(std::string& action, json& data)
             std::string path, file;
             Utils::splitFilenameFromPath(pathAndFile, path, file);          // get just filename from full path
 
-            shared.imageSilo->add(slot, file, pathAndFile, empty);    // insert into slot
+            shared.imageSilo->add(slot, file, pathAndFile);    // insert into slot
         } else {
             logFdd(LOG_WARNING, "handleFloppyAction: missing 'image' in message, ignoring message!");
         }

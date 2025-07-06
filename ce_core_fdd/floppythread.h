@@ -4,15 +4,11 @@
 #include "global.h"
 #include "settings.h"
 
-#include "settingsreloadproxy.h"
-#include "isettingsuser.h"
-
-#include "version.h"
 #include "utils.h"
 
 #define INBUF_SIZE  16384
 
-class FloppyThread: public ISettingsUser
+class FloppyThread
 {
 public:
     FloppyThread();
