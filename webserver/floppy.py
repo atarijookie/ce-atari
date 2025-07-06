@@ -1,24 +1,10 @@
 import os
 from flask import Blueprint, make_response, request, current_app as app, abort
-from utils import slot_activate, get_image_slots, text_from_file, slot_insert, file_seems_to_be_image, \
-    unlink_without_fail, symlink_if_needed
+from utils import slot_insert, file_seems_to_be_image, \
+    unlink_without_fail, symlink_if_needed, get_setting, set_setting, send_to_core_fdd
 from werkzeug.utils import secure_filename
 
 floppy = Blueprint('floppy', __name__)
-
-
-@floppy.route('/slots', methods=['GET'])
-def status():
-    image_names = get_image_slots()
-    active_slot = text_from_file(os.getenv('FILE_FLOPPY_ACTIVE_SLOT'))
-
-    try:        # try to convert to int if possible
-        active_slot = int(active_slot)
-    except Exception as ex:
-        app.logger.warning(f"failed to convert {active_slot} to int: {str(ex)}")
-        active_slot = None
-
-    return {'slots': image_names, 'active': active_slot}
 
 
 @floppy.route('/<int:slot_no>', methods=['POST'])
@@ -68,15 +54,48 @@ def upload_image(slot_no):
 
 
 @floppy.route('/<int:slot_no>', methods=['PUT'])
-def activate_slot(slot_no):
-    """
-    :param slot_no: 0-2 - regular slots
-                    100 - config image
-                    101 - test image
-    """
+def set_floppy_slot(slot_no):
+    """ set new image path for specified slot_no """
 
-    if slot_no not in [0, 1, 2, 100, 101]:  # invalid slot number? This means deactivate any selected slot.
-        slot_no = -1
+    data = request.get_json(force=True)
+    path = data['path']
 
-    slot_activate(slot_no)
+    # check if the file extension is supported
+    success, message = file_seems_to_be_image(path, True)
+
+    if not success:     # not a valid image? fail here
+        app.logger.warning(f"set_floppy_slot: not a valid image, failing: {message}")
+        abort(400, message)
+    
+    set_setting("FLOPPY_IMAGE_" + str(slot_no), path)
+    send_to_core_fdd({'module': 'floppy', 'action': 'insert', 'slot': slot_no, 'image': path})
+
     return {'status': 'ok'}
+
+
+@floppy.route('/get_slots', methods=['GET'])
+def get_slots():
+    """ get paths for floppy images in slots """
+
+    resp = {'max_clients': 8, 'paths': []}
+    max_clients = 8
+
+    # get max clients from env file
+    try:
+        max_clients = os.getenv('FDD_MAX_CLIENTS')
+
+        if not max_clients:
+            max_clients = 8
+
+        max_clients = int(max_clients)
+        resp['max_clients'] = max_clients
+    except ValueError:                  # if not int, fail
+        abort(400, 'conversion to int failed')
+
+    # get path and device type for each raw drive
+    for i in range(max_clients):
+        path = get_setting("FLOPPY_IMAGE_" + str(i), "")
+        resp['paths'].append(path)
+
+    return resp
+

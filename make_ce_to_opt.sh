@@ -36,11 +36,11 @@ cp ./ce_logo.bin "$BIN_DIR"
 cp -r ./configdrive "$BIN_DIR"
 cd - > /dev/null 2>&1
 
-# cd ce_core_fdd
-# echo "building ce_core_fdd"
-# make -j4
-# cp ./ce_fdd.elf "$BIN_DIR"
-# cd - > /dev/null 2>&1
+cd ce_core_fdd
+echo "building ce_core_fdd"
+make -j4
+cp ./ce_fdd.elf "$BIN_DIR"
+cd - > /dev/null 2>&1
 
 cd ce_core_ikbd
 echo "building ce_core_ikbd"
