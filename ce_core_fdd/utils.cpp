@@ -1043,34 +1043,6 @@ void Utils::trimTrail(char *bfr)
     }
 }
 
-void Utils::sendToMounter(const std::string& jsonString)
-{
-    std::string sockPath = Utils::dotEnvValue("MOUNT_SOCK_PATH");    // path to mounter socket
-
-	// create a UNIX DGRAM socket
-	int sockFd = socket(AF_UNIX, SOCK_DGRAM, 0);
-
-	if (sockFd < 0) {   // if failed to create socket
-	    logFdd(LOG_ERROR, "sendToMounter: failed to create socket - errno: %d", errno);
-	    return;
-	}
-
-    struct sockaddr_un addr;
-    strcpy(addr.sun_path, sockPath.c_str());
-    addr.sun_family = AF_UNIX;
-
-    // try to send to mounter socket
-    int res = sendto(sockFd, jsonString.c_str(), jsonString.length() + 1, 0, (struct sockaddr *) &addr, sizeof(struct sockaddr_un));
-
-    if(res < 0) {       // if failed to send
-	    logFdd(LOG_ERROR, "sendToMounter: sendto failed - errno: %d", errno);
-    } else {
-        logFdd(LOG_DEBUG, "sendToMounter: sent to mounter: %s", jsonString.c_str());
-    }
-
-    close(sockFd);
-}
-
 void Utils::createFloppyTestImage(void)
 {
     // open the file and write to it

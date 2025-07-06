@@ -96,8 +96,6 @@ public:
 
     static void createFloppyTestImage(void);
 
-    static void sendToMounter(const std::string& jsonString);
-
     static void closeFdIfOpen(int& fd);
 
 private:

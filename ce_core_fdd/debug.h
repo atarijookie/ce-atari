@@ -46,16 +46,8 @@ public:
 
     static void logRotateIfNeeded(const char *logFilePath);
 
-    static void chipLog(const char* bfr);
-    static void chipLog(uint16_t cnt, char* bfr);
-
     static FILE* logFileOpen(int whichLog);
     static const char* getCoreLogFileName(bool forceCreate = false, int whichLog = LOGFILE_HDD);
-
-    static void cmdMarkStartTime(void);
-    static void cmdStart(uint8_t* cmd, const char* tag);
-    static void cmdMid(bool readNotWrite, uint32_t count);
-    static void cmdEnd(uint8_t statusByte, bool succeeded);
 };
 
 #endif
