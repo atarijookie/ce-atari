@@ -11,7 +11,6 @@
 #include "../settingsreloadproxy.h"
 #include "../chipinterface_network/chipinterfacenetwork.h"
 
-#include "floppyimagefactory.h"
 #include "mfmdecoder.h"
 #include "mfmcachedimage.h"
 
@@ -64,20 +63,11 @@ public:
     bool getParams(int floppySlotindex, int &tracks, int &sides, int &sectorsPerTrack);
     uint8_t *getEmptyTrack(void);
 
-    void add(int positionIndex, std::string &filename, std::string &hostPath, std::string &atariSrcPath, bool saveToSettings);
-    void swap(int index);
+    void add(int positionIndex, std::string &filename, std::string &hostPath, std::string &atariSrcPath);
     void remove(int index);
-
-    bool containsImage(const char *filename);
-    void removeByFileName(std::string &filenameWExt);
 
     void dumpStringsToBuffer(uint8_t *bfr);
 
-    SiloSlot *getSiloSlot(int index);
-
-    static SiloSlotSimple * getFloppyImageSimple(int index);
-
-    void siloToSlotsFile(void);
     bool createNewImage(std::string pathAndFile);
 
 private:

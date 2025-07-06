@@ -10,7 +10,6 @@
 #include <stdint.h>
 #include "../settingsreloadproxy.h"
 
-#include "floppyimagefactory.h"
 #include "mfmdecoder.h"
 #include "mfmcachedimage.h"
 

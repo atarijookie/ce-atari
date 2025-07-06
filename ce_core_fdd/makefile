@@ -13,7 +13,7 @@ VPATH = ./lib
 LDFLAGS	= -Llib $(CPU_FLAGS)
 LDLIBS = -lrt -lanl -lpthread -ldl -lutil
 OBJDIR = obj
-TARGET = ce_core_fdd.elf
+TARGET = ce_fdd.elf
 
 CFLAGS += -I./
 LDLIBS += -ldl

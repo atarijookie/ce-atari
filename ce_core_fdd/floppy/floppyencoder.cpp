@@ -13,6 +13,8 @@
 #include "../utils.h"
 #include "../debug.h"
 #include "../settings.h"
+#include "floppyimagemsa.h"
+#include "floppyimagest.h"
 #include "imagesilo.h"
 #include "floppyencoder.h"
 
@@ -143,6 +145,31 @@ void floppyEncoder_stop(void)
     pthread_mutex_unlock(&floppyEncoderMutex);      // unlock the mutex
 }
 
+FloppyImage *getImage(const char *fileName)
+{
+    FloppyImage *img = NULL;
+    const char *ext = Utils::getExtension(fileName);    // find extensions
+
+    if(ext == NULL) {                       // extension not found? fail
+        return NULL;
+    }
+
+    if(strcasecmp(ext, "msa") == 0) {   // msa image?
+        logFdd(LOG_DEBUG, "using MSA image on %s", fileName);
+        img = new FloppyImageMsa();
+    } else if(strcasecmp(ext, "st") == 0) {    // st image?
+        logFdd(LOG_DEBUG, "using ST image on %s", fileName);
+        img = new FloppyImageSt();
+    } else {
+        logFdd(LOG_DEBUG, "Image file %s type %s not supported", fileName, ext);
+    }
+
+    if(img) {
+        img->open(fileName);            // open the new image
+    }
+    return img;                        // unknown extension?
+}
+
 static void floppyEncoder_handleLoadFiles(void)
 {
     for(int i=0; i<SLOT_COUNT; i++) {
@@ -166,7 +193,7 @@ static void floppyEncoder_handleLoadFiles(void)
         }
 
         // try to load image from disk
-        slot->image = FloppyImageFactory::getImage(imageFileName.c_str());
+        slot->image = getImage(imageFileName.c_str());
 
         if(!slot->image || !slot->image->isLoaded()) { // not supported image format or failed to open file?
             logFdd(LOG_DEBUG, "floppyEncoder_handleLoadFiles - failed to load image %s", imageFileName.c_str());

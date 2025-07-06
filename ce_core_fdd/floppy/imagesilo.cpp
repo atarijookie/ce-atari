@@ -51,8 +51,6 @@ ImageSilo::ImageSilo()
     for(int i=0; i<SLOT_COUNT; i++) {
         clearSlot(i);
     }
-
-    siloToSlotsFile();                  // silo content to file on disk
     //-----------
     // create empty image and encode it (will be used when no slot is selected)
     bool res = createNewImage(EMPTY_IMAGE_PATH);                   // create empty image in /tmp/ directory
@@ -118,7 +116,7 @@ void ImageSilo::loadSettings(void)
     Settings s;
 
     char key[32];
-    for(int slot=0; slot<3; slot++) {
+    for(int slot=0; slot<SLOT_COUNT; slot++) {
         sprintf(key, "FLOPPY_IMAGE_%d", slot);      // create settings key
 
         const char *img = s.getString(key, "");     // try to read the value
@@ -131,7 +129,7 @@ void ImageSilo::loadSettings(void)
         }
 
         std::string empty;
-        add(slot, file, pathAndFile, empty, false); // add this image, don't save to settings
+        add(slot, file, pathAndFile, empty);        // add this image
     }
 
     // now tell the core thread that floppy images have changed
@@ -142,26 +140,7 @@ void ImageSilo::loadSettings(void)
 
 void ImageSilo::saveSettings(void)
 {
-    Settings s;
 
-    char key[32];
-    for(int slot=0; slot<3; slot++) {
-        sprintf(key, "FLOPPY_IMAGE_%d", slot);                                  // create settings key
-
-        const char *oldVal = s.getString(key, "");                           // try to read the old value
-        std::string oldValStr = oldVal;
-
-        if(oldValStr == slots[slot].hostPath) {                              // if old value matches what we would save, skip it
-            continue;
-        }
-
-        s.setString(key, slots[slot].hostPath.c_str());             // store the value at that slot
-    }
-
-    // if something changed and got settings reload proxy, invoke reload
-    if(reloadProxy) {
-        reloadProxy->reloadSettings(SETTINGSUSER_FLOPPYIMGS);
-    }
 }
 
 void ImageSilo::setSettingsReloadProxy(SettingsReloadProxy *rp)
@@ -169,9 +148,9 @@ void ImageSilo::setSettingsReloadProxy(SettingsReloadProxy *rp)
     reloadProxy = rp;
 }
 
-void ImageSilo::add(int positionIndex, std::string &filename, std::string &hostPath, std::string &atariSrcPath, bool saveToSettings)
+void ImageSilo::add(int positionIndex, std::string &filename, std::string &hostPath, std::string &atariSrcPath)
 {
-    if(positionIndex < 0 || positionIndex > 2) {
+    if(positionIndex < 0 || positionIndex >= SLOT_COUNT) {
         return;
     }
 
@@ -188,56 +167,11 @@ void ImageSilo::add(int positionIndex, std::string &filename, std::string &hostP
 
     // create and add floppy encode request
     floppyEncoder_addEncodeWholeImageRequest(positionIndex, hostPath.c_str());
-
-    siloToSlotsFile();                      // silo content to file on disk
-
-    if(saveToSettings) {                    // should we save this to settings? (false when loading settings)
-        saveSettings();
-    }
-}
-
-void ImageSilo::swap(int index)
-{
-    if(index < 0 || index > 2) {
-        return;
-    }
-
-    SiloSlot *a, *b;
-
-    // find out which two slots to swap
-    switch(index) {
-        case 0:
-            a = &slots[0];
-            b = &slots[1];
-            break;
-
-        case 1:
-            a = &slots[1];
-            b = &slots[2];
-            break;
-
-        case 2:
-            a = &slots[2];
-            b = &slots[0];
-            break;
-    }
-
-    // swap image files
-    a->imageFile.swap(b->imageFile);
-    a->hostPath.swap(b->hostPath);
-    a->atariSrcPath.swap(b->atariSrcPath);
-
-    for(int i=0; i<3; i++) {
-        floppyImages[i].imageFile = slots[i].imageFile;
-    }
-
-    siloToSlotsFile();                  // silo content to file on disk
-    saveSettings();                     // save it to settings
 }
 
 void ImageSilo::remove(int index)                   // remove image at specified slot
 {
-    if(index < 0 || index > 2) {
+    if(index < 0 || index >= SLOT_COUNT) {
         return;
     }
 
@@ -248,7 +182,6 @@ void ImageSilo::remove(int index)                   // remove image at specified
     }
 
     clearSlot(index);
-    siloToSlotsFile();                  // silo content to file on disk
     saveSettings();                     // save it to settings
 }
 
@@ -271,26 +204,6 @@ void ImageSilo::clearSlot(int index)
     if(index >= 0 && index < 3) {
         floppyImages[index].imageFile.clear();
     }
-}
-
-void ImageSilo::siloToSlotsFile(void)
-{
-    /* store current image silo content to file, so external components can pick them up */
-
-    std::string fileContent;
-
-    for(int i=0; i<SLOT_COUNT; i++) {
-        if(slots[i].imageFile.empty()) {                                // no image in this slot? just add empty line
-            fileContent += std::string("\n");
-        } else {                                                        // some image in slot?
-            std::string imageWithPath = slots[i].hostPath;              // get copy of path
-            Utils::mergeHostPaths(imageWithPath, slots[i].imageFile);   // full path = path + filename
-            fileContent += imageWithPath;                               // add image with path
-            fileContent += std::string("\n");                           // add new line char
-        }
-    }
-
-    Utils::textToFileFromEnv(fileContent.c_str(), "FILE_FLOPPY_SLOTS"); // silo content to this file
 }
 
 uint8_t *ImageSilo::getEncodedTrack(int floppySlotindex, int track, int side, int &bytesInBuffer)
@@ -342,50 +255,4 @@ bool ImageSilo::getParams(int floppySlotindex, int &tracks, int &sides, int &sec
     }
 
     return slots[floppySlotindex].encImage.getParams(tracks, sides, sectorsPerTrack);
-}
-
-bool ImageSilo::containsImage(const char *filename)    // check if image with this filename exists in silo
-{
-    std::string fnameStr = filename;
-
-    for(int i=0; i<3; i++) {
-        if(slots[i].imageFile == fnameStr) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-
-// check if image with this filename exists in silo and eject it from each slot it is in
-void ImageSilo::removeByFileName(std::string &filenameWExt)
-{
-    std::string filename, ext;
-    Utils::splitFilenameFromExt(filenameWExt, filename, ext);   // create filename without extension (ZIPed image in list might be extracted under different extension)
-
-    for(int i=0; i<3; i++) {
-        bool isInSlot = (slots[i].imageFileNoExt == filename);  // if this file is in this slot
-
-        if(isInSlot) {                                          // if image is in slot
-             remove(i);
-             siloToSlotsFile();                                 // silo content to file on disk
-        }
-    }
-}
-
-SiloSlot *ImageSilo::getSiloSlot(int index)
-{
-    if(index < 0 || index > 2) {
-        return NULL;
-    }
-
-    return &slots[index];
-}
-
-SiloSlotSimple * ImageSilo::getFloppyImageSimple(int index)
-{
-    if(index < 0 || index >= 3)
-        return NULL;
-    return &floppyImages[index];
 }
