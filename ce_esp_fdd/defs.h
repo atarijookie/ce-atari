@@ -37,11 +37,10 @@
 #define CMD_TIMEOUT_LONG        (CMD_TIMEOUT_ONESECOND * 3)     // this period will be 3.0 second
 
 // commands sent from device to host
-#define ATN_FW_VERSION                      0x01                                // followed by string with FW version (length: 4 uint16_ts - cmd, v[0], v[1], 0)
-#define ATN_ACSI_COMMAND                    0x02
-// #define ATN_READ_MORE_DATA                  0x03
-#define ATN_WRITE_MORE_DATA                 0x04
-// #define ATN_GET_STATUS                      0x05
+#define ATN_FW_VERSION          0x01        // followed by string with FW version (length: 4 WORDs - cmd, v[0], v[1], 0)
+#define ATN_SECTOR_WRITTEN      0x03        // sent: 3, side (highest bit) + track #, current sector #
+#define ATN_SEND_TRACK          0x04        // send the whole track
+#define ATN_SEND_WHOLE_IMAGE    0x05        // send the whole image
 
 // commands sent from host to device
 #define CMD_ACSI_CONFIG                     0x10
@@ -53,16 +52,6 @@
 #define CMD_FLOPPY_SWITCH                   0x80
 #define CMD_DATA_MARKER                     0xda
 
-// these states define if the device should get command or transfer data
-#define STATE_GET_COMMAND                       0
-// #define STATE_SEND_COMMAND                   1
-#define STATE_WAIT_COMMAND_RESPONSE             2
-#define STATE_DATA_READ_WITH_STATUS             3
-#define STATE_DATA_READ_WITHOUT_STATUS          4
-#define STATE_DATA_WRITE                        5
-#define STATE_WAIT_FOR_STATUS_ARRIVAL           6
-#define STATE_READ_STATUS                       7
-// #define STATE_SEND_FW_VER                       10
 
 ///////////////////////////
 
@@ -70,7 +59,7 @@
 
 #define TX_HEADER_SIZE                  10
 #define ATN_SENDFWVERSION_LEN_TX        (TX_HEADER_SIZE + 10)
-#define ATN_SENDACSICOMMAND_LEN_TX      (TX_HEADER_SIZE + 14)
+#define ATN_SENDTRACK_REQ_LEN_TX        (TX_HEADER_SIZE + 2)
 
 ///////////////////////////
 
@@ -153,6 +142,17 @@ typedef struct {
 
 #define READTRACKDATA_SIZE_BYTES    13800
 #define MAX_TRACKS                  80
+
+#define IMAGE_NOT_LOADED    0
+#define IMAGE_REQUESTED     1
+#define IMAGE_LOADED        2
+
+typedef struct {
+    bool loaded;
+    int track;
+    int side;
+    uint8_t* data;
+} SingleTrack;
 
 #define STREAM_TABLE_OFFSET (10/2)              // 10 bytes / 5 words - the stream table starts at this offset, because first 5 words are empty (ATN + sizes + other)
 

@@ -11,10 +11,16 @@
 Preferences preferences;
 
 uint16_t version[2] = {0xf025, 0x0616}; // this means: Franz, 2025-06-16
+uint8_t atnSendFwVersion[ATN_SENDFWVERSION_LEN_TX];
+uint8_t atnSendTrackRequest[ATN_SENDTRACK_REQ_LEN_TX]; 
+uint8_t atnSendWholeImageRequest[TX_HEADER_SIZE];
 
 extern volatile bool ikbdEnabled;   // if true, should send data to host; otherwise just loopback ikdb data back
 
 void handleButton(void);
+void setupAtnBuffers(void);
+void requestTrack(uint8_t side, uint8_t track);
+void requestWholeImage(void);
 
 TOutputFlags outFlags;
 volatile uint32_t lastRequestTime;
@@ -23,27 +29,48 @@ int trackStreamedCount;
 SStreamed streamed, streamingNow, streamedPrev;
 uint8_t sectorsWritten;
 
-bool sendrequestTrack;
 uint32_t prevIntTime;
 extern bool connected;
 
-#define IMAGE_NOT_LOADED    0
-#define IMAGE_REQUESTED     1
-#define IMAGE_LOADED        2
-
-typedef struct {
-    bool loaded;
-    int track;
-    int side;
-    uint8_t* data;
-} SingleTrack;
-
 SingleTrack tracks[2 * MAX_TRACKS];
 int imageState = IMAGE_NOT_LOADED;
+uint8_t imgTracks, imgSides, imgSectorsPerTrack;
+char imageFileName[32];
+bool diskChanged;
 
 uint8_t singleTrackData[READTRACKDATA_SIZE_BYTES];      // TODO: remove this once the tracks.data is properly allocated from PSRAM
 
 uint8_t *readTrackDataBfr;
+
+TWriteBuffer wrBuffer[2];                           // two buffers for written sectors
+TWriteBuffer *wrNow;
+
+// interrupt handler for STEP signal
+void IRAM_ATTR floppyStepISR(void)
+{
+    static uint32_t lastStepTime = 0;
+
+    uint32_t now = millis();
+
+    if((now - lastStepTime) < 2) {  // last step ISR was less than 2 ms ago? this is a glitch, ignore it
+        return;
+    }
+    lastStepTime = now;
+
+    if(BIT_IS_H(PIN_MOT_EN)) {       // motor not enabled? Skip the following code.
+        return;
+    }
+
+    if(BIT_IS_H(PIN_DIR)) {  // direction is High? track--
+        if(streamingNow.track > 0) {
+            streamingNow.track--;
+        }
+    } else  {                // direction is Low? track++
+        if(streamingNow.track < 85) {
+            streamingNow.track++;
+        }
+    }
+}
 
 void setup(void)
 {
@@ -99,21 +126,24 @@ void setup(void)
     ikbdEnabled = preferences.getUChar("enabled", 1);
     preferences.end();
 
+    setupAtnBuffers();
+
     createIkbdTask();   // this task sends ikdb data to host and back
     displayInit();
+
+    attachInterrupt(PIN_STEP, floppyStepISR, FALLING);
 }
 
-void requestTrack(uint8_t forceRequest) 
+void requestTrack(uint8_t side, uint8_t track)
 {
-    // drivePos
-
-    sendrequestTrack = true;
-    outFlags.weAreReceivingTrack = true;        // mark that we are receiving TRACK data, and thus shouldn't stream
+    atnSendFwVersion[TX_HEADER_SIZE + 0] = side;
+    atnSendFwVersion[TX_HEADER_SIZE + 1] = track;
+    sendHeaderAndDataToHost(atnSendTrackRequest, ATN_SENDTRACK_REQ_LEN_TX - TX_HEADER_SIZE);
 }
 
-void requestAllTracks(void)
+void requestWholeImage(void)
 {
-
+    sendHeaderAndDataToHost(atnSendWholeImageRequest, 0);
 }
 
 void readTrackData_goToStart(void)
@@ -136,10 +166,20 @@ void loop(void)
         // connect to wifi, discover CE server, connect to CE server
         connectToHost();
 
+        // handle any data incoming
+        handleIncommingData();
+
+        uint32_t now = millis();
+        if (connected && (now - lastSendFwTime) >= 1000)
+        {
+            lastSendFwTime = now;
+            sendHeaderAndDataToHost(atnSendFwVersion, ATN_SENDFWVERSION_LEN_TX - TX_HEADER_SIZE);
+        }
+
         if(connected && imageState == IMAGE_NOT_LOADED)
         {
             imageState = IMAGE_REQUESTED;
-            requestAllTracks();
+            requestWholeImage();
         }
 
         if(outFlags.updatePosition) {
@@ -147,30 +187,38 @@ void loop(void)
             updateStreamPositionByFloppyPosition(timeTrackStart);     // place the read marker on the right place in the stream
         }
 
-        outFlags.stWantsTheStream = BIT_IS_L(PIN_DRIVE_SEL) && BIT_IS_L(PIN_MOT_EN);
+        bool stWantsTheStream = BIT_IS_L(PIN_DRIVE_SEL) && BIT_IS_L(PIN_MOT_EN);
 
         // ST wants the stream and we are not receiving TRACK data? ENABLE stream
-        if(outFlags.stWantsTheStream && !outFlags.weAreReceivingTrack) {
-            if(!outFlags.outputsAreEnabled) {           // the outputs are not enabled yet?
-                BIT_CLR(PIN_FLCC_OE);                   // enable them
-                outFlags.outputsAreEnabled = true;      // mark that we enabled them
-            }
+        if(stWantsTheStream && !outFlags.weAreReceivingTrack) {
+            BIT_CLR(PIN_FLCC_OE);
         } else {    // other cases? DISABLE stream
-            if(outFlags.outputsAreEnabled) {            // the outputs are enabled?
-                BIT_SET(PIN_FLCC_OE);                   // disable them
-                outFlags.outputsAreEnabled = false;     // mark that we disabled them
-            }
+            BIT_SET(PIN_FLCC_OE);
         }
 
-        // if(wrNow->readyToSend) {                                                     // not sending any ATN right now? and current write buffer has something?
-        //     spiDma_txRx(wrNow->count, wrNow->buffer, 1, &fakeBuffer);
+        if(streamingNow.track == 0) {        // if track is 0, TRACK00 is L
+            BIT_CLR(PIN_TRACK00);
+        } else {                    // if track is not 0, TRACK00 to H
+            BIT_SET(PIN_TRACK00);
+        }
 
-        //     wrNow->readyToSend  = false;                                                    // mark the current buffer as not ready to send (so we won't send this one again)
+        // can send this write buffer?
+        if(wrNow->readyToSend) {
+            uint32_t dataSize = (wrNow->count > TX_HEADER_SIZE) ? (wrNow->count - TX_HEADER_SIZE) : 0;
+            sendHeaderAndDataToHost(wrNow->buffer, dataSize);
+            wrNow->readyToSend = false;     // mark the current buffer as not ready to send (so we won't send this one again)
 
-        //     wrNow               = wrNow->next;                                              // and now we will select the next buffer as current
-        //     wrNow->readyToSend  = false;                                                    // the next buffer is not ready to send (yet)
-        //     wrNow->count        = 4;                                                        // at the start we already have 4 uint16_ts in buffer - SYNC, ATN code, TX len, RX len
-        // }
+            wrNow = (TWriteBuffer*) wrNow->next;    // and now we will select the next buffer as current
+            wrNow->readyToSend = false;     // the next buffer is not ready to send (yet)
+            wrNow->count = 10;              // at the start we already have header there
+        }
+
+        /*
+            // on write start
+            wrNow->buffer[10] = streamed.track | ((streamed.side != 0) ? 0x80 : 0);
+            wrNow->buffer[11] = streamed.sector;
+            wrNow->count = 12;          // 10 for header, 2 for track + side + sector
+        */
 
         //-------------------------------------------------
 
@@ -182,10 +230,12 @@ void loop(void)
         // }
 
         //------------
-        uint32_t now = millis();
+        now = millis();
         uint32_t timeSinceTrackStart = now - timeTrackStart;
 
-        if(timeSinceTrackStart >= 5) {      // track time: 5m - rest - INDEX to H
+        if(timeSinceTrackStart < 5) {    // INDEX is L for time 0-4
+            BIT_CLR(PIN_INDEX);
+        } else {                         // INDEX is H for times 5-200
             BIT_SET(PIN_INDEX);
         }
 
@@ -197,7 +247,7 @@ void loop(void)
 
             if(sectorsWritten > 0) {        // if some sectors were written to floppy, we need to get the new stream now
                 sectorsWritten = 0;         // nothing written now
-                requestTrack(true);         // ask for the changed track data, but force it - get it immediatelly
+                // requestTrack(true);         // ask for the changed track data, but force it - get it immediatelly
             }
 
             //-----------
@@ -206,7 +256,7 @@ void loop(void)
 
             if(trackStreamedCount >= 2) {       // if since the last request 2 rotations happened
                 if(streamed.track != streamingNow.track || streamed.side != streamingNow.side) {  // and we're not streaming what we really want to stream
-                    requestTrack(false);        // ask for track data (again?)
+                    // requestTrack(false);        // ask for track data (again?)
                 }
             }
             streamed.track = 0xff;        // after the end of track mark that we're not streaming anything
@@ -223,7 +273,7 @@ void loop(void)
         // update SIDE var
         streamingNow.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1; // get the current SIDE
         if(streamedPrev.side != streamingNow.side) {             // side changed?
-            requestTrack(false);                // we need track from the right side
+            // requestTrack(false);                // we need track from the right side
             streamedPrev.side = streamingNow.side;
         }
 
@@ -346,4 +396,30 @@ void updateStreamPositionByFloppyPosition(uint32_t timeTrackStart)
     // // calculate index where we should place sream reading index -
     // // current position is between 0 and 200, that is from 0 to 100%, so place it between 0 and LENGTH OF STREAM position
     // inIndexGet = (streamSize * timeSinceTrackStart) / 200;
+}
+
+void setupAtnBuffers(void)
+{
+    // firmware report / keep alive / heartbeat
+    memset(atnSendFwVersion, 0, ATN_SENDFWVERSION_LEN_TX);
+    storeHeader(atnSendFwVersion, ATN_FW_VERSION, 0);
+    storeWord(atnSendFwVersion + TX_HEADER_SIZE, version[0]);
+    storeWord(atnSendFwVersion + TX_HEADER_SIZE + 2, version[1]);
+
+    // one track request
+    memset(atnSendTrackRequest, 0, ATN_SENDTRACK_REQ_LEN_TX);
+    storeHeader(atnSendTrackRequest, ATN_SEND_TRACK, 2);
+
+    // all tracks request
+    storeHeader(atnSendWholeImageRequest, ATN_SEND_WHOLE_IMAGE, 0);
+
+    // configure write buffers
+    for(int i=0; i<2; i++) {
+        storeHeader(wrBuffer[i].buffer, ATN_SECTOR_WRITTEN, 10);
+        wrBuffer[i].count = 10;
+        wrBuffer[i].readyToSend = false;
+        wrBuffer[i].next = (i == 0) ? &wrBuffer[1] : &wrBuffer[0];
+    }
+
+    wrNow = &wrBuffer[0];
 }

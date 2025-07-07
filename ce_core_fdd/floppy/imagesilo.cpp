@@ -166,26 +166,26 @@ void ImageSilo::clearSlot(int index)
     slots[index].hostPath.clear();
 }
 
-uint8_t *ImageSilo::getEncodedTrack(int floppySlotindex, int track, int side, int &bytesInBuffer)
+uint8_t *ImageSilo::getEncodedTrack(int floppySlotIndex, int track, int side, int &bytesInBuffer)
 {
     uint8_t *pTrack;
 
-    if(floppySlotindex < 0 || floppySlotindex >= SLOT_COUNT) {
+    if(floppySlotIndex < 0 || floppySlotIndex >= SLOT_COUNT) {
         return emptyTrack;
     }
 
     //logFdd(LOG_DEBUG, "ImageSilo::getEncodedTrack - track: %d, side: %d, currentSlot: %d, isReady: %d", track, side, currentSlot, slots[currentSlot].encImage.encodedTrackIsReady(track, side));
     //uint32_t start = Utils::getCurrentMs();
 
-    if(!slots[floppySlotindex].encImage.encodedTrackIsReady(track, side)) {     // track not ready?
-        floppyEncoder_addReencodeTrackRequest(floppySlotindex, track, side);    // ask for reencoding
+    if(!slots[floppySlotIndex].encImage.encodedTrackIsReady(track, side)) {     // track not ready?
+        floppyEncoder_addReencodeTrackRequest(floppySlotIndex, track, side);    // ask for reencoding
 
         // wait short while to see if the image gets encoded
         uint32_t endTime = Utils::getEndTime(500);
         bool isReady = false;
 
         while(Utils::getCurrentMs() < endTime) {    // still should wait?
-            isReady = slots[floppySlotindex].encImage.encodedTrackIsReady(track, side); // check if it's ready
+            isReady = slots[floppySlotIndex].encImage.encodedTrackIsReady(track, side); // check if it's ready
 
             if(isReady) {   // ready? quit loop
                 break;
@@ -201,18 +201,28 @@ uint8_t *ImageSilo::getEncodedTrack(int floppySlotindex, int track, int side, in
     //logFdd(LOG_DEBUG, "ImageSilo::getEncodedTrack - finishing with isReady: %d after %d ms", true, Utils::getCurrentMs() - start);
     
     // is ready? return that track
-    pTrack = slots[floppySlotindex].encImage.getEncodedTrack(track, side, bytesInBuffer);   // get data from current slot
+    pTrack = slots[floppySlotIndex].encImage.getEncodedTrack(track, side, bytesInBuffer);   // get data from current slot
     return pTrack;
 }
 
-bool ImageSilo::getParams(int floppySlotindex, int &tracks, int &sides, int &sectorsPerTrack)
+bool ImageSilo::getParams(int floppySlotIndex, int &tracks, int &sides, int &sectorsPerTrack)
 {
-    if(floppySlotindex < 0 || floppySlotindex >= SLOT_COUNT) {
+    if(floppySlotIndex < 0 || floppySlotIndex >= SLOT_COUNT) {
         tracks = 0;
         sides = 0;
         sectorsPerTrack = 0;
         return false;
     }
 
-    return slots[floppySlotindex].encImage.getParams(tracks, sides, sectorsPerTrack);
+    return slots[floppySlotIndex].encImage.getParams(tracks, sides, sectorsPerTrack);
+}
+
+std::string ImageSilo::getFileName(int floppySlotIndex)
+{
+    if(floppySlotIndex < 0 || floppySlotIndex >= SLOT_COUNT) {
+        std::string empty;
+        return empty;
+    }
+
+    return slots[floppySlotIndex].imageFile;
 }

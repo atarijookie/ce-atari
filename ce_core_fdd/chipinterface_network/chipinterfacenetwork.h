@@ -37,7 +37,7 @@
 typedef struct {
     int         fdClient;           // tcp socket fd
     uint32_t    ipAddr;             // client's IP addr
-    int         floppySlotindex;    // which floppy slot this IP is using
+    int         floppySlotIndex;    // which floppy slot this IP is using
     uint32_t    lastMs;             // value of getCurrentMs() when was last time anything was received from this client
     
     BufferedReader bufReader;
@@ -69,7 +69,7 @@ virtual ~ChipInterfaceNetwork();
     // FDD: all you need for handling the floppy interface
     void fdd_sendTrackToChip(int& fdClient, int byteCount, uint8_t *encodedTrack);    // send encodedTrack to chip for MFM streaming
     uint8_t* fdd_sectorWritten(int clientIndex, int &side, int &track, int &sector, int &byteCount);
-    void fdd_sendImageParamsToChip(int& fdClient, int imgTracks, int imgSides, int imgSectorsPerTrack);
+    void fdd_sendImageParamsToChip(int& fdClient, bool finished, int imgTracks, int imgSides, int imgSectorsPerTrack, std::string fileName);
 
     void setFDDconfig(bool setFloppyConfig, FloppyConfig* fddConfig, bool setDiskChanged, bool diskChanged);
 

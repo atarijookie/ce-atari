@@ -28,16 +28,16 @@ uint16_t hostPortHdd;
 uint16_t hostPortFdd;
 uint16_t hostPortIkbd;
 
-extern uint8_t state;
-extern uint32_t dataCnt;
-extern uint8_t statusByte;
-extern bool dataReceived;
-
 bool connected;
-
 extern volatile bool ikbdEnabled;   // if true, should send data to host; otherwise just loopback ikdb data back
 
 THeader fddHeader;      // keep the header global to preserve syncTag between calls
+
+extern SingleTrack tracks[2 * MAX_TRACKS];
+extern uint8_t imgTracks, imgSides, imgSectorsPerTrack;
+extern char imageFileName[32];
+extern bool diskChanged;
+extern int imageState;
 
 void showRunningStateOnDisplay(void)
 {
@@ -385,21 +385,71 @@ bool getIncommingHeader(NetworkClient* client, uint32_t expectedSyncTag, THeader
     return false;       // no valid header
 }
 
-void handleReadDataReceived(void)
+uint8_t tmpTrackBfr[READTRACKDATA_SIZE_BYTES];
+
+void handleTrackReceived(void)
 {
-    dataCnt = fddHeader.len;
-    dataReceived = true;
+    int lenData = MIN(READTRACKDATA_SIZE_BYTES, fddHeader.len);  // limit read length to buffer length
+
+    int len = lenData;
+    uint8_t* pBfr = tmpTrackBfr;        // read into temp track buffer
+
+    while(len > 0)
+    {
+        int readLen = clientFdd.read(pBfr, len);    // read data
+    
+        if(readLen > 0)     // something was read? decrease size of what we need to read, advance in buffer
+        {
+            len -= readLen;
+            pBfr += readLen;
+        }
+    }
+
+    // read track # and side # from bfr
+    int trackNo = MIN(tmpTrackBfr[0], MAX_TRACKS);
+    int sideNo = MIN(tmpTrackBfr[1], 1);
+
+    // store the track and side into struct and copy in the data from temp buffer
+    int index = trackNo * 2 + sideNo;
+    tracks[index].loaded = true;
+    tracks[index].track = trackNo;
+    tracks[index].side = sideNo;
+    
+    memcpy(tracks[index].data, tmpTrackBfr + 2, lenData - 2);
+}
+
+void handleImageReceived(void)
+{
+    int lenData = MIN(READTRACKDATA_SIZE_BYTES, fddHeader.len);  // limit read length to buffer length
+    clientFdd.read(tmpTrackBfr, lenData);
+
+    if(tmpTrackBfr[0] == 1)     // image receiving finished?
+    {
+        diskChanged = true;
+        imageState = IMAGE_LOADED;
+    }
+    else                // image receiving started?
+    {
+        imageState = IMAGE_REQUESTED;
+    }
+
+    imgTracks = tmpTrackBfr[1];
+    imgSides = tmpTrackBfr[2];
+    imgSectorsPerTrack = tmpTrackBfr[3];
+
+    memset(imageFileName, 0, 32);
+    strncpy(imageFileName, (const char*) (tmpTrackBfr + 4), 31);        // store file name, up to 31 chars
 }
 
 void handleIncommingData(void)
 {
     if(getIncommingHeader(&clientFdd, SYNC_TAG_FDD, &fddHeader))   // if got valid hdd header
     {
-        dataReceived = false;
         fddHeader.syncTag = 0;      // clear sync tag
 
         switch(fddHeader.cmdCode) {
-            case CMD_DATA_MARKER: handleReadDataReceived(); break;
+            case ATN_SEND_TRACK: handleTrackReceived(); break;
+            case ATN_SEND_WHOLE_IMAGE: handleImageReceived(); break;
             default: Serial.print("unknown cmdCode "); Serial.println(fddHeader.cmdCode); break;
         }
     }
@@ -408,39 +458,28 @@ void handleIncommingData(void)
 /*
     Send data as is to host using the desired socket.
     This just selects the right socket and sends the count of data specified in dataSizeBytes.
-    @param whichSock SOCK_HDD or SOCK_FDD
     @param bfr Pointer to start of the data buffer
     @param dataSizeBytes Size of the data you want to send.
 */
-bool sendDataToHost(uint8_t whichSock, uint8_t *bfr, uint32_t dataSizeBytes)
+bool sendDataToHost(uint8_t *bfr, uint32_t dataSizeBytes)
 {
-    NetworkClient* client = NULL;
-
-    switch(whichSock)
-    {
-        case SOCK_FDD: client = &clientFdd; break;
-        case SOCK_IKBD: client = &clientIkbd; break;
-        default: return false;
-    }
-
-    if(!client->connected())
+    if(!clientFdd.connected())
     {
         return false;
     }
 
-    uint32_t writtenCount = client->write(bfr, dataSizeBytes);
+    uint32_t writtenCount = clientFdd.write(bfr, dataSizeBytes);
     return (writtenCount == dataSizeBytes);
 }
 
 /*
     Send header and data to host using the desired socket.
     This is just extension to sendDataToHost, because it also stores the data size in the header and sends the header, too.
-    @param whichSock SOCK_HDD or SOCK_FDD
     @param bfr Pointer to start of the data buffer
     @param dataSizeBytes Size of the data portion after the header (header is TX_HEADER_SIZE bytes big) in bytes
 */
-bool sendHeaderAndDataToHost(uint8_t whichSock, uint8_t *bfr, uint32_t dataSizeBytes)
+bool sendHeaderAndDataToHost(uint8_t *bfr, uint32_t dataSizeBytes)
 {
     storeDword(bfr + 6, dataSizeBytes);     // store the tx length on index 6..9
-    return sendDataToHost(whichSock, bfr, TX_HEADER_SIZE + dataSizeBytes);
+    return sendDataToHost(bfr, TX_HEADER_SIZE + dataSizeBytes);
 }

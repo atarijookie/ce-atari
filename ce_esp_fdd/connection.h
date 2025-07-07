@@ -3,17 +3,13 @@
 
 #include <arduino.h>
 
-#define SOCK_HDD    0
-#define SOCK_FDD    1
-#define SOCK_IKBD   2
-
 void showRunningStateOnDisplay(void);
 
 void connectToHost(void);
 void handleIncommingData(void);
 
-bool sendDataToHost(uint8_t whichSock, uint8_t *bfr, uint32_t dataSizeBytes);
-bool sendHeaderAndDataToHost(uint8_t whichSock, uint8_t *bfr, uint32_t dataSizeBytes);
+bool sendDataToHost(uint8_t *bfr, uint32_t dataSizeBytes);
+bool sendHeaderAndDataToHost(uint8_t *bfr, uint32_t dataSizeBytes);
 
 #define SYNC_TAG_FDD    0xc050f108
 

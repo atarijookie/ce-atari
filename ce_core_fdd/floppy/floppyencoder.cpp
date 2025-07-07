@@ -53,13 +53,13 @@ void floppyEncoder_addEncodeWholeImageRequest(int slotNo, const char *imageFileN
     pthread_mutex_unlock(&floppyEncoderMutex);      	// unlock the mutex
 }
 
-void floppyEncoder_addReencodeTrackRequest(int floppySlotindex, int track, int side)
+void floppyEncoder_addReencodeTrackRequest(int floppySlotIndex, int track, int side)
 {
     logFdd(LOG_DEBUG, "floppyEncoder_addReencodeTrackRequest - track: %d, side: %d", track, side);
 
     pthread_mutex_lock(&floppyEncoderMutex);        // lock the mutex
 
-    SiloSlot *slot = &slots[floppySlotindex];       // get pointer to the right slot
+    SiloSlot *slot = &slots[floppySlotIndex];       // get pointer to the right slot
     slot->encImage.askToReencodeTrack(track, side); // this specific track needs to be reencoded
 
     pthread_cond_signal(&floppyEncoderShouldWork);  // wake up encoder
@@ -107,7 +107,7 @@ static void freeWrittenSectorStorage(void)
     }
 }
 
-void floppyEncoder_decodeMfmWrittenSector(int floppySlotindex, int track, int side, int sector, uint8_t *data, uint32_t size)
+void floppyEncoder_decodeMfmWrittenSector(int floppySlotIndex, int track, int side, int sector, uint8_t *data, uint32_t size)
 {
     if(size > WRITTENMFMSECTOR_SIZE) {              // if data too big to fit, fail
         logFdd(LOG_ERROR, "floppyEncoder_decodeMfmWrittenSector - size: %d > %d !!! sector not stored", size, WRITTENMFMSECTOR_SIZE);
@@ -122,7 +122,7 @@ void floppyEncoder_decodeMfmWrittenSector(int floppySlotindex, int track, int si
     if(index != -1) {                               // if was able to find empty place for this sector, store it
         WrittenMfmSector *wrSector = &writtenSectors[index];    // get pointer to it and store data and params
         wrSector->hasData = true;
-        wrSector->slotNo = floppySlotindex;
+        wrSector->slotNo = floppySlotIndex;
         wrSector->track = track;
         wrSector->side = side;
         wrSector->sector = sector;

@@ -131,7 +131,7 @@ void ChipInterfaceNetwork::acceptSocketIfNeededAndPossible(void)
     // got the new client socket now
     clientsStoreOne(clientInfo, newSock, clientIpInt);
 
-    logFdd(LOG_INFO, "acceptSocketIfNeededAndPossible() - client #%d connected from %s, will use floppy slot #%d", idx, clientIp, clientInfo->floppySlotindex);
+    logFdd(LOG_INFO, "acceptSocketIfNeededAndPossible() - client #%d connected from %s, will use floppy slot #%d", idx, clientIp, clientInfo->floppySlotIndex);
 }
 
 bool ChipInterfaceNetwork::ciOpen(void)
@@ -173,7 +173,7 @@ void ChipInterfaceNetwork::handleAllReadyClients(fd_set* readfds, FloppyThread* 
         }
 
         if(FD_ISSET(clients[i].fdClient, readfds)) {    // this fd read for read?
-            bool hadData = core->handleOneClient(i, clients[i].fdClient, clients[i].floppySlotindex);
+            bool hadData = core->handleOneClient(i, clients[i].fdClient, clients[i].floppySlotIndex);
 
             if(hadData) {       // something was read, mark client as active
                 clients[i].lastMs = Utils::getCurrentMs();
@@ -259,14 +259,20 @@ void ChipInterfaceNetwork::fdd_sendTrackToChip(int& fdClient, int byteCount, uin
     sendHeaderAndDataToChip(fdClient, ATN_SEND_TRACK, encodedTrack, byteCount);
 }
 
-void ChipInterfaceNetwork::fdd_sendImageParamsToChip(int& fdClient, int imgTracks, int imgSides, int imgSectorsPerTrack)
+void ChipInterfaceNetwork::fdd_sendImageParamsToChip(int& fdClient, bool finished, int imgTracks, int imgSides, int imgSectorsPerTrack, std::string fileName)
 {
-    uint8_t bfr[4];
-    bfr[0] = (uint8_t) imgTracks;
-    bfr[1] = (uint8_t) imgSides;
-    bfr[2] = (uint8_t) imgSectorsPerTrack;
+    uint8_t bfr[64];
+    memset(bfr, 0, 64);
 
-    sendHeaderAndDataToChip(fdClient, ATN_SEND_WHOLE_IMAGE, bfr, 3);
+    bfr[0] = finished ? 1 : 0;              // 1 for finished sending, 0 for start of sending
+    bfr[1] = (uint8_t) imgTracks;
+    bfr[2] = (uint8_t) imgSides;
+    bfr[3] = (uint8_t) imgSectorsPerTrack;
+
+    int fnameLen = MIN(fileName.length(), 31);
+    memcpy(bfr + 4, fileName.c_str(), fnameLen);    // filename, max 31 chars + zero terminator
+
+    sendHeaderAndDataToChip(fdClient, ATN_SEND_WHOLE_IMAGE, bfr, 4 + 32);   // 4 bytes param, 32 bytes filename
 }
 
 uint8_t* ChipInterfaceNetwork::fdd_sectorWritten(int clientIndex, int &side, int &track, int &sector, int &byteCount)
@@ -456,7 +462,7 @@ void ChipInterfaceNetwork::clientsClearOne(ClientInfo* info)
 {
     info->fdClient = FD_EMPTY;
     info->ipAddr = 0;
-    info->floppySlotindex = FD_EMPTY;
+    info->floppySlotIndex = FD_EMPTY;
     info->lastMs = 0;
 }
 
@@ -492,11 +498,11 @@ int ChipInterfaceNetwork::clientsGetFloppySlotIndexForIp(uint32_t ipAddr)
     // check if this ip is already using some slot and build usedSlots bits
     for(int i=0; i<MAX_CLIENTS; i++) {
         if(clients[i].ipAddr == ipAddr) {   // if this slot is already using this ipAddress, return the floppy slot
-            return clients[i].floppySlotindex;
+            return clients[i].floppySlotIndex;
         }
 
-        if(clients[i].floppySlotindex != FD_EMPTY) {        // this client has a floppy slot, add its bit to usedSlots
-            usedSlots |= (1 << clients[i].floppySlotindex);
+        if(clients[i].floppySlotIndex != FD_EMPTY) {        // this client has a floppy slot, add its bit to usedSlots
+            usedSlots |= (1 << clients[i].floppySlotIndex);
         }
     }
 
@@ -516,7 +522,7 @@ void ChipInterfaceNetwork::clientsStoreOne(ClientInfo* info, int newSock, uint32
     info->fdClient = newSock;
     info->lastMs = Utils::getCurrentMs();
     info->ipAddr = ipAddr;
-    info->floppySlotindex = clientsGetFloppySlotIndexForIp(ipAddr);
+    info->floppySlotIndex = clientsGetFloppySlotIndexForIp(ipAddr);
 }
 
 void ChipInterfaceNetwork::clientsDisconnectInactive(void)

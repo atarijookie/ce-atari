@@ -47,8 +47,9 @@ public:
     void loadSettings(void);
     void saveSettings(void);
 
-    uint8_t *getEncodedTrack(int floppySlotindex, int track, int side, int &bytesInBuffer);
-    bool getParams(int floppySlotindex, int &tracks, int &sides, int &sectorsPerTrack);
+    uint8_t *getEncodedTrack(int floppySlotIndex, int track, int side, int &bytesInBuffer);
+    bool getParams(int floppySlotIndex, int &tracks, int &sides, int &sectorsPerTrack);
+    std::string getFileName(int floppySlotIndex);
     uint8_t *getEmptyTrack(void);
 
     void add(int positionIndex, std::string &filename, std::string &hostPath);

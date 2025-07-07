@@ -16,7 +16,7 @@ public:
 
     void run(void);
     virtual void reloadSettings(int type);                                  // from ISettingsUser
-    bool handleOneClient(int clientIndex, int fdClient, int floppySlotindex);
+    bool handleOneClient(int clientIndex, int fdClient, int floppySlotIndex);
 
 private:
     bool shouldRun;
@@ -30,7 +30,7 @@ private:
     //-----------------------------------
     // floppy stuff
 
-    bool handleFdd(int clientIndex, int fdClient, int floppySlotindex, uint8_t* inBuff);
+    bool handleFdd(int clientIndex, int fdClient, int floppySlotIndex, uint8_t* inBuff);
     void handleFwVersion_franz(int clientIndex);
     void handleSendTrack(int clientIndex);
     void handleSendImage(int clientIndex);

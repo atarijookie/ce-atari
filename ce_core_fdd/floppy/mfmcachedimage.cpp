@@ -205,7 +205,10 @@ bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, 
     //-----
 
     memset(tracks[index].mfmStream, 0, MFM_STREAM_SIZE);    // initialize MFM stream
-    currentStreamStart = tracks[index].mfmStream;   // where the stream starts
+    currentStreamStart = tracks[index].mfmStream + 2;       // where the stream starts
+
+    tracks[index].mfmStream[0] = track;     // store track and side at position 0 and 1
+    tracks[index].mfmStream[1] = side;
 
     #define STREAM_TABLE_ITEMS  20
     #define STREAM_TABLE_SIZE   (2 * STREAM_TABLE_ITEMS)

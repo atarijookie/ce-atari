@@ -105,7 +105,7 @@ void FloppyThread::run(void)
     }
 }
 
-bool FloppyThread::handleOneClient(int clientIndex, int fdClient, int floppySlotindex)
+bool FloppyThread::handleOneClient(int clientIndex, int fdClient, int floppySlotIndex)
 {
     uint8_t inBuff[INBUF_SIZE];
     memset(inBuff, 0, INBUF_SIZE);
@@ -113,13 +113,13 @@ bool FloppyThread::handleOneClient(int clientIndex, int fdClient, int floppySlot
     bool needsAction = chipInterface->actionNeeded(clientIndex, inBuff);
 
     if(needsAction) {   // floppy drive needs action?
-        handleFdd(clientIndex, fdClient, floppySlotindex, inBuff);
+        handleFdd(clientIndex, fdClient, floppySlotIndex, inBuff);
     }
 
     return needsAction;
 }
 
-bool FloppyThread::handleFdd(int clientIndex, int fdClient, int floppySlotindex, uint8_t* inBuff)
+bool FloppyThread::handleFdd(int clientIndex, int fdClient, int floppySlotIndex, uint8_t* inBuff)
 {
     bool isFddCommand = false;
 
@@ -193,7 +193,7 @@ void FloppyThread::handleSendTrack(int clientIndex)
     ClientInfo* client = chipInterface->clientsGetOne(clientIndex);
 
     int tr, si, spt;
-    shared.imageSilo->getParams(client->floppySlotindex, tr, si, spt);      // read the floppy image params
+    shared.imageSilo->getParams(client->floppySlotIndex, tr, si, spt);      // read the floppy image params
 
     uint8_t *encodedTrack;
     int countInTrack;
@@ -206,7 +206,7 @@ void FloppyThread::handleSendTrack(int clientIndex)
     } else {                                                    // side + track within range? use encoded track
         logFdd(LOG_DEBUG, "handleSendTrack() -- Franz wants: [track %d, side %d]", track, side);
 
-        encodedTrack = shared.imageSilo->getEncodedTrack(client->floppySlotindex, track, side, countInTrack);
+        encodedTrack = shared.imageSilo->getEncodedTrack(client->floppySlotIndex, track, side, countInTrack);
         countInTrack = MIN(countInTrack, MFM_STREAM_SIZE);
     }
 
@@ -222,23 +222,28 @@ void FloppyThread::handleSendImage(int clientIndex)
 
     ClientInfo* client = chipInterface->clientsGetOne(clientIndex);
 
+    std::string fileName = shared.imageSilo->getFileName(client->floppySlotIndex);   // get the filename
+
     int imgTracks, imgSides, imgSectorsPerTrack;
-    shared.imageSilo->getParams(client->floppySlotindex, imgTracks, imgSides, imgSectorsPerTrack);      // read the floppy image params
+    shared.imageSilo->getParams(client->floppySlotIndex, imgTracks, imgSides, imgSectorsPerTrack);      // read the floppy image params
 
     uint8_t *encodedTrack;
     int countInTrack;
 
+    // sending started, send imagTracks, imgSides, spt
+    chipInterface->fdd_sendImageParamsToChip(client->fdClient, false, imgTracks, imgSides, imgSectorsPerTrack, fileName);
+
     // send all the tracks from all the sides
     for(int side=0; side<imgSides; side++) {
         for(int track=0; track<imgTracks; track++) {
-            encodedTrack = shared.imageSilo->getEncodedTrack(client->floppySlotindex, track, side, countInTrack);
+            encodedTrack = shared.imageSilo->getEncodedTrack(client->floppySlotIndex, track, side, countInTrack);
             countInTrack = MIN(countInTrack, MFM_STREAM_SIZE);
             chipInterface->fdd_sendTrackToChip(client->fdClient, countInTrack, encodedTrack);
         }
     }
 
-    // send imagTracks, imgSides, spt, this will also do the disk change
-    chipInterface->fdd_sendImageParamsToChip(client->fdClient, imgTracks, imgSides, imgSectorsPerTrack);
+    // sending finished, send imagTracks, imgSides, spt, this will also do the disk change
+    chipInterface->fdd_sendImageParamsToChip(client->fdClient, true, imgTracks, imgSides, imgSectorsPerTrack, fileName);
 }
 
 void FloppyThread::handleSectorWritten(int clientIndex)
@@ -249,5 +254,5 @@ void FloppyThread::handleSectorWritten(int clientIndex)
     ClientInfo* client = chipInterface->clientsGetOne(clientIndex);
 
     logFdd(LOG_DEBUG, "handleSectorWritten -- track %d, side %d, sector %d", track, side, sector);
-    floppyEncoder_decodeMfmWrittenSector(client->floppySlotindex, track, side, sector, writtenSector, byteCount); // let floppy encoder handle decoding, reencoding, saving
+    floppyEncoder_decodeMfmWrittenSector(client->floppySlotIndex, track, side, sector, writtenSector, byteCount); // let floppy encoder handle decoding, reencoding, saving
 }
