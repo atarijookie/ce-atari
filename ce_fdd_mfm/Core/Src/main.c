@@ -98,7 +98,13 @@ void updateReadTimer(void)
 
     if(bitsAvail == 0) {        // all bits used? get new stream byte
         bitsAvail = 8;
-        streamByte = (rxCnt > 0) ? RX_GET() : 0x55;
+
+        if(rxCnt > 0) {             // got something in RX buffer?
+            streamByte = RX_GET();
+            UPDATE_PIN_RXE;         // after removing byte from RX buffer, update RXE flag
+        } else {                    // RX buffer empty?
+            streamByte = 0x55;
+        }
     }
 
     bitsAvail -= 2;             // decrease bits available, because we're using 2 bits now
@@ -135,6 +141,7 @@ void updateWriteData(uint32_t duration)
         if(txCnt < BFR_SIZE) {
             TX_PUT(streamByte);
         }
+
         bits = 0;           // don't have bits now
     }
 }
@@ -180,6 +187,10 @@ int main(void)
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim16, TIM_CHANNEL_1);
 
+  SET_BIT(SPI1->CR1, SPI_CR1_SPE);
+
+  UPDATE_PIN_RXE;       // set RXE pin because we're empty
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -190,8 +201,6 @@ int main(void)
 
     if(writingNow)  // when writing to floppy
     {
-        RX_CLEAR();
-
         // CC1IF bit set? input capture happened
         /* Takes 2.61 us when also storing byte to circular buffer,
          * takes 1.81 us when just storing bits, not adding to circular buffer.
@@ -202,35 +211,39 @@ int main(void)
             uint32_t captured = TIM16->CCR1;
             updateWriteData(captured);            // send the input WDATA to buffer
         }
-
-        GPIOA->BSRR = (txCnt >= BFR_SIZE_HALF) ? PIN_HALF_EMPTY : (PIN_HALF_EMPTY << 16);    // H if a bunch of data can be read from RX buffer
     }
-    else    // when reading from floppy
-    {
-        // overflow of TIM3 occurred (UIF flag set)? stream next mfm symbol
-        /* Takes 2.16 us when getting byte from circular buffer
-         * takes 0.86 us when just using previously fetched byte.
-         * Can happen in 4 us intervals (min), but up to 6 us or 8 us also.
-         */
-        if((TIM3->SR & TIM_SR_UIF) != 0) {
-           TIM3->SR = ~TIM_SR_UIF;             // clear UIF flag
-           updateReadTimer();
-        }
 
-        GPIOA->BSRR = (rxCnt <= BFR_SIZE_HALF) ? PIN_HALF_EMPTY : (PIN_HALF_EMPTY << 16);    // H if read buffer getting low
+    // overflow of TIM3 occurred (UIF flag set)? stream next mfm symbol
+    /*                              o0            o2
+     * just checking TIM3->SR       0.34 us       0.34 us
+     * taking value from memory     1.60 us       1.60 us
+     * taking value from FIFO       2.92 us       2.51 us
+     */
+    if((TIM3->SR & TIM_SR_UIF) != 0) {
+       TIM3->SR = ~TIM_SR_UIF;             // clear UIF flag
+       updateReadTimer();
     }
 
     // RXNE? read data, place it in RX buffer if have space
-    /* takes 1.29 us, happens every 8 us */
+    /*                              o0            o2
+     * just checking SPI1->SR                     0.29 us
+     * storing value to FIFO                      1.25 us
+     * happens in 8 us intervals or more
+     */
     if(SPI1->SR & SPI_SR_RXNE) {
         uint8_t data = SPI1->DR;
         if(rxCnt < BFR_SIZE) {
             RX_PUT(data);
+            UPDATE_PIN_RXE;     // after adding byte to RX buffer, update RXE flag
         }
     }
 
     // TXE? if have TX data in TX buffer, place it in DR
-    /* takes 1.05 us, happens every 8 us */
+    /*                              o0            o2
+     * just checking SPI1->SR                     0.35 us
+     * getting value from FIFO                    0.89 us
+     * happens in 8 us intervals or more
+     */
     if(SPI1->SR & SPI_SR_TXE) {
         SPI1->DR = (txCnt > 0) ? TX_GET() : 0;
     }
@@ -441,6 +454,9 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
 
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
+
   /*Configure GPIO pin : PA3 */
   GPIO_InitStruct.Pin = GPIO_PIN_3;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
@@ -453,6 +469,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PB6 */
+  GPIO_InitStruct.Pin = GPIO_PIN_6;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */

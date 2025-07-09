@@ -22,4 +22,6 @@ extern uint8_t rxData[BFR_SIZE];
 #define RX_PUT(VAL)   { rxCnt++;                  rxData[rxStore] = VAL;  rxStore = (rxStore + 1) & BFR_MASK;         }
 #define RX_GET()     ({ rxCnt--; uint8_t retVal = rxData[rxLoad];         rxLoad  = (rxLoad  + 1) & BFR_MASK; retVal; })
 
+#define UPDATE_PIN_RXE  { GPIOA->BSRR = (rxCnt <= BFR_SIZE_HALF) ? PIN_HALF_EMPTY : (PIN_HALF_EMPTY << 16); }    // H if read buffer getting low
+
 #endif
