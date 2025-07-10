@@ -43,14 +43,21 @@
 #define ATN_SEND_WHOLE_IMAGE    0x05        // send the whole image
 
 // commands sent from host to device
-#define CMD_ACSI_CONFIG                     0x10
-#define CMD_DATA_WRITE                      0x20
-#define CMD_DATA_READ_WITH_STATUS           0x30
-#define CMD_SEND_STATUS                     0x40
-#define CMD_DATA_READ_WITHOUT_STATUS        0x50
-#define CMD_FLOPPY_CONFIG                   0x70
-#define CMD_FLOPPY_SWITCH                   0x80
-#define CMD_DATA_MARKER                     0xda
+#define CMD_WRITE_PROTECT_OFF       0x10
+#define CMD_WRITE_PROTECT_ON        0x20
+#define CMD_DISK_CHANGE_OFF         0x30
+#define CMD_DISK_CHANGE_ON          0x40
+#define CMD_CURRENT_SECTOR          0x50                            // followed by sector #
+#define CMD_GET_FW_VERSION          0x60
+#define CMD_SET_DRIVE_ID_0          0x70
+#define CMD_SET_DRIVE_ID_1          0x80
+#define CMD_CURRENT_TRACK           0x90                            // followed by track #
+#define CMD_DRIVE_ENABLED           0xa0
+#define CMD_DRIVE_DISABLED          0xb0
+#define CMD_MARK_READ               0xF000                          // this is not sent from host, but just a mark that this WORD has been read and you shouldn't continue to read further
+#define CMD_MARK_READ_BYTE          0xF0                            // this is not sent from host, but just a mark that this BYTE has been read and you shouldn't continue to read further
+#define CMD_TRACK_STREAM_END        0xF000                          // this is the mark in the track stream that we shouldn't go any further in the stream
+#define CMD_TRACK_STREAM_END_BYTE   0xF0                            // this is the mark in the track stream that we shouldn't go any further in the stream
 
 
 ///////////////////////////
@@ -63,27 +70,34 @@
 
 ///////////////////////////
 
-#define PIN_WGATE       3
-#define PIN_DRIVE_SEL   4
-#define PIN_MOT_EN      5
-#define PIN_DIR         6
-#define PIN_STEP        7
-#define PIN_WDATA       8
-#define PIN_SIDE1       9
-#define PIN_DENSITY     10
-#define PIN_INDEX       11
-#define PIN_TRACK00     12
-#define PIN_WPROTECT    13
-#define PIN_RDATA       14
-#define PIN_DSKCHG      21
-#define PIN_FLCC_OE     47
+#define PIN_WGATE           3
+#define PIN_DRIVE_SEL       4
+#define PIN_MOT_EN          5
+#define PIN_DIR             6
+#define PIN_STEP            7
+#define PIN_SIDE1           9
+#define PIN_DENSITY         10
+#define PIN_INDEX           11
+#define PIN_TRACK00         12
+#define PIN_WPROTECT        13
+#define PIN_RDATA           14
+#define PIN_DSKCHG          21
+#define PIN_FLCC_OE         47
+
+#define PIN_SCK             1
+#define PIN_CS              2
+#define PIN_MISO            8
+#define PIN_MOSI            14
+#define PIN_MFM_RXE         48
 
 #define PIN_SCL             15      // output
 #define PIN_SDA             16      // input/output
+
 #define PIN_KEYB_TX         17
 #define PIN_KEYB_TX_ORIG    18
 #define PIN_KEYB_RX         19
 #define PIN_TXD2            20
+
 #define PIN_TXD_DEBUG       43
 #define PIN_RXD_DEBUG       44
 
@@ -104,17 +118,17 @@
 #define BIT_IS_L(PIN)   ((REG_READ(GPIO_IN_REG) & (1 << PIN)) == 0)
 #define BIT_LEVEL(PIN)  (BIT_IS_L(PIN) ? LOW : HIGH)
 
+// for bits 0-31
 #define BIT_SET(PIN)    REG_WRITE(GPIO_OUT_W1TS_REG, (1 << PIN))
 #define BIT_CLR(PIN)    REG_WRITE(GPIO_OUT_W1TC_REG, (1 << PIN))
 
-typedef struct {
-    uint8_t stWantsTheStream;          // based on floppy SELECT0/1 signal and MOTOR ON signal
-    uint8_t weAreReceivingTrack;       // based on if STEP pulse happened, if SPI is receiving the track or not
+// for bits 32-48, but needs to subtract 32
+#define BIT_SET1(PIN)    REG_WRITE(GPIO_OUT1_W1TS_REG, (1 << (PIN - 32)))
+#define BIT_CLR1(PIN)    REG_WRITE(GPIO_OUT1_W1TC_REG, (1 << (PIN - 32)))
 
-    uint8_t updatePosition;
-    
-    uint8_t outputsAreEnabled;         // this says whether currently the output pins are streaming the MFM stream or not    
-} TOutputFlags;
+#define BIT_IS_H1(PIN)   ((REG_READ(GPIO_IN1_REG) & (1 << (PIN - 32))) == (1 << (PIN - 32)))
+#define BIT_IS_L1(PIN)   ((REG_READ(GPIO_IN1_REG) & (1 << (PIN - 32))) == 0)
+#define BIT_LEVEL1(PIN)  (BIT_IS_L1(PIN) ? LOW : HIGH)
 
 
 #define WRITEBUFFER_SIZE    1300
@@ -154,6 +168,10 @@ typedef struct {
     uint8_t* data;
 } SingleTrack;
 
-#define STREAM_TABLE_OFFSET (10/2)              // 10 bytes / 5 words - the stream table starts at this offset, because first 5 words are empty (ATN + sizes + other)
+#define STREAM_TABLE_ITEMS  20
+#define STREAM_TABLE_SIZE   STREAM_TABLE_ITEMS
+
+#define STREAM_TABLE_OFFSET 10                  // 10 bytes - the stream table starts at this offset, because first 5 words are empty (ATN + sizes + other)
+#define STREAM_START_OFFSET (STREAM_TABLE_OFFSET + STREAM_TABLE_SIZE)
 
 #endif /* DEFS_H_ */

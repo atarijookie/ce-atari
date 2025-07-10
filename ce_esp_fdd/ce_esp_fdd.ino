@@ -1,5 +1,6 @@
 #include "WiFi.h"
 #include <Preferences.h>
+#include <SPI.h>
 
 #include "defs.h"
 #include "utils.h"
@@ -22,11 +23,7 @@ void setupAtnBuffers(void);
 void requestTrack(uint8_t side, uint8_t track);
 void requestWholeImage(void);
 
-TOutputFlags outFlags;
-volatile uint32_t lastRequestTime;
-volatile TDrivePosition drivePos;
-int trackStreamedCount;
-SStreamed streamed, streamingNow, streamedPrev;
+SStreamed streamed, hwPosition;
 uint8_t sectorsWritten;
 
 uint32_t prevIntTime;
@@ -37,6 +34,7 @@ int imageState = IMAGE_NOT_LOADED;
 uint8_t imgTracks, imgSides, imgSectorsPerTrack;
 char imageFileName[32];
 bool diskChanged;
+uint32_t dataIndexInTrack = STREAM_START_OFFSET;
 
 uint8_t singleTrackData[READTRACKDATA_SIZE_BYTES];      // TODO: remove this once the tracks.data is properly allocated from PSRAM
 
@@ -62,13 +60,19 @@ void IRAM_ATTR floppyStepISR(void)
     }
 
     if(BIT_IS_H(PIN_DIR)) {  // direction is High? track--
-        if(streamingNow.track > 0) {
-            streamingNow.track--;
+        if(hwPosition.track > 0) {
+            hwPosition.track--;
         }
     } else  {                // direction is Low? track++
-        if(streamingNow.track < 85) {
-            streamingNow.track++;
+        if(hwPosition.track < 85) {
+            hwPosition.track++;
         }
+    }
+
+    if(hwPosition.track == 0) {   // if track is 0, TRACK00 is L
+        BIT_CLR(PIN_TRACK00);
+    } else {                        // if track is not 0, TRACK00 to H
+        BIT_SET(PIN_TRACK00);
     }
 }
 
@@ -80,8 +84,8 @@ void setup(void)
 
     Serial.println("setup() starting");
 
-    #define INPUTS_COUNT 8
-    int inputs[INPUTS_COUNT] = {PIN_SDA, PIN_DRIVE_SEL, PIN_MOT_EN, PIN_DIR, PIN_STEP, PIN_WDATA, PIN_WGATE, PIN_SIDE1};
+    #define INPUTS_COUNT 9
+    int inputs[INPUTS_COUNT] = {PIN_SDA, PIN_DRIVE_SEL, PIN_MOT_EN, PIN_DIR, PIN_STEP, PIN_WGATE, PIN_SIDE1, PIN_MFM_RXE};
 
     for (int i = 0; i < INPUTS_COUNT; i++)
     {
@@ -90,26 +94,23 @@ void setup(void)
 
     pinMode(PIN_BOOT_BTN, INPUT_PULLUP);
 
-    #define OUTPUTS_COUNT 8
-    int outputs[OUTPUTS_COUNT] = {PIN_SCL, PIN_DENSITY, PIN_INDEX, PIN_TRACK00, PIN_WPROTECT, PIN_RDATA, PIN_DSKCHG, PIN_FLCC_OE};
+    #define OUTPUTS_COUNT 9
+    int outputs[OUTPUTS_COUNT] = {PIN_SCL, PIN_DENSITY, PIN_INDEX, PIN_TRACK00, PIN_WPROTECT, PIN_RDATA, PIN_DSKCHG, PIN_FLCC_OE, PIN_CS};
 
     for (int i = 0; i < OUTPUTS_COUNT; i++)
     {
         pinMode(outputs[i], OUTPUT);
     }
 
+    BIT_SET(PIN_CS);            // CS to H to deselect SPI slave
+
     // init floppy signals
     BIT_CLR(PIN_TRACK00);
     BIT_CLR(PIN_DSKCHG);
-    BIT_SET(PIN_FLCC_OE);       // disable output
+    BIT_SET1(PIN_FLCC_OE);       // disable output
     BIT_SET(PIN_WPROTECT);
 
-    // init track and side vars for the floppy position
-    drivePos.side = 0;
-    drivePos.track = 0;
-    
-    lastRequestTime = 0;
-
+    // allocate and init tracks
     for(int trackNo=0; trackNo<MAX_TRACKS; trackNo++) {
         for(int sideNo=0; sideNo<2; sideNo++) {
             int index = trackNo*2 + sideNo;
@@ -122,6 +123,8 @@ void setup(void)
     }
     readTrackDataBfr = tracks[0].data;
 
+    readTrackData_goToStart();
+
     preferences.begin("ikbd", PREFERENCES_RO_MODE);
     ikbdEnabled = preferences.getUChar("enabled", 1);
     preferences.end();
@@ -130,6 +133,36 @@ void setup(void)
 
     createIkbdTask();   // this task sends ikdb data to host and back
     displayInit();
+
+    ////////////////////////////////////////////////////////////
+/*
+    vspi = new SPIClass(VSPI);
+    vspi.begin(PIN_SCK, PIN_MISO, PIN_MOSI, PIN_CS);
+*/
+    SPI.begin(PIN_SCK, PIN_MISO, PIN_MOSI, PIN_CS);
+    SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
+
+    uint8_t spiDataOut[32];
+    uint8_t spiDataIn[32];
+
+    memset(spiDataOut, 0xff, 32);
+
+    while(true)
+    {
+        if(digitalRead(PIN_MFM_RXE) == HIGH)
+        {
+            // Serial.println(".");
+            // BIT_CLR(PIN_CS);
+            digitalWrite(PIN_CS, LOW);
+            // delay(500);
+            SPI.transferBytes(spiDataOut, spiDataIn, 32);
+            // BIT_SET(PIN_CS);
+            digitalWrite(PIN_CS, HIGH);
+            // delay(500);
+        }
+    }
+
+    ////////////////////////////////////////////////////////////
 
     attachInterrupt(PIN_STEP, floppyStepISR, FALLING);
 }
@@ -148,7 +181,75 @@ void requestWholeImage(void)
 
 void readTrackData_goToStart(void)
 {
+    dataIndexInTrack = STREAM_START_OFFSET;
+}
 
+void getMfmDataToBuffer(uint8_t* bfr, int len)
+{
+    // update SIDE var
+    hwPosition.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1; // get the current SIDE
+
+    // get current track and side we should be streaming, limit them to maximum values
+    int trackNo = MIN(hwPosition.track, MAX_TRACKS);
+    int sideNo = MIN(hwPosition.side, 1);
+
+    // find out from track and side vars which track we should stream, then in that track find the pointer to next position
+    int trackIndex = trackNo * 2 + sideNo;                       // track + side create index into tracks array
+    uint8_t* pTrackData = &tracks[trackIndex].data[dataIndexInTrack];  // copy data from here
+    uint8_t* pTrackDataEnd = &tracks[trackIndex].data[READTRACKDATA_SIZE_BYTES - 1];
+
+    memset(bfr, 0x55, len);                // init all values to 0x55
+
+    for(int i=0; i<len; ) {
+        uint8_t val = *pTrackData;
+
+        // end of array or end-of-track marker? we've at the end, don't copy anything more
+        if(pTrackData >= pTrackDataEnd || val == CMD_TRACK_STREAM_END_BYTE) {
+            break;
+        }
+
+        pTrackData++;
+
+        // skip empty bytes
+        if(val == 0) {
+            continue;
+        }
+
+        // current sector marker?
+        if(val == CMD_CURRENT_SECTOR) {
+            streamed.side = *pTrackData++;
+            streamed.track = *pTrackData++;
+            streamed.sector = *pTrackData++;
+            continue;
+        }
+
+        // val is just mfm data, store it
+        bfr[i] = val;
+        i++;
+    }
+
+    // now we got 'len' bytes in the bfr, we just need to update data retrieval index
+    uint8_t* pTrackDataStart = tracks[trackIndex].data;
+    dataIndexInTrack = pTrackData - pTrackDataStart;
+}
+
+void refillMfmStreamer(void)
+{
+    uint8_t bufferOut[32];
+    uint8_t bufferIn[32];
+
+    while(digitalRead(PIN_MFM_RXE) == HIGH) {       // while still can send data to mfm streamer
+        // get stream data into buffer
+        getMfmDataToBuffer(bufferOut, 32);
+
+        // send data over SPI to mfm streamer
+        digitalWrite(PIN_CS, LOW);
+        SPI.transferBytes(bufferOut, bufferIn, 32);
+        digitalWrite(PIN_CS, HIGH);
+
+        // TODO: check bufferIn for any data, process non-zero bytes (sector written data)
+        //
+    }
 }
 
 void loop(void)
@@ -182,24 +283,18 @@ void loop(void)
             requestWholeImage();
         }
 
-        if(outFlags.updatePosition) {
-            outFlags.updatePosition = false;
-            updateStreamPositionByFloppyPosition(timeTrackStart);     // place the read marker on the right place in the stream
-        }
-
         bool stWantsTheStream = BIT_IS_L(PIN_DRIVE_SEL) && BIT_IS_L(PIN_MOT_EN);
 
         // ST wants the stream and we are not receiving TRACK data? ENABLE stream
-        if(stWantsTheStream && !outFlags.weAreReceivingTrack) {
-            BIT_CLR(PIN_FLCC_OE);
+        if(stWantsTheStream) {
+            BIT_CLR1(PIN_FLCC_OE);
         } else {    // other cases? DISABLE stream
-            BIT_SET(PIN_FLCC_OE);
+            BIT_SET1(PIN_FLCC_OE);
         }
 
-        if(streamingNow.track == 0) {        // if track is 0, TRACK00 is L
-            BIT_CLR(PIN_TRACK00);
-        } else {                    // if track is not 0, TRACK00 to H
-            BIT_SET(PIN_TRACK00);
+        // if the mfm streamer needs more data
+        if(digitalRead(PIN_MFM_RXE) == HIGH) {
+            refillMfmStreamer();
         }
 
         // can send this write buffer?
@@ -241,7 +336,7 @@ void loop(void)
 
         if(timeSinceTrackStart >= 200) {    // track finished
             BIT_CLR(PIN_INDEX);             // INDEX to L
-            timeTrackStart = millis();
+            timeTrackStart = now;
 
             readTrackData_goToStart();      // move the pointer in the track stream to start
 
@@ -250,31 +345,9 @@ void loop(void)
                 // requestTrack(true);         // ask for the changed track data, but force it - get it immediatelly
             }
 
-            //-----------
-            // the following section of code should request track again if even after 2 rotations of floppy we're not streaming what we should
-            trackStreamedCount++;               // increment the count of how many times we've streamed this track
-
-            if(trackStreamedCount >= 2) {       // if since the last request 2 rotations happened
-                if(streamed.track != streamingNow.track || streamed.side != streamingNow.side) {  // and we're not streaming what we really want to stream
-                    // requestTrack(false);        // ask for track data (again?)
-                }
-            }
             streamed.track = 0xff;        // after the end of track mark that we're not streaming anything
             streamed.side = 0xff;
-        }
-
-        //--------
-        // NOTE! Handling of STEP and SIDE only when MOTOR is ON, but the drive doesn't have to be selected and it must handle the control anyway
-        if(BIT_IS_H(PIN_MOT_EN)) {             // motor not enabled? Skip the following code.
-            continue;
-        }
-
-        //------------
-        // update SIDE var
-        streamingNow.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1; // get the current SIDE
-        if(streamedPrev.side != streamingNow.side) {             // side changed?
-            // requestTrack(false);                // we need track from the right side
-            streamedPrev.side = streamingNow.side;
+            streamed.sector = 0xff;
         }
 
         //---------------------------
@@ -379,23 +452,6 @@ void handleButton(void)
             duringButtonPressed(now, buttonPressTime);
         }
     }
-}
-
-void updateStreamPositionByFloppyPosition(uint32_t timeTrackStart)
-{
-    // uint32_t streamSize = readTrackDataBfr[STREAM_TABLE_OFFSET];       // get stream size (in bytes) from stream table at index 0
-
-    // if(streamSize >= (READTRACKDATA_SIZE_BYTES - 1)) {              // if stream size is invalid (is bigger than where we store read track data)
-    //     inIndexGet = STREAM_START_OFFSET;                           // just go to the start of stream
-    //     return;
-    // }
-
-    // // read the current position - from 0 to 200
-    // uint32_t timeSinceTrackStart = millis() - timeTrackStart;
-
-    // // calculate index where we should place sream reading index -
-    // // current position is between 0 and 200, that is from 0 to 100%, so place it between 0 and LENGTH OF STREAM position
-    // inIndexGet = (streamSize * timeSinceTrackStart) / 200;
 }
 
 void setupAtnBuffers(void)
