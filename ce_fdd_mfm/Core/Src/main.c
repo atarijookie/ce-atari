@@ -34,19 +34,6 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-
-/*
-Theoretical durations, based on simulation:
-    - cicrularAdd                   - 0.63 us
-    - cicrularGet                   - 0.65 us
-    - updateReadTimer on new byte   - 1.95 us
-    - updateReadTimer on just bits  - 0.65 us
-    - updateWriteData on just bits  - 1.28 us
-    - updateWriteData on store byte - 2.15 us
-
-    1 MHz SPI clock -> 125 kB/s -> received byte very 8 us
- */
-
 #define MFM_4US         1
 #define MFM_6US         2
 #define MFM_8US         3
@@ -57,7 +44,7 @@ Theoretical durations, based on simulation:
 #define PULSE_8US       72
 
 #define PIN_WGATE       (1 << 3)        // GPIOA 3, write is happening when WGATE is L
-#define PIN_HALF_EMPTY  (1 << 5)        // GPIOA 5, SPI can get more data if this is H
+#define PIN_RXE         (1 << 5)        // GPIOA 5, SPI can get more data if this is H
 
 /* USER CODE END PD */
 
@@ -114,10 +101,14 @@ void updateReadTimer(void)
     TIM3->ARR = arrValue;       // update ARR value
 }
 
-void updateWriteData(uint32_t duration)
+void updateWriteData(uint32_t captured)
 {
     static uint8_t streamByte = 0;
     static uint8_t bits = 0;
+    static uint32_t prevCaptured = 0;
+
+    uint32_t duration = captured - prevCaptured;    // calculate the change from previous captured value
+    prevCaptured = captured;                        // store the current captured time
 
     uint8_t newTime = 0;
 
@@ -140,6 +131,14 @@ void updateWriteData(uint32_t duration)
         // tx buffer not full? add streamByte to tx buffer
         if(txCnt < BFR_SIZE) {
             TX_PUT(streamByte);
+        }
+
+        // to avoid doing the whole read part, just assume that it takes on average
+        // the same time to stream out 4 symbols as it takes to get them,
+        // so just drop one byte from RX buffer
+        if(rxCnt > 0) {
+            RX_DROP();
+            UPDATE_PIN_RXE;         // after removing byte from RX buffer, update RXE flag
         }
 
         bits = 0;           // don't have bits now
@@ -212,16 +211,18 @@ int main(void)
             updateWriteData(captured);            // send the input WDATA to buffer
         }
     }
-
-    // overflow of TIM3 occurred (UIF flag set)? stream next mfm symbol
-    /*                              o0            o2
-     * just checking TIM3->SR       0.34 us       0.34 us
-     * taking value from memory     1.60 us       1.60 us
-     * taking value from FIFO       2.92 us       2.51 us
-     */
-    if((TIM3->SR & TIM_SR_UIF) != 0) {
-       TIM3->SR = ~TIM_SR_UIF;             // clear UIF flag
-       updateReadTimer();
+    else        // when reading from floppy
+    {
+        // overflow of TIM3 occurred (UIF flag set)? stream next mfm symbol
+        /*                              o0            o2
+         * just checking TIM3->SR       0.34 us       0.34 us
+         * taking value from memory     1.60 us       1.60 us
+         * taking value from FIFO       2.92 us       2.51 us
+         */
+        if((TIM3->SR & TIM_SR_UIF) != 0) {
+           TIM3->SR = ~TIM_SR_UIF;             // clear UIF flag
+           updateReadTimer();
+        }
     }
 
     // RXNE? read data, place it in RX buffer if have space
