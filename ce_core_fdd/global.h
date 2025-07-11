@@ -40,9 +40,6 @@ void preloadGlobalsFromDotEnv(void);
 
 // These were global const string constants, but now they depend on .env content, so they are now
 // loaded on app start and used when needed.
-extern std::string corePath;
-extern std::string CE_CONF_FDD_IMAGE_PATH_AND_FILENAME;
-extern std::string FDD_TEST_IMAGE_PATH_AND_FILENAME;
 extern std::string CONFIG_DRIVE_PATH;
 
 #define LOG_DIR_DEFAULT     "/tmp/ce/log"

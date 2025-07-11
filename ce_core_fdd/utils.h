@@ -94,8 +94,6 @@ public:
     static bool startsWith(const std::string& value, const char* head);
     static bool endsWith(const std::string& value, const char* tail);
 
-    static void createFloppyTestImage(void);
-
     static void closeFdIfOpen(int& fd);
 
 private:

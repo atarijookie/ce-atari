@@ -293,13 +293,14 @@ bool ChipInterfaceNetwork::waitForAtn(int clientIndex, int atnIdWant, uint8_t at
     gotAtnId = 0;
     gotAtnCode = 0;
 
-    BufferedReader& bufReader = clients[clientIndex].bufReader;
+    BufferedReader* bufReader = &clients[clientIndex].bufReader;
+    bufReader->setFd(clients[clientIndex].fdClient);
 
     // we might need to wait for ATN multiple times, as there might be ZEROS packet or IKBD packet before we read wanted Hans or Franz packet
     while(sigintReceived == 0) {
         // check for any ATN code waiting from Hans
-        int atnIdGot = bufReader.waitForAtn(atnCode, timeoutMs);            // which chip wants to communicate? (which chip's stream we should process?)
-        uint8_t atnCode = bufReader.getAtnCode();                           // what command does this chip wants us to handle?
+        int atnIdGot = bufReader->waitForAtn(atnCode, timeoutMs);            // which chip wants to communicate? (which chip's stream we should process?)
+        uint8_t atnCode = bufReader->getAtnCode();                           // what command does this chip wants us to handle?
 
         if(atnIdGot == NET_ATN_DISCONNECTED) {         // if buffered reader detected client disconnect, close it and quit
             logFdd(LOG_DEBUG, "waitForAtn() - DISCONNECTED!");
@@ -316,8 +317,8 @@ bool ChipInterfaceNetwork::waitForAtn(int clientIndex, int atnIdWant, uint8_t at
         //logFdd(LOG_DEBUG, "waitForAtn() - atnIdGot=%d, atnCode=%d", atnIdGot, atnCode);
 
         // if we got here, it'z not ZEROS, IKDB or NONE, so it's FRANZ or HANS
-        memcpy(inBuf, bufReader.getHeaderPointer(), 8); // copy in the header to start of buffer
-        bufReader.clear();                              // clear buffered reader after reading data
+        memcpy(inBuf, bufReader->getHeaderPointer(), 8); // copy in the header to start of buffer
+        bufReader->clear();                              // clear buffered reader after reading data
 
         //logFdd(LOG_DEBUG, "waitForAtn() - %02X %02X %02X %02X %02X %02X %02X %02X", inBuf[0], inBuf[1], inBuf[2], inBuf[3], inBuf[4], inBuf[5], inBuf[6], inBuf[7]);
 

@@ -21,23 +21,23 @@ extern TFlags   flags;
 
 DebugVars dbgVars;
 
-std::string coreLogFileName;
+std::string coreLogFileName[3];
 
 const char* Debug::getCoreLogFileName(bool forceCreate, int whichLog)
 {
-    if(coreLogFileName.length() > 0 && !forceCreate) {
-        return coreLogFileName.c_str();
+    if(coreLogFileName[whichLog].length() > 0 && !forceCreate) {
+        return coreLogFileName[whichLog].c_str();
     }
 
     std::string logDir = Utils::dotEnvValue("LOG_DIR", LOG_DIR_DEFAULT, false);
 
     switch(whichLog) {
-        case LOGFILE_HDD: coreLogFileName = logDir + std::string("/" CORE_HDD_LOG_FILENAME); break;
-        case LOGFILE_FDD: coreLogFileName = logDir + std::string("/" CORE_FDD_LOG_FILENAME); break;
-        case LOGFILE_IKBD: coreLogFileName = logDir + std::string("/" CORE_IKBD_LOG_FILENAME); break;
+        case LOGFILE_HDD: coreLogFileName[whichLog] = logDir + std::string("/" CORE_HDD_LOG_FILENAME); break;
+        case LOGFILE_FDD: coreLogFileName[whichLog] = logDir + std::string("/" CORE_FDD_LOG_FILENAME); break;
+        case LOGFILE_IKBD: coreLogFileName[whichLog] = logDir + std::string("/" CORE_IKBD_LOG_FILENAME); break;
     }
 
-    return coreLogFileName.c_str();
+    return coreLogFileName[whichLog].c_str();
 }
 
 void Debug::setOutputToConsole(void)
@@ -223,8 +223,6 @@ void Debug::setLogLevel(int newLogLevel)
 
     logFdd(LOG_INFO, "Switching LOG LEVEL from %d to %d", flags.logLevel, newLogLevel);
     flags.logLevel = newLogLevel;                               // new value to struct
-
-    Utils::intToFileFromEnv(newLogLevel, "CORE_IKBD_LOGLEVEL_FILE");        // new value to file
 }
 
 void Debug::logRotateIfNeeded(const char *logFilePath)

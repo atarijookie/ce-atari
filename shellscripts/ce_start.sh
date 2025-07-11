@@ -29,6 +29,9 @@ echo "Starting processes."
 # run ikbd server
 ./ce_ikbd.elf > /dev/null  2>&1 &
 
+# run fdd server
+./ce_fdd.elf > /dev/null  2>&1 &
+
 # run web server
 cd webserver
 ./ce_web.sh > /dev/null 2>&1 &

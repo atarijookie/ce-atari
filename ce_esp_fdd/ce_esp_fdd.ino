@@ -133,43 +133,16 @@ void setup(void)
     createIkbdTask();   // this task sends ikdb data to host and back
     displayInit();
 
-    ////////////////////////////////////////////////////////////
-/*
-    vspi = new SPIClass(VSPI);
-    vspi.begin(PIN_SCK, PIN_MISO, PIN_MOSI, PIN_CS);
-*/
     SPI.begin(PIN_SCK, PIN_MISO, PIN_MOSI, PIN_CS);
     SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
-
-    uint8_t spiDataOut[32];
-    uint8_t spiDataIn[32];
-
-    memset(spiDataOut, 0xff, 32);
-
-    while(true)
-    {
-        if(digitalRead(PIN_MFM_RXE) == HIGH)
-        {
-            // Serial.println(".");
-            // BIT_CLR(PIN_CS);
-            digitalWrite(PIN_CS, LOW);
-            // delay(500);
-            SPI.transferBytes(spiDataOut, spiDataIn, 32);
-            // BIT_SET(PIN_CS);
-            digitalWrite(PIN_CS, HIGH);
-            // delay(500);
-        }
-    }
-
-    ////////////////////////////////////////////////////////////
 
     attachInterrupt(PIN_STEP, floppyStepISR, FALLING);
 }
 
 void requestTrack(uint8_t side, uint8_t track)
 {
-    atnSendFwVersion[TX_HEADER_SIZE + 0] = side;
-    atnSendFwVersion[TX_HEADER_SIZE + 1] = track;
+    atnSendTrackRequest[TX_HEADER_SIZE + 0] = side;
+    atnSendTrackRequest[TX_HEADER_SIZE + 1] = track;
     sendHeaderAndDataToHost(atnSendTrackRequest, ATN_SENDTRACK_REQ_LEN_TX - TX_HEADER_SIZE);
 }
 

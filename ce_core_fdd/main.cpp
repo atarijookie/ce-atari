@@ -74,6 +74,8 @@ int main(int argc, char *argv[])
     // Opening of chip interface.
     logFdd(LOG_INFO, "ChipInterface: starting NETWORK server");
 
+    chipInterface = new ChipInterfaceNetwork();
+
     if(!chipInterface->ciOpen()) {
         logFdd(LOG_ERROR, "ChipInterface - failed to open chip Interface, terminating.");
         printf("\nChipInterface - failed to open chip Interface, terminating.\n");

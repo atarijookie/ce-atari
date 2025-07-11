@@ -790,15 +790,7 @@ void Utils::toUpperCaseString(std::string &st)
 
 void Utils::loadDotEnv(void)
 {
-    /* try to load .env from multiple locations in their priority order */
-    loadDotEnvFrom("/etc/ce.env");                  // load the one which will never be overwritten by update
-
-    bool good = false;
-    good = loadDotEnvFrom("/ce/services/.env");     // try to load from main location
-
-    if(!good) {
-        good = loadDotEnvFrom("./.env");            // if failed, try from local directory
-    }
+    bool good = loadDotEnvFrom("./.env");
 
     if(good) {      // if something was loaded, do the vars subtitution
         dotEnvSubstituteVars();
@@ -1041,43 +1033,6 @@ void Utils::trimTrail(char *bfr)
 
         break;              // if got here, this char is not blank, wasn't cleared and we should stop
     }
-}
-
-void Utils::createFloppyTestImage(void)
-{
-    // open the file and write to it
-    FILE *f = fopen(FDD_TEST_IMAGE_PATH_AND_FILENAME.c_str(), "wb");
-
-    if(!f) {
-        logFdd(LOG_ERROR, "Failed to create floppy test image!");
-        printf("Failed to create floppy test image!\n");
-        return;
-    }
-
-    // first fill the write buffer with simple counter
-    uint8_t writeBfr[512];
-    int i;
-    for(i=0; i<512; i++) {
-        writeBfr[i] = (uint8_t) i;
-    }
-
-    // write one sector after another...
-    int sector, track, side;
-    for(track=0; track<80; track++) {
-        for(side=0; side<2; side++) {
-            for(sector=1; sector<10; sector++) {
-                // customize write data
-                writeBfr[0] = track;
-                writeBfr[1] = side;
-                writeBfr[2] = sector;
-
-                fwrite(writeBfr, 1, 512, f);
-            }
-        }
-    }
-
-    // close file and we're done
-    fclose(f);
 }
 
 bool Utils::startsWith(const std::string& value, const char* head)

@@ -1,4 +1,5 @@
 #include "defs.h"
+#include "connection.h"
 
 hw_timer_t *timer = NULL;
 volatile uint8_t hasTimedOut = false;
@@ -130,7 +131,7 @@ void longTimeout_basedOnSectorCount(uint16_t sectorCount)
 
 void storeHeader(uint8_t *bfr, uint16_t atnCode, uint32_t txLen)
 {
-    storeDword(bfr, 0xc050d1c5); //  0..3: 0xc050d1c5 [COSmODICS] (4 bytes)
-    storeWord(bfr + 4, atnCode); //  4..5: ATN code (2 bytes)
-    storeDword(bfr + 6, txLen);  //  6..9: txLen (4 bytes)
+    storeDword(bfr, SYNC_TAG_FDD);  //  0..3: 0xc050fdd0 [COSmOFDD0] (4 bytes)
+    storeWord(bfr + 4, atnCode);    //  4..5: ATN code (2 bytes)
+    storeDword(bfr + 6, txLen);     //  6..9: txLen (4 bytes)
 }

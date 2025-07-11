@@ -179,8 +179,6 @@ void Debug::setLogLevel(int newLogLevel)
 
     flags.logLevel = newLogLevel;                               // new value to struct
     ldp_setParam(1, (uint64_t) flags.logLevel);                 // libDOSpath - set new log level to file
-
-    Utils::intToFileFromEnv(newLogLevel, "CORE_HDD_LOGLEVEL_FILE");        // new value to file
 }
 
 void Debug::logRotateIfNeeded(const char *logFilePath)
