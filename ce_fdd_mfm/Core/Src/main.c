@@ -46,6 +46,9 @@
 #define PIN_WGATE       (1 << 3)        // GPIOA 3, write is happening when WGATE is L
 #define PIN_RXE         (1 << 5)        // GPIOA 5, SPI can get more data if this is H
 
+#define TAG_WRITE_START 0x80    // start of sector data
+#define TAG_WRITE_END   0xc0    // end of sector data
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -190,6 +193,8 @@ int main(void)
 
   UPDATE_PIN_RXE;       // set RXE pin because we're empty
 
+  uint8_t writingPrev = (GPIOA->IDR & PIN_WGATE) == 0;      // track WGATE changes with this var, init to current WGATE state
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -197,6 +202,16 @@ int main(void)
   while (1)
   {
     uint8_t writingNow = (GPIOA->IDR & PIN_WGATE) == 0;     // true if now writing data (0.3 us)
+
+    // when the WGATE signal changes, we need to mark start or stop of data with a special tag
+    if(writingPrev != writingNow)   // when WGATE signal changed
+    {
+        writingPrev = writingNow;
+
+        if(txCnt < BFR_SIZE) {      // if have space in buffer, store start or end tag
+            TX_PUT( writingNow ? TAG_WRITE_START : TAG_WRITE_END );
+        }
+    }
 
     if(writingNow)  // when writing to floppy
     {
