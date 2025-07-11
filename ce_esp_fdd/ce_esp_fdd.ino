@@ -26,7 +26,6 @@ void requestWholeImage(void);
 SStreamed streamed, hwPosition;
 uint8_t sectorsWritten;
 
-uint32_t prevIntTime;
 extern bool connected;
 
 SingleTrack tracks[2 * MAX_TRACKS];
@@ -233,6 +232,30 @@ void getMfmDataToBuffer(uint8_t* bfr, int len)
     dataIndexInTrack = pTrackData - pTrackDataStart;
 }
 
+void processMfmWriteBuffer(uint8_t* bfr, int len)
+{
+    uint8_t* pStore = &wrNow->buffer[wrNow->count];
+
+    for(int i=0; i<len; i++)
+    {
+        // buffer full? quit
+        if(wrNow->count >= WRITEBUFFER_SIZE) {
+            break;
+        }
+
+        uint8_t val = *bfr;
+        bfr++;
+
+        // non-zero value gets stored
+        if(val != 0) {
+           *pStore = val;   // store value
+           pStore++;
+
+           wrNow->count++;  // increment count of data in buffer
+        }
+    }
+}
+
 void refillMfmStreamer(void)
 {
     uint8_t bufferOut[32];
@@ -247,8 +270,8 @@ void refillMfmStreamer(void)
         SPI.transferBytes(bufferOut, bufferIn, 32);
         digitalWrite(PIN_CS, HIGH);
 
-        // TODO: check bufferIn for any data, process non-zero bytes (sector written data)
-        //
+        // // check bufferIn for any data, process non-zero bytes (sector written data)
+        // processMfmWriteBuffer(bufferIn, 32);
     }
 }
 
@@ -259,7 +282,7 @@ void loop(void)
     uint8_t indexCount = 0;
     uint32_t timeTrackStart = millis();
 
-    prevIntTime = 0;
+    int WGatePrev = HIGH;
     sectorsWritten = 0;         // nothing written yet
 
     while(1)
@@ -270,6 +293,7 @@ void loop(void)
         // handle any data incoming
         handleIncommingData();
 
+        // send heartbeat (fw version) once a second
         uint32_t now = millis();
         if (connected && (now - lastSendFwTime) >= 1000)
         {
@@ -277,6 +301,7 @@ void loop(void)
             sendHeaderAndDataToHost(atnSendFwVersion, ATN_SENDFWVERSION_LEN_TX - TX_HEADER_SIZE);
         }
 
+        // request whole image if no image loaded
         if(connected && imageState == IMAGE_NOT_LOADED)
         {
             imageState = IMAGE_REQUESTED;
@@ -285,7 +310,7 @@ void loop(void)
 
         bool stWantsTheStream = BIT_IS_L(PIN_DRIVE_SEL) && BIT_IS_L(PIN_MOT_EN);
 
-        // ST wants the stream and we are not receiving TRACK data? ENABLE stream
+        // ST wants the stream? ENABLE stream
         if(stWantsTheStream) {
             BIT_CLR1(PIN_FLCC_OE);
         } else {    // other cases? DISABLE stream
@@ -297,31 +322,39 @@ void loop(void)
             refillMfmStreamer();
         }
 
-        // can send this write buffer?
-        if(wrNow->readyToSend) {
-            uint32_t dataSize = (wrNow->count > TX_HEADER_SIZE) ? (wrNow->count - TX_HEADER_SIZE) : 0;
-            sendHeaderAndDataToHost(wrNow->buffer, dataSize);
-            wrNow->readyToSend = false;     // mark the current buffer as not ready to send (so we won't send this one again)
+        // // can send this write buffer?
+        // if(wrNow->readyToSend) {
+        //     uint32_t dataSize = (wrNow->count > TX_HEADER_SIZE) ? (wrNow->count - TX_HEADER_SIZE) : 0;
+        //     sendHeaderAndDataToHost(wrNow->buffer, dataSize);
+        //     wrNow->readyToSend = false;     // mark the current buffer as not ready to send (so we won't send this one again)
 
-            wrNow = (TWriteBuffer*) wrNow->next;    // and now we will select the next buffer as current
-            wrNow->readyToSend = false;     // the next buffer is not ready to send (yet)
-            wrNow->count = 10;              // at the start we already have header there
-        }
-
-        /*
-            // on write start
-            wrNow->buffer[10] = streamed.track | ((streamed.side != 0) ? 0x80 : 0);
-            wrNow->buffer[11] = streamed.sector;
-            wrNow->count = 12;          // 10 for header, 2 for track + side + sector
-        */
+        //     wrNow = (TWriteBuffer*) wrNow->next;    // and now we will select the next buffer as current
+        //     wrNow->readyToSend = false;     // the next buffer is not ready to send (yet)
+        //     wrNow->count = 10;              // at the start we already have header there
+        // }
 
         //-------------------------------------------------
+        // if(stWantsTheStream)
+        // {
+        //     int WGateNow = BIT_LEVEL(PIN_WGATE);
 
-        // WGate = inputs & WGATE;                                         // get current WGATE value
+        //     if(WGatePrev != WGateNow)   // write gate changed?
+        //     {
+        //         WGatePrev = WGateNow;
 
-        // if(WGate == 0) {                                                // when write gate is low, the data is written to floppy
-        //     handleFloppyWrite();
-        //     sectorsWritten++;                                       // one sector was written, request updated track at the end of stream
+        //         if(WGateNow == LOW)     // on write start
+        //         {
+        //             hwPosition.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1; // get the current SIDE
+        //             wrNow->buffer[10] = hwPosition.track | ((hwPosition.side != 0) ? 0x80 : 0);
+        //             wrNow->buffer[11] = hwPosition.sector;
+        //             wrNow->count = 12;          // 10 for header, 2 for track + side + sector
+        //         }
+        //         else                    // on write end
+        //         {
+        //             sectorsWritten++;   // one sector was written, request updated track at the end of stream
+
+        //         }
+        //     }
         // }
 
         //------------
@@ -340,10 +373,10 @@ void loop(void)
 
             readTrackData_goToStart();      // move the pointer in the track stream to start
 
-            if(sectorsWritten > 0) {        // if some sectors were written to floppy, we need to get the new stream now
-                sectorsWritten = 0;         // nothing written now
-                // requestTrack(true);         // ask for the changed track data, but force it - get it immediatelly
-            }
+            // if(sectorsWritten > 0) {        // if some sectors were written to floppy, we need to get the new stream now
+            //     sectorsWritten = 0;         // nothing written now
+            //     // requestTrack(true);         // ask for the changed track data, but force it - get it immediatelly
+            // }
 
             streamed.track = 0xff;        // after the end of track mark that we're not streaming anything
             streamed.side = 0xff;
