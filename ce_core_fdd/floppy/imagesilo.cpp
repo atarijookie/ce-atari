@@ -100,15 +100,16 @@ void ImageSilo::loadSettings(void)
         sprintf(key, "FLOPPY_IMAGE_%d", slot);      // create settings key
 
         const char *img = s.getString(key, "");     // try to read the value
-
-        std::string pathAndFile, path, file;
-        pathAndFile = img;
+        std::string pathAndFile = img;
 
         if(pathAndFile.empty()) {                   // nothing stored? skip it
             // TODO: add() empty image
             continue;
         }
 
+        std::string path, file;
+        Utils::splitFilenameFromPath(pathAndFile, path, file);
+        logFdd(LOG_DEBUG, "ImageSilo::loadSettings -- slot: %d, pathAndFile: %s, file: %s", slot, pathAndFile.c_str(), file.c_str());
         add(slot, file, pathAndFile);        // add this image
     }
 }
@@ -124,13 +125,11 @@ void ImageSilo::add(int positionIndex, std::string &filename, std::string &hostP
         return;
     }
 
-    std::string filenameNoExt, ext;
-    Utils::splitFilenameFromExt(filename, filenameNoExt, ext);   // create filename without extension (ZIPed image in list might be extracted under different extension)
+    logFdd(LOG_DEBUG, "ImageSilo::add() -- positionIndex: %d, filename: %s, hostPath: %s", positionIndex, filename.c_str(), hostPath.c_str());
 
     // store the info about slot
-    slots[positionIndex].imageFile      = filename;         // just file name:                     bla.st
-    slots[positionIndex].imageFileNoExt = filenameNoExt;    // just file name without extension:   bla
-    slots[positionIndex].hostPath       = hostPath;         // where the file is stored on translated drive (/mnt/sda/gamez/bla.st) or where the image is uploaded from atari (/tmp/bla.st)
+    slots[positionIndex].imageFile = filename;  // just file name: bla.st
+    slots[positionIndex].hostPath = hostPath;   // where the file is stored on disk
 
     // create and add floppy encode request
     floppyEncoder_addEncodeWholeImageRequest(positionIndex, hostPath.c_str());
@@ -162,7 +161,6 @@ void ImageSilo::dumpStringsToBuffer(uint8_t *bfr)      // copy the strings to bu
 void ImageSilo::clearSlot(int index)
 {
     slots[index].imageFile.clear();
-    slots[index].imageFileNoExt.clear();
     slots[index].hostPath.clear();
 }
 
@@ -220,9 +218,11 @@ bool ImageSilo::getParams(int floppySlotIndex, int &tracks, int &sides, int &sec
 std::string ImageSilo::getFileName(int floppySlotIndex)
 {
     if(floppySlotIndex < 0 || floppySlotIndex >= SLOT_COUNT) {
+        logFdd(LOG_DEBUG, "getFileName() -- floppySlotIndex out of bounds: %d, returning empty string", floppySlotIndex);
         std::string empty;
         return empty;
     }
 
+    logFdd(LOG_DEBUG, "getFileName() -- floppySlotIndex: %d, returning: %s", floppySlotIndex, slots[floppySlotIndex].imageFile.c_str());
     return slots[floppySlotIndex].imageFile;
 }

@@ -47,7 +47,7 @@ public:
     static void logRotateIfNeeded(const char *logFilePath);
 
     static FILE* logFileOpen(int whichLog);
-    static const char* getCoreLogFileName(bool forceCreate = false, int whichLog = LOGFILE_HDD);
+    static const char* getCoreLogFileName(bool forceCreate, int whichLog);
 };
 
 #endif

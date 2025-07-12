@@ -205,10 +205,11 @@ bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, 
     //-----
 
     memset(tracks[index].mfmStream, 0, MFM_STREAM_SIZE);    // initialize MFM stream
-    currentStreamStart = tracks[index].mfmStream + 2;       // where the stream starts
 
     tracks[index].mfmStream[0] = track;     // store track and side at position 0 and 1
     tracks[index].mfmStream[1] = side;
+
+    currentStreamStart = tracks[index].mfmStream + 2;       // where the stream starts
 
     #define STREAM_TABLE_ITEMS  20
     #define STREAM_TABLE_SIZE   (2 * STREAM_TABLE_ITEMS)
@@ -246,15 +247,6 @@ bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, 
 
     tracks[index].bytesInStream = bytesInBfr;   // store the data count
     setRawWordAtIndex(0, STREAM_TABLE_OFFSET + bytesInBfr);     // stream table - index 0: stream size in bytes (include those extra 5 empty WORDs on start in Franz)
-
-    {   // TODO: rework
-    // if(hwConfig.version == 1 || hwConfig.version == 2) {    // HW v1 and v2 need byte swap, HW v3 needs bytes in the original order
-        for(int i=0; i<MFM_STREAM_SIZE; i += 2) {           // swap bytes - Franz has other endiannes
-            uint8_t tmp                        = tracks[index].mfmStream[i + 0];
-            tracks[index].mfmStream[i + 0]  = tracks[index].mfmStream[i + 1];
-            tracks[index].mfmStream[i + 1]  = tmp;
-        }
-    }
 
     //-----
     pthread_mutex_lock(&floppyEncoderMutex);      // unlock the mutex

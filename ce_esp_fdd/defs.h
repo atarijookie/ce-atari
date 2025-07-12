@@ -65,7 +65,7 @@
 #define ATN_VARIABLE_LEN                0xffff
 
 #define TX_HEADER_SIZE                  10
-#define ATN_SENDFWVERSION_LEN_TX        (TX_HEADER_SIZE + 10)
+#define ATN_SENDFWVERSION_LEN_TX        (TX_HEADER_SIZE + 4)
 #define ATN_SENDTRACK_REQ_LEN_TX        (TX_HEADER_SIZE + 2)
 
 ///////////////////////////
@@ -155,7 +155,7 @@ typedef struct {
 } SStreamed;
 
 #define READTRACKDATA_SIZE_BYTES    13800
-#define MAX_TRACKS                  80
+#define MAX_TRACKS                  90
 
 #define IMAGE_NOT_LOADED    0
 #define IMAGE_REQUESTED     1

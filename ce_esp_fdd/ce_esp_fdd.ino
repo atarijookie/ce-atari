@@ -9,6 +9,12 @@
 #include "display.h"
 #include "ikbd.h"
 
+/*
+    Arduino IDE: 2.3.6
+    Board: 'ESP32S3 Dev Module'
+    PSRAM: OPI PSRAM
+*/
+
 Preferences preferences;
 
 uint16_t version[2] = {0xf025, 0x0616}; // this means: Franz, 2025-06-16
@@ -109,6 +115,15 @@ void setup(void)
     BIT_SET1(PIN_FLCC_OE);       // disable output
     BIT_SET(PIN_WPROTECT);
 
+    uint32_t psramSize = ESP.getPsramSize();
+    Serial.print("Found PSRAM: ");
+    Serial.println(psramSize / 1024);
+
+    if(psramSize < (2 * MAX_TRACKS * READTRACKDATA_SIZE_BYTES)) {
+        Serial.println("Not enough PSRAM, will fail to work! HALT!");
+        while(1);
+    }
+
     // allocate and init tracks
     for(int trackNo=0; trackNo<MAX_TRACKS; trackNo++) {
         for(int sideNo=0; sideNo<2; sideNo++) {
@@ -116,10 +131,26 @@ void setup(void)
             tracks[index].loaded = false;
             tracks[index].track = trackNo;
             tracks[index].side = sideNo;
-            // tracks[index].data = (uint8_t*) malloc(READTRACKDATA_SIZE_BYTES);        // TODO: uncomment this once the PSRAM is working
-            tracks[index].data = singleTrackData;
+            tracks[index].data = (uint8_t*) ps_malloc(READTRACKDATA_SIZE_BYTES);
+
+            if(tracks[index].data == NULL) {
+                Serial.println("ps_malloc() failed! HALT!");
+                while(1);
+            }
         }
     }
+
+    // do a short PSRAM check
+    tracks[0].data[0] = 0xab;
+    tracks[(2 * MAX_TRACKS) - 1].data[0] = 0xcd;
+
+    if(tracks[0].data[0] == 0xab && tracks[(2 * MAX_TRACKS) - 1].data[0] == 0xcd) {
+        Serial.println("PSRAM used and working");
+    } else {
+        Serial.println("PSRAM not working correctly! HALT");
+        while(1);
+    }
+
     readTrackDataBfr = tracks[0].data;
 
     readTrackData_goToStart();
@@ -148,6 +179,7 @@ void requestTrack(uint8_t side, uint8_t track)
 
 void requestWholeImage(void)
 {
+    Serial.println("requestWholeImage");
     sendHeaderAndDataToHost(atnSendWholeImageRequest, 0);
 }
 

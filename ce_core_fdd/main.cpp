@@ -43,14 +43,14 @@ int main(int argc, char *argv[])
 
     printf("\033[H\033[2J\n");
 
-    initializeFlags();                                          // initialize flags
+    initializeFlags();                      // initialize flags
     logFdd(LOG_INFO, "\n\n"); logFdd(LOG_INFO, "---------------------------------------------------");
 
-    parseCmdLineArguments(argc, argv);                          // then parse cmd line arguments and set global variables
+    parseCmdLineArguments(argc, argv);      // then parse cmd line arguments and set global variables
     Debug::printfLogLevelString();
 
     Utils::loadDotEnv();                    // load dotEnv before setting default log file
-    Debug::getCoreLogFileName(true);        // call this with force=true to re-create the log file name
+    Debug::getCoreLogFileName(true, LOGFILE_FDD);
     Debug::logLevelFromDotEnv();            // set log level from .env value of LOG_LEVEL
 
     preloadGlobalsFromDotEnv();
@@ -112,7 +112,7 @@ int runCore(void)
 
     logFdd(LOG_INFO, "CosmosEx FDD core starting at port %d", SERVER_TCP_PORT_FDD);
     printf("\nCosmosEx FDD core starting at port %d\n", SERVER_TCP_PORT_FDD);
-    printf("\nlog file: %s\n", Debug::getCoreLogFileName(false));
+    printf("\nlog file: %s\n", Debug::getCoreLogFileName(false, LOGFILE_FDD));
 
     Utils::setTimezoneVariable_inThisContext();
 

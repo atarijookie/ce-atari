@@ -256,6 +256,7 @@ void ChipInterfaceNetwork::getFWversion(int clientIndex)
 
 void ChipInterfaceNetwork::fdd_sendTrackToChip(int& fdClient, int byteCount, uint8_t *encodedTrack)
 {
+    // logFdd(LOG_DEBUG, "fdd_sendTrackToChip -- byteCount: %d", byteCount);
     sendHeaderAndDataToChip(fdClient, ATN_SEND_TRACK, encodedTrack, byteCount);
 }
 
@@ -272,6 +273,7 @@ void ChipInterfaceNetwork::fdd_sendImageParamsToChip(int& fdClient, bool finishe
     int fnameLen = MIN(fileName.length(), 31);
     memcpy(bfr + 4, fileName.c_str(), fnameLen);    // filename, max 31 chars + zero terminator
 
+    logFdd(LOG_DEBUG, "fdd_sendImageParamsToChip -- finished: %d, tracks: %d, sides: %d, spt: %d, filename: %s", bfr[0], bfr[1], bfr[2], bfr[3], bfr + 4);
     sendHeaderAndDataToChip(fdClient, ATN_SEND_WHOLE_IMAGE, bfr, 4 + 32);   // 4 bytes param, 32 bytes filename
 }
 
@@ -359,7 +361,7 @@ bool ChipInterfaceNetwork::sendHeaderToChip(int& fdClient, uint16_t cmdCode, uin
     uint8_t head[10];
     storeHeaderToBuffer(cmdCode, futureDatalen, head);
 
-    int res = write(fdClient, head, 10);        // send header
+    int res = send(fdClient, head, 10, MSG_NOSIGNAL);        // send header
     return (res == 10);
 }
 
@@ -369,7 +371,7 @@ bool ChipInterfaceNetwork::sendDataToChip(int& fdClient, uint8_t* data, uint32_t
         return false;
     }
 
-    int res = write(fdClient, data, len);   // send data
+    int res = send(fdClient, data, len, MSG_NOSIGNAL);   // send data
     return (((uint32_t)res) == len);
 }
 
@@ -377,7 +379,7 @@ bool ChipInterfaceNetwork::sendHeaderAndDataToChip(int& fdClient, uint16_t cmdCo
 {
     bool good;
 
-    if(len > 512)       // for larger data send using separate write() commands
+    if(len > 512)       // for larger data send using separate send() commands
     {
         if(!sendHeaderToChip(fdClient, cmdCode, len))
         {
@@ -386,9 +388,9 @@ bool ChipInterfaceNetwork::sendHeaderAndDataToChip(int& fdClient, uint16_t cmdCo
         }
 
         good = sendDataToChip(fdClient, data, len);
-        logFdd(LOG_DEBUG, "sendHeaderAndDataToChip - good: %d", good);
+        // logFdd(LOG_DEBUG, "sendHeaderAndDataToChip - good: %d", good);
     } 
-    else                // for small data first copy data into buffers, then send with one write() command
+    else                // for small data first copy data into buffers, then send with one send() command
     {
         if(fdClient < 0) {                      // no client socket? quit
             return false;
@@ -398,7 +400,7 @@ bool ChipInterfaceNetwork::sendHeaderAndDataToChip(int& fdClient, uint16_t cmdCo
         storeHeaderToBuffer(cmdCode, len, bfr);     // store header at start
         memcpy(bfr + 10, data, len);                // copy data after the header
 
-        int res = write(fdClient, bfr, len + 10);   // send header and data
+        int res = send(fdClient, bfr, len + 10, MSG_NOSIGNAL);   // send header and data
         good = (res == ((int) (len + 10)));
     }
 
@@ -499,6 +501,7 @@ int ChipInterfaceNetwork::clientsGetFloppySlotIndexForIp(uint32_t ipAddr)
     // check if this ip is already using some slot and build usedSlots bits
     for(int i=0; i<MAX_CLIENTS; i++) {
         if(clients[i].ipAddr == ipAddr) {   // if this slot is already using this ipAddress, return the floppy slot
+            logFdd(LOG_INFO, "clientsGetFloppySlotIndexForIp - found IP in table, will reuse floppySlotIndex: %d", clients[i].floppySlotIndex);
             return clients[i].floppySlotIndex;
         }
 
@@ -510,11 +513,13 @@ int ChipInterfaceNetwork::clientsGetFloppySlotIndexForIp(uint32_t ipAddr)
     // find a floppy slot that is not used
     for(int i=0; i<MAX_CLIENTS; i++) {
         if((usedSlots & (1 << i)) == 0) {       // floppy slot i not used, return it
+            logFdd(LOG_INFO, "clientsGetFloppySlotIndexForIp - IP not found in table, start using floppySlotIndex: %d", i);
             return i;
         }
     }
 
     // no empty floppy slot found
+    logFdd(LOG_ERROR, "clientsGetFloppySlotIndexForIp - no empty slot found, will return: %d", FD_EMPTY);
     return FD_EMPTY;
 }
 
@@ -522,8 +527,8 @@ void ChipInterfaceNetwork::clientsStoreOne(ClientInfo* info, int newSock, uint32
 {
     info->fdClient = newSock;
     info->lastMs = Utils::getCurrentMs();
-    info->ipAddr = ipAddr;
     info->floppySlotIndex = clientsGetFloppySlotIndexForIp(ipAddr);
+    info->ipAddr = ipAddr;  // store ip after calling clientsGetFloppySlotIndexForIp() so it won't match this same client for the 1st time
 }
 
 void ChipInterfaceNetwork::clientsDisconnectInactive(void)

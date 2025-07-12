@@ -22,7 +22,6 @@ typedef struct
     int slotNo;                     // slot number of this slot (used for debugging)
 
     std::string     imageFile;      // just file name:                     bla.st
-    std::string     imageFileNoExt; // file name without extension:        bla
     std::string     hostPath;       // for translated disk, host path:     /mnt/sda/gamez/bla.st
                                     // or where uploaded disk where is stored: /tmp/bla.st
 

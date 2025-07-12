@@ -311,6 +311,7 @@ void connectToHost(void)
         prevConnected = connected;
 
         if(connected) {     // now in connected state, display state on display
+            imageState = IMAGE_NOT_LOADED;
             showRunningStateOnDisplay();
         }
     }
@@ -394,8 +395,15 @@ void handleTrackReceived(void)
     int len = lenData;
     uint8_t* pBfr = tmpTrackBfr;        // read into temp track buffer
 
+    uint32_t start = millis();
     while(len > 0)
     {
+        uint32_t now = millis();
+        if((now - start) > 2000) {
+            Serial.println("handleTrackReceived TIMEOUT!");
+            return;
+        }
+
         int readLen = clientFdd.read(pBfr, len);    // read data
     
         if(readLen > 0)     // something was read? decrease size of what we need to read, advance in buffer
@@ -406,7 +414,7 @@ void handleTrackReceived(void)
     }
 
     // read track # and side # from bfr
-    int trackNo = MIN(tmpTrackBfr[0], MAX_TRACKS);
+    int trackNo = MIN(tmpTrackBfr[0], MAX_TRACKS - 1);
     int sideNo = MIN(tmpTrackBfr[1], 1);
 
     // store the track and side into struct and copy in the data from temp buffer
@@ -414,8 +422,13 @@ void handleTrackReceived(void)
     tracks[index].loaded = true;
     tracks[index].track = trackNo;
     tracks[index].side = sideNo;
-    
+
     memcpy(tracks[index].data, tmpTrackBfr + 2, lenData - 2);
+
+    Serial.print("handleTrackReceived ");
+    Serial.print(trackNo);
+    Serial.print(" side ");
+    Serial.println(sideNo);
 }
 
 void handleImageReceived(void)
@@ -439,6 +452,15 @@ void handleImageReceived(void)
 
     memset(imageFileName, 0, 32);
     strncpy(imageFileName, (const char*) (tmpTrackBfr + 4), 31);        // store file name, up to 31 chars
+
+    Serial.print("handleImageReceived ");
+    Serial.print((tmpTrackBfr[0] == 1) ? "END" : "START");
+    Serial.print(", imgTracks: ");
+    Serial.print(imgTracks);
+    Serial.print(", imgSides: ");
+    Serial.print(imgSides);
+    Serial.print(", imageFileName: ");
+    Serial.println(imageFileName);
 }
 
 void handleIncommingData(void)

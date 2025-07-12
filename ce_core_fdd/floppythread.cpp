@@ -236,6 +236,7 @@ void FloppyThread::handleSendImage(int clientIndex)
     // send all the tracks from all the sides
     for(int side=0; side<imgSides; side++) {
         for(int track=0; track<imgTracks; track++) {
+            // logFdd(LOG_DEBUG, "handleSendImage -- sending track %d, side %d, countInTrack: %d", track, side, countInTrack);
             encodedTrack = shared.imageSilo->getEncodedTrack(client->floppySlotIndex, track, side, countInTrack);
             countInTrack = MIN(countInTrack, MFM_STREAM_SIZE);
             chipInterface->fdd_sendTrackToChip(client->fdClient, countInTrack, encodedTrack);
