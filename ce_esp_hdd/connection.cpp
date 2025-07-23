@@ -41,6 +41,8 @@ extern volatile bool ikbdEnabled;   // if true, should send data to host; otherw
 
 THeader hddHeader;      // keep the header global to preserve syncTag between calls
 
+void storeMacAddress(void);
+
 void showRunningStateOnDisplay(void)
 {
     char msg1[128];
@@ -121,6 +123,8 @@ void connectToWifi(void)
     // not connected to wifi yet, try to connect
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid.c_str(), password.c_str());
+
+    storeMacAddress();      // copy wifi mac address to fw report buffer
 }
 
 // Send broadcast to find any CE server on the network.

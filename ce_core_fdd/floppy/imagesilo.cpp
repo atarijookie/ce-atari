@@ -17,6 +17,7 @@
 
 extern pthread_mutex_t floppyEncoderMutex;
 extern pthread_cond_t  floppyEncoderShouldWork;
+extern ChipInterfaceNetwork* chipInterface;
 
 extern SiloSlot slots[SLOT_COUNT];
 //-------------------------------
@@ -102,15 +103,7 @@ void ImageSilo::loadSettings(void)
         const char *img = s.getString(key, "");     // try to read the value
         std::string pathAndFile = img;
 
-        if(pathAndFile.empty()) {                   // nothing stored? skip it
-            // TODO: add() empty image
-            continue;
-        }
-
-        std::string path, file;
-        Utils::splitFilenameFromPath(pathAndFile, path, file);
-        logFdd(LOG_DEBUG, "ImageSilo::loadSettings -- slot: %d, pathAndFile: %s, file: %s", slot, pathAndFile.c_str(), file.c_str());
-        add(slot, file, pathAndFile);        // add this image
+        loadImageToSlot(slot, pathAndFile.c_str());
     }
 }
 
@@ -119,11 +112,70 @@ void ImageSilo::saveSettings(void)
 
 }
 
+void ImageSilo::saveImageFilepathToSlot(int slotNo, const char* pathAndFile)
+{
+    if(slotNo < 0 || slotNo >= SLOT_COUNT) {
+        logFdd(LOG_WARNING, "ImageSilo::saveImageFilepathToSlot -- slotNo: %d invalid", slotNo);
+        return;
+    }
+
+    Settings s;
+
+    char key[32];
+    sprintf(key, "FLOPPY_IMAGE_%d", slotNo);      // create settings key
+
+    s.setString(key, pathAndFile);     // store the value
+    logFdd(LOG_DEBUG, "ImageSilo::saveImageFilepathToSlot -- slotNo: %d, file: %s", slotNo, pathAndFile);
+}
+
+void ImageSilo::saveImageFilepathToClient(int slotNo, const char* pathAndFile)
+{
+    if(slotNo < 0 || slotNo >= SLOT_COUNT) {
+        logFdd(LOG_WARNING, "ImageSilo::saveImageFilepathToSlot -- slotNo: %d invalid", slotNo);
+        return;
+    }
+
+    ClientInfo* client = chipInterface->clientsGetOneByFloppySlot(slotNo);
+    if(!client) {
+        logFdd(LOG_WARNING, "ImageSilo::saveImageFilepathToClient -- slotNo: %d - no client found", slotNo);
+        return;
+    }
+
+    Settings s;
+    s.setPrefix(client->mac, 6);                // mac as prefix to settings
+    s.setString("FLOPPY_IMAGE", pathAndFile);   // store the value
+
+    logFdd(LOG_DEBUG, "ImageSilo::saveImageFilepathToClient -- slotNo: %d, file: %s", slotNo, pathAndFile);
+}
+
+void ImageSilo::loadImageToSlot(int slotNo, const char* pPathAndFile)
+{
+    if(slotNo < 0 || slotNo >= SLOT_COUNT) {
+        logFdd(LOG_WARNING, "ImageSilo::loadImageToSlot -- slotNo: %d invalid", slotNo);
+        return;
+    }
+
+    std::string pathAndFile = pPathAndFile;
+
+    if(pathAndFile.empty()) {                   // nothing stored? skip it
+        logFdd(LOG_DEBUG, "ImageSilo::loadSettings -- slotNo: %d, pathAndFile: %s - empty!", slotNo, pathAndFile.c_str());
+        // TODO: add() empty image
+        return;
+    }
+
+    std::string path, file;
+    Utils::splitFilenameFromPath(pathAndFile, path, file);
+    logFdd(LOG_DEBUG, "ImageSilo::loadSettings -- slotNo: %d, pathAndFile: %s, file: %s", slotNo, pathAndFile.c_str(), file.c_str());
+    add(slotNo, file, pathAndFile);        // add this image
+}
+
 void ImageSilo::add(int positionIndex, std::string &filename, std::string &hostPath)
 {
     if(positionIndex < 0 || positionIndex >= SLOT_COUNT) {
         return;
     }
+
+    saveImageFilepathToClient(positionIndex, hostPath.c_str()); // for this client's mac store image file path
 
     logFdd(LOG_DEBUG, "ImageSilo::add() -- positionIndex: %d, filename: %s, hostPath: %s", positionIndex, filename.c_str(), hostPath.c_str());
 

@@ -58,6 +58,10 @@ public:
 
     bool createNewImage(std::string pathAndFile);
 
+    void saveImageFilepathToSlot(int slotNo, const char* pathAndFile);
+    void saveImageFilepathToClient(int slotNo, const char* pathAndFile);
+    void loadImageToSlot(int slotNo, const char* pPathAndFile);
+
 private:
     void clearSlot(int index);
 

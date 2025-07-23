@@ -69,7 +69,7 @@
 #define ATN_VARIABLE_LEN                0xffff
 
 #define TX_HEADER_SIZE                  10
-#define ATN_SENDFWVERSION_LEN_TX        (TX_HEADER_SIZE + 10)
+#define ATN_SENDFWVERSION_LEN_TX        (TX_HEADER_SIZE + 12)
 #define ATN_SENDACSICOMMAND_LEN_TX      (TX_HEADER_SIZE + 14)
 
 ///////////////////////////

@@ -15,6 +15,8 @@ extern TFlags       flags;
 
 Settings::Settings(void)
 {
+    setPrefix(NULL, 0);
+
     std::string settingsDir = Utils::dotEnvValue("SETTINGS_DIR", "./settings"); // path to settings dir
     int res = mkdir(settingsDir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);      // mod: 0x775
 
@@ -26,6 +28,16 @@ Settings::Settings(void)
         if(errno != EEXIST) {       // and it's not because it already exists...
             logFdd(LOG_ERROR, "Settings: failed to create settings directory %s - %s", settingsDir.c_str(), strerror(errno));
         }
+    }
+}
+
+void Settings::setPrefix(uint8_t* bytes, int len)
+{
+    if(bytes != NULL && len > 0) {      // got pointer and length, store prefix as string
+        binToHex(bytes, len, prefix);
+        strcat(prefix, "_");
+    } else {        // no pointer or length, clear prefix
+        memset(prefix, 0, 32);
     }
 }
 
@@ -276,7 +288,9 @@ void Settings::saveFloppyConfig(FloppyConfig *fc)
 FILE *Settings::sOpen(const char *key, bool readNotWrite)
 {
     std::string settingsDir = Utils::dotEnvValue("SETTINGS_DIR", "./settings"); // path to settings dir
-    std::string path = Utils::mergeHostPaths3(settingsDir, key);
+
+    std::string keyWithPrefix = prefix[0] ? (std::string(prefix) + std::string(key)) : std::string(key);
+    std::string path = Utils::mergeHostPaths2(settingsDir, keyWithPrefix);
 
     FILE *file;
 

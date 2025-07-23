@@ -29,6 +29,8 @@ public:
     Settings(void);
     virtual ~Settings(void) { };
 
+    void setPrefix(uint8_t* bytes, int len);
+
     bool getBool(const char *key, bool defValue);
     void setBool(const char *key, bool value);
 
@@ -53,6 +55,7 @@ public:
     static void binToHex(uint8_t *inBfr, int len, char *outBfr);
 
 private:
+    char prefix[32];
 
     FILE *sOpen(const char *key, bool readNotWrite);
 

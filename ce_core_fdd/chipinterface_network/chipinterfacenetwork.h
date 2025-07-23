@@ -37,6 +37,7 @@
 typedef struct {
     int         fdClient;           // tcp socket fd
     uint32_t    ipAddr;             // client's IP addr
+    uint8_t     mac[6];             // client's mac addr
     int         floppySlotIndex;    // which floppy slot this IP is using
     uint32_t    lastMs;             // value of getCurrentMs() when was last time anything was received from this client
     
@@ -48,8 +49,8 @@ class FloppyThread;
 class ChipInterfaceNetwork
 {
 public:
-ChipInterfaceNetwork();
-virtual ~ChipInterfaceNetwork();
+    ChipInterfaceNetwork(int whichLogFile);
+    virtual ~ChipInterfaceNetwork();
 
     //----------------
     // chip interface initialization and deinitialization - e.g. open GPIO, or open socket, ...
@@ -63,7 +64,7 @@ virtual ~ChipInterfaceNetwork();
     bool actionNeeded(int clientIndex, uint8_t *inBuf);
 
     // to handle FW version, first call setHDDconfig() to fill config into bufOut, then call getFWversion to get the FW version from chip
-    void getFWversion(int clientIndex);
+    bool getFWversion(int clientIndex);
 
     //----------------
     // FDD: all you need for handling the floppy interface
@@ -75,7 +76,8 @@ virtual ~ChipInterfaceNetwork();
 
     // the following ones are called from FloppyThread
     void clientsDisconnectInactive(void);
-    ClientInfo* clientsGetOne(int clientIndex);
+    ClientInfo* clientsGetOne(int clientIndex);                     // get by client index
+    ClientInfo* clientsGetOneByFloppySlot(int floppySlotIndex);     // get by floppy slot
     int readRestOfData(int clientIndex, uint8_t* buffer, uint32_t bufferSize);
 
     int setAllClientFds(fd_set* readfds);
@@ -83,6 +85,8 @@ virtual ~ChipInterfaceNetwork();
     void acceptSocketIfNeededAndPossible(void);
 
 private:
+    int whichLog;
+
     int fdListen;                       // socket for listen()
     ClientInfo clients[MAX_CLIENTS];
 

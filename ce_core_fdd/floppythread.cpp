@@ -170,10 +170,30 @@ void FloppyThread::loadSettings(void)
     logFdd(LOG_DEBUG, "FloppyThread::loadSettings");
 }
 
+void FloppyThread::loadLastImageIntoSlot(int clientIndex)
+{
+    ClientInfo* client = chipInterface->clientsGetOne(clientIndex);
+    if(!client) {
+        return;
+    }
+
+    Settings s;
+    s.setPrefix(client->mac, 6);                        // mac as prefix to settings
+    const char *pPathAndFile = s.getString("FLOPPY_IMAGE", "");  // try to read the value
+    std::string pathAndFile = pPathAndFile;
+
+    shared.imageSilo->saveImageFilepathToSlot(client->floppySlotIndex, pathAndFile.c_str());
+    shared.imageSilo->loadImageToSlot(client->floppySlotIndex, pathAndFile.c_str());
+}
+
 void FloppyThread::handleFwVersion_franz(int clientIndex)
 {
     // chipInterface->setFDDconfig(setFloppyConfig, &floppyConfig, setDiskChanged, diskChanged);
-    chipInterface->getFWversion(clientIndex);
+    bool macChanged = chipInterface->getFWversion(clientIndex);
+
+    if(macChanged) {
+        loadLastImageIntoSlot(clientIndex);
+    }
 }
 
 void FloppyThread::handleSendTrack(int clientIndex)

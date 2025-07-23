@@ -36,6 +36,8 @@ private:
     void handleSendImage(int clientIndex);
     void handleSectorWritten(int clientIndex);
 
+    void loadLastImageIntoSlot(int clientIndex);
+
     //----------------------------------
     // recovery stuff
     void insertSpecialFloppyImage(int specialImageId);

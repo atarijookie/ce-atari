@@ -249,7 +249,7 @@ bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, 
     setRawWordAtIndex(0, STREAM_TABLE_OFFSET + bytesInBfr);     // stream table - index 0: stream size in bytes (include those extra 5 empty WORDs on start in Franz)
 
     //-----
-    pthread_mutex_lock(&floppyEncoderMutex);      // unlock the mutex
+    pthread_mutex_lock(&floppyEncoderMutex);      // lock the mutex
 
     if(tracks[index].encodeRequestTime <= tracks[index].encodeActionTime) {  // if there wasn't any request since we started to encode this track, it's ready (otherwise needs reencoding)
         tracks[index].isReady = true;               // track is now ready to be streamed

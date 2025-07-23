@@ -104,6 +104,16 @@ void setupAtnBuffers(void)
     atnSendFwVersion[TX_HEADER_SIZE + 5] = 0x41;                    // v.4, ACSI
 }
 
+void storeMacAddress(void)
+{
+    WiFi.STA.macAddress(atnSendFwVersion + TX_HEADER_SIZE + 6);
+
+    char msg[128];
+    sprintf(msg, "mac: %02X:%02X:%02X:%02X:%02X:%02X", atnSendFwVersion[TX_HEADER_SIZE + 6], atnSendFwVersion[TX_HEADER_SIZE + 7], atnSendFwVersion[TX_HEADER_SIZE + 8], 
+                                                       atnSendFwVersion[TX_HEADER_SIZE + 9], atnSendFwVersion[TX_HEADER_SIZE + 10], atnSendFwVersion[TX_HEADER_SIZE + 11]);
+    Serial.println(msg);
+}
+
 void loop(void)
 {
     uint32_t lastSendFwTime = millis();
