@@ -80,7 +80,6 @@
 #define PIN_INDEX           11
 #define PIN_TRACK00         12
 #define PIN_WPROTECT        13
-#define PIN_RDATA           14
 #define PIN_DSKCHG          21
 #define PIN_FLCC_OE         47
 

@@ -38,7 +38,8 @@ SingleTrack tracks[2 * MAX_TRACKS];
 int imageState = IMAGE_NOT_LOADED;
 uint8_t imgTracks, imgSides, imgSectorsPerTrack;
 char imageFileName[32];
-bool diskChanged;
+bool diskChanged = false;
+uint32_t diskChangeEnd;
 uint32_t dataIndexInTrack = STREAM_START_OFFSET;
 
 uint8_t singleTrackData[READTRACKDATA_SIZE_BYTES];      // TODO: remove this once the tracks.data is properly allocated from PSRAM
@@ -97,23 +98,17 @@ void setup(void)
         pinMode(inputs[i], INPUT);
     }
 
-    pinMode(PIN_BOOT_BTN, INPUT_PULLUP);
+    pinMode(PIN_BOOT_BTN, INPUT_PULLUP);    // boot pin needs pullup enabled
 
-    #define OUTPUTS_COUNT 9
-    int outputs[OUTPUTS_COUNT] = {PIN_SCL, PIN_DENSITY, PIN_INDEX, PIN_TRACK00, PIN_WPROTECT, PIN_RDATA, PIN_DSKCHG, PIN_FLCC_OE, PIN_CS};
+    #define OUTPUTS_COUNT 8
+    int outputs[OUTPUTS_COUNT] = {PIN_SCL, PIN_DENSITY, PIN_INDEX, PIN_TRACK00, PIN_WPROTECT, PIN_DSKCHG, PIN_FLCC_OE, PIN_CS};
+    int levels[OUTPUTS_COUNT]  = {    LOW,         LOW,       LOW,         LOW,         HIGH,        LOW,        HIGH,   HIGH};
 
     for (int i = 0; i < OUTPUTS_COUNT; i++)
     {
         pinMode(outputs[i], OUTPUT);
+        digitalWrite(outputs[i], levels[i]);
     }
-
-    BIT_SET(PIN_CS);            // CS to H to deselect SPI slave
-
-    // init floppy signals
-    BIT_CLR(PIN_TRACK00);
-    BIT_CLR(PIN_DSKCHG);
-    BIT_SET1(PIN_FLCC_OE);       // disable output
-    BIT_SET(PIN_WPROTECT);
 
     uint32_t psramSize = ESP.getPsramSize();
     Serial.print("Found PSRAM: ");
@@ -280,9 +275,26 @@ void refillMfmStreamer(void)
     }
 }
 
+void BIT_INVERT(int pin)
+{
+    if(BIT_IS_H(pin)) {
+        BIT_CLR(pin);
+    } else {
+        BIT_SET(pin);
+    }
+}
+
+uint32_t lastSendFwTime;
+
+void sendFwReport(uint32_t now)
+{
+    lastSendFwTime = now;
+    sendHeaderAndDataToHost(atnSendFwVersion, ATN_SENDFWVERSION_LEN_TX - TX_HEADER_SIZE);
+}
+
 void loop(void)
 {
-    uint32_t lastSendFwTime = millis();
+    lastSendFwTime = millis();
 
     uint8_t indexCount = 0;
     uint32_t timeTrackStart = millis();
@@ -302,13 +314,17 @@ void loop(void)
         uint32_t now = millis();
         if (connected && (now - lastSendFwTime) >= 1000)
         {
-            lastSendFwTime = now;
-            sendHeaderAndDataToHost(atnSendFwVersion, ATN_SENDFWVERSION_LEN_TX - TX_HEADER_SIZE);
+            sendFwReport(now);
         }
 
         // request whole image if no image loaded
         if(connected && imageState == IMAGE_NOT_LOADED)
         {
+            // before requesting the whole image, send fw report, so the host will get mac address, 
+            // which he will use to identify this device
+            sendFwReport(now);
+
+            // now do the image request
             imageState = IMAGE_REQUESTED;
             requestWholeImage();
         }
@@ -325,6 +341,28 @@ void loop(void)
         // if the mfm streamer needs more data
         if(digitalRead(PIN_MFM_RXE) == HIGH) {
             refillMfmStreamer();
+        }
+
+        // when disk change happened
+        if(diskChanged) {
+            diskChanged = false;        // no change anymore
+
+            BIT_INVERT(PIN_DENSITY);    // invert pins
+            BIT_INVERT(PIN_WPROTECT);
+            BIT_INVERT(PIN_DSKCHG);
+
+            diskChangeEnd = now + 1000; // at this upcomming time invert back
+            // Serial.println("DSK CHG start");
+        }
+
+        // after enough time passed since the disk change, need to invert pins back
+        if(diskChangeEnd != 0 && (now >= diskChangeEnd)) {
+            diskChangeEnd = 0;          // set this var to zero, so we don't do this until next disk change
+
+            BIT_INVERT(PIN_DENSITY);    // invert pins
+            BIT_INVERT(PIN_WPROTECT);
+            BIT_INVERT(PIN_DSKCHG);
+            // Serial.println("DSK CHG end");
         }
 
         // // can send this write buffer?
