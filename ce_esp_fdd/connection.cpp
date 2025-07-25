@@ -47,14 +47,12 @@ void showRunningStateOnDisplay(void)
     sprintf(msg1, "ssid: %s", ssid.c_str());
 
     char msg2[64];
-    sprintf(msg2, "host: %s", hostIpString.c_str());
+    sprintf(msg2, "host: %s %c", hostIpString.c_str(), ikbdEnabled ? 'I' : ' ');
 
-    String msg3 = "devs: ";
-    if(ikbdEnabled) {       // if ikbd is enabled
-        msg3 += "IKBD";
-    }
+    char msg3[64];
+    sprintf(msg3, "image: %s", imageFileName);
 
-    displayMessage(msg1, msg2, msg3.c_str());
+    displayMessage(msg1, msg2, msg3);
 }
 
 // Read wifi settings, connect to wifi if not connected, don't try too often.
@@ -390,6 +388,30 @@ bool getIncommingHeader(NetworkClient* client, uint32_t expectedSyncTag, THeader
     return false;       // no valid header
 }
 
+int receivedTracks = 0;
+
+void showImageLoadProgress(void)
+{
+    static uint32_t lastDisplay = 0;
+
+    uint32_t now = millis();
+    if(now - lastDisplay < 200) {       // too soon after last display? quit
+        return;
+    }
+    lastDisplay = now;
+
+    uint32_t totalTracks = MAX(imgTracks * imgSides, 1);
+    uint32_t percent = (receivedTracks * 100) / totalTracks;    // calc progress in percents
+
+    char progress[32];
+    memset(progress, 0, 32);
+    for(int i=0; i<20; i++) {
+        progress[i] = (percent > (i * 5)) ? '*' : ' ';
+    }
+
+    displayMessage("Loading image", imageFileName, progress);  // show on display
+}
+
 uint8_t tmpTrackBfr[READTRACKDATA_SIZE_BYTES];
 
 void handleTrackReceived(void)
@@ -433,6 +455,12 @@ void handleTrackReceived(void)
     Serial.print(trackNo);
     Serial.print(" side ");
     Serial.println(sideNo);
+
+    receivedTracks++;
+
+    if(imageState == IMAGE_REQUESTED) {
+        showImageLoadProgress();
+    }
 }
 
 void handleImageReceived(void)
@@ -444,9 +472,11 @@ void handleImageReceived(void)
     {
         diskChanged = true;
         imageState = IMAGE_LOADED;
+        showRunningStateOnDisplay();
     }
     else                // image receiving started?
     {
+        receivedTracks = 0;
         imageState = IMAGE_REQUESTED;
     }
 

@@ -178,13 +178,18 @@ void requestWholeImage(void)
     sendHeaderAndDataToHost(atnSendWholeImageRequest, 0);
 }
 
+uint32_t timeTrackStart;
+
 void readTrackData_goToStart(void)
 {
-    dataIndexInTrack = STREAM_START_OFFSET;
+    dataIndexInTrack = STREAM_START_OFFSET;     // stream index to start
+    timeTrackStart = millis();                  // time of track start to now
 }
 
 void getMfmDataToBuffer(uint8_t* bfr, int len)
 {
+    static int prevTrackIndex = 255;
+
     // update SIDE var
     hwPosition.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1; // get the current SIDE
 
@@ -194,6 +199,12 @@ void getMfmDataToBuffer(uint8_t* bfr, int len)
 
     // find out from track and side vars which track we should stream, then in that track find the pointer to next position
     int trackIndex = trackNo * 2 + sideNo;                       // track + side create index into tracks array
+
+    if(prevTrackIndex != trackIndex) {      // track or side changed? restart stream
+        readTrackData_goToStart();
+    }
+    prevTrackIndex = trackIndex;
+
     uint8_t* pTrackData = &tracks[trackIndex].data[dataIndexInTrack];  // copy data from here
     uint8_t* pTrackDataEnd = &tracks[trackIndex].data[READTRACKDATA_SIZE_BYTES - 1];
 
@@ -295,9 +306,7 @@ void sendFwReport(uint32_t now)
 void loop(void)
 {
     lastSendFwTime = millis();
-
-    uint8_t indexCount = 0;
-    uint32_t timeTrackStart = millis();
+    timeTrackStart = millis();
 
     int WGatePrev = HIGH;
     sectorsWritten = 0;         // nothing written yet
@@ -404,16 +413,13 @@ void loop(void)
         now = millis();
         uint32_t timeSinceTrackStart = now - timeTrackStart;
 
-        if(timeSinceTrackStart < 5) {    // INDEX is L for time 0-4
-            BIT_CLR(PIN_INDEX);
-        } else {                         // INDEX is H for times 5-200
+        if(timeSinceTrackStart <= 195) {  // INDEX is H for time 0-195
             BIT_SET(PIN_INDEX);
+        } else {                         // INDEX is H for times 196-200
+            BIT_CLR(PIN_INDEX);
         }
 
         if(timeSinceTrackStart >= 200) {    // track finished
-            BIT_CLR(PIN_INDEX);             // INDEX to L
-            timeTrackStart = now;
-
             readTrackData_goToStart();      // move the pointer in the track stream to start
 
             // if(sectorsWritten > 0) {        // if some sectors were written to floppy, we need to get the new stream now

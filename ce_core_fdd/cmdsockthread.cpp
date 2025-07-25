@@ -66,7 +66,7 @@ int createRecvSocket(const char* dotEnvKey)
 void *cmdSockThreadCode(void *ptr)
 {
     logFdd(LOG_INFO, "Command Socket thread starting...");
-    int sock = createRecvSocket("CORE_SOCK_PATH");
+    int sock = createRecvSocket("CORE_FDD_SOCK_PATH");
 
     if(sock < 0) {              // without socket this thread has no use
         return 0;

@@ -94,15 +94,8 @@ uint8_t *ImageSilo::getEmptyTrack(void)
 
 void ImageSilo::loadSettings(void)
 {
-    Settings s;
-
-    char key[32];
     for(int slot=0; slot<SLOT_COUNT; slot++) {
-        sprintf(key, "FLOPPY_IMAGE_%d", slot);      // create settings key
-
-        const char *img = s.getString(key, "");     // try to read the value
-        std::string pathAndFile = img;
-
+        std::string pathAndFile = getImageFilePathFromSlotNo(slot);
         loadImageToSlot(slot, pathAndFile.c_str());
     }
 }
@@ -110,6 +103,24 @@ void ImageSilo::loadSettings(void)
 void ImageSilo::saveSettings(void)
 {
 
+}
+
+std::string ImageSilo::getImageFilePathFromSlotNo(int slotNo)
+{
+    std::string res;
+
+    if(slotNo < 0 || slotNo >= SLOT_COUNT) {
+        logFdd(LOG_WARNING, "ImageSilo::saveImageFilepathToSlot -- slotNo: %d invalid", slotNo);
+        return res;
+    }
+
+    Settings s;
+
+    char key[32];
+    sprintf(key, "FLOPPY_IMAGE_%d", slotNo);      // create settings key
+    res = s.getString(key, "");       // get the value
+
+    return res;
 }
 
 void ImageSilo::saveImageFilepathToSlot(int slotNo, const char* pathAndFile)

@@ -40,16 +40,23 @@ extern TFlags flags;
 
 void floppyEncoder_addEncodeWholeImageRequest(int slotNo, const char *imageFileName)
 {
-    logFdd(LOG_DEBUG, "floppyEncoder_addEncodeWholeImageRequest -- slotNo: %d, image: %s", slotNo, imageFileName);
-
     pthread_mutex_lock(&floppyEncoderMutex);    		// lock the mutex
 
     SiloSlot *slot = &slots[slotNo];            		// get pointer to the right slot
-    slot->openRequested = true;
-    slot->openRequestTime = Utils::getCurrentMs();		// mark time when we requested opening of file
-    slot->imageFileName = std::string(imageFileName);	// store image file name
+    std::string inImageFileName = imageFileName;
 
-    pthread_cond_signal(&floppyEncoderShouldWork);  	// wake up encoder
+    if(inImageFileName != slot->imageFileName) {        // slot has different image? load
+        logFdd(LOG_DEBUG, "floppyEncoder_addEncodeWholeImageRequest -- slotNo: %d, image: %s - image changed, loading", slotNo, imageFileName);
+
+        slot->openRequested = true;
+        slot->openRequestTime = Utils::getCurrentMs();	// mark time when we requested opening of file
+        slot->imageFileName = inImageFileName;	        // store image file name
+
+        pthread_cond_signal(&floppyEncoderShouldWork);  	// wake up encoder
+    } else {        // image not changed, don't load
+        logFdd(LOG_WARNING, "floppyEncoder_addEncodeWholeImageRequest -- slotNo: %d, image: %s - image not changed, ignoring", slotNo, imageFileName);
+    }
+
     pthread_mutex_unlock(&floppyEncoderMutex);      	// unlock the mutex
 }
 

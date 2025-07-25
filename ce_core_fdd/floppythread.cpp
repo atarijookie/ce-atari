@@ -182,7 +182,20 @@ void FloppyThread::loadLastImageIntoSlot(int clientIndex)
     const char *pPathAndFile = s.getString("FLOPPY_IMAGE", "");  // try to read the value
     std::string pathAndFile = pPathAndFile;
 
-    shared.imageSilo->saveImageFilepathToSlot(client->floppySlotIndex, pathAndFile.c_str());
+    if(!pathAndFile.empty()) {      // this specific device has file? store it also to slot #
+        logFdd(LOG_DEBUG, "FloppyThread::loadLastImageIntoSlot - have stored image for this specific device, saving to slot %d -> %s", client->floppySlotIndex, pathAndFile.c_str());
+        shared.imageSilo->saveImageFilepathToSlot(client->floppySlotIndex, pathAndFile.c_str());
+    } else {                        // no image file for this specific device? try to get it from the slot #
+        pathAndFile = shared.imageSilo->getImageFilePathFromSlotNo(client->floppySlotIndex);
+
+        if(!pathAndFile.empty()) {  // slot # had an image stored? store it for this specific device
+            logFdd(LOG_DEBUG, "FloppyThread::loadLastImageIntoSlot - no stored image for this specific device, but slot %d had image, so storing for specific device -> %s", client->floppySlotIndex, pathAndFile.c_str());
+            s.setString("FLOPPY_IMAGE", pathAndFile.c_str());
+        } else {
+            logFdd(LOG_DEBUG, "FloppyThread::loadLastImageIntoSlot - no stored image for this specific device and no stored image for slot %d, so no image to load", client->floppySlotIndex);
+        }
+    }
+
     shared.imageSilo->loadImageToSlot(client->floppySlotIndex, pathAndFile.c_str());
 }
 
