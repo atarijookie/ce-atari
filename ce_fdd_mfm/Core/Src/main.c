@@ -59,6 +59,8 @@
 /* Private variables ---------------------------------------------------------*/
 
 SPI_HandleTypeDef hspi1;
+DMA_HandleTypeDef hdma_spi1_rx;
+DMA_HandleTypeDef hdma_spi1_tx;
 
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim16;
@@ -70,8 +72,9 @@ TIM_HandleTypeDef htim16;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_SPI1_Init(void);
+static void MX_DMA_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_SPI1_Init(void);
 static void MX_TIM16_Init(void);
 /* USER CODE BEGIN PFP */
 
@@ -79,6 +82,8 @@ static void MX_TIM16_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+uint8_t* pWrite;
 
 void updateReadTimer(void)
 {
@@ -132,8 +137,10 @@ void updateWriteData(uint32_t captured)
 
     if(bits >= 8) {         // got 8 bits?
         // tx buffer not full? add streamByte to tx buffer
-        if(txCnt < BFR_SIZE) {
-            TX_PUT(streamByte);
+        if(txCnt < WRITEBUFFER_SIZE) {
+            *pWrite = streamByte;
+            pWrite++;
+            txCnt++;
         }
 
         // to avoid doing the whole read part, just assume that it takes on average
@@ -145,6 +152,134 @@ void updateWriteData(uint32_t captured)
         }
 
         bits = 0;           // don't have bits now
+    }
+}
+
+void setupSpiUsingCircularDma(void)
+{
+    CLEAR_BIT(SPI1->CR1, SPI_CR1_SPE);          // SPI disable
+    CLEAR_BIT(DMA1_Channel1->CCR, DMA_CCR_EN);  // DMA disable channel 1
+    CLEAR_BIT(DMA1_Channel2->CCR, DMA_CCR_EN);  // DMA disable channel 2
+
+    SET_BIT(SPI1->CR2, SPI_RXFIFO_THRESHOLD);   // Set RX FIFO threshold according the reception data length: 8bit
+
+    DMAMUX1_ChannelStatus->CFR = 0x1f;          // Clear the DMAMUX synchro overrun flag
+    DMAMUX1_RequestGenStatus->RGCFR = 0x0f;     // Clear the DMAMUX request generator overrun flag
+
+    //----
+    // DMA1 channel 1 - SPI RX
+    DMA1->IFCR = DMA_FLAG_GI1;                  // Clear all flags
+
+    DMA1_Channel1->CPAR = (uint32_t) &(SPI1->DR);   // peripheral address: SPI DR
+    DMA1_Channel1->CMAR = (uint32_t) rxData;        // memory address: rxData
+    DMA1_Channel1->CNDTR = BFR_SIZE;                // Configure DMA Channel data length
+    SET_BIT(DMA1_Channel1->CCR, (DMA_CCR_PL_1 | DMA_CCR_PL_0));         // channel 1 - high priority
+    SET_BIT(DMA1_Channel1->CCR, (DMA_IT_TC | DMA_IT_HT | DMA_IT_TE));   // enable interrupts for half-transfer and transfer complete
+    SET_BIT(DMA1_Channel1->CCR, (DMA_CCR_MINC | DMA_CCR_CIRC));         // enable memory increment, circular mode
+    CLEAR_BIT(DMA1_Channel1->CCR, (DMA_CCR_PINC | DMA_CCR_DIR));        // disable peripheral increment, direction: read from peripheral
+
+    //----
+    // DMA1 channel 2 - SPI TX
+    DMA1->IFCR = DMA_FLAG_GI2;                  // Clear all flags
+
+    DMA1_Channel2->CPAR = (uint32_t) &(SPI1->DR);   // peripheral address: SPI DR
+    DMA1_Channel2->CMAR = (uint32_t) txData;        // memory address: tx buffer
+    DMA1_Channel2->CNDTR = TX_DATA_SIZE;            // Configure DMA Channel data length
+    SET_BIT(DMA1_Channel2->CCR, DMA_CCR_PL_1); CLEAR_BIT(DMA1_Channel2->CCR, DMA_CCR_PL_0); // channel 2 - mid priority
+    SET_BIT(DMA1_Channel2->CCR, (DMA_IT_TC | DMA_IT_HT | DMA_IT_TE));   // enable interrupts for half-transfer and transfer complete
+    SET_BIT(DMA1_Channel2->CCR, (DMA_CCR_MINC | DMA_CCR_CIRC | DMA_CCR_DIR));   // enable memory increment, circular mode, direction: read from memory
+    CLEAR_BIT(DMA1_Channel2->CCR, DMA_CCR_PINC);        // disable peripheral increment
+
+    //----
+    SET_BIT(DMA1_Channel1->CCR, DMA_CCR_EN);    // DMA enable channel 1
+    SET_BIT(DMA1_Channel2->CCR, DMA_CCR_EN);    // DMA enable channel 2
+
+    SET_BIT(SPI1->CR1, SPI_CR1_SPE);            // SPI enable
+    SET_BIT(SPI1->CR2, SPI_CR2_RXDMAEN);        // enable DMA on SPI
+}
+
+void DMA1_Channel1_IRQHandler(void)
+{
+    uint32_t flag_it = DMA1->ISR;
+
+    // DMA channel 1
+    // Half Transfer Complete Interrupt management
+    if((flag_it & DMA_FLAG_HT1) != 0U)
+    {
+       DMA1->IFCR = DMA_FLAG_HT1;   // clear flag
+       rxCnt += BFR_SIZE_HALF;      // got half buffer of data now
+       UPDATE_PIN_RXE;
+    }
+
+    // Transfer Complete Interrupt management
+    if((flag_it & DMA_FLAG_TC1) != 0)
+    {
+        DMA1->IFCR = DMA_FLAG_TC1;  // clear flag
+        rxCnt += BFR_SIZE_HALF;     // got half buffer of data now
+        UPDATE_PIN_RXE;
+    }
+
+    // Transfer Error Interrupt management
+    if((flag_it & DMA_FLAG_TE1) != 0)
+    {
+        DMA1->IFCR = DMA_FLAG_TE1;
+    }
+}
+
+#define STATE_EMPTY         0       // buffer currently not used and is empty
+#define STATE_STORING       1       // write data is being stored here, but it's still incomplete, and doesn't have tags, so will be ignored by esp32
+#define STATE_WAIT_FOR_SEND 2       // all data stored, start and stop tags present, but waiting for DMA to send it via SPI
+#define STATE_SENDING       3       // DMA is currently sending this part of buffer
+
+volatile uint8_t bfrStateLow, bfrStateHigh;
+
+void DMA1_Channel2_3_IRQHandler(void)
+{
+    uint32_t flag_it = DMA1->ISR;
+
+    // DMA channel 2
+    // Half Transfer Complete Interrupt management
+    if((flag_it & DMA_FLAG_HT2) != 0U)
+    {
+       DMA1->IFCR = DMA_FLAG_HT2;   // clear flag
+
+       // If the high part was waiting to be sent, now it's being sent.
+       if(bfrStateHigh == STATE_WAIT_FOR_SEND) {
+           bfrStateHigh = STATE_SENDING;
+       }
+
+       // If the low part was sending, now it's sent.
+       // Mark lower part as sent/empty - first and last bytes are zeros now.
+       if(bfrStateLow == STATE_SENDING) {
+           bfrStateLow = STATE_EMPTY;
+           txData[0] = 0;
+           txData[WRITEBUFFER_SIZE - 1] = 0;
+       }
+    }
+
+    // Transfer Complete Interrupt management
+    if((flag_it & DMA_FLAG_TC2) != 0)
+    {
+        DMA1->IFCR = DMA_FLAG_TC2;  // clear flag
+
+        // If the low part was waiting to be sent, now it's being sent.
+        if(bfrStateLow == STATE_WAIT_FOR_SEND) {
+            bfrStateLow = STATE_SENDING;
+        }
+
+        // If the high part was sending, now it's sent.
+        // Mark higher part as sent/empty - first and last bytes are zeros now.
+        if(bfrStateHigh == STATE_SENDING) {
+            bfrStateHigh = STATE_EMPTY;
+            txData[WRITEBUFFER_SIZE] = 0;
+            txData[TX_DATA_SIZE - 1] = 0;
+        }
+    }
+
+    // Transfer Error Interrupt management
+    if((flag_it & DMA_FLAG_TE2) != 0)
+    {
+        DMA1->IFCR = DMA_FLAG_TE2;
     }
 }
 
@@ -178,19 +313,26 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_SPI1_Init();
+  MX_DMA_Init();
   MX_TIM3_Init();
+  MX_SPI1_Init();
   MX_TIM16_Init();
   /* USER CODE BEGIN 2 */
 
-  TX_CLEAR();
+  bfrStateLow = STATE_EMPTY;
+  bfrStateHigh = STATE_EMPTY;
+
+  setupSpiUsingCircularDma();
+
+//  TX_CLEAR();
   RX_CLEAR();
 
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim16, TIM_CHANNEL_1);
 
-  SET_BIT(SPI1->CR1, SPI_CR1_SPE);
+//  SET_BIT(SPI1->CR1, SPI_CR1_SPE);
 
+  pWrite = &txData[0];
   UPDATE_PIN_RXE;       // set RXE pin because we're empty
 
   uint8_t writingPrev = (GPIOA->IDR & PIN_WGATE) == 0;      // track WGATE changes with this var, init to current WGATE state
@@ -199,17 +341,52 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+
   while (1)
   {
     uint8_t writingNow = (GPIOA->IDR & PIN_WGATE) == 0;     // true if now writing data (0.3 us)
 
-    // when the WGATE signal changes, we need to mark start or stop of data with a special tag
+    // when the WGATE signal changes, we need to
+    // - on START of write - get pointer to empty buffer
+    // - on END of write - just mark the buffer as used and valid
     if(writingPrev != writingNow)   // when WGATE signal changed
     {
         writingPrev = writingNow;
 
-        if(txCnt < BFR_SIZE) {      // if have space in buffer, store start or end tag
-            TX_PUT( writingNow ? TAG_WRITE_START : TAG_WRITE_END );
+//        if(txCnt < BFR_SIZE) {      // if have space in buffer, store start or end tag
+//            TX_PUT( writingNow ? TAG_WRITE_START : TAG_WRITE_END );
+//        }
+
+        // on write START - see which part of buffer is empty - lower part or upper part?
+        // Initialize pointer and count to the free empty part of tx buffer.
+        if(writingNow) {
+            if(bfrStateLow == STATE_EMPTY) {              // lower part empty?
+                bfrStateLow = STATE_STORING;
+                pWrite = &txData[1];
+                txCnt = 0;
+            } else if(bfrStateHigh == STATE_EMPTY) {      // upper part empty?
+                bfrStateHigh = STATE_STORING;
+                pWrite = &txData[WRITEBUFFER_SIZE + 1];
+                txCnt = 0;
+            }
+        }
+
+        // on write END - mark start and end of this buffer with known tags, this
+        // marks the buffer used and esp will know that the valid data is between these tags.
+        else {
+            // write was storing data to lower part of buffer?
+            if(bfrStateLow == STATE_STORING) {
+                bfrStateLow = STATE_WAIT_FOR_SEND;
+                txData[0] = TAG_WRITE_START;
+                txData[WRITEBUFFER_SIZE - 1] = TAG_WRITE_END;
+            }
+
+            // write was storing data to upper part of buffer?
+            if(bfrStateHigh == STATE_STORING) {
+                bfrStateHigh = STATE_WAIT_FOR_SEND;
+                txData[WRITEBUFFER_SIZE] = TAG_WRITE_START;
+                txData[TX_DATA_SIZE - 1] = TAG_WRITE_END;
+            }
         }
     }
 
@@ -240,29 +417,29 @@ int main(void)
         }
     }
 
-    // RXNE? read data, place it in RX buffer if have space
-    /*                              o0            o2
-     * just checking SPI1->SR                     0.29 us
-     * storing value to FIFO                      1.25 us
-     * happens in 8 us intervals or more
-     */
-    if(SPI1->SR & SPI_SR_RXNE) {
-        uint8_t data = SPI1->DR;
-        if(rxCnt < BFR_SIZE) {
-            RX_PUT(data);
-            UPDATE_PIN_RXE;     // after adding byte to RX buffer, update RXE flag
-        }
-    }
+//    // RXNE? read data, place it in RX buffer if have space
+//    /*                              o0            o2
+//     * just checking SPI1->SR                     0.29 us
+//     * storing value to FIFO                      1.25 us
+//     * happens in 8 us intervals or more
+//     */
+//    if(SPI1->SR & SPI_SR_RXNE) {
+//        uint8_t data = SPI1->DR;
+//        if(rxCnt < BFR_SIZE) {
+//            RX_PUT(data);
+//            UPDATE_PIN_RXE;     // after adding byte to RX buffer, update RXE flag
+//        }
+//    }
 
-    // TXE? if have TX data in TX buffer, place it in DR
-    /*                              o0            o2
-     * just checking SPI1->SR                     0.35 us
-     * getting value from FIFO                    0.89 us
-     * happens in 8 us intervals or more
-     */
-    if(SPI1->SR & SPI_SR_TXE) {
-        SPI1->DR = (txCnt > 0) ? TX_GET() : 0;
-    }
+//    // TXE? if have TX data in TX buffer, place it in DR
+//    /*                              o0            o2
+//     * just checking SPI1->SR                     0.35 us
+//     * getting value from FIFO                    0.89 us
+//     * happens in 8 us intervals or more
+//     */
+//    if(SPI1->SR & SPI_SR_TXE) {
+//        SPI1->DR = (txCnt > 0) ? TX_GET() : 0;
+//    }
 
     /* USER CODE END WHILE */
 
@@ -449,6 +626,25 @@ static void MX_TIM16_Init(void)
   /* USER CODE BEGIN TIM16_Init 2 */
 
   /* USER CODE END TIM16_Init 2 */
+
+}
+
+/**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Channel1_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
+  /* DMA1_Channel2_3_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel2_3_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel2_3_IRQn);
 
 }
 
