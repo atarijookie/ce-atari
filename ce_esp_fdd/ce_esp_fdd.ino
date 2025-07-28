@@ -46,8 +46,7 @@ uint8_t singleTrackData[READTRACKDATA_SIZE_BYTES];      // TODO: remove this onc
 
 uint8_t *readTrackDataBfr;
 
-TWriteBuffer wrBuffer[2];                           // two buffers for written sectors
-TWriteBuffer *wrNow;
+TWriteBuffer wrBuffer;  // buffer for written sectors
 
 // interrupt handler for STEP signal
 void IRAM_ATTR floppyStepISR(void)
@@ -160,7 +159,7 @@ void setup(void)
     displayInit();
 
     SPI.begin(PIN_SCK, PIN_MISO, PIN_MOSI, PIN_CS);
-    SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
+    SPI.beginTransaction(SPISettings(8000000, MSBFIRST, SPI_MODE0));
 
     attachInterrupt(PIN_STEP, floppyStepISR, FALLING);
 }
@@ -245,45 +244,64 @@ void getMfmDataToBuffer(uint8_t* bfr, int len)
 
 void processMfmWriteBuffer(uint8_t* bfr, int len)
 {
-    uint8_t* pStore = &wrNow->buffer[wrNow->count];
+    static bool receivingWriteData = false;
+
+    uint8_t* pStore = &wrBuffer.buffer[wrBuffer.count];
 
     for(int i=0; i<len; i++)
     {
-        // buffer full? quit
-        if(wrNow->count >= WRITEBUFFER_SIZE) {
-            break;
+        uint8_t val = bfr[i];
+
+        if(val == TAG_WRITE_START) {    // on START tag found - now we're receiving write data
+            receivingWriteData = true;
+            continue;
         }
 
-        uint8_t val = *bfr;
-        bfr++;
+        if(val == TAG_WRITE_END) {      // on END tag found - we're no longer receiving write data
+            if(receivingWriteData) {    // this END tag is the first END tag found after START tag, so we're done with receiving this sector
+                receivingWriteData = false;     //  not receiving anymore
+                sectorsWritten++;               // one sector was written, request updated track at the end of stream
 
-        // non-zero value gets stored
-        if(val != 0) {
-           *pStore = val;   // store value
-           pStore++;
+                sendHeaderAndDataToHost(wrBuffer.buffer, wrBuffer.count - TX_HEADER_SIZE);      // send sector to host
 
-           wrNow->count++;  // increment count of data in buffer
+                wrBuffer.count = 10;    // no more data in write buffer
+            }
+
+            continue;
+        }
+
+        // we're not between START and END tag? ignore the data
+        if(!receivingWriteData) {
+            continue;
+        }
+
+        // buffer not full and the value is not a zero? store
+        if(wrBuffer.count < WRITEBUFFER_SIZE && val != 0) {
+            *pStore = val;
+            pStore++;
+
+            wrBuffer.count++;  // increment count of data in buffer
         }
     }
 }
 
 void refillMfmStreamer(void)
 {
-    uint8_t bufferOut[32];
-    uint8_t bufferIn[32];
+    #define SPI_CHUNK_SIZE  256
 
-    while(digitalRead(PIN_MFM_RXE) == HIGH) {       // while still can send data to mfm streamer
-        // get stream data into buffer
-        getMfmDataToBuffer(bufferOut, 32);
+    uint8_t bufferOut[SPI_CHUNK_SIZE];
+    uint8_t bufferIn[SPI_CHUNK_SIZE];
 
-        // send data over SPI to mfm streamer
-        digitalWrite(PIN_CS, LOW);
-        SPI.transferBytes(bufferOut, bufferIn, 32);
-        digitalWrite(PIN_CS, HIGH);
+    // get stream data into buffer - duration: 24 us
+    getMfmDataToBuffer(bufferOut, SPI_CHUNK_SIZE);
 
-        // // check bufferIn for any data, process non-zero bytes (sector written data)
-        // processMfmWriteBuffer(bufferIn, 32);
-    }
+    // send data over SPI to mfm streamer - duration 262 us when SPI running at 8 MHz
+    digitalWrite(PIN_CS, LOW);
+    SPI.transferBytes(bufferOut, bufferIn, SPI_CHUNK_SIZE);
+    digitalWrite(PIN_CS, HIGH);
+
+    // check bufferIn for any data, process non-zero bytes (sector written data) between start and stop tags
+    processMfmWriteBuffer(bufferIn, SPI_CHUNK_SIZE);
 }
 
 void BIT_INVERT(int pin)
@@ -374,40 +392,24 @@ void loop(void)
             // Serial.println("DSK CHG end");
         }
 
-        // // can send this write buffer?
-        // if(wrNow->readyToSend) {
-        //     uint32_t dataSize = (wrNow->count > TX_HEADER_SIZE) ? (wrNow->count - TX_HEADER_SIZE) : 0;
-        //     sendHeaderAndDataToHost(wrNow->buffer, dataSize);
-        //     wrNow->readyToSend = false;     // mark the current buffer as not ready to send (so we won't send this one again)
-
-        //     wrNow = (TWriteBuffer*) wrNow->next;    // and now we will select the next buffer as current
-        //     wrNow->readyToSend = false;     // the next buffer is not ready to send (yet)
-        //     wrNow->count = 10;              // at the start we already have header there
-        // }
-
         //-------------------------------------------------
-        // if(stWantsTheStream)
-        // {
-        //     int WGateNow = BIT_LEVEL(PIN_WGATE);
+        if(stWantsTheStream)
+        {
+            int WGateNow = BIT_LEVEL(PIN_WGATE);
 
-        //     if(WGatePrev != WGateNow)   // write gate changed?
-        //     {
-        //         WGatePrev = WGateNow;
+            if(WGatePrev != WGateNow)   // write gate changed?
+            {
+                WGatePrev = WGateNow;
 
-        //         if(WGateNow == LOW)     // on write start
-        //         {
-        //             hwPosition.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1; // get the current SIDE
-        //             wrNow->buffer[10] = hwPosition.track | ((hwPosition.side != 0) ? 0x80 : 0);
-        //             wrNow->buffer[11] = hwPosition.sector;
-        //             wrNow->count = 12;          // 10 for header, 2 for track + side + sector
-        //         }
-        //         else                    // on write end
-        //         {
-        //             sectorsWritten++;   // one sector was written, request updated track at the end of stream
-
-        //         }
-        //     }
-        // }
+                if(WGateNow == LOW)     // on write start
+                {
+                    streamed.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1; // get the current SIDE
+                    wrBuffer.buffer[10] = streamed.track | ((streamed.side != 0) ? 0x80 : 0);
+                    wrBuffer.buffer[11] = streamed.sector;
+                    wrBuffer.count = 12;          // 10 for header, 2 for track + side + sector
+                }
+            }
+        }
 
         //------------
         now = millis();
@@ -422,14 +424,10 @@ void loop(void)
         if(timeSinceTrackStart >= 200) {    // track finished
             readTrackData_goToStart();      // move the pointer in the track stream to start
 
-            // if(sectorsWritten > 0) {        // if some sectors were written to floppy, we need to get the new stream now
-            //     sectorsWritten = 0;         // nothing written now
-            //     // requestTrack(true);         // ask for the changed track data, but force it - get it immediatelly
-            // }
-
-            streamed.track = 0xff;        // after the end of track mark that we're not streaming anything
-            streamed.side = 0xff;
-            streamed.sector = 0xff;
+            if(sectorsWritten > 0) {        // if some sectors were written to floppy, we need to get the new stream now
+                sectorsWritten = 0;         // nothing written now
+                requestTrack(streamed.side, streamed.track);    // ask for the changed track data
+            }
         }
 
         //---------------------------
@@ -552,14 +550,8 @@ void setupAtnBuffers(void)
     storeHeader(atnSendWholeImageRequest, ATN_SEND_WHOLE_IMAGE, 0);
 
     // configure write buffers
-    for(int i=0; i<2; i++) {
-        storeHeader(wrBuffer[i].buffer, ATN_SECTOR_WRITTEN, 10);
-        wrBuffer[i].count = 10;
-        wrBuffer[i].readyToSend = false;
-        wrBuffer[i].next = (i == 0) ? &wrBuffer[1] : &wrBuffer[0];
-    }
-
-    wrNow = &wrBuffer[0];
+    storeHeader(wrBuffer.buffer, ATN_SECTOR_WRITTEN, 10);
+    wrBuffer.count = 10;
 }
 
 void storeMacAddress(void)

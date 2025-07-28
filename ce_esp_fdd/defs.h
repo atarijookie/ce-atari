@@ -136,10 +136,6 @@ typedef struct
 {
     uint8_t buffer[WRITEBUFFER_SIZE];  // buffer for the written data
     uint16_t count;                    // count of WORDs in buffer 
-
-    uint8_t readyToSend;               // until we store all the data, don't 
-
-    void *next;                     // pointer to the next available TAtnBuffer
 } TWriteBuffer;
 
 typedef struct {
@@ -172,5 +168,8 @@ typedef struct {
 
 #define STREAM_TABLE_OFFSET 10                  // 10 bytes - the stream table starts at this offset, because first 5 words are empty (ATN + sizes + other)
 #define STREAM_START_OFFSET (STREAM_TABLE_OFFSET + STREAM_TABLE_SIZE)
+
+#define TAG_WRITE_START 0x80    // start of sector data
+#define TAG_WRITE_END   0xc0    // end of sector data
 
 #endif /* DEFS_H_ */
