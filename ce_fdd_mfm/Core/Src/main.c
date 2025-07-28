@@ -64,6 +64,7 @@ DMA_HandleTypeDef hdma_spi1_tx;
 
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim16;
+DMA_HandleTypeDef hdma_tim3_up;
 
 /* USER CODE BEGIN PV */
 
@@ -85,28 +86,27 @@ static void MX_TIM16_Init(void);
 
 uint8_t* pWrite;
 
-void updateReadTimer(void)
+#define MFM_READ_SIZE   8
+uint16_t mfmReadStreamBuffer[MFM_READ_SIZE];
+
+void updateReadTimerDma(uint8_t lowerNotUpper)
 {
-    static uint8_t streamByte = 0;
-    static uint8_t bitsAvail = 0;
-    static uint16_t arrValues[4] = {7, 7, 11, 15};       // conversion table from mfm packed symbol to timer ARR value (for 0 us, 4 us, 6 us, 8 us)
+    const uint16_t arrValues[4] = {7, 7, 11, 15};       // conversion table from mfm packed symbol to timer ARR value (for 0 us, 4 us, 6 us, 8 us)
+    uint8_t streamByte = 0;
 
-    if(bitsAvail == 0) {        // all bits used? get new stream byte
-        bitsAvail = 8;
-
-        if(rxCnt > 0) {             // got something in RX buffer?
-            streamByte = RX_GET();
-            UPDATE_PIN_RXE;         // after removing byte from RX buffer, update RXE flag
-        } else {                    // RX buffer empty?
-            streamByte = 0x55;
-        }
+    if(rxCnt > 0) {             // got something in RX buffer?
+        streamByte = RX_GET();
+        UPDATE_PIN_RXE;         // after removing byte from RX buffer, update RXE flag
+    } else {                    // RX buffer empty?
+        streamByte = 0x55;
     }
 
-    bitsAvail -= 2;             // decrease bits available, because we're using 2 bits now
-    uint8_t encodedMfmTime = (streamByte >> bitsAvail) & 0x03;      // get bits 7-6, then 5-4, then 3-2, then 1-0 (by shifting right by 6, 4, 2, 0)
-    uint16_t arrValue = arrValues[encodedMfmTime];      // from 1-3 values to actual ARR values
+    uint16_t* bfr = lowerNotUpper ? &mfmReadStreamBuffer[0] : &mfmReadStreamBuffer[MFM_READ_SIZE/2];
 
-    TIM3->ARR = arrValue;       // update ARR value
+    bfr[0] = arrValues[ ((streamByte >> 6) & 3) ];
+    bfr[1] = arrValues[ ((streamByte >> 4) & 3) ];
+    bfr[2] = arrValues[ ((streamByte >> 2) & 3) ];
+    bfr[3] = arrValues[ ((streamByte     ) & 3) ];
 }
 
 void updateWriteData(uint32_t captured)
@@ -141,14 +141,6 @@ void updateWriteData(uint32_t captured)
             *pWrite = streamByte;
             pWrite++;
             txCnt++;
-        }
-
-        // to avoid doing the whole read part, just assume that it takes on average
-        // the same time to stream out 4 symbols as it takes to get them,
-        // so just drop one byte from RX buffer
-        if(rxCnt > 0) {
-            RX_DROP();
-            UPDATE_PIN_RXE;         // after removing byte from RX buffer, update RXE flag
         }
 
         bits = 0;           // don't have bits now
@@ -199,7 +191,37 @@ void setupSpiUsingCircularDma(void)
     SET_BIT(SPI1->CR2, SPI_CR2_TXDMAEN);        // enable TX DMA on SPI
 }
 
+void setupTMI3circularDma(void)
+{
+    for(int i=0; i<MFM_READ_SIZE; i++) {
+        mfmReadStreamBuffer[i] = 7;     // by default -- all pulses 4 us
+    }
+
+    CLEAR_BIT(DMA1_Channel3->CCR, DMA_CCR_EN);  // DMA disable channel
+
+    //----
+
+    DMA1_Channel3->CPAR = (uint32_t) &(TIM3->DMAR);         // peripheral address: SPI DR
+    DMA1_Channel3->CMAR = (uint32_t) mfmReadStreamBuffer;   // memory address: mfmReadStreamBuffer
+    DMA1_Channel3->CNDTR = MFM_READ_SIZE;                   // Configure DMA Channel data length
+    CLEAR_BIT(DMA1_Channel3->CCR, DMA_CCR_PL_1); SET_BIT(DMA1_Channel2->CCR, DMA_CCR_PL_0); // channel 3 priority - low (1)
+    SET_BIT(DMA1_Channel3->CCR, (DMA_IT_TC | DMA_IT_HT | DMA_IT_TE));   // enable interrupts for half-transfer and transfer complete
+    SET_BIT(DMA1_Channel3->CCR, (DMA_CCR_MINC | DMA_CCR_CIRC | DMA_CCR_DIR));         // enable memory increment, circular mode, direction: read from memory
+    CLEAR_BIT(DMA1_Channel3->CCR, (DMA_CCR_PINC));        // disable peripheral increment
+    CLEAR_BIT(DMA1_Channel3->CCR, DMA_CCR_PSIZE_1); SET_BIT(DMA1_Channel2->CCR, DMA_CCR_PSIZE_0); // peripheral transfer size: 16 bits (1)
+    CLEAR_BIT(DMA1_Channel3->CCR, DMA_CCR_MSIZE_1); SET_BIT(DMA1_Channel2->CCR, DMA_CCR_MSIZE_0); // memory transfer size: 16 bits (1)
+
+    //----
+    SET_BIT(DMA1_Channel3->CCR, DMA_CCR_EN);    // DMA enable channel
+
+    // set TIM3 DMA control register (TIMx_DCR) as: DBL (<<8) =0 (1 transfer), DBA (<<0) =11 (0x2C TIMx_ARR)
+    TIM3->DCR = 11;
+    SET_BIT(TIM3->DIER, TIM_DIER_UDE);
+}
+
+
 // can happen up to every 256 us, or longer
+// Takes 1.1 us
 void DMA1_Channel1_IRQHandler(void)
 {
     uint32_t flag_it = DMA1->ISR;
@@ -244,11 +266,13 @@ volatile uint8_t bfrStateLow, bfrStateHigh;
  * - this buffer gets sent again (so twice the same sector)
  */
 
-// can happen up to every 1.3 ms, or longer
+// can happen up to every 1.3 ms for SPI, takes 0.5 us
+// can happen up to every 16 us for TIM3, takes 3.2 us
 void DMA1_Channel2_3_IRQHandler(void)
 {
     uint32_t flag_it = DMA1->ISR;
 
+    //-------------
     // DMA channel 2
     // Half Transfer Complete Interrupt management
     if((flag_it & DMA_FLAG_HT2) != 0U)
@@ -292,6 +316,28 @@ void DMA1_Channel2_3_IRQHandler(void)
     if((flag_it & DMA_FLAG_TE2) != 0)
     {
         DMA1->IFCR = DMA_FLAG_TE2;
+    }
+
+    //-------------
+    // DMA channel 3
+    // Half Transfer Complete Interrupt management
+    if((flag_it & DMA_FLAG_HT3) != 0U)
+    {
+       DMA1->IFCR = DMA_FLAG_HT3;   // clear flag
+       updateReadTimerDma(1);
+    }
+
+    // Transfer Complete Interrupt management
+    if((flag_it & DMA_FLAG_TC3) != 0)
+    {
+        DMA1->IFCR = DMA_FLAG_TC3;  // clear flag
+        updateReadTimerDma(0);
+    }
+
+    // Transfer Error Interrupt management
+    if((flag_it & DMA_FLAG_TE3) != 0)
+    {
+        DMA1->IFCR = DMA_FLAG_TE3;
     }
 }
 
@@ -379,6 +425,7 @@ int main(void)
   bfrStateHigh = STATE_EMPTY;
 
   setupSpiUsingCircularDma();
+  setupTMI3circularDma();
 
   RX_CLEAR();
 
@@ -426,19 +473,6 @@ int main(void)
             TIM16->SR = ~TIM_SR_CC1IF;            // Clear the flag
             uint32_t captured = TIM16->CCR1;
             updateWriteData(captured);            // send the input WDATA to buffer
-        }
-    }
-    else        // when reading from floppy
-    {
-        // overflow of TIM3 occurred (UIF flag set)? stream next mfm symbol
-        /*                              o0            o2
-         * just checking TIM3->SR       0.34 us       0.34 us
-         * taking value from memory     1.60 us       1.60 us
-         * taking value from FIFO       2.92 us       2.51 us
-         */
-        if((TIM3->SR & TIM_SR_UIF) != 0) {
-           TIM3->SR = ~TIM_SR_UIF;             // clear UIF flag
-           updateReadTimer();
         }
     }
 
