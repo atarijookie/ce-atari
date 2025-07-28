@@ -173,7 +173,7 @@ void setupSpiUsingCircularDma(void)
     DMA1_Channel1->CPAR = (uint32_t) &(SPI1->DR);   // peripheral address: SPI DR
     DMA1_Channel1->CMAR = (uint32_t) rxData;        // memory address: rxData
     DMA1_Channel1->CNDTR = BFR_SIZE;                // Configure DMA Channel data length
-    SET_BIT(DMA1_Channel1->CCR, (DMA_CCR_PL_1 | DMA_CCR_PL_0));         // channel 1 - high priority
+    SET_BIT(DMA1_Channel1->CCR, (DMA_CCR_PL_1 | DMA_CCR_PL_0));         // channel 1 priority - very high (3)
     SET_BIT(DMA1_Channel1->CCR, (DMA_IT_TC | DMA_IT_HT | DMA_IT_TE));   // enable interrupts for half-transfer and transfer complete
     SET_BIT(DMA1_Channel1->CCR, (DMA_CCR_MINC | DMA_CCR_CIRC));         // enable memory increment, circular mode
     CLEAR_BIT(DMA1_Channel1->CCR, (DMA_CCR_PINC | DMA_CCR_DIR));        // disable peripheral increment, direction: read from peripheral
@@ -185,7 +185,7 @@ void setupSpiUsingCircularDma(void)
     DMA1_Channel2->CPAR = (uint32_t) &(SPI1->DR);   // peripheral address: SPI DR
     DMA1_Channel2->CMAR = (uint32_t) txData;        // memory address: tx buffer
     DMA1_Channel2->CNDTR = TX_DATA_SIZE;            // Configure DMA Channel data length
-    SET_BIT(DMA1_Channel2->CCR, DMA_CCR_PL_1); CLEAR_BIT(DMA1_Channel2->CCR, DMA_CCR_PL_0); // channel 2 - mid priority
+    SET_BIT(DMA1_Channel2->CCR, DMA_CCR_PL_1); CLEAR_BIT(DMA1_Channel2->CCR, DMA_CCR_PL_0); // channel 2 priority - high (2)
     SET_BIT(DMA1_Channel2->CCR, (DMA_IT_TC | DMA_IT_HT | DMA_IT_TE));   // enable interrupts for half-transfer and transfer complete
     SET_BIT(DMA1_Channel2->CCR, (DMA_CCR_MINC | DMA_CCR_CIRC | DMA_CCR_DIR));   // enable memory increment, circular mode, direction: read from memory
     CLEAR_BIT(DMA1_Channel2->CCR, DMA_CCR_PINC);        // disable peripheral increment
@@ -195,9 +195,11 @@ void setupSpiUsingCircularDma(void)
     SET_BIT(DMA1_Channel2->CCR, DMA_CCR_EN);    // DMA enable channel 2
 
     SET_BIT(SPI1->CR1, SPI_CR1_SPE);            // SPI enable
-    SET_BIT(SPI1->CR2, SPI_CR2_RXDMAEN);        // enable DMA on SPI
+    SET_BIT(SPI1->CR2, SPI_CR2_RXDMAEN);        // enable RX DMA on SPI
+    SET_BIT(SPI1->CR2, SPI_CR2_TXDMAEN);        // enable TX DMA on SPI
 }
 
+// can happen up to every 256 us, or longer
 void DMA1_Channel1_IRQHandler(void)
 {
     uint32_t flag_it = DMA1->ISR;
@@ -233,6 +235,16 @@ void DMA1_Channel1_IRQHandler(void)
 
 volatile uint8_t bfrStateLow, bfrStateHigh;
 
+/*
+ * Note: there's still a race-condition hazard, if:
+ * - interrupt doesn't see the half of buffer ready to be sent, but it already contains tags
+ * - main loop marks the buffer as waiting for send
+ * - spi + dma will send this buffer, esp32 will receive it
+ * - but upon half / full transfer complete this buffer is not marked as already sent
+ * - this buffer gets sent again (so twice the same sector)
+ */
+
+// can happen up to every 1.3 ms, or longer
 void DMA1_Channel2_3_IRQHandler(void)
 {
     uint32_t flag_it = DMA1->ISR;
@@ -283,6 +295,50 @@ void DMA1_Channel2_3_IRQHandler(void)
     }
 }
 
+// on write START - see which part of buffer is empty - lower part or upper part?
+// Initialize pointer and count to the free empty part of tx buffer.
+void onWriteStart(void)
+{
+    if(bfrStateLow == STATE_EMPTY) {              // lower part empty?
+        bfrStateLow = STATE_STORING;
+        pWrite = &txData[1];
+        txCnt = 0;
+    } else if(bfrStateHigh == STATE_EMPTY) {      // upper part empty?
+        bfrStateHigh = STATE_STORING;
+        pWrite = &txData[WRITEBUFFER_SIZE + 1];
+        txCnt = 0;
+    }
+}
+
+// on write END - mark start and end of this buffer with known tags, this
+// marks the buffer used and esp will know that the valid data is between these tags.
+void onWriteEnd(void)
+{
+    // TODO: disable int?
+
+    if(txCnt < WRITEBUFFER_SIZE) {
+        *pWrite = TAG_WRITE_END;    // store END tag after the last valid data byte
+        pWrite++;
+        txCnt++;
+    }
+
+    // write was storing data to lower part of buffer?
+    if(bfrStateLow == STATE_STORING) {
+        bfrStateLow = STATE_WAIT_FOR_SEND;
+        txData[0] = TAG_WRITE_START;
+        txData[WRITEBUFFER_SIZE - 1] = TAG_WRITE_END;
+    }
+
+    // write was storing data to upper part of buffer?
+    if(bfrStateHigh == STATE_STORING) {
+        bfrStateHigh = STATE_WAIT_FOR_SEND;
+        txData[WRITEBUFFER_SIZE] = TAG_WRITE_START;
+        txData[TX_DATA_SIZE - 1] = TAG_WRITE_END;
+    }
+
+    // TODO: enable int?
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -324,15 +380,14 @@ int main(void)
 
   setupSpiUsingCircularDma();
 
-//  TX_CLEAR();
   RX_CLEAR();
 
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim16, TIM_CHANNEL_1);
 
-//  SET_BIT(SPI1->CR1, SPI_CR1_SPE);
+  pWrite = &txData[1];
+  txCnt = 0;
 
-  pWrite = &txData[0];
   UPDATE_PIN_RXE;       // set RXE pin because we're empty
 
   uint8_t writingPrev = (GPIOA->IDR & PIN_WGATE) == 0;      // track WGATE changes with this var, init to current WGATE state
@@ -348,45 +403,15 @@ int main(void)
 
     // when the WGATE signal changes, we need to
     // - on START of write - get pointer to empty buffer
-    // - on END of write - just mark the buffer as used and valid
+    // - on END of write - just mark the buffer as ready to be sent and valid
     if(writingPrev != writingNow)   // when WGATE signal changed
     {
         writingPrev = writingNow;
 
-//        if(txCnt < BFR_SIZE) {      // if have space in buffer, store start or end tag
-//            TX_PUT( writingNow ? TAG_WRITE_START : TAG_WRITE_END );
-//        }
-
-        // on write START - see which part of buffer is empty - lower part or upper part?
-        // Initialize pointer and count to the free empty part of tx buffer.
         if(writingNow) {
-            if(bfrStateLow == STATE_EMPTY) {              // lower part empty?
-                bfrStateLow = STATE_STORING;
-                pWrite = &txData[1];
-                txCnt = 0;
-            } else if(bfrStateHigh == STATE_EMPTY) {      // upper part empty?
-                bfrStateHigh = STATE_STORING;
-                pWrite = &txData[WRITEBUFFER_SIZE + 1];
-                txCnt = 0;
-            }
-        }
-
-        // on write END - mark start and end of this buffer with known tags, this
-        // marks the buffer used and esp will know that the valid data is between these tags.
-        else {
-            // write was storing data to lower part of buffer?
-            if(bfrStateLow == STATE_STORING) {
-                bfrStateLow = STATE_WAIT_FOR_SEND;
-                txData[0] = TAG_WRITE_START;
-                txData[WRITEBUFFER_SIZE - 1] = TAG_WRITE_END;
-            }
-
-            // write was storing data to upper part of buffer?
-            if(bfrStateHigh == STATE_STORING) {
-                bfrStateHigh = STATE_WAIT_FOR_SEND;
-                txData[WRITEBUFFER_SIZE] = TAG_WRITE_START;
-                txData[TX_DATA_SIZE - 1] = TAG_WRITE_END;
-            }
+            onWriteStart();
+        } else {
+            onWriteEnd();
         }
     }
 
@@ -416,30 +441,6 @@ int main(void)
            updateReadTimer();
         }
     }
-
-//    // RXNE? read data, place it in RX buffer if have space
-//    /*                              o0            o2
-//     * just checking SPI1->SR                     0.29 us
-//     * storing value to FIFO                      1.25 us
-//     * happens in 8 us intervals or more
-//     */
-//    if(SPI1->SR & SPI_SR_RXNE) {
-//        uint8_t data = SPI1->DR;
-//        if(rxCnt < BFR_SIZE) {
-//            RX_PUT(data);
-//            UPDATE_PIN_RXE;     // after adding byte to RX buffer, update RXE flag
-//        }
-//    }
-
-//    // TXE? if have TX data in TX buffer, place it in DR
-//    /*                              o0            o2
-//     * just checking SPI1->SR                     0.35 us
-//     * getting value from FIFO                    0.89 us
-//     * happens in 8 us intervals or more
-//     */
-//    if(SPI1->SR & SPI_SR_TXE) {
-//        SPI1->DR = (txCnt > 0) ? TX_GET() : 0;
-//    }
 
     /* USER CODE END WHILE */
 

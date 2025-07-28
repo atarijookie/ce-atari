@@ -19,21 +19,14 @@
 #define WRITEBUFFER_SIZE    1300
 #define TX_DATA_SIZE        (WRITEBUFFER_SIZE * 2)
 
-//extern uint32_t txCnt, txStore, txLoad;
 extern uint32_t txCnt;
 extern uint8_t txData[TX_DATA_SIZE];
 
 extern volatile uint32_t rxCnt;
-// rxStore
 extern uint32_t rxLoad;
 extern uint8_t rxData[BFR_SIZE];
 
-//#define TX_CLEAR()    { txCnt = 0; txStore = 0; txLoad = 0;                                                           }
-//#define TX_PUT(VAL)   { txCnt++;                  txData[txStore] = VAL;  txStore = (txStore + 1) & BFR_MASK;         }
-//#define TX_GET()     ({ txCnt--; uint8_t retVal = txData[txLoad];         txLoad  = (txLoad  + 1) & BFR_MASK; retVal; })
-
-#define RX_CLEAR()    { rxCnt = 0; /* rxStore = 0; */ rxLoad = 0;                                                           }
-//#define RX_PUT(VAL)   { rxCnt++;                  rxData[rxStore] = VAL;  rxStore = (rxStore + 1) & BFR_MASK;         }
+#define RX_CLEAR()    { rxCnt = 0; rxLoad = 0;                                                           }
 #define RX_GET()     ({ rxCnt--; uint8_t retVal = rxData[rxLoad];         rxLoad  = (rxLoad  + 1) & BFR_MASK; retVal; })
 #define RX_DROP()     { rxCnt--;                                          rxLoad  = (rxLoad  + 1) & BFR_MASK;         }
 
