@@ -44,7 +44,62 @@ uint32_t dataIndexInTrack = STREAM_START_OFFSET;
 
 uint8_t singleTrackData[READTRACKDATA_SIZE_BYTES];      // TODO: remove this once the tracks.data is properly allocated from PSRAM
 
-uint8_t *readTrackDataBfr;
+#define WRPOS_SIZE  4
+uint8_t wrPosCnt, wrPosStore, wrPosLoad;
+uint16_t writePos[WRPOS_SIZE];
+
+void wrPosClear(void)
+{
+    wrPosCnt = 0;
+    wrPosStore = 0;
+    wrPosLoad = 0;
+}
+
+void wrPosPut(uint8_t side, uint8_t track, uint8_t sector)
+{
+    // buffer full? don't store
+    if(wrPosCnt >= WRPOS_SIZE) {
+        return;
+    }
+
+    // pack track, side, sector into single uint16_t
+    uint16_t sideTrack = track | ((side != 0) ? 0x80 : 0);
+    uint16_t sideTrackSector = (sideTrack << 8) | sector;
+
+    // store and update storing position
+    writePos[wrPosStore] = sideTrackSector;
+    wrPosStore++;
+
+    if(wrPosStore >= WRPOS_SIZE) {
+        wrPosStore = 0;
+    }
+
+    wrPosCnt++;
+}
+
+void wrPosGet(uint8_t* pSideTrack, uint8_t* pSector)
+{
+    // got anything stored? get it
+    if(wrPosCnt > 0) {
+        uint16_t sideTrackSector = writePos[wrPosLoad];
+        wrPosLoad++;
+
+        if(wrPosLoad >= WRPOS_SIZE) {
+           wrPosLoad = 0;
+        }
+
+        wrPosCnt--;
+
+        *pSideTrack = (uint8_t) (sideTrackSector >> 8);
+        *pSector = (uint8_t) sideTrackSector;
+    }
+    // nothing stored? return zeros
+    else
+    {
+        *pSideTrack = 0;
+        *pSector = 0;
+    }
+}
 
 TWriteBuffer wrBuffer;  // buffer for written sectors
 
@@ -145,8 +200,6 @@ void setup(void)
         while(1);
     }
 
-    readTrackDataBfr = tracks[0].data;
-
     readTrackData_goToStart();
 
     preferences.begin("ikbd", PREFERENCES_RO_MODE);
@@ -154,6 +207,7 @@ void setup(void)
     preferences.end();
 
     setupAtnBuffers();
+    wrPosClear();
 
     createIkbdTask();   // this task sends ikdb data to host and back
     displayInit();
@@ -254,6 +308,7 @@ void processMfmWriteBuffer(uint8_t* bfr, int len)
 
         if(val == TAG_WRITE_START) {    // on START tag found - now we're receiving write data
             receivingWriteData = true;
+            wrBuffer.count = 12;        // start with 12 bytes in the buffer - 10 for header, 2 for track + side + sector
             continue;
         }
 
@@ -262,9 +317,12 @@ void processMfmWriteBuffer(uint8_t* bfr, int len)
                 receivingWriteData = false;     //  not receiving anymore
                 sectorsWritten++;               // one sector was written, request updated track at the end of stream
 
-                sendHeaderAndDataToHost(wrBuffer.buffer, wrBuffer.count - TX_HEADER_SIZE);      // send sector to host
+                uint8_t sideTrack, sector;
+                wrPosGet(&sideTrack, &sector);  // get side, track and sector number from the write-positions buffer
+                wrBuffer.buffer[10] = sideTrack;
+                wrBuffer.buffer[11] = sector;
 
-                wrBuffer.count = 10;    // no more data in write buffer
+                sendHeaderAndDataToHost(wrBuffer.buffer, wrBuffer.count - TX_HEADER_SIZE);      // send sector to host
             }
 
             continue;
@@ -403,10 +461,8 @@ void loop(void)
 
                 if(WGateNow == LOW)     // on write start
                 {
-                    streamed.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1; // get the current SIDE
-                    wrBuffer.buffer[10] = streamed.track | ((streamed.side != 0) ? 0x80 : 0);
-                    wrBuffer.buffer[11] = streamed.sector;
-                    wrBuffer.count = 12;          // 10 for header, 2 for track + side + sector
+                    streamed.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1;                // get the current SIDE
+                    wrPosPut(streamed.side, streamed.track, streamed.sector);   // store side, track, sector into write positions buffer
                 }
             }
         }
