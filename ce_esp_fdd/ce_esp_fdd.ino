@@ -8,6 +8,7 @@
 #include "captive_portal.h"
 #include "display.h"
 #include "ikbd.h"
+#include "buttons.h"
 
 /*
     Arduino IDE: 2.3.6
@@ -24,7 +25,6 @@ uint8_t atnSendWholeImageRequest[TX_HEADER_SIZE];
 
 extern volatile bool ikbdEnabled;   // if true, should send data to host; otherwise just loopback ikdb data back
 
-void handleButton(void);
 void setupAtnBuffers(void);
 void requestTrack(uint8_t side, uint8_t track);
 void requestWholeImage(void);
@@ -364,10 +364,20 @@ void refillMfmStreamer(void)
 
 void BIT_INVERT(int pin)
 {
-    if(BIT_IS_H(pin)) {
-        BIT_CLR(pin);
-    } else {
-        BIT_SET(pin);
+    if(pin < 32) {
+        if(BIT_IS_H(pin)) {
+            BIT_CLR(pin);
+        } else {
+            BIT_SET(pin);
+        }
+    }
+    else
+    {
+        if(BIT_IS_H1(pin)) {
+            BIT_CLR1(pin);
+        } else {
+            BIT_SET1(pin);
+        }
     }
 }
 
@@ -395,10 +405,21 @@ void loop(void)
         // handle any data incoming
         handleIncommingData();
 
+        bool stWantsTheStream = BIT_IS_L(PIN_DRIVE_SEL) && BIT_IS_L(PIN_MOT_EN);
+
         // send heartbeat (fw version) once a second
         uint32_t now = millis();
         if (connected && (now - lastSendFwTime) >= 1000)
         {
+            if(stWantsTheStream) {
+                hwPosition.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1; // get the current SIDE
+
+                Serial.print("S ");
+                Serial.print(hwPosition.side);
+                Serial.print(" ");
+                Serial.println(hwPosition.track);
+            }
+
             sendFwReport(now);
         }
 
@@ -413,8 +434,6 @@ void loop(void)
             imageState = IMAGE_REQUESTED;
             requestWholeImage();
         }
-
-        bool stWantsTheStream = BIT_IS_L(PIN_DRIVE_SEL) && BIT_IS_L(PIN_MOT_EN);
 
         // ST wants the stream? ENABLE stream
         if(stWantsTheStream) {
@@ -488,105 +507,7 @@ void loop(void)
 
         //---------------------------
         // check the button state and press duration
-        handleButton();
-    }
-}
-
-#define BTN_PRESS_SHORT     500
-#define BTN_PRESS_SAVE      2000
-#define BTN_PRESS_CAPTIVE   5000
-
-// This gets called on button pressed (current button state LOW) or released (current button state HIGH)
-void onButtonStateChanged(int buttonState, uint32_t now, uint32_t& buttonPressTime)
-{
-    // button state change to low, so button just pressed - store time, nothing more to do
-    if(buttonState == LOW)
-    {
-        buttonPressTime = now;
-        return;
-    }
-
-    //-------
-    // button state change to high, so button released
-    uint32_t pressDuration = now - buttonPressTime;
-
-    if(pressDuration < BTN_PRESS_SHORT)     // on short press, ikbd enable / disable
-    {
-        ikbdEnabled = !ikbdEnabled;
-    }
-
-    // on longer press, save ikbd enabled flag
-    if(pressDuration >= BTN_PRESS_SAVE && pressDuration < BTN_PRESS_CAPTIVE)
-    {
-        preferences.begin("ikbd", PREFERENCES_RW_MODE);
-        preferences.putUChar("enabled", ikbdEnabled);
-        preferences.end();
-    }
-
-    // on longest press, run captive portal
-    if(pressDuration >= BTN_PRESS_CAPTIVE)
-    {
-        runCaptivePortal();
-    }
-
-    showRunningStateOnDisplay();
-}
-
-// Gets called during the button is pressed down, used to show stuff on display for long press.
-void duringButtonPressed(uint32_t now, uint32_t& buttonPressTime)
-{
-    uint32_t pressDuration = now - buttonPressTime;
-
-    // press too short? nothing to show on display
-    if(pressDuration < BTN_PRESS_SAVE)
-    {
-        return;
-    }
-
-    // longer press? ask about saving ikbd settings
-    if(pressDuration >= BTN_PRESS_SAVE && pressDuration < BTN_PRESS_CAPTIVE)
-    {
-        displayMessage(NULL, "Store IKDB enabled?", NULL);
-    }
-
-    // longest press? ask about running captive portal
-    if(pressDuration >= BTN_PRESS_CAPTIVE)
-    {
-        displayMessage(NULL, "Run captive portal?", NULL);
-    }
-}
-
-// Check the button pressed / released state, check if button has been just pressed, released, 
-// or is being held down. Show stuff on display, handle button actions.
-void handleButton(void)
-{
-    static uint32_t lastCheck = millis();
-    static int lastButtonState = HIGH;
-    static uint32_t buttonPressTime = 0;
-
-    uint32_t now = millis();
-
-    if(now - lastCheck < 100)      // check for button change only every now and then
-    {
-        return;
-    }
-    lastCheck = now;
-
-    int buttonState = digitalRead(PIN_BOOT_BTN);    // read button
-
-    bool buttonStateChanged = (lastButtonState != buttonState);
-    lastButtonState = buttonState;
-
-    if(buttonStateChanged)      // button state changed? (e.g. pressed, released)
-    {
-        onButtonStateChanged(buttonState, now, buttonPressTime);
-    }
-    else        // button state not changed (stayed released, stayed pressed)
-    {
-        if(buttonState == LOW)
-        {
-            duringButtonPressed(now, buttonPressTime);
-        }
+        handleAllButtons();
     }
 }
 

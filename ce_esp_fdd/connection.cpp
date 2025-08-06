@@ -451,7 +451,7 @@ void handleTrackReceived(void)
 
     memcpy(tracks[index].data, tmpTrackBfr + 2, lenData - 2);
 
-    Serial.print("handleTrackReceived ");
+    Serial.print("Rx ");
     Serial.print(trackNo);
     Serial.print(" side ");
     Serial.println(sideNo);

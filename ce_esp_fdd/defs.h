@@ -76,11 +76,12 @@
 #define PIN_DIR             6
 #define PIN_STEP            7
 #define PIN_SIDE1           9
-#define PIN_DENSITY         10
+#define PIN_ANALOG_BTNS     10
 #define PIN_INDEX           11
 #define PIN_TRACK00         12
 #define PIN_WPROTECT        13
 #define PIN_DSKCHG          21
+#define PIN_DENSITY         38
 #define PIN_FLCC_OE         47
 
 #define PIN_SCK             1
