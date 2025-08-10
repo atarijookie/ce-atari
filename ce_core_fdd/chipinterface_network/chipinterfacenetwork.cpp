@@ -40,6 +40,7 @@ ChipInterfaceNetwork::ChipInterfaceNetwork(int whichLogFile)
     fdListen = FD_EMPTY;
 
     clientsClearAll();
+    clientsWriteToFile();
 
     bufOut = new uint8_t[MFM_STREAM_SIZE];
     bufIn = new uint8_t[MFM_STREAM_SIZE];
@@ -132,6 +133,7 @@ void ChipInterfaceNetwork::acceptSocketIfNeededAndPossible(void)
 
     // got the new client socket now
     clientsStoreOne(clientInfo, newSock, clientIpInt);
+    clientsWriteToFile();
 
     Debug::out(whichLog, LOG_INFO, "acceptSocketIfNeededAndPossible() - client #%d connected from %s, will use floppy slot #%d", idx, clientIp, clientInfo->floppySlotIndex);
 }
@@ -258,6 +260,8 @@ bool ChipInterfaceNetwork::getFWversion(int clientIndex)
     if(memcmp(clients[clientIndex].mac, fwVer + 6, 6) != 0) {   // mac changed? (e.g. first received)
         memcpy(clients[clientIndex].mac, fwVer + 6, 6);         // copy mac address into client's info
         macChanged = true;
+
+        clientsWriteToFile();
     }
 
     uint8_t* mac = clients[clientIndex].mac;
@@ -320,6 +324,8 @@ bool ChipInterfaceNetwork::waitForAtn(int clientIndex, int atnIdWant, uint8_t at
             Debug::out(whichLog, LOG_DEBUG, "waitForAtn() - DISCONNECTED!");
 
             clientsCloseOne(&clients[clientIndex]);
+            clientsWriteToFile();
+
             return false;
         }
 
@@ -558,6 +564,8 @@ void ChipInterfaceNetwork::clientsDisconnectInactive(void)
 
         if(diff > 15000) {
             clientsCloseOne(&clients[i]);
+            clientsWriteToFile();
+
             Debug::out(whichLog, LOG_INFO, "disconnected inactive client #%i", i);
         }
     }
@@ -593,4 +601,47 @@ int ChipInterfaceNetwork::readRestOfData(int clientIndex, uint8_t* buffer, uint3
     memset(buffer, 0, bufferSize);
     int readSize = MIN(clients[clientIndex].bufReader.dataSizeRest(), bufferSize);
     return recvFromClient(clientIndex, buffer, readSize);
+}
+
+void ChipInterfaceNetwork::clientsWriteToFile(void)
+{
+    std::string slots;
+    slots = "{";
+
+    Settings s;
+    int gotClients = 0;
+    int clientIndex = 0;
+
+    for(int i=0; i<MAX_CLIENTS; i++) {
+        if(clients[i].fdClient != FD_EMPTY) {
+            gotClients++;
+        }
+    }
+
+    for(int i=0; i<MAX_CLIENTS; i++) {
+        clientIndex++;
+        ClientInfo* c = &clients[i];
+
+        bool isLast = (clientIndex >= gotClients);
+
+        if(c->fdClient != FD_EMPTY) {
+            char slotInfo[1024];
+
+            s.setPrefix(c->mac, 6);                         // mac as prefix to settings
+            const char *name = s.getString("NAME", "");     // try to read the value
+
+            sprintf(slotInfo, "\"%d\": {\"ip\": \"%d.%d.%d.%d\", \"mac\": \"%02X:%02X:%02X:%02X:%02X:%02X\", \"name\": \"%s\"}%s",
+                c->floppySlotIndex,
+                (c->ipAddr >> 24) & 0xff, (c->ipAddr >> 16) & 0xff, (c->ipAddr >> 8) & 0xff, c->ipAddr  & 0xff,
+                c->mac[0], c->mac[1], c->mac[2], c->mac[3], c->mac[4], c->mac[5],
+                name,
+                (isLast ? "" : ", ")
+            );
+
+            slots += slotInfo;
+        }
+    }
+    slots += "}";
+
+    Utils::textToFileFromEnv(slots.c_str(), "FILE_FLOPPY_SLOTS");
 }

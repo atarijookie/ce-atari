@@ -115,6 +115,8 @@ private:
     int  clientsGetEmptyIndex(void);
     int  clientsGetFloppySlotIndexForIp(uint32_t ipAddr);
     void clientsStoreOne(ClientInfo* info, int newSock, uint32_t ipAddr);
+
+    void clientsWriteToFile(void);
 };
 
 #endif // __CHIPINTERFACENETWORK_H__

@@ -255,30 +255,6 @@ def slot_eject(slot_index):
     send_to_core_fdd(item)
 
 
-def get_image_slots():
-    # first get the image names that are in slot 1, 2, 3
-    image_names = []
-    txt_image_name = []
-
-    try:
-        with open(os.getenv('FILE_FLOPPY_SLOTS'), 'rt') as f:
-            txt_image_name = f.readlines()
-    except Exception as ex:
-        app_log.warning(f"Failed to open file {os.getenv('FILE_FLOPPY_SLOTS')} : {str(ex)}")
-
-    # now get images content for slot 1, 2, 3
-    for i in range(3):
-        if not i < len(txt_image_name):     # don't have this item at index i? quit
-            break
-
-        image_name = txt_image_name[i].strip()
-        image_name = os.path.basename(image_name)           # get just filename from the path
-
-        image_names.append(image_name)
-
-    return image_names
-
-
 def get_storage_path():
     """ Find the storage path and return it. Use cached value if possible. """
 

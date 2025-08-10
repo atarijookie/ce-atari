@@ -87,3 +87,32 @@ function onSelectorOK() {
 function onSelectorCancel() {
     $("[name=file-selector]").hide();
 }
+
+function getFddClients() {
+        $.ajax({
+        url: '/floppy/get_clients',
+        type: 'GET',
+        dataType: 'json',
+        success: function (data) {
+            console.log("floppy/get_clients - data: " + data);
+            fillFloppyClients(data);
+        },
+        error: function (xhr) {
+            console.log("Error: " + xhr.statusText);
+        },
+    })
+}
+
+function fillFloppyClients(data) {
+  for(var i=0; i<8; i++) {
+        var key = i.toString();
+        var td = document.getElementById("ip" + i);
+
+        if(key in data) {
+            var info = data[key];
+            td.innerHTML = "name: " + info['name'] + "<br>mac: " + info['mac'] + "<br>ip: " + info['ip'];
+        } else {
+            td.innerHTML = "";
+        }
+    }
+}

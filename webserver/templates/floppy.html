@@ -35,7 +35,12 @@
           window.onload = function() { 
             $("[name=file-selector]").hide();
             getSlots();
+            getFddClients();
           }
+
+          const interval = setInterval(function() {
+            getFddClients();
+          }, 10000);
         </script>
         <style>
           button {

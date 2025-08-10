@@ -1,7 +1,7 @@
 import os
 from flask import Blueprint, make_response, request, current_app as app, abort
 from utils import slot_insert, file_seems_to_be_image, \
-    unlink_without_fail, symlink_if_needed, get_setting, set_setting, send_to_core_fdd
+    unlink_without_fail, symlink_if_needed, get_setting, set_setting, send_to_core_fdd, text_from_file
 from werkzeug.utils import secure_filename
 
 floppy = Blueprint('floppy', __name__)
@@ -99,3 +99,11 @@ def get_slots():
 
     return resp
 
+
+@floppy.route('/get_clients', methods=['GET'])
+def get_clients():
+    """ get info about connected clients """
+
+    path = os.path.join(os.getenv('FILE_FLOPPY_SLOTS'), "/tmp/ce/data/floppy_slots.json")
+    resp = text_from_file(path)
+    return resp
