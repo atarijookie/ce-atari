@@ -5,11 +5,13 @@
 #include "../global.h"
 
 #include "mfmcachedimage.h"
+#include "imagesilo.h"
 
 #define LOBYTE(w)   ((uint8_t)(w))
 #define HIBYTE(w)   ((uint8_t)(((uint16_t)(w)>>8)&0xFF))
 
 extern pthread_mutex_t floppyEncoderMutex;
+extern volatile uint8_t slotSendToDevice[SLOT_COUNT];
 
 #define DAM_MARK    0xfb
 #define ID_MARK     0xfe
@@ -53,6 +55,7 @@ const uint16_t crcTable[256] = {
 MfmCachedImage::MfmCachedImage()
 {
     gotImage = false;
+    slotNo = 0;
 
     // allocate tracks
     for(int i=0; i<MAX_TRACKS; i++) {
@@ -101,8 +104,10 @@ void MfmCachedImage::clearWholeCachedImage(void)    // go and memset() all the c
 }
 
 // call this after opening the FloppyImage, before encoding
-void MfmCachedImage::storeImageParams(FloppyImage *img)
+void MfmCachedImage::storeImageParams(FloppyImage *img, int slotNo)
 {
+    this->slotNo = slotNo;
+
     // clear the params first
     params.tracks = 0;
     params.sides = 0;
@@ -160,6 +165,13 @@ int MfmCachedImage::getNextIndexToEncode(void)
         if(!tracks[i].isReady) {            // this track is not ready? return index
             return i;
         }
+    }
+
+    // this image content is new and there's nothing more to encode, we can send the whole image to device
+    if(newContent) {
+        newContent = false;
+        logFdd(LOG_INFO, "MfmCachedImage::getNextIndexToEncode() - new image now fully encoded, sending to device");
+        slotSendToDevice[slotNo] = true;
     }
 
     // if wasn't able to find valid next index

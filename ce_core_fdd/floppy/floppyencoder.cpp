@@ -32,6 +32,7 @@ volatile bool shouldStop;
 // (that means we're not encoding that track at that moment).
 
 SiloSlot slots[SLOT_COUNT];
+volatile uint8_t slotSendToDevice[SLOT_COUNT];
 
 WrittenMfmSector writtenSectors[WRITTENMFMSECTOR_COUNT];
 //-------------------------------
@@ -211,7 +212,7 @@ static void floppyEncoder_handleLoadFiles(void)
             }
         } else {                                    // image loaded? good
             logFdd(LOG_DEBUG, "floppyEncoder_handleLoadFiles - image %s loaded", imageFileName.c_str());
-            slot->encImage.storeImageParams(slot->image);   // sets tracksToBeEncoded to all tracks count
+            slot->encImage.storeImageParams(slot->image, i);    // sets tracksToBeEncoded to all tracks count
         }
 
         // if no open request happened during the encoding (since openActionTime), clear the openRequested flag and we're done here

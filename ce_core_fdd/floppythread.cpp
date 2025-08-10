@@ -29,6 +29,7 @@ extern ChipInterfaceNetwork* chipInterface;
 extern DebugVars    dbgVars;
 
 extern SharedObjects shared;
+extern volatile uint8_t slotSendToDevice[SLOT_COUNT];
 
 struct TLastFwInfoTime {
     uint32_t franz;
@@ -70,6 +71,22 @@ void FloppyThread::run(void)
 
         chipInterface->clientsDisconnectInactive();
 
+        // check if any slot was just loaded and needs to be sent to device
+        for(int i=0; i<SLOT_COUNT; i++) {
+            if(slotSendToDevice[i]) {                   // if slot #i should be sent to device
+                slotSendToDevice[0] = false;
+
+                ClientInfo* client = chipInterface->clientsGetOne(i);
+
+                if(client->fdClient == FD_EMPTY) {       // client not connected? skip
+                    continue;
+                }
+
+                logFdd(LOG_DEBUG, "FloppyThread::run - sending whole image to client %d", i);
+                handleSendImageToClient(client);
+            }
+        }
+
         max_fd = -1;
         FD_ZERO(&readfds);
 
@@ -84,7 +101,8 @@ void FloppyThread::run(void)
         // add timeout to select(), so we can check for connection status, settings reload, etc.
         timeval timeout;
         memset(&timeout, 0, sizeof(timeout));
-        timeout.tv_sec = 2;
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 500000;
 
         if(select(max_fd + 1, &readfds, NULL, NULL, &timeout) < 0) {
             if(errno == EINTR) {
@@ -141,7 +159,7 @@ bool FloppyThread::handleFdd(int clientIndex, int fdClient, int floppySlotIndex,
 
     case ATN_SEND_WHOLE_IMAGE:
         isFddCommand = true;
-        handleSendImage(clientIndex);
+        handleSendImageToIndex(clientIndex);
         break;
 
     default:
@@ -246,7 +264,7 @@ void FloppyThread::handleSendTrack(int clientIndex)
     chipInterface->fdd_sendTrackToChip(client->fdClient, countInTrack, encodedTrack);
 }
 
-void FloppyThread::handleSendImage(int clientIndex)
+void FloppyThread::handleSendImageToIndex(int clientIndex)
 {
     #define BFR_SIZE    32
     uint8_t inBuf[BFR_SIZE];
@@ -254,7 +272,11 @@ void FloppyThread::handleSendImage(int clientIndex)
     chipInterface->readRestOfData(clientIndex, inBuf, BFR_SIZE);
 
     ClientInfo* client = chipInterface->clientsGetOne(clientIndex);
+    handleSendImageToClient(client);
+}
 
+void FloppyThread::handleSendImageToClient(ClientInfo* client)
+{
     std::string fileName = shared.imageSilo->getFileName(client->floppySlotIndex);   // get the filename
 
     int imgTracks, imgSides, imgSectorsPerTrack;

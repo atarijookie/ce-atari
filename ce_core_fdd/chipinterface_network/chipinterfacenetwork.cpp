@@ -202,7 +202,7 @@ bool ChipInterfaceNetwork::actionNeeded(int clientIndex, uint8_t *inBuf)
         return false;
     }
 
-    Debug::out(whichLog, LOG_DEBUG, "actionNeeded() - bytesAvailable: %d", bytesAvailable);
+    // Debug::out(whichLog, LOG_DEBUG, "actionNeeded() - bytesAvailable: %d", bytesAvailable);
 
     // if waitForAtn() succeeds, it fills 8 bytes of data in buffer
     // ...but then we might need some little more, so let's determine what it was
@@ -228,7 +228,7 @@ bool ChipInterfaceNetwork::actionNeeded(int clientIndex, uint8_t *inBuf)
         }
 
         // if came here, probably weird situation, quit
-        Debug::out(whichLog, LOG_DEBUG, "actionNeeded() - weird situation?");
+        Debug::out(whichLog, LOG_WARNING, "actionNeeded() - weird situation?");
         break;
     }
 

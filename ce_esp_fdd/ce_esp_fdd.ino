@@ -110,7 +110,7 @@ void IRAM_ATTR floppyStepISR(void)
 
     uint32_t now = millis();
 
-    if((now - lastStepTime) < 2) {  // last step ISR was less than 2 ms ago? this is a glitch, ignore it
+    if((now - lastStepTime) < 1) {  // last step ISR was less than 2 ms ago? this is a glitch, ignore it
         return;
     }
     lastStepTime = now;

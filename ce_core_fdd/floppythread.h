@@ -3,8 +3,8 @@
 
 #include "global.h"
 #include "settings.h"
-
 #include "utils.h"
+#include "chipinterface_network/chipinterfacenetwork.h"
 
 #define INBUF_SIZE  16384
 
@@ -33,7 +33,8 @@ private:
     bool handleFdd(int clientIndex, int fdClient, int floppySlotIndex, uint8_t* inBuff);
     void handleFwVersion_franz(int clientIndex);
     void handleSendTrack(int clientIndex);
-    void handleSendImage(int clientIndex);
+    void handleSendImageToIndex(int clientIndex);
+    void handleSendImageToClient(ClientInfo* client);
     void handleSectorWritten(int clientIndex);
 
     void loadLastImageIntoSlot(int clientIndex);

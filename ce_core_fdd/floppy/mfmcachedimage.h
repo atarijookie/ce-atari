@@ -36,7 +36,7 @@ public:
     virtual ~MfmCachedImage();
 
     void clearWholeCachedImage(void);           // go and memset() all the cached tracks - used on new image (not on reencode)
-    void storeImageParams(FloppyImage *img);
+    void storeImageParams(FloppyImage *img, int slotNo);
     bool somethingToBeEncoded(void);
     void askToReencodeTrack(int track, int side);
 
@@ -55,6 +55,7 @@ public:
     static void indexToTrackAndSide(const int index, int &track, int &side);
 
 private:
+    int slotNo;
     int nextIndex;      // set this to force encoding of some track sooner than would go
 
     bool gotImage;

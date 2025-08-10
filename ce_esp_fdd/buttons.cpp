@@ -141,5 +141,6 @@ void handleAllButtons(void)
     lastCheck = now;
 
     handleBootButton(now);
-    handleAnalogButtons(now);
+    // TODO: uncomment when there's at least a pull up on analog buttons pin
+    //handleAnalogButtons(now);
 }
