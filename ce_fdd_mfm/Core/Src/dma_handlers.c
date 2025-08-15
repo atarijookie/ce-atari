@@ -32,6 +32,9 @@ void updateReadTimerDma(uint8_t lowerNotUpper)
     bfr[3] = arrValues[ ((streamByte     ) & 3) ];
 }
 
+// With the check of registers in the interrupt, this takes:
+// - 3.2 us when updateWriteDataDirect() is without inline, or...
+// - 2.7 us when updateWriteDataDirect() is always_inline
 void processWriteTimerDma(uint8_t lowerNotUpper)
 {
     uint16_t* bfr = lowerNotUpper ? &mfmWriteStreamBuffer[0] : &mfmWriteStreamBuffer[MFM_WRITE_SIZE/2];
@@ -48,17 +51,10 @@ uint8_t wrBits = 0;
 volatile uint16_t wrPrevCapturedStamp = 0;
 extern volatile uint8_t writingNow;
 
-/* Takes 2.61 us when also storing byte to circular buffer,
- * takes 1.81 us when just storing bits, not adding to circular buffer.
- * Can happen in 4 us intervals (min), but up to 6 us or 8 us also.
- *
- * If you use always_inline, you get a compiler warning, but in the Build Analyzer
- * you can see the difference:
- * - no inline - processWriteTimerDma  44
- *             - updateWriteDataDirect 184
- *             - total:   44 + 4*184 = 780
- * - inline    - processWriteTimerDma  664
- * This looks like 15% less of overall code executed, could help.
+/*
+ * If you use always_inline, you get a compiler warning, but the test shows the differences:
+ * - 3.2 us when not inline
+ * - 2.6 us when always_inline
  */
 __attribute__((always_inline)) void updateWriteDataDirect(uint16_t capturedStamp)
 {
@@ -144,7 +140,8 @@ volatile uint8_t bfrStateLow, bfrStateHigh;
  */
 
 // can happen up to every 1.3 ms for SPI, takes 0.5 us
-// can happen up to every 16 us for TIM3, takes 3.2 us
+// can happen up to every 16 us for TIM3 (read), takes 3.2 us
+// can happen up to every 16 us for TIM16 (write), takes 3.2 us
 void DMA1_Channel2_3_IRQHandler(void)
 {
     uint32_t flag_it = DMA1->ISR;
@@ -199,8 +196,6 @@ void DMA1_Channel2_3_IRQHandler(void)
     // DMA channel 3
     // Half Transfer Complete Interrupt management
 
-    GPIOB->BSRR = (1 << 6);     // TODO: just for debug, remove later
-
     if((flag_it & DMA_FLAG_HT3) != 0U)
     {
        DMA1->IFCR = DMA_FLAG_HT3;   // clear flag
@@ -227,6 +222,4 @@ void DMA1_Channel2_3_IRQHandler(void)
     {
         DMA1->IFCR = DMA_FLAG_TE3;
     }
-
-    GPIOB->BRR = (1 << 6);     // TODO: just for debug, remove later
 }
