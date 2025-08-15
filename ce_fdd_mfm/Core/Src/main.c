@@ -23,6 +23,8 @@
 /* USER CODE BEGIN Includes */
 
 #include "circularbuffer.h"
+#include "initializers.h"
+#include "dma_handlers.h"
 
 /* USER CODE END Includes */
 
@@ -33,21 +35,6 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
-#define MFM_4US         1
-#define MFM_6US         2
-#define MFM_8US         3
-
-#define PULSE_TOO_SHORT 18
-#define PULSE_4US       36
-#define PULSE_6US       52
-#define PULSE_8US       72
-
-#define PIN_WGATE       (1 << 3)        // GPIOA 3, write is happening when WGATE is L
-#define PIN_RXE         (1 << 5)        // GPIOA 5, SPI can get more data if this is H
-
-#define TAG_WRITE_START 0x80    // start of sector data
-#define TAG_WRITE_END   0xc0    // end of sector data
 
 /* USER CODE END PD */
 
@@ -84,267 +71,23 @@ static void MX_TIM16_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-uint8_t* pWrite;
+extern uint8_t* pWrite;
 
-#define MFM_READ_SIZE   8
-uint16_t mfmReadStreamBuffer[MFM_READ_SIZE];
+extern uint8_t wrStreamByte;
+extern uint8_t wrBits;
 
-void updateReadTimerDma(uint8_t lowerNotUpper)
-{
-    const uint16_t arrValues[4] = {7, 7, 11, 15};       // conversion table from mfm packed symbol to timer ARR value (for 0 us, 4 us, 6 us, 8 us)
-    uint8_t streamByte = 0;
-
-    if(rxCnt > 0) {             // got something in RX buffer?
-        streamByte = RX_GET();
-        UPDATE_PIN_RXE;         // after removing byte from RX buffer, update RXE flag
-    } else {                    // RX buffer empty?
-        streamByte = 0x55;
-    }
-
-    uint16_t* bfr = lowerNotUpper ? &mfmReadStreamBuffer[0] : &mfmReadStreamBuffer[MFM_READ_SIZE/2];
-
-    bfr[0] = arrValues[ ((streamByte >> 6) & 3) ];
-    bfr[1] = arrValues[ ((streamByte >> 4) & 3) ];
-    bfr[2] = arrValues[ ((streamByte >> 2) & 3) ];
-    bfr[3] = arrValues[ ((streamByte     ) & 3) ];
-}
-
-void updateWriteData(uint32_t captured)
-{
-    static uint8_t streamByte = 0;
-    static uint8_t bits = 0;
-    static uint32_t prevCaptured = 0;
-
-    uint32_t duration = captured - prevCaptured;    // calculate the change from previous captured value
-    prevCaptured = captured;                        // store the current captured time
-
-    uint8_t newTime = 0;
-
-    if(duration < PULSE_TOO_SHORT) {    // if this pulse is too short (less than 2.7 us long)
-        return;
-    } else if(duration < PULSE_4US) {   // 4 us? (interval 2.7 us - 5.0 us) (40 pulses of 0.125 us)
-        newTime = MFM_4US;
-    } else if(duration < PULSE_6US) {   // 6 us? (interval 5.0 us - 7.0 us) (56 pulses of 0.125 us)
-        newTime = MFM_6US;
-    } else if(duration < PULSE_8US) {   // 8 us? (interval 7.0 us - 9.0 us) (72 pulses of 0.125 us)
-        newTime = MFM_8US;
-    } else {                            // pulse too long? (longer than 9 us)
-        return;
-    }
-
-    streamByte = (streamByte << 2) | newTime;   // append new time to streamByte
-    bits += 2;              // now got 2 more bits
-
-    if(bits >= 8) {         // got 8 bits?
-        // tx buffer not full? add streamByte to tx buffer
-        if(txCnt < WRITEBUFFER_SIZE) {
-            *pWrite = streamByte;
-            pWrite++;
-            txCnt++;
-        }
-
-        bits = 0;           // don't have bits now
-    }
-}
-
-void setupSpiUsingCircularDma(void)
-{
-    CLEAR_BIT(SPI1->CR1, SPI_CR1_SPE);          // SPI disable
-    CLEAR_BIT(DMA1_Channel1->CCR, DMA_CCR_EN);  // DMA disable channel 1
-    CLEAR_BIT(DMA1_Channel2->CCR, DMA_CCR_EN);  // DMA disable channel 2
-
-    SET_BIT(SPI1->CR2, SPI_RXFIFO_THRESHOLD);   // Set RX FIFO threshold according the reception data length: 8bit
-
-    DMAMUX1_ChannelStatus->CFR = 0x1f;          // Clear the DMAMUX synchro overrun flag
-    DMAMUX1_RequestGenStatus->RGCFR = 0x0f;     // Clear the DMAMUX request generator overrun flag
-
-    //----
-    // DMA1 channel 1 - SPI RX
-    DMA1->IFCR = DMA_FLAG_GI1;                  // Clear all flags
-
-    DMA1_Channel1->CPAR = (uint32_t) &(SPI1->DR);   // peripheral address: SPI DR
-    DMA1_Channel1->CMAR = (uint32_t) rxData;        // memory address: rxData
-    DMA1_Channel1->CNDTR = BFR_SIZE;                // Configure DMA Channel data length
-    SET_BIT(DMA1_Channel1->CCR, (DMA_CCR_PL_1 | DMA_CCR_PL_0));         // channel 1 priority - very high (3)
-    SET_BIT(DMA1_Channel1->CCR, (DMA_IT_TC | DMA_IT_HT | DMA_IT_TE));   // enable interrupts for half-transfer and transfer complete
-    SET_BIT(DMA1_Channel1->CCR, (DMA_CCR_MINC | DMA_CCR_CIRC));         // enable memory increment, circular mode
-    CLEAR_BIT(DMA1_Channel1->CCR, (DMA_CCR_PINC | DMA_CCR_DIR));        // disable peripheral increment, direction: read from peripheral
-
-    //----
-    // DMA1 channel 2 - SPI TX
-    DMA1->IFCR = DMA_FLAG_GI2;                  // Clear all flags
-
-    DMA1_Channel2->CPAR = (uint32_t) &(SPI1->DR);   // peripheral address: SPI DR
-    DMA1_Channel2->CMAR = (uint32_t) txData;        // memory address: tx buffer
-    DMA1_Channel2->CNDTR = TX_DATA_SIZE;            // Configure DMA Channel data length
-    SET_BIT(DMA1_Channel2->CCR, DMA_CCR_PL_1); CLEAR_BIT(DMA1_Channel2->CCR, DMA_CCR_PL_0); // channel 2 priority - high (2)
-    SET_BIT(DMA1_Channel2->CCR, (DMA_IT_TC | DMA_IT_HT | DMA_IT_TE));   // enable interrupts for half-transfer and transfer complete
-    SET_BIT(DMA1_Channel2->CCR, (DMA_CCR_MINC | DMA_CCR_CIRC | DMA_CCR_DIR));   // enable memory increment, circular mode, direction: read from memory
-    CLEAR_BIT(DMA1_Channel2->CCR, DMA_CCR_PINC);        // disable peripheral increment
-
-    //----
-    SET_BIT(DMA1_Channel1->CCR, DMA_CCR_EN);    // DMA enable channel 1
-    SET_BIT(DMA1_Channel2->CCR, DMA_CCR_EN);    // DMA enable channel 2
-
-    SET_BIT(SPI1->CR1, SPI_CR1_SPE);            // SPI enable
-    SET_BIT(SPI1->CR2, SPI_CR2_RXDMAEN);        // enable RX DMA on SPI
-    SET_BIT(SPI1->CR2, SPI_CR2_TXDMAEN);        // enable TX DMA on SPI
-}
-
-void setupTMI3circularDma(void)
-{
-    for(int i=0; i<MFM_READ_SIZE; i++) {
-        mfmReadStreamBuffer[i] = 7;     // by default -- all pulses 4 us
-    }
-
-    CLEAR_BIT(DMA1_Channel3->CCR, DMA_CCR_EN);  // DMA disable channel
-
-    //----
-
-    DMA1_Channel3->CPAR = (uint32_t) &(TIM3->DMAR);         // peripheral address: SPI DR
-    DMA1_Channel3->CMAR = (uint32_t) mfmReadStreamBuffer;   // memory address: mfmReadStreamBuffer
-    DMA1_Channel3->CNDTR = MFM_READ_SIZE;                   // Configure DMA Channel data length
-    CLEAR_BIT(DMA1_Channel3->CCR, DMA_CCR_PL_1); SET_BIT(DMA1_Channel2->CCR, DMA_CCR_PL_0); // channel 3 priority - low (1)
-    SET_BIT(DMA1_Channel3->CCR, (DMA_IT_TC | DMA_IT_HT | DMA_IT_TE));   // enable interrupts for half-transfer and transfer complete
-    SET_BIT(DMA1_Channel3->CCR, (DMA_CCR_MINC | DMA_CCR_CIRC | DMA_CCR_DIR));         // enable memory increment, circular mode, direction: read from memory
-    CLEAR_BIT(DMA1_Channel3->CCR, (DMA_CCR_PINC));        // disable peripheral increment
-    CLEAR_BIT(DMA1_Channel3->CCR, DMA_CCR_PSIZE_1); SET_BIT(DMA1_Channel2->CCR, DMA_CCR_PSIZE_0); // peripheral transfer size: 16 bits (1)
-    CLEAR_BIT(DMA1_Channel3->CCR, DMA_CCR_MSIZE_1); SET_BIT(DMA1_Channel2->CCR, DMA_CCR_MSIZE_0); // memory transfer size: 16 bits (1)
-
-    //----
-    SET_BIT(DMA1_Channel3->CCR, DMA_CCR_EN);    // DMA enable channel
-
-    // set TIM3 DMA control register (TIMx_DCR) as: DBL (<<8) =0 (1 transfer), DBA (<<0) =11 (0x2C TIMx_ARR)
-    TIM3->DCR = 11;
-    SET_BIT(TIM3->DIER, TIM_DIER_UDE);
-}
-
-
-// can happen up to every 256 us, or longer
-// Takes 1.1 us
-void DMA1_Channel1_IRQHandler(void)
-{
-    uint32_t flag_it = DMA1->ISR;
-
-    // DMA channel 1
-    // Half Transfer Complete Interrupt management
-    if((flag_it & DMA_FLAG_HT1) != 0U)
-    {
-       DMA1->IFCR = DMA_FLAG_HT1;   // clear flag
-       rxCnt += BFR_SIZE_HALF;      // got half buffer of data now
-       UPDATE_PIN_RXE;
-    }
-
-    // Transfer Complete Interrupt management
-    if((flag_it & DMA_FLAG_TC1) != 0)
-    {
-        DMA1->IFCR = DMA_FLAG_TC1;  // clear flag
-        rxCnt += BFR_SIZE_HALF;     // got half buffer of data now
-        UPDATE_PIN_RXE;
-    }
-
-    // Transfer Error Interrupt management
-    if((flag_it & DMA_FLAG_TE1) != 0)
-    {
-        DMA1->IFCR = DMA_FLAG_TE1;
-    }
-}
-
-#define STATE_EMPTY         0       // buffer currently not used and is empty
-#define STATE_STORING       1       // write data is being stored here, but it's still incomplete, and doesn't have tags, so will be ignored by esp32
-#define STATE_WAIT_FOR_SEND 2       // all data stored, start and stop tags present, but waiting for DMA to send it via SPI
-#define STATE_SENDING       3       // DMA is currently sending this part of buffer
-
-volatile uint8_t bfrStateLow, bfrStateHigh;
-
-/*
- * Note: there's still a race-condition hazard, if:
- * - interrupt doesn't see the half of buffer ready to be sent, but it already contains tags
- * - main loop marks the buffer as waiting for send
- * - spi + dma will send this buffer, esp32 will receive it
- * - but upon half / full transfer complete this buffer is not marked as already sent
- * - this buffer gets sent again (so twice the same sector)
- */
-
-// can happen up to every 1.3 ms for SPI, takes 0.5 us
-// can happen up to every 16 us for TIM3, takes 3.2 us
-void DMA1_Channel2_3_IRQHandler(void)
-{
-    uint32_t flag_it = DMA1->ISR;
-
-    //-------------
-    // DMA channel 2
-    // Half Transfer Complete Interrupt management
-    if((flag_it & DMA_FLAG_HT2) != 0U)
-    {
-       DMA1->IFCR = DMA_FLAG_HT2;   // clear flag
-
-       // If the high part was waiting to be sent, now it's being sent.
-       if(bfrStateHigh == STATE_WAIT_FOR_SEND) {
-           bfrStateHigh = STATE_SENDING;
-       }
-
-       // If the low part was sending, now it's sent.
-       // Mark lower part as sent/empty - first and last bytes are zeros now.
-       if(bfrStateLow == STATE_SENDING) {
-           bfrStateLow = STATE_EMPTY;
-           txData[0] = 0;
-           txData[WRITEBUFFER_SIZE - 1] = 0;
-       }
-    }
-
-    // Transfer Complete Interrupt management
-    if((flag_it & DMA_FLAG_TC2) != 0)
-    {
-        DMA1->IFCR = DMA_FLAG_TC2;  // clear flag
-
-        // If the low part was waiting to be sent, now it's being sent.
-        if(bfrStateLow == STATE_WAIT_FOR_SEND) {
-            bfrStateLow = STATE_SENDING;
-        }
-
-        // If the high part was sending, now it's sent.
-        // Mark higher part as sent/empty - first and last bytes are zeros now.
-        if(bfrStateHigh == STATE_SENDING) {
-            bfrStateHigh = STATE_EMPTY;
-            txData[WRITEBUFFER_SIZE] = 0;
-            txData[TX_DATA_SIZE - 1] = 0;
-        }
-    }
-
-    // Transfer Error Interrupt management
-    if((flag_it & DMA_FLAG_TE2) != 0)
-    {
-        DMA1->IFCR = DMA_FLAG_TE2;
-    }
-
-    //-------------
-    // DMA channel 3
-    // Half Transfer Complete Interrupt management
-    if((flag_it & DMA_FLAG_HT3) != 0U)
-    {
-       DMA1->IFCR = DMA_FLAG_HT3;   // clear flag
-       updateReadTimerDma(1);
-    }
-
-    // Transfer Complete Interrupt management
-    if((flag_it & DMA_FLAG_TC3) != 0)
-    {
-        DMA1->IFCR = DMA_FLAG_TC3;  // clear flag
-        updateReadTimerDma(0);
-    }
-
-    // Transfer Error Interrupt management
-    if((flag_it & DMA_FLAG_TE3) != 0)
-    {
-        DMA1->IFCR = DMA_FLAG_TE3;
-    }
-}
+extern volatile uint16_t wrPrevCapturedStamp;
+volatile uint8_t writingNow;
 
 // on write START - see which part of buffer is empty - lower part or upper part?
 // Initialize pointer and count to the free empty part of tx buffer.
 void onWriteStart(void)
 {
+    // restart write handling variables
+    wrStreamByte = 0;
+    wrBits = 0;
+
+    // decide where the next data will be stored
     if(bfrStateLow == STATE_EMPTY) {              // lower part empty?
         bfrStateLow = STATE_STORING;
         pWrite = &txData[1];
@@ -439,6 +182,12 @@ int main(void)
 
   uint8_t writingPrev = (GPIOA->IDR & PIN_WGATE) == 0;      // track WGATE changes with this var, init to current WGATE state
 
+  if(writingPrev) {
+      dmaReconfigForWrite();
+  } else {
+      dmaReconfigForRead();
+  }
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -446,7 +195,7 @@ int main(void)
 
   while (1)
   {
-    uint8_t writingNow = (GPIOA->IDR & PIN_WGATE) == 0;     // true if now writing data (0.3 us)
+    writingNow = (GPIOA->IDR & PIN_WGATE) == 0;     // true if now writing data (0.3 us)
 
     // when the WGATE signal changes, we need to
     // - on START of write - get pointer to empty buffer
@@ -457,22 +206,10 @@ int main(void)
 
         if(writingNow) {
             onWriteStart();
+            dmaReconfigForWrite();
         } else {
             onWriteEnd();
-        }
-    }
-
-    if(writingNow)  // when writing to floppy
-    {
-        // CC1IF bit set? input capture happened
-        /* Takes 2.61 us when also storing byte to circular buffer,
-         * takes 1.81 us when just storing bits, not adding to circular buffer.
-         * Can happen in 4 us intervals (min), but up to 6 us or 8 us also.
-         */
-        if (TIM16->SR & TIM_SR_CC1IF) {
-            TIM16->SR = ~TIM_SR_CC1IF;            // Clear the flag
-            uint32_t captured = TIM16->CCR1;
-            updateWriteData(captured);            // send the input WDATA to buffer
+            dmaReconfigForRead();
         }
     }
 

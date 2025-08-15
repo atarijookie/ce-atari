@@ -16,7 +16,7 @@
 #define BFR_MASK            0x1FF
 #define BFR_SIZE_CAN_RX     BFR_SIZE_HALF
 
-#define WRITEBUFFER_SIZE    1300
+#define WRITEBUFFER_SIZE    1200
 #define TX_DATA_SIZE        (WRITEBUFFER_SIZE * 2)
 
 extern uint32_t txCnt;
