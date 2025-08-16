@@ -79,6 +79,9 @@ extern uint8_t wrBits;
 extern volatile uint16_t wrPrevCapturedStamp;
 volatile uint8_t writingNow;
 
+uint32_t txCnt, txCount1, txCount2;
+uint8_t txData1[WRITEBUFFER_SIZE], txData2[WRITEBUFFER_SIZE];
+
 // on write START - see which part of buffer is empty - lower part or upper part?
 // Initialize pointer and count to the free empty part of tx buffer.
 void onWriteStart(void)
@@ -88,14 +91,34 @@ void onWriteStart(void)
     wrBits = 0;
 
     // decide where the next data will be stored
-    if(bfrStateLow == STATE_EMPTY) {              // lower part empty?
-        bfrStateLow = STATE_STORING;
-        pWrite = &txData[1];
-        txCnt = 0;
-    } else if(bfrStateHigh == STATE_EMPTY) {      // upper part empty?
-        bfrStateHigh = STATE_STORING;
-        pWrite = &txData[WRITEBUFFER_SIZE + 1];
-        txCnt = 0;
+    if(txDataState1 == STATE_EMPTY) {              // lower part empty?
+        txDataState1 = STATE_STORING;
+        pWrite = &txData1[2];
+        txCnt = 2;
+    } else if(txDataState2 == STATE_EMPTY) {      // upper part empty?
+        txDataState2 = STATE_STORING;
+        pWrite = &txData2[2];
+        txCnt = 2;
+    }
+}
+
+void sendBufferIfWaiting(void)
+{
+    // something is being sent now? nothing to do
+    if(txDataState1 == STATE_SENDING || txDataState2 == STATE_SENDING) {
+        return;
+    }
+
+    if(txDataState1 == STATE_WAIT_FOR_SEND) {
+        txDataState1 = STATE_SENDING;
+        spiDmaTxBuffer((uint32_t) &txData1[0], txCount1);  // send this buffer
+        return;
+    }
+
+    if(txDataState2 == STATE_WAIT_FOR_SEND) {
+        txDataState2 = STATE_SENDING;
+        spiDmaTxBuffer((uint32_t) &txData2[0], txCount2);  // send this buffer
+        return;
     }
 }
 
@@ -103,29 +126,35 @@ void onWriteStart(void)
 // marks the buffer used and esp will know that the valid data is between these tags.
 void onWriteEnd(void)
 {
-    // TODO: disable int?
+    uint32_t bytesEmpty = WRITEBUFFER_SIZE - txCnt;   // how much more can we add to the buffer?
+    uint32_t bytesRemove = (bytesEmpty >= 2) ? 0 : (2 - bytesEmpty);    // if have at least 2 bytes empty, don't remove anything; but for 1 or 0 empty bytes remove 1 or 2 bytes
+    pWrite -= bytesRemove;
+    txCnt -= bytesRemove;
 
-    if(txCnt < WRITEBUFFER_SIZE) {
-        *pWrite = TAG_WRITE_END;    // store END tag after the last valid data byte
-        pWrite++;
-        txCnt++;
+    *pWrite = TAG_WRITE_END;    // store END tag after the last valid data byte
+    pWrite++;
+
+    *pWrite = 0;    // one more zero after end tag, just to be safe
+    pWrite++;
+
+    txCnt += 2;
+
+    // too little data? probably glitch, ignore buffer and mark it as empty; otherwise send it
+    uint8_t nextState = (txCnt < 400) ? STATE_EMPTY : STATE_WAIT_FOR_SEND;
+
+    // write was storing data to buffer 1?
+    if(txDataState1 == STATE_STORING) {
+        txDataState1 = nextState;
+        txCount1 = txCnt;
+        return;
     }
 
-    // write was storing data to lower part of buffer?
-    if(bfrStateLow == STATE_STORING) {
-        bfrStateLow = STATE_WAIT_FOR_SEND;
-        txData[0] = TAG_WRITE_START;
-        txData[WRITEBUFFER_SIZE - 1] = TAG_WRITE_END;
+    // write was storing data to buffer 2?
+    if(txDataState2 == STATE_STORING) {
+        txDataState2 = nextState;
+        txCount2 = txCnt;
+        return;
     }
-
-    // write was storing data to upper part of buffer?
-    if(bfrStateHigh == STATE_STORING) {
-        bfrStateHigh = STATE_WAIT_FOR_SEND;
-        txData[WRITEBUFFER_SIZE] = TAG_WRITE_START;
-        txData[TX_DATA_SIZE - 1] = TAG_WRITE_END;
-    }
-
-    // TODO: enable int?
 }
 
 /* USER CODE END 0 */
@@ -164,19 +193,26 @@ int main(void)
   MX_TIM16_Init();
   /* USER CODE BEGIN 2 */
 
-  bfrStateLow = STATE_EMPTY;
-  bfrStateHigh = STATE_EMPTY;
-
   setupSpiUsingCircularDma();
   setupTMI3circularDma();
+
+  spiDmaTxZeros();
 
   RX_CLEAR();
 
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim16, TIM_CHANNEL_1);
 
-  pWrite = &txData[1];
-  txCnt = 0;
+  txDataState1 = STATE_EMPTY;
+  txData1[0] = 0;
+  txData1[1] = TAG_WRITE_START;
+
+  txDataState2 = STATE_EMPTY;
+  txData2[0] = 0;
+  txData2[1] = TAG_WRITE_START;
+
+  pWrite = &txData1[2];
+  txCnt = 2;
 
   UPDATE_PIN_RXE;       // set RXE pin because we're empty
 
@@ -212,6 +248,9 @@ int main(void)
             dmaReconfigForRead();
         }
     }
+
+    // send write buffers if some is waiting to be sent
+    sendBufferIfWaiting();
 
     /* USER CODE END WHILE */
 

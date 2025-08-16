@@ -7,8 +7,12 @@ extern "C" {
 
 void setupSpiUsingCircularDma(void);
 void setupTMI3circularDma(void);
+
 void dmaReconfigForRead(void);
 void dmaReconfigForWrite(void);
+
+void spiDmaTxBuffer(uint32_t pData, uint32_t count);
+void spiDmaTxZeros(void);
 
 #ifdef __cplusplus
 }

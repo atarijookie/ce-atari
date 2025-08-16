@@ -1,6 +1,7 @@
 #include "main.h"
 #include "circularbuffer.h"
 #include "dma_handlers.h"
+#include "initializers.h"
 
 void updateWriteDataDirect(uint16_t capturedStamp);
 
@@ -98,6 +99,7 @@ __attribute__((always_inline)) void updateWriteDataDirect(uint16_t capturedStamp
     }
 }
 
+// DMA for SPI RX, interrupt on half transfer and full transfer.
 // can happen up to every 256 us, or longer
 // Takes 1.1 us
 void DMA1_Channel1_IRQHandler(void)
@@ -128,20 +130,16 @@ void DMA1_Channel1_IRQHandler(void)
     }
 }
 
-volatile uint8_t bfrStateLow, bfrStateHigh;
+volatile uint8_t txDataState1, txDataState2;
 
 /*
- * Note: there's still a race-condition hazard, if:
- * - interrupt doesn't see the half of buffer ready to be sent, but it already contains tags
- * - main loop marks the buffer as waiting for send
- * - spi + dma will send this buffer, esp32 will receive it
- * - but upon half / full transfer complete this buffer is not marked as already sent
- * - this buffer gets sent again (so twice the same sector)
+ * DMA channel 2 - interrupt when finished SPI TX of written data.
+ * Can happen up to every 1.3 ms for SPI, takes 0.5 us
+ *
+ * DMA channel 3 - interrupt on half transfer and full transfer of MFM output (read) or MFM input (write).
+ * - can happen up to every 16 us for TIM3 (read), takes 3.2 us
+ * - can happen up to every 16 us for TIM16 (write), takes 6.3 us
  */
-
-// can happen up to every 1.3 ms for SPI, takes 0.5 us
-// can happen up to every 16 us for TIM3 (read), takes 3.2 us
-// can happen up to every 16 us for TIM16 (write), takes 3.2 us
 void DMA1_Channel2_3_IRQHandler(void)
 {
     uint32_t flag_it = DMA1->ISR;
@@ -152,19 +150,6 @@ void DMA1_Channel2_3_IRQHandler(void)
     if((flag_it & DMA_FLAG_HT2) != 0U)
     {
        DMA1->IFCR = DMA_FLAG_HT2;   // clear flag
-
-       // If the high part was waiting to be sent, now it's being sent.
-       if(bfrStateHigh == STATE_WAIT_FOR_SEND) {
-           bfrStateHigh = STATE_SENDING;
-       }
-
-       // If the low part was sending, now it's sent.
-       // Mark lower part as sent/empty - first and last bytes are zeros now.
-       if(bfrStateLow == STATE_SENDING) {
-           bfrStateLow = STATE_EMPTY;
-           txData[0] = 0;
-           txData[WRITEBUFFER_SIZE - 1] = 0;
-       }
     }
 
     // Transfer Complete Interrupt management
@@ -172,17 +157,14 @@ void DMA1_Channel2_3_IRQHandler(void)
     {
         DMA1->IFCR = DMA_FLAG_TC2;  // clear flag
 
-        // If the low part was waiting to be sent, now it's being sent.
-        if(bfrStateLow == STATE_WAIT_FOR_SEND) {
-            bfrStateLow = STATE_SENDING;
+        if(txDataState1 == STATE_SENDING) {    // was sending low buffer? now it's empty
+          txDataState1 = STATE_EMPTY;
+          spiDmaTxZeros();
         }
 
-        // If the high part was sending, now it's sent.
-        // Mark higher part as sent/empty - first and last bytes are zeros now.
-        if(bfrStateHigh == STATE_SENDING) {
-            bfrStateHigh = STATE_EMPTY;
-            txData[WRITEBUFFER_SIZE] = 0;
-            txData[TX_DATA_SIZE - 1] = 0;
+        if(txDataState2 == STATE_SENDING) {   // was sending high buffer? now it's empty
+          txDataState2 = STATE_EMPTY;
+          spiDmaTxZeros();
         }
     }
 

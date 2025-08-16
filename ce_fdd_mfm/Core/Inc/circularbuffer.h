@@ -16,11 +16,17 @@
 #define BFR_MASK            0x1FF
 #define BFR_SIZE_CAN_RX     BFR_SIZE_HALF
 
+/*
+ * Maximum bytes with mfm symbols count in written sector == write buffer size
+ * - you get the most symbols in sector, if all data bytes are zeros or all ones
+ * - if you write header + data: 1189 bytes (you write this only when formatting?)
+ * - if you write just data part: 1096 bytes (you write this when you write new sector data)
+ * This means that 1200 bytes should be enough for written data.
+ */
 #define WRITEBUFFER_SIZE    1200
-#define TX_DATA_SIZE        (WRITEBUFFER_SIZE * 2)
 
 extern uint32_t txCnt;
-extern uint8_t txData[TX_DATA_SIZE];
+extern uint8_t txData1[WRITEBUFFER_SIZE], txData2[WRITEBUFFER_SIZE];
 
 extern volatile uint32_t rxCnt;
 extern uint32_t rxLoad;

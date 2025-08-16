@@ -14,7 +14,7 @@ extern "C" {
 extern uint16_t mfmReadStreamBuffer[MFM_READ_SIZE];
 extern uint16_t mfmWriteStreamBuffer[MFM_WRITE_SIZE];
 
-extern volatile uint8_t bfrStateLow, bfrStateHigh;
+extern volatile uint8_t txDataState1, txDataState2;
 
 void updateWriteDataDirect(uint16_t capturedStamp);
 void updateReadTimerDma(uint8_t lowerNotUpper);

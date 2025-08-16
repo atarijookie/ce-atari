@@ -33,8 +33,8 @@ void setupSpiUsingCircularDma(void)
     DMA1->IFCR = DMA_FLAG_GI2;                  // Clear all flags
 
     DMA1_Channel2->CPAR = (uint32_t) &(SPI1->DR);   // peripheral address: SPI DR
-    DMA1_Channel2->CMAR = (uint32_t) txData;        // memory address: tx buffer
-    DMA1_Channel2->CNDTR = TX_DATA_SIZE;            // Configure DMA Channel data length
+    DMA1_Channel2->CMAR = (uint32_t) txData1;       // memory address: tx buffer
+    DMA1_Channel2->CNDTR = WRITEBUFFER_SIZE;        // Configure DMA Channel data length
     SET_BIT(DMA1_Channel2->CCR, DMA_CCR_PL_1); CLEAR_BIT(DMA1_Channel2->CCR, DMA_CCR_PL_0); // channel 2 priority - high (2)
     SET_BIT(DMA1_Channel2->CCR, (DMA_IT_TC | DMA_IT_HT | DMA_IT_TE));   // enable interrupts for half-transfer and transfer complete
     SET_BIT(DMA1_Channel2->CCR, (DMA_CCR_MINC | DMA_CCR_CIRC | DMA_CCR_DIR));   // enable memory increment, circular mode, direction: read from memory
@@ -76,10 +76,11 @@ void setupTMI3circularDma(void)
     TIM3->DCR = 11;
     SET_BIT(TIM3->DIER, TIM_DIER_UDE);
 
-    // set TIM16 DMA control register (TIMx_DCR) as: DBL (<<8) =0 (1 transfer), DBA (<<0) =6 (0x18 TIMx_CCMR1)
-    TIM16->DCR = 6;
+    // set TIM16 DMA control register (TIMx_DCR) as: DBL (<<8) =0 (1 transfer), DBA (<<0) =13 (0x34 TIMx_CCR1)
+    TIM16->DCR = 13;
 }
 
+// Reconfigure DMA channel 3, so that it reads from memory into TIM3 - for MFM read output
 void dmaReconfigForRead(void)
 {
     CLEAR_BIT(TIM16->DIER, TIM_DIER_CC1DE);                 // TIM16 DMA request disable
@@ -101,14 +102,13 @@ void dmaReconfigForRead(void)
     SET_BIT(TIM3->DIER, TIM_DIER_UDE);                      // enable timer update DMA
 }
 
+// Reconfigure DMA channel 3, so that it reads from TIM16 into memory - for MFM write input
 void dmaReconfigForWrite(void)
 {
     CLEAR_BIT(TIM3->DIER, TIM_DIER_UDE);                    // TIM3 DMA request disable
     CLEAR_BIT(DMA1_Channel3->CCR, DMA_CCR_EN);              // DMA disable channel
 
-    for(int i=0; i<MFM_READ_SIZE; i++) {
-        mfmReadStreamBuffer[i] = 7;                         // by default -- all pulses 4 us
-    }
+    TIM3->ARR = 7;                                          // TIM3 will now just output 4 us pulses all the time
 
     DMA1_Channel3->CPAR = (uint32_t) &(TIM16->DMAR);        // peripheral address
     DMA1_Channel3->CMAR = (uint32_t) mfmWriteStreamBuffer;  // memory address: mfmReadStreamBuffer
@@ -121,3 +121,39 @@ void dmaReconfigForWrite(void)
     SET_BIT(DMA1_Channel3->CCR, DMA_CCR_EN);                // DMA enable channel
     SET_BIT(TIM16->DIER, TIM_DIER_CC1DE);                   // TIM16 DMA request enable
 }
+
+// Reconfigure DMA channel 2, so that it reads from memory into SPI TX - for sending buffer out
+void spiDmaTxBuffer(uint32_t pData, uint32_t count)
+{
+    CLEAR_BIT(SPI1->CR2, SPI_CR2_TXDMAEN);                  // disable TX DMA on SPI
+    CLEAR_BIT(DMA1_Channel2->CCR, DMA_CCR_EN);              // DMA disable channel
+
+    CLEAR_BIT(DMA1_Channel2->CCR, DMA_CCR_CIRC);            // linear mode (disable circular mode)
+    DMA1_Channel2->CMAR = pData;                            // memory address: the supplied buffer
+    DMA1_Channel2->CNDTR = count;                           // length: the size of data in buffer
+
+    SET_BIT(DMA1_Channel2->CCR, DMA_IT_TC);                 // enable interrupts for transfer complete
+    CLEAR_BIT(DMA1_Channel2->CCR, DMA_IT_HT);               // disable interrupts for half-transfer
+
+    SET_BIT(DMA1_Channel2->CCR, DMA_CCR_EN);                // DMA enable channel
+    SET_BIT(SPI1->CR2, SPI_CR2_TXDMAEN);                    // enable TX DMA on SPI
+}
+
+uint32_t zero = 0;
+
+// Reconfigure DMA channel 2, so that it sends just zeros - when there are no write buffers to send
+void spiDmaTxZeros(void)
+{
+    CLEAR_BIT(SPI1->CR2, SPI_CR2_TXDMAEN);                  // disable TX DMA on SPI
+    CLEAR_BIT(DMA1_Channel2->CCR, DMA_CCR_EN);              // DMA disable channel
+
+    SET_BIT(DMA1_Channel2->CCR, DMA_CCR_CIRC);              // circular mode
+    DMA1_Channel2->CMAR = (uint32_t) &zero;                 // memory address: pointer to single zero
+    DMA1_Channel2->CNDTR = 1;                               // length: just one
+
+    CLEAR_BIT(DMA1_Channel2->CCR, (DMA_IT_TC | DMA_IT_HT)); // disable interrupts for half-transfer and transfer complete
+
+    SET_BIT(DMA1_Channel2->CCR, DMA_CCR_EN);                // DMA enable channel
+    SET_BIT(SPI1->CR2, SPI_CR2_TXDMAEN);                    // enable TX DMA on SPI
+}
+
