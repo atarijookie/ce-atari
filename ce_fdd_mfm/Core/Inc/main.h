@@ -62,29 +62,6 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN Private defines */
 
-#define MFM_4US         1
-#define MFM_6US         2
-#define MFM_8US         3
-
-#define PULSE_TOO_SHORT 18
-#define PULSE_4US       36
-#define PULSE_6US       52
-#define PULSE_8US       72
-
-#define PIN_WGATE       (1 << 3)        // GPIOA 3, write is happening when WGATE is L
-#define PIN_RXE         (1 << 5)        // GPIOA 5, SPI can get more data if this is H
-
-#define TAG_WRITE_START 0x80    // start of sector data
-#define TAG_WRITE_END   0xc0    // end of sector data
-
-#define STATE_EMPTY         0       // buffer currently not used and is empty
-#define STATE_STORING       1       // write data is being stored here, but it's still incomplete, and doesn't have tags, so will be ignored by esp32
-#define STATE_WAIT_FOR_SEND 2       // all data stored, start and stop tags present, but waiting for DMA to send it via SPI
-#define STATE_SENDING       3       // DMA is currently sending this part of buffer
-
-#define MFM_READ_SIZE   8
-#define MFM_WRITE_SIZE   8
-
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

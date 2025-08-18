@@ -1,4 +1,5 @@
 #include "main.h"
+#include "defs.h"
 #include "circularbuffer.h"
 #include "initializers.h"
 #include "dma_handlers.h"
@@ -85,6 +86,7 @@ void dmaReconfigForRead(void)
 {
     CLEAR_BIT(TIM16->DIER, TIM_DIER_CC1DE);                 // TIM16 DMA request disable
     CLEAR_BIT(DMA1_Channel3->CCR, DMA_CCR_EN);              // DMA disable channel
+    DMA1->IFCR = DMA_FLAG_GI3;                              // DMA channel 3 - clear interrupt flags
 
     for(int i=0; i<MFM_READ_SIZE; i++) {
         mfmReadStreamBuffer[i] = 7;                         // by default -- all pulses 4 us
@@ -100,13 +102,18 @@ void dmaReconfigForRead(void)
 
     SET_BIT(DMA1_Channel3->CCR, DMA_CCR_EN);                // DMA enable channel
     SET_BIT(TIM3->DIER, TIM_DIER_UDE);                      // enable timer update DMA
+
+    HAL_NVIC_EnableIRQ(DMA1_Channel2_3_IRQn);               // enable DMA channel 2_3 interrupt for read
 }
 
 // Reconfigure DMA channel 3, so that it reads from TIM16 into memory - for MFM write input
 void dmaReconfigForWrite(void)
 {
+    HAL_NVIC_DisableIRQ(DMA1_Channel2_3_IRQn);              // disable DMA channel 2_3 interrupt for read
+
     CLEAR_BIT(TIM3->DIER, TIM_DIER_UDE);                    // TIM3 DMA request disable
     CLEAR_BIT(DMA1_Channel3->CCR, DMA_CCR_EN);              // DMA disable channel
+    DMA1->IFCR = DMA_FLAG_GI3;                              // DMA channel 3 - clear interrupt flags
 
     TIM3->ARR = 7;                                          // TIM3 will now just output 4 us pulses all the time
 
@@ -127,6 +134,7 @@ void spiDmaTxBuffer(uint32_t pData, uint32_t count)
 {
     CLEAR_BIT(SPI1->CR2, SPI_CR2_TXDMAEN);                  // disable TX DMA on SPI
     CLEAR_BIT(DMA1_Channel2->CCR, DMA_CCR_EN);              // DMA disable channel
+    DMA1->IFCR = DMA_FLAG_GI2;                              // DMA channel 2 - clear interrupt flags
 
     CLEAR_BIT(DMA1_Channel2->CCR, DMA_CCR_CIRC);            // linear mode (disable circular mode)
     DMA1_Channel2->CMAR = pData;                            // memory address: the supplied buffer
@@ -146,6 +154,7 @@ void spiDmaTxZeros(void)
 {
     CLEAR_BIT(SPI1->CR2, SPI_CR2_TXDMAEN);                  // disable TX DMA on SPI
     CLEAR_BIT(DMA1_Channel2->CCR, DMA_CCR_EN);              // DMA disable channel
+    DMA1->IFCR = DMA_FLAG_GI2;                              // DMA channel 2 - clear interrupt flags
 
     SET_BIT(DMA1_Channel2->CCR, DMA_CCR_CIRC);              // circular mode
     DMA1_Channel2->CMAR = (uint32_t) &zero;                 // memory address: pointer to single zero

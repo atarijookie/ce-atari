@@ -143,18 +143,18 @@ void SysTick_Handler(void)
 /* For the available peripheral interrupt handler names,                      */
 /* please refer to the startup file (startup_stm32c0xx.s).                    */
 /******************************************************************************/
-
-/**
-  * @brief This function handles DMA1 channel 1 interrupt.
-  */
+//
+///**
+//  * @brief This function handles DMA1 channel 1 interrupt.
+//  */
 //void DMA1_Channel1_IRQHandler(void)
 //{
 //  /* USER CODE BEGIN DMA1_Channel1_IRQn 0 */
-//////
+//
 //  /* USER CODE END DMA1_Channel1_IRQn 0 */
 //  HAL_DMA_IRQHandler(&hdma_spi1_rx);
 //  /* USER CODE BEGIN DMA1_Channel1_IRQn 1 */
-//////
+//
 //  /* USER CODE END DMA1_Channel1_IRQn 1 */
 //}
 //
@@ -164,12 +164,12 @@ void SysTick_Handler(void)
 //void DMA1_Channel2_3_IRQHandler(void)
 //{
 //  /* USER CODE BEGIN DMA1_Channel2_3_IRQn 0 */
-//////
+//
 //  /* USER CODE END DMA1_Channel2_3_IRQn 0 */
 //  HAL_DMA_IRQHandler(&hdma_spi1_tx);
 //  HAL_DMA_IRQHandler(&hdma_tim3_up);
 //  /* USER CODE BEGIN DMA1_Channel2_3_IRQn 1 */
-//////
+//
 //  /* USER CODE END DMA1_Channel2_3_IRQn 1 */
 //}
 
@@ -179,11 +179,11 @@ void SysTick_Handler(void)
 void TIM1_BRK_UP_TRG_COM_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM1_BRK_UP_TRG_COM_IRQn 0 */
-
+//
   /* USER CODE END TIM1_BRK_UP_TRG_COM_IRQn 0 */
   HAL_TIM_IRQHandler(&htim1);
   /* USER CODE BEGIN TIM1_BRK_UP_TRG_COM_IRQn 1 */
-
+//
   /* USER CODE END TIM1_BRK_UP_TRG_COM_IRQn 1 */
 }
 

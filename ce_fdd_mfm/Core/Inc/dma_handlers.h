@@ -8,14 +8,6 @@ extern "C" {
 #include "main.h"
 #include "circularbuffer.h"
 
-#define MFM_READ_SIZE   8
-#define MFM_WRITE_SIZE   8
-
-extern uint16_t mfmReadStreamBuffer[MFM_READ_SIZE];
-extern uint16_t mfmWriteStreamBuffer[MFM_WRITE_SIZE];
-
-extern volatile uint8_t txDataState1, txDataState2;
-
 void updateWriteDataDirect(uint16_t capturedStamp);
 void updateReadTimerDma(uint8_t lowerNotUpper);
 void processWriteTimerDma(uint8_t lowerNotUpper);

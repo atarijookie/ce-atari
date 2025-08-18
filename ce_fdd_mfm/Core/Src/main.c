@@ -71,12 +71,8 @@ static void MX_TIM16_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-extern uint8_t* pWrite;
+volatile uint16_t iStart, iEnd;
 
-extern uint8_t wrStreamByte;
-extern uint8_t wrBits;
-
-extern volatile uint16_t wrPrevCapturedStamp;
 volatile uint8_t writingNow;
 
 uint32_t txCnt, txCount1, txCount2;
@@ -102,19 +98,21 @@ void onWriteStart(void)
     }
 }
 
-void sendBufferIfWaiting(void)
+__attribute__((always_inline)) void sendBufferIfWaiting(void)
 {
     // something is being sent now? nothing to do
     if(txDataState1 == STATE_SENDING || txDataState2 == STATE_SENDING) {
         return;
     }
 
+    // should send txData1?
     if(txDataState1 == STATE_WAIT_FOR_SEND) {
         txDataState1 = STATE_SENDING;
         spiDmaTxBuffer((uint32_t) &txData1[0], txCount1);  // send this buffer
         return;
     }
 
+    // should send txData2?
     if(txDataState2 == STATE_WAIT_FOR_SEND) {
         txDataState2 = STATE_SENDING;
         spiDmaTxBuffer((uint32_t) &txData2[0], txCount2);  // send this buffer
@@ -122,10 +120,15 @@ void sendBufferIfWaiting(void)
     }
 }
 
+uint8_t prevWhichPart = CIRC_HANDLE_NOTHING;
+
 // on write END - mark start and end of this buffer with known tags, this
 // marks the buffer used and esp will know that the valid data is between these tags.
 void onWriteEnd(void)
 {
+    uint8_t otherPart = (prevWhichPart == CIRC_HANDLE_LOW) ? CIRC_HANDLE_HIGH : CIRC_HANDLE_LOW;
+    processWriteTimerDma(otherPart);        // final processing of the OTHER part
+
     uint32_t bytesEmpty = WRITEBUFFER_SIZE - txCnt;   // how much more can we add to the buffer?
     uint32_t bytesRemove = (bytesEmpty >= 2) ? 0 : (2 - bytesEmpty);    // if have at least 2 bytes empty, don't remove anything; but for 1 or 0 empty bytes remove 1 or 2 bytes
     pWrite -= bytesRemove;
@@ -140,12 +143,14 @@ void onWriteEnd(void)
     txCnt += 2;
 
     // too little data? probably glitch, ignore buffer and mark it as empty; otherwise send it
-    uint8_t nextState = (txCnt < 400) ? STATE_EMPTY : STATE_WAIT_FOR_SEND;
+//    uint8_t nextState = (txCnt < 400) ? STATE_EMPTY : STATE_WAIT_FOR_SEND;
+    uint8_t nextState = (txCnt < 400) ? STATE_EMPTY : STATE_SENDING;
 
     // write was storing data to buffer 1?
     if(txDataState1 == STATE_STORING) {
         txDataState1 = nextState;
         txCount1 = txCnt;
+        spiDmaTxBuffer((uint32_t) &txData1[0], txCount1);  // send this buffer
         return;
     }
 
@@ -153,6 +158,7 @@ void onWriteEnd(void)
     if(txDataState2 == STATE_STORING) {
         txDataState2 = nextState;
         txCount2 = txCnt;
+        spiDmaTxBuffer((uint32_t) &txData2[0], txCount2);  // send this buffer
         return;
     }
 }
@@ -166,7 +172,6 @@ void onWriteEnd(void)
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -249,8 +254,38 @@ int main(void)
         }
     }
 
-    // send write buffers if some is waiting to be sent
-    sendBufferIfWaiting();
+    // if writing, handle DMA channel 2_3 events here, because interrupt is disabled
+    if(writingNow) {
+        uint32_t flag_it = DMA1->ISR;
+
+        if((flag_it & DMA_FLAG_TC2) != 0)
+        {
+            DMA1->IFCR = DMA_FLAG_TC2;
+
+            if(txDataState1 == STATE_SENDING) {    // was sending low buffer? now it's empty
+              txDataState1 = STATE_EMPTY;
+            }
+
+            if(txDataState2 == STATE_SENDING) {   // was sending high buffer? now it's empty
+              txDataState2 = STATE_EMPTY;
+            }
+        }
+
+        if((flag_it & DMA_FLAG_HT3) != 0)
+        {
+           DMA1->IFCR = DMA_FLAG_HT3;
+           prevWhichPart = CIRC_HANDLE_LOW;
+           processWriteTimerDma(prevWhichPart);
+        }
+
+        // Transfer Complete Interrupt management
+        if((flag_it & DMA_FLAG_TC3) != 0)
+        {
+            DMA1->IFCR = DMA_FLAG_TC3;
+            prevWhichPart = CIRC_HANDLE_HIGH;
+            processWriteTimerDma(prevWhichPart);
+        }
+    }
 
     /* USER CODE END WHILE */
 
