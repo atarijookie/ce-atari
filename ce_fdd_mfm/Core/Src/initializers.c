@@ -125,6 +125,8 @@ void dmaReconfigForWrite(void)
     uint32_t ccr = hdma_tim3_up.DMAmuxChannel->CCR & (~0x7f);  // get original value, remove request part
     hdma_tim3_up.DMAmuxChannel->CCR = (ccr | 44);          // DMA request source: tim16_ch1_dma
 
+    TIM16->CCMR1 = (TIM16->CCMR1 & 0x0f) | 0x10;            // input capture filter
+
     SET_BIT(DMA1_Channel3->CCR, DMA_CCR_EN);                // DMA enable channel
     SET_BIT(TIM16->DIER, TIM_DIER_CC1DE);                   // TIM16 DMA request enable
 }

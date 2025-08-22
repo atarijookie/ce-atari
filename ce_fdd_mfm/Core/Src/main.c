@@ -273,9 +273,9 @@ int main(void)
 
         if((flag_it & DMA_FLAG_HT3) != 0)
         {
-           DMA1->IFCR = DMA_FLAG_HT3;
-           prevWhichPart = CIRC_HANDLE_LOW;
-           processWriteTimerDma(prevWhichPart);
+            DMA1->IFCR = DMA_FLAG_HT3;
+            prevWhichPart = CIRC_HANDLE_LOW;
+            processWriteTimerDma(prevWhichPart);
         }
 
         // Transfer Complete Interrupt management

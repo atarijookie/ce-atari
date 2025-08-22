@@ -5,7 +5,7 @@
 #define MFM_6US         2
 #define MFM_8US         3
 
-#define PULSE_TOO_SHORT 18
+#define PULSE_TOO_SHORT 8
 #define PULSE_4US       40
 #define PULSE_6US       57
 #define PULSE_8US       72

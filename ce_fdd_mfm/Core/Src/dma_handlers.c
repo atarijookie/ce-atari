@@ -53,6 +53,8 @@ uint8_t wrBits = 0;
 
 volatile uint16_t wrPrevCapturedStamp = 0;
 
+//uint16_t diffs[PULSE_8US];                      // TODO: remove
+
 /*
  * If you use always_inline, you get a compiler warning, but the test shows the differences:
  * - 3.2 us when not inline
@@ -64,6 +66,10 @@ __attribute__((always_inline)) void updateWriteDataDirect(uint16_t capturedStamp
     wrPrevCapturedStamp = capturedStamp;                      // store the current captured time
 
     uint8_t newTime = 0;
+
+//    if(capturedDuration < PULSE_8US) {          // TODO: remove
+//        diffs[capturedDuration]++;
+//    }
 
     if(capturedDuration < PULSE_TOO_SHORT) {    // if this pulse is too short (less than 2.7 us long)
         return;
