@@ -14,9 +14,6 @@ void setupSpiUsingCircularDma(void)
 
     SET_BIT(SPI1->CR2, SPI_RXFIFO_THRESHOLD);   // Set RX FIFO threshold according the reception data length: 8bit
 
-//    DMAMUX1_ChannelStatus->CFR = 0x1f;          // Clear the DMAMUX synchro overrun flag
-//    DMAMUX1_RequestGenStatus->RGCFR = 0x0f;     // Clear the DMAMUX request generator overrun flag
-
     //----
     // DMA1 channel 2 - SPI RX
     DMA1->IFCR = DMA_FLAG_GI2;                  // Clear all flags
@@ -96,56 +93,6 @@ void setupTMIcircularDma(DMA_Channel_TypeDef* dmaChannel, TIM_TypeDef* timer, ui
 
     SET_BIT(dmaChannel->CCR, DMA_CCR_EN);    // DMA enable channel
 }
-
-//// Reconfigure DMA channel 3, so that it reads from memory into TIM3 - for MFM read output
-//void dmaReconfigForRead(void)
-//{
-//    CLEAR_BIT(TIM16->DIER, TIM_DIER_CC1DE);                 // TIM16 DMA request disable
-//    CLEAR_BIT(DMA1_Channel3->CCR, DMA_CCR_EN);              // DMA disable channel
-//    DMA1->IFCR = DMA_FLAG_GI3;                              // DMA channel 3 - clear interrupt flags
-//
-//    for(int i=0; i<MFM_READ_SIZE; i++) {
-//        mfmReadStreamBuffer[i] = 7;                         // by default -- all pulses 4 us
-//    }
-//
-//    DMA1_Channel3->CPAR = (uint32_t) &(TIM3->DMAR);         // peripheral address
-//    DMA1_Channel3->CMAR = (uint32_t) mfmReadStreamBuffer;   // memory address: mfmReadStreamBuffer
-//    DMA1_Channel3->CNDTR = MFM_READ_SIZE;                   // Configure DMA Channel data length
-//    SET_BIT(DMA1_Channel3->CCR, DMA_CCR_DIR);               // direction: read from memory
-//
-//    uint32_t ccr = hdma_tim3_up.DMAmuxChannel->CCR & (~0x7f);  // get original value, remove request part
-//    hdma_tim3_up.DMAmuxChannel->CCR = (ccr | 37);          // DMA request source: tim3_up_dma
-//
-//    SET_BIT(DMA1_Channel3->CCR, DMA_CCR_EN);                // DMA enable channel
-//    SET_BIT(TIM3->DIER, TIM_DIER_UDE);                      // enable timer update DMA
-//
-//    HAL_NVIC_EnableIRQ(DMA1_Channel2_3_IRQn);               // enable DMA channel 2_3 interrupt for read
-//}
-//
-//// Reconfigure DMA channel 3, so that it reads from TIM16 into memory - for MFM write input
-//void dmaReconfigForWrite(void)
-//{
-//    HAL_NVIC_DisableIRQ(DMA1_Channel2_3_IRQn);              // disable DMA channel 2_3 interrupt for read
-//
-//    CLEAR_BIT(TIM3->DIER, TIM_DIER_UDE);                    // TIM3 DMA request disable
-//    CLEAR_BIT(DMA1_Channel3->CCR, DMA_CCR_EN);              // DMA disable channel
-//    DMA1->IFCR = DMA_FLAG_GI3;                              // DMA channel 3 - clear interrupt flags
-//
-//    TIM3->ARR = 7;                                          // TIM3 will now just output 4 us pulses all the time
-//
-//    DMA1_Channel3->CPAR = (uint32_t) &(TIM16->DMAR);        // peripheral address
-//    DMA1_Channel3->CMAR = (uint32_t) mfmWriteStreamBuffer;  // memory address: mfmReadStreamBuffer
-//    DMA1_Channel3->CNDTR = MFM_WRITE_SIZE;                  // Configure DMA Channel data length
-//    CLEAR_BIT(DMA1_Channel3->CCR, DMA_CCR_DIR);             // direction: read from peripheral
-//
-//    uint32_t ccr = hdma_tim3_up.DMAmuxChannel->CCR & (~0x7f);  // get original value, remove request part
-//    hdma_tim3_up.DMAmuxChannel->CCR = (ccr | 44);          // DMA request source: tim16_ch1_dma
-//
-//    TIM16->CCMR1 = (TIM16->CCMR1 & 0x0f) | 0x10;            // input capture filter
-//
-//    SET_BIT(DMA1_Channel3->CCR, DMA_CCR_EN);                // DMA enable channel
-//    SET_BIT(TIM16->DIER, TIM_DIER_CC1DE);                   // TIM16 DMA request enable
-//}
 
 // Reconfigure DMA channel, so that it reads from memory into SPI TX - for sending buffer out
 void spiDmaTxBuffer(uint32_t pData, uint32_t count)
