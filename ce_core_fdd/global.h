@@ -11,10 +11,22 @@
 #define SERVER_TCP_PORT_IKBD        7401        // port used by IKBD core
 
 // commands sent from host to device
-#define CMD_CURRENT_SECTOR          0x50                                // followed by sector #
+// #define CMD_WRITE_PROTECT_OFF    0x10
+// #define CMD_WRITE_PROTECT_ON     0x20
+// #define CMD_DISK_CHANGE_OFF      0x30
+// #define CMD_DISK_CHANGE_ON       0x40
+#define CMD_CURRENT_SECTOR          0x50        // followed by sector #
 #define CMD_GET_FW_VERSION          0x60
-#define CMD_CURRENT_TRACK           0x90                                // followed by track #
-#define CMD_MARK_READ               0xF000                              // this is not sent from host, but just a mark that this uint16_t has been read and you shouldn't continue to read further
+// #define CMD_SET_DRIVE_ID_0       0x70
+// #define CMD_SET_DRIVE_ID_1       0x80
+#define CMD_CURRENT_TRACK           0x90        // followed by track #
+// #define CMD_DRIVE_ENABLED        0xa0
+// #define CMD_DRIVE_DISABLED       0xb0
+#define CMD_DATA_PART_OF_SECTOR     0xC0
+
+#define CMD_TRACK_STREAM_END        0xF0    // this is the mark in the track stream that we shouldn't go any further in the stream
+
+#define ENCODED_SECTOR_MAX_SIZE     1200    // the mfm encoded sector - header + gaps + markers + data - should not exceed this size. Using fixed size to simplify sector write to memory in device.
 
 #define MFM_4US     1
 #define MFM_6US     2

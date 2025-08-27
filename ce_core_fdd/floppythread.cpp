@@ -74,7 +74,7 @@ void FloppyThread::run(void)
         // check if any slot was just loaded and needs to be sent to device
         for(int i=0; i<SLOT_COUNT; i++) {
             if(slotSendToDevice[i]) {                   // if slot #i should be sent to device
-                slotSendToDevice[0] = false;
+                slotSendToDevice[i] = false;
 
                 ClientInfo* client = chipInterface->clientsGetOne(i);
 
@@ -306,6 +306,8 @@ void FloppyThread::handleSectorWritten(int clientIndex)
 {
     int side, track, sector, byteCount;
     uint8_t *writtenSector = chipInterface->fdd_sectorWritten(clientIndex, side, track, sector, byteCount); // get side + track + sector number, byte count, and pointer to buffer where the written data is
+
+    // Debug::outBfr(LOGFILE_FDD, writtenSector, byteCount);
 
     ClientInfo* client = chipInterface->clientsGetOne(clientIndex);
 

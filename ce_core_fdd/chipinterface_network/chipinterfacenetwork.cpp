@@ -220,10 +220,6 @@ bool ChipInterfaceNetwork::actionNeeded(int clientIndex, uint8_t *inBuf)
         //Debug::out(whichLog, LOG_DEBUG, "actionNeeded() - gotAtnId=%d, gotAtnCode=%d", gotAtnId, gotAtnCode);
 
         if(gotAtnId == NET_ATN_FRANZ_ID) {                  // for Franz
-            if(gotAtnCode == ATN_SEND_TRACK) {              // for this command read 2 more bytes: side + track
-                recvFromClient(clientIndex, inBuf + 8, 2);
-            }
-
             return true;
         }
 
@@ -303,7 +299,11 @@ uint8_t* ChipInterfaceNetwork::fdd_sectorWritten(int clientIndex, int &side, int
     track   = bufIn[0] & 0x7f;
     side    = (bufIn[0] & 0x80) ? 1 : 0;
 
-    return bufIn;                                           // return pointer to received written sector
+    if(byteCount > 2) {         // if has at least 2 bytes, remove 2 bytes from count
+        byteCount -= 2;
+    }
+
+    return (bufIn + 2);         // return pointer to received written sector (beyond sector / track bytes)
 }
 
 bool ChipInterfaceNetwork::waitForAtn(int clientIndex, int atnIdWant, uint8_t atnCode, uint32_t timeoutMs, uint8_t *inBuf)

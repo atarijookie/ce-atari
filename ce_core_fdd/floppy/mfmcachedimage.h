@@ -109,6 +109,7 @@ private:
     void encodeSingleTrack(FloppyImage *img, int side, int track, int sectorsPerTrack);
 
     void appendCurrentSectorCommand(int track, int side, int sector);
+    void appendDataSectionStartCommand(void);
     void appendRawByte(uint8_t val);
     void setRawWordAtIndex(int index, uint16_t val);
     void appendA1MarkToStream(void);

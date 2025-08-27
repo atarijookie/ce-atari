@@ -223,11 +223,10 @@ bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, 
 
     currentStreamStart = tracks[index].mfmStream + 2;       // where the stream starts
 
-    #define STREAM_TABLE_ITEMS  20
-    #define STREAM_TABLE_SIZE   (2 * STREAM_TABLE_ITEMS)
+    #define STREAM_TABLE_ITEMS      20
+    #define STREAM_TABLE_SIZE       (2 * STREAM_TABLE_ITEMS)
 
-    #define STREAM_TABLE_OFFSET 10              // the stream table in Franz starts at this offset, because first 5 words are empty (ATN + sizes + other)
-    #define STREAM_START_OFFSET (STREAM_TABLE_OFFSET + STREAM_TABLE_SIZE)
+    #define STREAM_START_OFFSET     STREAM_TABLE_SIZE
 
     bfr = currentStreamStart + STREAM_TABLE_SIZE;   // where the MFM data will start (after initial table)
     bytesInBfr = STREAM_TABLE_SIZE;             // no bytes in stream yet
@@ -258,7 +257,13 @@ bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, 
     }
 
     tracks[index].bytesInStream = bytesInBfr;   // store the data count
-    setRawWordAtIndex(0, STREAM_TABLE_OFFSET + bytesInBfr);     // stream table - index 0: stream size in bytes (include those extra 5 empty WORDs on start in Franz)
+    setRawWordAtIndex(0, STREAM_START_OFFSET + bytesInBfr);     // stream table - index 0: stream size in bytes (stream table + actual mfm data)
+
+    // Debug::outBfr(LOGFILE_FDD, tracks[index].mfmStream, 48);     // uncomment to see start of stream with stream table in logs
+
+    if(bytesInBfr >= MFM_STREAM_SIZE) {
+        logFdd(LOG_WARNING, "MfmCachedImage::findNotReadyTrackAndEncodeIt() - WARNING! Track with index %d has %d bytes in it - TOO MUCH!", index, tracks[index].bytesInStream);
+    }
 
     //-----
     pthread_mutex_lock(&floppyEncoderMutex);      // lock the mutex
@@ -349,7 +354,7 @@ void MfmCachedImage::encodeSingleTrack(FloppyImage *img, int side, int track, in
         }
     }
 
-    appendRawByte(0xF0);            // append this - this is a mark of track stream end
+    appendRawByte(CMD_TRACK_STREAM_END);                // append this - this is a mark of track stream end
     appendRawByte(0x00);
 }
 
@@ -407,6 +412,8 @@ bool MfmCachedImage::encodeSingleSector(FloppyImage *img, int side, int track, i
         return false;
     }
 
+    int bytesAtStartOfSector = bytesInBfr;
+
     appendCurrentSectorCommand(track, side, sector);     // append this sector mark so we would know what are we streaming out
 
     int i;
@@ -431,6 +438,8 @@ bool MfmCachedImage::encodeSingleSector(FloppyImage *img, int side, int track, i
         appendByteToStream(0x4e);
     }
 
+    appendDataSectionStartCommand();    // this will tell the floppy device that here the DATA part starts, so write can replace data from here
+
     for(i=0; i<12; i++) {                                   // GAP 3b: 12 * 0x00
         appendByteToStream(0);
     }
@@ -451,6 +460,16 @@ bool MfmCachedImage::encodeSingleSector(FloppyImage *img, int side, int track, i
 
     for(i=0; i<40; i++) {                                   // GAP 4: 40 * 0x4e
         appendByteToStream(0x4e);
+    }
+
+    // now append zero bytes to end of this sector, so when new mfm data is written to floppy, it will not overrun to next sector
+    int bytesToAppend = ENCODED_SECTOR_MAX_SIZE - (bytesInBfr - bytesAtStartOfSector);
+    for(i=0; i<bytesToAppend; i++) {
+        appendRawByte(0);
+    }
+
+    if(bytesToAppend < 5) {
+        logFdd(LOG_WARNING, "MfmCachedImage::encodeSingleSector - appended only %d bytes, might be too little", bytesToAppend);
     }
 
     return true;
@@ -566,11 +585,14 @@ void MfmCachedImage::appendCurrentSectorCommand(int track, int side, int sector)
     appendRawByte(sector);
 }
 
+void MfmCachedImage::appendDataSectionStartCommand(void)
+{
+    appendRawByte(CMD_DATA_PART_OF_SECTOR);
+}
+
 void MfmCachedImage::setRawWordAtIndex(int index, uint16_t val)
 {
-    uint16_t *pWord = (uint16_t *) currentStreamStart;  // get word pointer to start of current stream
-    pWord += index;                             // move pointer to the wanted offset (at index)
-    *pWord = val;                               // store the value
+    Utils::storeWord((currentStreamStart + (2 * index)), val);
 }
 
 void MfmCachedImage::appendRawByte(uint8_t val)
@@ -697,10 +719,11 @@ void MfmCachedImage::handleDecodedByte(void)
         int logLevel = decoder.good ? LOG_DEBUG : LOG_ERROR;        // if good then show only on debug log level; if bad then show on error log level
         logFdd(logLevel, "MfmCachedImage::handleDecodedByte - received CRC: %02x, calculated CRC: %02x, good: %d", decoder.recvedCrc, decoder.calcedCrc, decoder.good);
 
-// uncomment following lines for dumping decoded data to log on error - for manual data inspection
-//      if(!decoder.good) {
-//          Debug::outBfr(decoder.oBfr - 512, 512);
-//      }
+        // uncomment following lines for dumping decoded data to log on error - for manual data inspection
+        // if(!decoder.good) 
+        // {
+        //     Debug::outBfr(LOGFILE_FDD, decoder.oBfr - 512, 512);
+        // }
     }
 
     decoder.byteOffset++;
