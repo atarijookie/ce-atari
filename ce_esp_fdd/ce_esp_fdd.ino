@@ -29,8 +29,7 @@ void setupAtnBuffers(void);
 void requestTrack(uint8_t side, uint8_t track);
 void requestWholeImage(void);
 
-SStreamed streamed, hwPosition;
-uint8_t sectorsWritten;
+SStreamed posStreamed, hwPosition, posWritten;
 
 extern bool connected;
 
@@ -267,7 +266,7 @@ void getMfmDataToBuffer(uint8_t* bfr, int len)
         uint8_t val = *pTrackData;
 
         // end of array or end-of-track marker? we've at the end, don't copy anything more
-        if(pTrackData >= pTrackDataEnd || val == CMD_TRACK_STREAM_END_BYTE) {
+        if(pTrackData >= pTrackDataEnd || val == CMD_TRACK_STREAM_END) {
             break;
         }
 
@@ -278,11 +277,16 @@ void getMfmDataToBuffer(uint8_t* bfr, int len)
             continue;
         }
 
+        // skip data part of the sector marker
+        if(val == CMD_DATA_PART_OF_SECTOR) {
+            continue;
+        }
+
         // current sector marker?
         if(val == CMD_CURRENT_SECTOR) {
-            streamed.side = *pTrackData++;
-            streamed.track = *pTrackData++;
-            streamed.sector = *pTrackData++;
+            posStreamed.side = *pTrackData++;
+            posStreamed.track = *pTrackData++;
+            posStreamed.sector = *pTrackData++;
             continue;
         }
 
@@ -296,6 +300,99 @@ void getMfmDataToBuffer(uint8_t* bfr, int len)
     dataIndexInTrack = pTrackData - pTrackDataStart;
 }
 
+void logFailedToWrite(uint8_t side, uint8_t track, uint8_t sector)
+{
+    Serial.print("Failed to write side: ");
+    Serial.print(side);
+    Serial.print(", track: ");
+    Serial.print(track);
+    Serial.print("sector: ");
+    Serial.print(sector);
+}
+
+void storeWrittenSectorDataToTrackLocally(uint8_t side, uint8_t track, uint8_t sector, uint8_t* bfr, int len)
+{
+    // track / side / sector out of bounds?
+    if(side > 1 || track >= MAX_TRACKS || sector >= 12) {
+        logFailedToWrite(side, track, sector);
+        Serial.println(" - TriSiSe out of bounds!");
+        return;
+    }
+
+    // get pointer to start and end of track
+    int trackIndex = track * 2 + side;            // track + side create index into tracks array
+    uint8_t* pData = &tracks[trackIndex].data[0];
+    uint8_t* pDataEnd = &tracks[trackIndex].data[READTRACKDATA_SIZE_BYTES - 1];
+
+    uint8_t* pStreamTableItem = pData + (sector * 2);       // calc pointer to where the offset to sector is - in the stream table
+    uint32_t offsetToSector = getWord(pStreamTableItem);   // get offset to sector in stream from stream table
+
+    // make sure that offset to sector is still within the track data
+    if(offsetToSector >= READTRACKDATA_SIZE_BYTES) {
+        logFailedToWrite(side, track, sector);
+        Serial.println(" - bad sector offset!");
+        return;
+    }
+
+    // advance pointer to start of the sector - this address should contain CMD_CURRENT_SECTOR
+    pData += offsetToSector;
+    uint8_t* pSectorEnd = pData + ENCODED_SECTOR_MAX_SIZE - 1;  // end of sector should be exactly here, because using fixed encoded sector size
+
+    uint8_t* pSectorDataStart = NULL;
+
+    #define HEADER_START    0
+    #define DATA_START      1
+    #define NOTHING         3
+
+    uint8_t lookingFor = HEADER_START;      // look for header, then for data start, then for data end
+
+    // find start and end of the sector we want to overwrite
+    while(pData < pDataEnd) {
+        uint8_t val = *pData;
+
+        // if data is not one of the few tags we expect, just move to next data and don't check the rest of the code
+        if(val != CMD_CURRENT_SECTOR && val != CMD_DATA_PART_OF_SECTOR && val != CMD_TRACK_STREAM_END) {
+            pData++;
+            continue;
+        }
+
+        // we're looking for header start and this is the current_sector mark
+        if(lookingFor == HEADER_START && val == CMD_CURRENT_SECTOR) {
+            if(pData[1] == side && pData[2] == track && pData[3] == sector) {   // side + track + sector match? found header!
+                lookingFor = DATA_START;    // header found, look for data start
+            }
+            pData += 4; // skip the current_sector mark - to continue after it
+            continue;
+        }
+
+        // if we already found the header, but not the sector data start, and this is start of the data, we've found start now
+        if(lookingFor == DATA_START && val == CMD_DATA_PART_OF_SECTOR) {
+            pData++;                    // skip beyond marker
+            pSectorDataStart = pData;   // store pointer to sector data start
+            lookingFor = NOTHING;       // data start found, look for data end
+            break;
+        }
+    }
+
+    // if we didn't find everything needed, fail
+    if(lookingFor != NOTHING) {
+        logFailedToWrite(side, track, sector);
+        Serial.println(" - no data start found");
+        return;
+    }
+
+    int dataSizeBytes = pSectorEnd - pSectorDataStart;  // how many bytes are allocated in buffer for the sector data (from end to start) - should be about 1100 bytes
+    int copySize = MIN(len, dataSizeBytes);         // pick smaller of these sizes, so we won't overwrite the start of next sector
+
+    int dataSizeToClear = dataSizeBytes - copySize; // how many bytes should be cleared 
+
+    memcpy(pData, bfr, copySize);                   // copy new data at the start of data part of the sector
+
+    if(dataSizeToClear > 0) {
+        memset(pData + len, 0, dataSizeToClear);    // clear the bytes up to end of sector data
+    }
+}
+
 void processMfmWriteBuffer(uint8_t* bfr, int len)
 {
     static bool receivingWriteData = false;
@@ -307,22 +404,37 @@ void processMfmWriteBuffer(uint8_t* bfr, int len)
         uint8_t val = bfr[i];
 
         if(val == TAG_WRITE_START) {    // on START tag found - now we're receiving write data
+            // Serial.println("START");
             receivingWriteData = true;
             wrBuffer.count = 12;        // start with 12 bytes in the buffer - 10 for header, 2 for track + side + sector
+            pStore = &wrBuffer.buffer[wrBuffer.count];
             continue;
         }
 
         if(val == TAG_WRITE_END) {      // on END tag found - we're no longer receiving write data
             if(receivingWriteData) {    // this END tag is the first END tag found after START tag, so we're done with receiving this sector
                 receivingWriteData = false;     //  not receiving anymore
-                sectorsWritten++;               // one sector was written, request updated track at the end of stream
+
+                // Serial.println("END");
+                // Serial.println(wrBuffer.count);
 
                 uint8_t sideTrack, sector;
                 wrPosGet(&sideTrack, &sector);  // get side, track and sector number from the write-positions buffer
                 wrBuffer.buffer[10] = sideTrack;
                 wrBuffer.buffer[11] = sector;
 
+                posWritten.side = ((sideTrack) & 0x80) ? 1 : 0;
+                posWritten.track = sideTrack & 0x7f;
+                posWritten.sector = sector;
+
+                // Serial.print("END sideTrack: ");
+                // Serial.print(sideTrack);
+                // Serial.print(", sector: ");
+                // Serial.print(sector);
+                // Serial.println(" ");
+
                 sendHeaderAndDataToHost(wrBuffer.buffer, wrBuffer.count - TX_HEADER_SIZE);      // send sector to host
+                storeWrittenSectorDataToTrackLocally(((sideTrack & 0x80) ? 1 : 0), (sideTrack & 0x7f), sector, wrBuffer.buffer, wrBuffer.count);
             }
 
             continue;
@@ -335,6 +447,9 @@ void processMfmWriteBuffer(uint8_t* bfr, int len)
 
         // buffer not full and the value is not a zero? store
         if(wrBuffer.count < WRITEBUFFER_SIZE && val != 0) {
+            // Serial.print(val, HEX);
+            // Serial.print(" ");
+
             *pStore = val;
             pStore++;
 
@@ -395,7 +510,6 @@ void loop(void)
     timeTrackStart = millis();
 
     int WGatePrev = HIGH;
-    sectorsWritten = 0;         // nothing written yet
 
     while(1)
     {
@@ -411,14 +525,14 @@ void loop(void)
         uint32_t now = millis();
         if (connected && (now - lastSendFwTime) >= 1000)
         {
-            if(stWantsTheStream) {
-                hwPosition.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1; // get the current SIDE
+            // if(stWantsTheStream) {
+            //     hwPosition.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1; // get the current SIDE
 
-                Serial.print("S ");
-                Serial.print(hwPosition.side);
-                Serial.print(" ");
-                Serial.println(hwPosition.track);
-            }
+            //     Serial.print("S ");
+            //     Serial.print(hwPosition.side);
+            //     Serial.print(" ");
+            //     Serial.println(hwPosition.track);
+            // }
 
             sendFwReport(now);
         }
@@ -480,8 +594,8 @@ void loop(void)
 
                 if(WGateNow == LOW)     // on write start
                 {
-                    streamed.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1;                // get the current SIDE
-                    wrPosPut(streamed.side, streamed.track, streamed.sector);   // store side, track, sector into write positions buffer
+                    posStreamed.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1;                // get the current SIDE
+                    wrPosPut(posStreamed.side, posStreamed.track, posStreamed.sector);   // store side, track, sector into write positions buffer
                 }
             }
         }
@@ -498,11 +612,6 @@ void loop(void)
 
         if(timeSinceTrackStart >= 200) {    // track finished
             readTrackData_goToStart();      // move the pointer in the track stream to start
-
-            if(sectorsWritten > 0) {        // if some sectors were written to floppy, we need to get the new stream now
-                sectorsWritten = 0;         // nothing written now
-                requestTrack(streamed.side, streamed.track);    // ask for the changed track data
-            }
         }
 
         //---------------------------
@@ -527,8 +636,8 @@ void setupAtnBuffers(void)
     storeHeader(atnSendWholeImageRequest, ATN_SEND_WHOLE_IMAGE, 0);
 
     // configure write buffers
-    storeHeader(wrBuffer.buffer, ATN_SECTOR_WRITTEN, 10);
-    wrBuffer.count = 10;
+    storeHeader(wrBuffer.buffer, ATN_SECTOR_WRITTEN, 12);
+    wrBuffer.count = 12;
 }
 
 void storeMacAddress(void)

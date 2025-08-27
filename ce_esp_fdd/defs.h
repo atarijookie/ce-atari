@@ -54,10 +54,9 @@
 #define CMD_CURRENT_TRACK           0x90                            // followed by track #
 #define CMD_DRIVE_ENABLED           0xa0
 #define CMD_DRIVE_DISABLED          0xb0
-#define CMD_MARK_READ               0xF000                          // this is not sent from host, but just a mark that this WORD has been read and you shouldn't continue to read further
-#define CMD_MARK_READ_BYTE          0xF0                            // this is not sent from host, but just a mark that this BYTE has been read and you shouldn't continue to read further
-#define CMD_TRACK_STREAM_END        0xF000                          // this is the mark in the track stream that we shouldn't go any further in the stream
-#define CMD_TRACK_STREAM_END_BYTE   0xF0                            // this is the mark in the track stream that we shouldn't go any further in the stream
+#define CMD_DATA_PART_OF_SECTOR     0xc0
+
+#define CMD_TRACK_STREAM_END        0xF0                            // this is the mark in the track stream that we shouldn't go any further in the stream
 
 
 ///////////////////////////
@@ -153,6 +152,8 @@ typedef struct {
 #define READTRACKDATA_SIZE_BYTES    13800
 #define MAX_TRACKS                  90
 
+#define ENCODED_SECTOR_MAX_SIZE     1200    // the mfm encoded sector - header + gaps + markers + data - should not exceed this size. Using fixed size to simplify sector write to memory in device.
+
 #define IMAGE_NOT_LOADED    0
 #define IMAGE_REQUESTED     1
 #define IMAGE_LOADED        2
@@ -167,8 +168,7 @@ typedef struct {
 #define STREAM_TABLE_ITEMS  20
 #define STREAM_TABLE_SIZE   STREAM_TABLE_ITEMS
 
-#define STREAM_TABLE_OFFSET 10                  // 10 bytes - the stream table starts at this offset, because first 5 words are empty (ATN + sizes + other)
-#define STREAM_START_OFFSET (STREAM_TABLE_OFFSET + STREAM_TABLE_SIZE)
+#define STREAM_START_OFFSET STREAM_TABLE_SIZE
 
 #define TAG_WRITE_START 0x80    // start of sector data
 #define TAG_WRITE_END   0xc0    // end of sector data
