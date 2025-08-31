@@ -13,6 +13,8 @@
 #define PIN_WGATE       (1 << 3)        // GPIOA 3, write is happening when WGATE is L
 #define PIN_RXE         (1 << 5)        // GPIOA 5, SPI can get more data if this is H
 
+#define CMD_CURRENT_SECTOR      0x50    // followed by sector # - this comes from host
+
 #define TAG_WRITE_START 0x80    // start of sector data
 #define TAG_WRITE_END   0xc0    // end of sector data
 
@@ -61,8 +63,23 @@ extern volatile uint8_t txDataState1, txDataState2;
  */
 #define WRITEBUFFER_SIZE    1200
 
+#define WRITE_BUFFERS_COUNT     3
+
+typedef struct TWriteBfr
+{
+    uint8_t state;
+
+    uint8_t data[WRITEBUFFER_SIZE];
+    uint32_t count;
+
+    struct TWriteBfr* next;
+} TWriteBuffer;
+
+extern TWriteBuffer wrBuffer[WRITE_BUFFERS_COUNT];
 extern uint32_t txCnt;
-extern uint8_t txData1[WRITEBUFFER_SIZE], txData2[WRITEBUFFER_SIZE];
+
+extern TWriteBuffer* wrStore;
+extern TWriteBuffer* wrSend;
 
 extern volatile uint32_t rxCnt;
 extern uint32_t rxLoad;
@@ -76,4 +93,7 @@ extern uint8_t wrStreamByte;
 extern uint8_t wrBits;
 
 extern volatile uint16_t wrPrevCapturedStamp;
+
+extern volatile uint8_t spiIsSending;
+
 #endif

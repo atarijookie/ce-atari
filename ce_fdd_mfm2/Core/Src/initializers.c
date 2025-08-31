@@ -31,7 +31,7 @@ void setupSpiUsingCircularDma(void)
     DMA1->IFCR = DMA_FLAG_GI3;                  // Clear all flags
 
     DMA1_Channel3->CPAR = (uint32_t) &(SPI1->DR);   // peripheral address: SPI DR
-    DMA1_Channel3->CMAR = (uint32_t) txData1;       // memory address: tx buffer
+    DMA1_Channel3->CMAR = (uint32_t) wrBuffer[0].data;  // memory address: tx buffer
     DMA1_Channel3->CNDTR = WRITEBUFFER_SIZE;        // Configure DMA Channel data length
     SET_BIT(DMA1_Channel3->CCR, DMA_CCR_PL_1); CLEAR_BIT(DMA1_Channel3->CCR, DMA_CCR_PL_0); // channel 2 priority - high (2)
     SET_BIT(DMA1_Channel3->CCR, (DMA_IT_TC | DMA_IT_HT | DMA_IT_TE));   // enable interrupts for half-transfer and transfer complete

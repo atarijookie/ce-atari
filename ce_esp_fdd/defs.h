@@ -170,7 +170,7 @@ typedef struct {
 
 #define STREAM_START_OFFSET STREAM_TABLE_SIZE
 
-#define TAG_WRITE_START 0x80    // start of sector data
-#define TAG_WRITE_END   0xc0    // end of sector data
+#define TAG_WRITE_START 0x80    // start of sector data - sent from MFM streamer
+#define TAG_WRITE_END   0xc0    // end of sector data - sent from MFM streamer
 
 #endif /* DEFS_H_ */

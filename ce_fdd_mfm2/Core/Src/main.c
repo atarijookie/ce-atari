@@ -75,8 +75,15 @@ volatile uint16_t iStart, iEnd;
 
 volatile uint8_t writingNow;
 
-uint32_t txCnt;
-uint8_t txData1[WRITEBUFFER_SIZE], txData2[WRITEBUFFER_SIZE];
+TWriteBuffer wrBuffer[WRITE_BUFFERS_COUNT];
+
+TWriteBuffer* wrStore;
+TWriteBuffer* wrSend;
+
+extern volatile uint8_t strSideTrack, strSector;
+volatile uint8_t spiIsSending;
+
+uint8_t failedCount = 0;
 
 // on write START - see which part of buffer is empty - lower part or upper part?
 // Initialize pointer and count to the free empty part of tx buffer.
@@ -86,16 +93,13 @@ void onWriteStart(void)
     wrStreamByte = 0;
     wrBits = 0;
 
-    // decide where the next data will be stored
-    if(txDataState1 == STATE_EMPTY) {              // lower part empty?
-        txDataState1 = STATE_STORING;
-        pWrite = &txData1[2];
-        txCnt = 2;
-    } else if(txDataState2 == STATE_EMPTY) {      // upper part empty?
-        txDataState2 = STATE_STORING;
-        pWrite = &txData2[2];
-        txCnt = 2;
-    }
+    // store side + track + sector at the start of buffer (after the 0 and START tag)
+    wrStore->data[2] = strSideTrack;
+    wrStore->data[3] = strSector;
+
+    wrStore->count = 4;
+
+    wrStore->state = STATE_STORING;
 }
 
 uint8_t prevWhichPart = CIRC_HANDLE_NOTHING;
@@ -107,43 +111,25 @@ void onWriteEnd(void)
     uint8_t otherPart = (prevWhichPart == CIRC_HANDLE_LOW) ? CIRC_HANDLE_HIGH : CIRC_HANDLE_LOW;
     processWriteTimerDma(otherPart);        // final processing of the OTHER part
 
-    uint32_t bytesEmpty = WRITEBUFFER_SIZE - txCnt;   // how much more can we add to the buffer?
+    uint32_t bytesEmpty = WRITEBUFFER_SIZE - wrStore->count;            // how much more can we add to the buffer?
     uint32_t bytesRemove = (bytesEmpty >= 2) ? 0 : (2 - bytesEmpty);    // if have at least 2 bytes empty, don't remove anything; but for 1 or 0 empty bytes remove 1 or 2 bytes
-    pWrite -= bytesRemove;
-    txCnt -= bytesRemove;
+    wrStore->count -= bytesRemove;
 
-    *pWrite = TAG_WRITE_END;    // store END tag after the last valid data byte
-    pWrite++;
+    wrStore->data[wrStore->count    ] = TAG_WRITE_END;  // store END tag after the last valid data byte
+    wrStore->data[wrStore->count + 1] = 0;              // one more zero after end tag, just to be safe
+    wrStore->count += 2;
 
-    *pWrite = 0;    // one more zero after end tag, just to be safe
-    pWrite++;
-
-    txCnt += 2;
-
-    // too little data? probably glitch, ignore buffer and mark it as empty; otherwise send it
-    uint8_t nextState = (txCnt < 400) ? STATE_EMPTY : STATE_SENDING;
-
-    // write was storing data to buffer 1?
-    if(txDataState1 == STATE_STORING) {
-        txDataState1 = nextState;
-
-        if(nextState == STATE_SENDING) {
-            spiDmaTxBuffer((uint32_t) &txData1[0], txCnt);  // send this buffer
-        }
-        return;
+    // too little data? probably glitch, ignore buffer and mark it as empty
+    if(wrStore->count < 400) {
+        wrStore->count = 2;
+        wrStore->state = STATE_EMPTY;
     }
-
-    // write was storing data to buffer 2?
-    if(txDataState2 == STATE_STORING) {
-        txDataState2 = nextState;
-
-        if(nextState == STATE_SENDING) {
-            spiDmaTxBuffer((uint32_t) &txData2[0], txCnt);  // send this buffer
-        }
-        return;
+    else    // enough data, mark it for sending
+    {
+        wrStore->state = STATE_WAIT_FOR_SEND;   // this buffer is waiting for send
+        wrStore = wrStore->next;                // next time store to next buffer
     }
 }
-
 
 /* USER CODE END 0 */
 
@@ -193,16 +179,23 @@ int main(void)
 
   HAL_NVIC_DisableIRQ(DMA1_Ch4_5_DMAMUX1_OVR_IRQn);  // disable DMA channel 5 interrupt - will be handled in main loop
 
-  txDataState1 = STATE_EMPTY;
-  txData1[0] = 0;
-  txData1[1] = TAG_WRITE_START;
+  // initialize write buffers - values, pointers, states
+  for(int i=0; i<WRITE_BUFFERS_COUNT; i++) {
+      wrBuffer[i].state = STATE_EMPTY;
+      wrBuffer[i].count = 0;
 
-  txDataState2 = STATE_EMPTY;
-  txData2[0] = 0;
-  txData2[1] = TAG_WRITE_START;
+      wrBuffer[i].data[0] = 0;
+      wrBuffer[i].data[1] = TAG_WRITE_START;
 
-  pWrite = &txData1[2];
-  txCnt = 2;
+      if(i < (WRITE_BUFFERS_COUNT - 1)) {
+          wrBuffer[i].next = &wrBuffer[i + 1];
+      } else {
+          wrBuffer[i].next = &wrBuffer[0];
+      }
+  }
+
+  wrStore = &wrBuffer[0];
+  wrSend = &wrBuffer[0];
 
   UPDATE_PIN_RXE;       // set RXE pin because we're empty
 
@@ -227,9 +220,26 @@ int main(void)
           writingPrev = writingNow;
 
           if(writingNow) {
-              onWriteStart();
+              onWriteStart();                           // buffer: STATE_EMPTY -> STATE_STORING
           } else {
-              onWriteEnd();
+              onWriteEnd();                             // buffer: STATE_STORING -> STATE_WAIT_FOR_SEND
+          }
+      }
+
+      // SPI is not sending data at this moment?
+      if(!spiIsSending) {
+          // Was the current send-buffer being sent, and now we're not sending?
+          // It's empty now and we can move to next send-buffer.
+          if(wrSend->state == STATE_SENDING) {
+              wrSend->state = STATE_EMPTY;              // buffer: STATE_SENDING -> STATE_EMPTY
+              wrSend = wrSend->next;
+          }
+
+          // Is the current send-buffer waiting to be sent? Start sending it, mark SPI as sending.
+          if(wrSend->state == STATE_WAIT_FOR_SEND) {
+              wrSend->state = STATE_SENDING;            // buffer: STATE_WAIT_FOR_SEND -> STATE_SENDING
+              spiIsSending = 1;
+              spiDmaTxBuffer((uint32_t) &wrSend->data[0], wrSend->count);  // send this buffer
           }
       }
 

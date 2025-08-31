@@ -12,8 +12,6 @@
  * Read is reliable when refilled in interrupt, not reliable when filled in main.
  */
 
-uint8_t* pWrite;
-
 uint16_t mfmReadStreamBuffer[MFM_READ_SIZE];
 uint16_t mfmWriteStreamBuffer[MFM_WRITE_SIZE];
 
@@ -21,12 +19,26 @@ volatile uint8_t circHandleWhat = CIRC_HANDLE_NOTHING;
 
 const uint16_t arrValues[4] = {7, 7, 11, 15};       // conversion table from mfm packed symbol to timer ARR value (for 0 us, 4 us, 6 us, 8 us)
 
+volatile uint8_t strSideTrack, strSector;
+
 __attribute__((always_inline)) void fillFourReadTimes(uint16_t* bfr)
 {
     uint8_t streamByte = 0;
 
     if(rxCnt > 0) {             // got something in RX buffer?
         streamByte = RX_GET();
+
+        // it's a current sector mark and we got enough data (assuming we will have enough
+        // data most of the time, there should be about BFR_SIZE_HALF or more bytes in the RX buffer)
+        if(streamByte == CMD_CURRENT_SECTOR && rxCnt >= 3) {
+            // fetch side + track + sector from stream, store them for later usage
+            uint8_t side = RX_GET();
+            uint8_t track = RX_GET();
+            strSideTrack = (side << 7) | track;     // combine side + track into single byte
+
+            strSector = RX_GET();                   // use sector # as is
+        }
+
         UPDATE_PIN_RXE;         // after removing byte from RX buffer, update RXE flag
     } else {                    // RX buffer empty?
         streamByte = 0x55;
@@ -90,10 +102,9 @@ __attribute__((always_inline)) void updateWriteDataDirect(uint16_t capturedStamp
         wrBits = 0;           // don't have bits now
 
         // tx buffer not full? add streamByte to tx buffer
-        if(txCnt < WRITEBUFFER_SIZE) {
-            *pWrite = wrStreamByte;
-            pWrite++;
-            txCnt++;
+        if(wrStore->count < WRITEBUFFER_SIZE) {
+            wrStore->data[wrStore->count] = wrStreamByte;
+            wrStore->count++;
         }
     }
 }
@@ -138,10 +149,6 @@ void DMA1_Channel1_IRQHandler(void)
     }
 }
 
-volatile uint8_t txDataState1, txDataState2;
-
-extern volatile uint16_t iStart, iEnd;
-
 /*
  * DMA channel 2 - SPI RX
  * DMA channel 3 - SPI TX
@@ -185,14 +192,7 @@ void DMA1_Channel2_3_IRQHandler(void)
     if((flag_it & DMA_FLAG_TC3) != 0)
     {
         DMA1->IFCR = DMA_FLAG_TC3;
-
-        if(txDataState1 == STATE_SENDING) {    // was sending low buffer? now it's empty
-          txDataState1 = STATE_EMPTY;
-        }
-
-        if(txDataState2 == STATE_SENDING) {   // was sending high buffer? now it's empty
-          txDataState2 = STATE_EMPTY;
-        }
+        spiIsSending = 0;           // finished sending, so not sending anymore
     }
 
     // Transfer Error Interrupt management
