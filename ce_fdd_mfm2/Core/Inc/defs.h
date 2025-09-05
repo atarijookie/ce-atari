@@ -23,7 +23,7 @@
 #define STATE_WAIT_FOR_SEND 2       // all data stored, start and stop tags present, but waiting for DMA to send it via SPI
 #define STATE_SENDING       3       // DMA is currently sending this part of buffer
 
-#define MFM_READ_SIZE       32
+#define MFM_READ_SIZE       16
 #define MFM_READ_SIZE_HALF  (MFM_READ_SIZE / 2)
 #define MFM_READ_SIZE_FILLS (MFM_READ_SIZE_HALF / 4)
 

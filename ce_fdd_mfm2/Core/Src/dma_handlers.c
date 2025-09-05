@@ -19,26 +19,12 @@ volatile uint8_t circHandleWhat = CIRC_HANDLE_NOTHING;
 
 const uint16_t arrValues[4] = {7, 7, 11, 15};       // conversion table from mfm packed symbol to timer ARR value (for 0 us, 4 us, 6 us, 8 us)
 
-volatile uint8_t strSideTrack, strSector;
-
 __attribute__((always_inline)) void fillFourReadTimes(uint16_t* bfr)
 {
     uint8_t streamByte = 0;
 
     if(rxCnt > 0) {             // got something in RX buffer?
         streamByte = RX_GET();
-
-        // it's a current sector mark and we got enough data (assuming we will have enough
-        // data most of the time, there should be about BFR_SIZE_HALF or more bytes in the RX buffer)
-        if(streamByte == CMD_CURRENT_SECTOR && rxCnt >= 3) {
-            // fetch side + track + sector from stream, store them for later usage
-            uint8_t side = RX_GET();
-            uint8_t track = RX_GET();
-            strSideTrack = (side << 7) | track;     // combine side + track into single byte
-
-            strSector = RX_GET();                   // use sector # as is
-        }
-
         UPDATE_PIN_RXE;         // after removing byte from RX buffer, update RXE flag
     } else {                    // RX buffer empty?
         streamByte = 0x55;

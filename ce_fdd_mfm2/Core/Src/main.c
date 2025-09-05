@@ -80,7 +80,6 @@ TWriteBuffer wrBuffer[WRITE_BUFFERS_COUNT];
 TWriteBuffer* wrStore;
 TWriteBuffer* wrSend;
 
-extern volatile uint8_t strSideTrack, strSector;
 volatile uint8_t spiIsSending;
 
 uint8_t failedCount = 0;
@@ -93,12 +92,7 @@ void onWriteStart(void)
     wrStreamByte = 0;
     wrBits = 0;
 
-    // store side + track + sector at the start of buffer (after the 0 and START tag)
-    wrStore->data[2] = strSideTrack;
-    wrStore->data[3] = strSector;
-
-    wrStore->count = 4;
-
+    wrStore->count = 2;
     wrStore->state = STATE_STORING;
 }
 
@@ -243,6 +237,7 @@ int main(void)
           }
       }
 
+      //----------
       // if writing, handle DMA channel
       if(writingNow) {
           uint32_t flag_it = DMA1->ISR;

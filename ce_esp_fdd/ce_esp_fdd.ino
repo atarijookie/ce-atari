@@ -29,7 +29,7 @@ void setupAtnBuffers(void);
 void requestTrack(uint8_t side, uint8_t track);
 void requestWholeImage(void);
 
-SStreamed hwPosition;
+SStreamed posStreamed, hwPosition, posWritten;
 
 extern bool connected;
 
@@ -41,7 +41,63 @@ bool diskChanged = false;
 uint32_t diskChangeEnd;
 uint32_t dataIndexInTrack = STREAM_START_OFFSET;
 
-uint8_t singleTrackData[READTRACKDATA_SIZE_BYTES];      // TODO: remove this once the tracks.data is properly allocated from PSRAM
+#define WRPOS_SIZE  4
+uint8_t wrPosCnt, wrPosStore, wrPosLoad;
+uint16_t writePos[WRPOS_SIZE];
+uint32_t lastPosPutTime;
+
+void wrPosClear(void)
+{
+    wrPosCnt = 0;
+    wrPosStore = 0;
+    wrPosLoad = 0;
+}
+
+void wrPosPut(uint8_t side, uint8_t track, uint8_t sector)
+{
+    // buffer full? don't store
+    if(wrPosCnt >= WRPOS_SIZE) {
+        return;
+    }
+
+    // pack track, side, sector into single uint16_t
+    uint16_t sideTrack = track | ((side != 0) ? 0x80 : 0);
+    uint16_t sideTrackSector = (sideTrack << 8) | sector;
+
+    // store and update storing position
+    writePos[wrPosStore] = sideTrackSector;
+    wrPosStore++;
+
+    if(wrPosStore >= WRPOS_SIZE) {
+        wrPosStore = 0;
+    }
+
+    wrPosCnt++;
+}
+
+void wrPosGet(uint8_t* pSideTrack, uint8_t* pSector)
+{
+    // got anything stored? get it
+    if(wrPosCnt > 0) {
+        uint16_t sideTrackSector = writePos[wrPosLoad];
+        wrPosLoad++;
+
+        if(wrPosLoad >= WRPOS_SIZE) {
+           wrPosLoad = 0;
+        }
+
+        wrPosCnt--;
+
+        *pSideTrack = (uint8_t) (sideTrackSector >> 8);
+        *pSector = (uint8_t) sideTrackSector;
+    }
+    // nothing stored? return zeros
+    else
+    {
+        *pSideTrack = 0;
+        *pSector = 0;
+    }
+}
 
 TWriteBuffer wrBuffer;  // buffer for written sectors
 
@@ -149,6 +205,7 @@ void setup(void)
     preferences.end();
 
     setupAtnBuffers();
+    wrPosClear();
 
     createIkbdTask();   // this task sends ikdb data to host and back
     displayInit();
@@ -183,7 +240,6 @@ void readTrackData_goToStart(void)
 void getMfmDataToBuffer(uint8_t* bfr, int len)
 {
     static int prevTrackIndex = 255;
-    static int dontEvalByteCount = 0;
 
     // update SIDE var
     hwPosition.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1; // get the current SIDE
@@ -209,36 +265,31 @@ void getMfmDataToBuffer(uint8_t* bfr, int len)
         uint8_t val = *pTrackData;
 
         // end of array or end-of-track marker? we've at the end, don't copy anything more
-        if(pTrackData >= pTrackDataEnd) {
+        if(pTrackData >= pTrackDataEnd || val == CMD_TRACK_STREAM_END) {
             break;
         }
 
         pTrackData++;
 
-        // If we're allowed to evaluate some data bytes, check other conditions for ignoring current value or stopping of stream copying to output buffer.
-        // (We're not allowed to evaluate data bytes if they are 3 bytes after CMD_CURRENT_SECTOR, which are side, track, sector number - they could match the CMD_ values)
-        if(dontEvalByteCount == 0) {
-            // skip empty bytes and skip marker of data part of the sector
-            if(val == 0 || val == CMD_DATA_PART_OF_SECTOR) {
-                continue;
-            }
-
-            // if this is end of stream, stop getting data here
-            if(val == CMD_TRACK_STREAM_END) {
-                break;
-            }
-
-            // let the CMD_CURRENT_SECTOR and following data pass to MFM streamer
-            if(val == CMD_CURRENT_SECTOR) {
-                dontEvalByteCount = 3;
-            }
-        }
-        else    // if we're in the don't-evaluate-bytes part, we've just not-evaluated one, so we can decrease this dontEval counter
-        {
-            dontEvalByteCount--;
+        // skip empty bytes
+        if(val == 0) {
+            continue;
         }
 
-        // val is just mfm data or CMD_CURRENT_SECTOR + position, store it
+        // skip data part of the sector marker
+        if(val == CMD_DATA_PART_OF_SECTOR) {
+            continue;
+        }
+
+        // current sector marker?
+        if(val == CMD_CURRENT_SECTOR) {
+            posStreamed.side = *pTrackData++;
+            posStreamed.track = *pTrackData++;
+            posStreamed.sector = *pTrackData++;
+            continue;
+        }
+
+        // val is just mfm data, store it
         bfr[i] = val;
         i++;
     }
@@ -345,8 +396,6 @@ void processMfmWriteBuffer(uint8_t* bfr, int len)
 {
     static bool receivingWriteData = false;
 
-    uint8_t* pStore = &wrBuffer.buffer[wrBuffer.count];
-
     for(int i=0; i<len; i++)
     {
         uint8_t val = bfr[i];
@@ -354,8 +403,7 @@ void processMfmWriteBuffer(uint8_t* bfr, int len)
         if(val == TAG_WRITE_START) {    // on START tag found - now we're receiving write data
             // Serial.println("START");
             receivingWriteData = true;
-            wrBuffer.count = 10;        // start with 10 bytes in the buffer - 10 for header
-            pStore = &wrBuffer.buffer[wrBuffer.count];
+            wrBuffer.count = 12;        // start with 12 bytes in the buffer - 10 for header, 2 for track + side + sector
             continue;
         }
 
@@ -363,15 +411,20 @@ void processMfmWriteBuffer(uint8_t* bfr, int len)
             if(receivingWriteData) {    // this END tag is the first END tag found after START tag, so we're done with receiving this sector
                 receivingWriteData = false;     //  not receiving anymore
 
+                uint8_t sideTrack, sector;
+                wrPosGet(&sideTrack, &sector);  // get side, track and sector number from the write-positions buffer
+                wrBuffer.buffer[10] = sideTrack;
+                wrBuffer.buffer[11] = sector;
+
+                posWritten.side = ((sideTrack) & 0x80) ? 1 : 0;
+                posWritten.track = sideTrack & 0x7f;
+                posWritten.sector = sector;
+
                 // Serial.println("END");
                 // Serial.println(wrBuffer.count);
 
-                uint8_t side = (wrBuffer.buffer[10] >> 7) & 1;
-                uint8_t track = wrBuffer.buffer[10] & 0x7f;
-                uint8_t sector = wrBuffer.buffer[11];
-
                 sendHeaderAndDataToHost(wrBuffer.buffer, wrBuffer.count - TX_HEADER_SIZE);      // send sector to host
-                storeWrittenSectorDataToTrackLocally(side, track, sector, wrBuffer.buffer + 2, wrBuffer.count - 2);     // store locally, skip first two bytes with side track sector values
+                storeWrittenSectorDataToTrackLocally(((sideTrack & 0x80) ? 1 : 0), (sideTrack & 0x7f), sector, wrBuffer.buffer, wrBuffer.count);
             }
 
             continue;
@@ -383,14 +436,12 @@ void processMfmWriteBuffer(uint8_t* bfr, int len)
         }
 
         // buffer not full and the value is not a zero? store
-        if(wrBuffer.count < WRITEBUFFER_SIZE && val != 0) {
+        if(wrBuffer.count < WRITEBUFFER_SIZE) {
             // Serial.print(val, HEX);
             // Serial.print(" ");
 
-            *pStore = val;
-            pStore++;
-
-            wrBuffer.count++;  // increment count of data in buffer
+            wrBuffer.buffer[wrBuffer.count] = val;
+            wrBuffer.count++;
         }
     }
 }
@@ -520,8 +571,37 @@ void loop(void)
             // Serial.println("DSK CHG end");
         }
 
-        //------------
+        //-------------------------------------------------
         now = millis();
+
+        if(stWantsTheStream)
+        {
+            int WGateNow = BIT_LEVEL(PIN_WGATE);
+
+            if(WGatePrev != WGateNow)   // write gate changed?
+            {
+                WGatePrev = WGateNow;
+
+                if(WGateNow == LOW)     // on write start
+                {
+                    posStreamed.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1;                // get the current SIDE
+                    wrPosPut(posStreamed.side, posStreamed.track, posStreamed.sector);   // store side, track, sector into write positions buffer
+                    lastPosPutTime = now;
+                }
+            }
+        }
+
+        // if passed enough time to get the written data from the mfm streamer, but this hasn't happened and 
+        // we still have some positions stored in the wrPos FIFO, clear it and log a message
+        if((now - lastPosPutTime) > 50 && wrPosCnt > 0) {
+            Serial.print("Probably missed ");
+            Serial.print(wrPosCnt);
+            Serial.println(" written sector(s)");
+
+            wrPosClear();       // clear the written positions, they are probably useless now
+        }
+
+        //------------
         uint32_t timeSinceTrackStart = now - timeTrackStart;
 
         if(timeSinceTrackStart <= 195) {  // INDEX is H for time 0-195
@@ -557,7 +637,7 @@ void setupAtnBuffers(void)
 
     // configure write buffers
     storeHeader(wrBuffer.buffer, ATN_SECTOR_WRITTEN, 12);
-    wrBuffer.count = 10;
+    wrBuffer.count = 12;
 }
 
 void storeMacAddress(void)
