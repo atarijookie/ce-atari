@@ -1,5 +1,4 @@
 #include "WiFi.h"
-// #include <Preferences.h>
 // #include <SPI.h>
 
 #include "defs.h"
@@ -14,8 +13,6 @@
     Arduino IDE: 2.3.6
     Board: 'Raspberry Pi Pico 2W'
 */
-
-// Preferences preferences;
 
 uint16_t version[2] = {0xf025, 0x0616}; // this means: Franz, 2025-06-16
 uint8_t atnSendFwVersion[ATN_SENDFWVERSION_LEN_TX];
@@ -202,11 +199,7 @@ void setup(void)
 
     readTrackData_goToStart();
 
-/*  TODO:
-    preferences.begin("ikbd", PREFERENCES_RO_MODE);
-    ikbdEnabled = preferences.getUChar("enabled", 1);
-    preferences.end();
-*/
+    ikbdEnabled = getIkbdEnabled();
 
     setupAtnBuffers();
     wrPosClear();

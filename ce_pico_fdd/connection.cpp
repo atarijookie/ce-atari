@@ -1,6 +1,4 @@
 #include "WiFi.h"
-// #include <Preferences.h>
-
 #include "defs.h"
 #include "connection.h"
 #include "utils.h"
@@ -8,8 +6,6 @@
 #include "display.h"
 
 WiFiMulti multi;
-
-// extern Preferences preferences;
 
 bool wifiSettingsLoaded;
 String ssid;
@@ -89,13 +85,7 @@ void connectToWifi(void)
     if (!wifiSettingsLoaded)
     {
         wifiSettingsLoaded = true;
-
-/* TODO:
-        preferences.begin("credentials", PREFERENCES_RO_MODE);
-        ssid = preferences.getString("ssid", "");
-        password = preferences.getString("password", "");
-        preferences.end();
-*/
+        getSsidAndPassword(ssid, password);
     }
 
     Serial.print("connectToWifi - ssid: ");

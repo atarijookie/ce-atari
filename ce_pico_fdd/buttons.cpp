@@ -1,5 +1,4 @@
 #include "WiFi.h"
-// #include <Preferences.h>
 
 #include "defs.h"
 #include "connection.h"
@@ -8,7 +7,6 @@
 #include "display.h"
 #include "buttons.h"
 
-// extern Preferences preferences;
 extern volatile bool ikbdEnabled;   // if true, should send data to host; otherwise just loopback ikdb data back
 
 void handleAnalogButtons(uint32_t now)
@@ -65,11 +63,7 @@ void onButtonStateChanged(int buttonState, uint32_t now, uint32_t& buttonPressTi
     // on longer press, save ikbd enabled flag
     if(pressDuration >= BTN_PRESS_SAVE && pressDuration < BTN_PRESS_CAPTIVE)
     {
-        /* TODO:
-        preferences.begin("ikbd", PREFERENCES_RW_MODE);
-        preferences.putUChar("enabled", ikbdEnabled);
-        preferences.end();
-        */
+        storeIkbdEnabled(ikbdEnabled);
     }
 
     // on longest press, run captive portal

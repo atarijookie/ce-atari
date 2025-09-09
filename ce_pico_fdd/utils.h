@@ -14,7 +14,7 @@ void storeHeader(uint8_t *bfr, uint16_t atnCode, uint32_t txLen);
 extern uint32_t timerEndMillis;
 extern volatile uint8_t hasTimedOut;
 void timeoutClear(void);
-void timeoutStart(uint32_t durationMs = CMD_TIMEOUT_SHORT);
+void timeoutStart(uint32_t durationMs);
 void cmdTimeoutChangeLength(uint32_t newPeriod);
 
 #define SETTING_SSID 'S'
@@ -22,5 +22,23 @@ void cmdTimeoutChangeLength(uint32_t newPeriod);
 #define SETTING_IDS 'I'
 void getSetting(uint8_t settingId, uint8_t *settingBfr, uint8_t settingMaxLen);
 void setSetting(uint8_t settingId, uint8_t *settingBfr, uint8_t settingMaxLen);
+
+#define SETTINGS_VALID  0xCAFE
+
+#define MAX_SETTINGS_STRING_LEN 32
+
+typedef struct {
+    uint16_t isValid;
+    char ssid[MAX_SETTINGS_STRING_LEN];
+    char password[MAX_SETTINGS_STRING_LEN];
+    uint8_t ikbdEnabled;
+} Settings_t;
+
+void loadSettingsFromEeprom(void);
+void saveSettingsToEeprom(void);
+void getSsidAndPassword(String& argSsid, String& argPassword);
+void storeSsidAndPassword(String& argSsid, String& argPassword);
+bool getIkbdEnabled(void);
+void storeIkbdEnabled(bool argIkbdEnabled);
 
 #endif

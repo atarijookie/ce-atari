@@ -1,16 +1,15 @@
 #include "WiFi.h"
-// #include <Preferences.h>
 
 #include <WebServer.h>
 #include <DNSServer.h>
 
+#include "utils.h"
 #include "display.h"
 #include "defs.h"
 
 DNSServer dnsServer;
 WebServer server(80);
 
-// extern Preferences preferences;
 extern String ssid;
 extern String password;
 
@@ -79,13 +78,9 @@ void handleSave(void)
         Serial.print(", password: ");
         Serial.println(password);
 
-        // store credentials to preferences
-/* TODO:
-        preferences.begin("credentials", PREFERENCES_RW_MODE);
-        preferences.putString("ssid", ssid.c_str());
-        preferences.putString("password", password.c_str());
-        preferences.end();
-*/
+        // store credentials to eeprom
+        storeSsidAndPassword(ssid, password);
+
         // mark that we now have new settings
         newSettingsSaved = true;
 
