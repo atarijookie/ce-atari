@@ -105,7 +105,8 @@ void handleBootButton(uint32_t now)
     static int lastButtonState = HIGH;
     static uint32_t buttonPressTime = 0;
 
-    int buttonState = digitalRead(PIN_BOOT_BTN);    // read button
+    int buttonState = HIGH;     // TODO:
+    // int buttonState = digitalRead(PIN_BOOT_BTN);    // read button
 
     bool buttonStateChanged = (lastButtonState != buttonState);
     lastButtonState = buttonState;

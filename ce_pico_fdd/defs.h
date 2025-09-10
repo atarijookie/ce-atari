@@ -4,13 +4,8 @@
 #include <arduino.h>
 
 #define LOG_MORE    1
-#define ALWAYS_INLINE inline __attribute__((always_inline))
 
 #define WIFI_CAPTIVE_AP_NAME    "CosmosEx AP"
-
-// #define RW_TASKS
-
-#define DELAY_NS   asm("nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop;");
 
 #ifndef TRUE
     #define TRUE 1
@@ -27,11 +22,6 @@
 #ifndef MAX
     #define MAX(X,Y)    ((X > Y) ? X : Y)
 #endif
-
-#define CMD_TIMEOUT_SECS_PER_MB 3
-#define CMD_TIMEOUT_ONESECOND   1000
-#define CMD_TIMEOUT_SHORT       (CMD_TIMEOUT_ONESECOND / 2)     // this period will be 0.5 second
-#define CMD_TIMEOUT_LONG        (CMD_TIMEOUT_ONESECOND * 3)     // this period will be 3.0 second
 
 // commands sent from device to host
 #define ATN_FW_VERSION          0x01        // followed by string with FW version (length: 4 WORDs - cmd, v[0], v[1], 0)
@@ -55,10 +45,7 @@
 
 #define CMD_TRACK_STREAM_END        0xF0                            // this is the mark in the track stream that we shouldn't go any further in the stream
 
-
 ///////////////////////////
-
-#define ATN_VARIABLE_LEN                0xffff
 
 #define TX_HEADER_SIZE                  10
 #define ATN_SENDFWVERSION_LEN_TX        (TX_HEADER_SIZE + 12)
@@ -66,38 +53,32 @@
 
 ///////////////////////////
 
-#define PIN_WGATE           3
-#define PIN_DRIVE_SEL       4
-#define PIN_MOT_EN          5
-#define PIN_DIR             6
-#define PIN_STEP            7
-#define PIN_SIDE1           9
-#define PIN_ANALOG_BTNS     10
-#define PIN_INDEX           11
-#define PIN_TRACK00         12
-#define PIN_WPROTECT        13
-#define PIN_DSKCHG          21
-#define PIN_DENSITY         38
-#define PIN_FLCC_OE         47
-
-#define PIN_SCK             1
-#define PIN_CS              2
-#define PIN_MISO            8
-#define PIN_MOSI            14
-#define PIN_MFM_RXE         48
-
-#define PIN_SCL             15      // output
+#define PIN_TXD_DEBUG       0
+#define PIN_RXD_DEBUG       1
+#define PIN_DRIVE_SEL       2
+#define PIN_MOT_EN          3
+#define PIN_DIR             4
+#define PIN_STEP            5
+#define PIN_WGATE           6
+#define PIN_SIDE1           7
+#define PIN_KEYB_TX         8
+#define PIN_KEYB_TX_ORIG    9
+#define PIN_SCK             10
+#define PIN_MOSI            11
+#define PIN_MISO            12
+#define PIN_CS              13
+#define PIN_RDATA           14
+#define PIN_DSKCHG          15
 #define PIN_SDA             16      // input/output
-
-#define PIN_KEYB_TX         17
-#define PIN_KEYB_TX_ORIG    18
-#define PIN_KEYB_RX         19
-#define PIN_TXD2            20
-
-#define PIN_TXD_DEBUG       43
-#define PIN_RXD_DEBUG       44
-
-#define PIN_BOOT_BTN    0       // input
+#define PIN_SCL             17      // output
+#define PIN_KEYB_RX         18
+#define PIN_WPROTECT        19
+#define PIN_TRACK00         20
+#define PIN_INDEX           21
+#define PIN_DENSITY         22
+#define PIN_WDATA           26
+#define PIN_ANALOG_BTNS     27
+#define PIN_FLCC_OE         28
 
 // using digitalRead / digitalWrite from Arduino env to manipulate gpio
 #define BIT_IS_H(PIN)   (digitalRead(PIN) == HIGH)

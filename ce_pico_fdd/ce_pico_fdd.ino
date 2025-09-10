@@ -139,15 +139,13 @@ void setup(void)
 */
     Serial.println("setup() starting");
 
-    #define INPUTS_COUNT 9
-    int inputs[INPUTS_COUNT] = {PIN_SDA, PIN_DRIVE_SEL, PIN_MOT_EN, PIN_DIR, PIN_STEP, PIN_WGATE, PIN_SIDE1, PIN_MFM_RXE};
+    #define INPUTS_COUNT 8
+    int inputs[INPUTS_COUNT] = {PIN_SDA, PIN_DRIVE_SEL, PIN_MOT_EN, PIN_DIR, PIN_STEP, PIN_WGATE, PIN_SIDE1};
 
     for (int i = 0; i < INPUTS_COUNT; i++)
     {
         pinMode(inputs[i], INPUT);
     }
-
-    pinMode(PIN_BOOT_BTN, INPUT_PULLUP);    // boot pin needs pullup enabled
 
     #define OUTPUTS_COUNT 8
     int outputs[OUTPUTS_COUNT] = {PIN_SCL, PIN_DENSITY, PIN_INDEX, PIN_TRACK00, PIN_WPROTECT, PIN_DSKCHG, PIN_FLCC_OE, PIN_CS};
@@ -541,10 +539,12 @@ void loop(void)
             BIT_SET(PIN_FLCC_OE);
         }
 
+        /* TODO:
         // if the mfm streamer needs more data
         if(digitalRead(PIN_MFM_RXE) == HIGH) {
             refillMfmStreamer();
         }
+        */
 
         // when disk change happened
         if(diskChanged) {

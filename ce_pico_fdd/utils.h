@@ -17,12 +17,6 @@ void timeoutClear(void);
 void timeoutStart(uint32_t durationMs);
 void cmdTimeoutChangeLength(uint32_t newPeriod);
 
-#define SETTING_SSID 'S'
-#define SETTING_PSWD 'P'
-#define SETTING_IDS 'I'
-void getSetting(uint8_t settingId, uint8_t *settingBfr, uint8_t settingMaxLen);
-void setSetting(uint8_t settingId, uint8_t *settingBfr, uint8_t settingMaxLen);
-
 #define SETTINGS_VALID  0xCAFE
 
 #define MAX_SETTINGS_STRING_LEN 32
