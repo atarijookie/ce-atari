@@ -1,5 +1,5 @@
 #include "WiFi.h"
-// #include <SPI.h>
+#include <SPI.h>
 
 #include "defs.h"
 #include "utils.h"
@@ -8,13 +8,14 @@
 #include "display.h"
 #include "ikbd.h"
 #include "buttons.h"
+#include "mfm.h"
 
 /*
     Arduino IDE: 2.3.6
     Board: 'Raspberry Pi Pico 2W'
 */
 
-uint16_t version[2] = {0xf025, 0x0616}; // this means: Franz, 2025-06-16
+uint16_t version[2] = {0xf025, 0x0901}; // this means: Franz, 2025-09-01
 uint8_t atnSendFwVersion[ATN_SENDFWVERSION_LEN_TX];
 uint8_t atnSendTrackRequest[ATN_SENDTRACK_REQ_LEN_TX]; 
 uint8_t atnSendWholeImageRequest[TX_HEADER_SIZE];
@@ -98,7 +99,7 @@ void wrPosGet(uint8_t* pSideTrack, uint8_t* pSector)
 TWriteBuffer wrBuffer;  // buffer for written sectors
 
 // interrupt handler for STEP signal
-void /*IRAM_ATTR*/ floppyStepISR(void)
+void floppyStepISR(uint gpio, uint32_t event_mask)
 {
     static uint32_t lastStepTime = 0;
 
@@ -157,16 +158,16 @@ void setup(void)
         digitalWrite(outputs[i], levels[i]);
     }
 
+    // init SPI, init PSRAM, read ID, test read and write
+    SPI.setSCK(PIN_SCK);
+    SPI.setTX(PIN_MOSI);
+    SPI.setRX(PIN_MISO);
+    SPI.setCS(PIN_CS);
+    SPI.begin(true);
+
+    psramTest();
+
     /*
-    uint32_t psramSize = ESP.getPsramSize();
-    Serial.print("Found PSRAM: ");
-    Serial.println(psramSize / 1024);
-
-    if(psramSize < (2 * MAX_TRACKS * READTRACKDATA_SIZE_BYTES)) {
-        Serial.println("Not enough PSRAM, will fail to work! HALT!");
-        while(1);
-    }
-
     // allocate and init tracks
     for(int trackNo=0; trackNo<MAX_TRACKS; trackNo++) {
         for(int sideNo=0; sideNo<2; sideNo++) {
@@ -182,17 +183,6 @@ void setup(void)
             }
         }
     }
-
-    // do a short PSRAM check
-    tracks[0].data[0] = 0xab;
-    tracks[(2 * MAX_TRACKS) - 1].data[0] = 0xcd;
-
-    if(tracks[0].data[0] == 0xab && tracks[(2 * MAX_TRACKS) - 1].data[0] == 0xcd) {
-        Serial.println("PSRAM used and working");
-    } else {
-        Serial.println("PSRAM not working correctly! HALT");
-        while(1);
-    }
     */
 
     readTrackData_goToStart();
@@ -205,10 +195,11 @@ void setup(void)
     createIkbdTask();   // this task sends ikdb data to host and back
     displayInit();
 
-    // SPI.begin(PIN_SCK, PIN_MISO, PIN_MOSI, PIN_CS);
-    // SPI.beginTransaction(SPISettings(8000000, MSBFIRST, SPI_MODE0));
+    // start mfm output
+    setupPwmOutput();
+    setupDmaToPwm();
 
-    // attachInterrupt(PIN_STEP, floppyStepISR, FALLING);       // TODO:
+    gpio_set_irq_enabled_with_callback(PIN_STEP, GPIO_IRQ_EDGE_FALL, true, floppyStepISR);
 }
 
 void requestTrack(uint8_t side, uint8_t track)

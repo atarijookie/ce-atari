@@ -35,4 +35,8 @@ void storeSsidAndPassword(String& argSsid, String& argPassword);
 bool getIkbdEnabled(void);
 void storeIkbdEnabled(bool argIkbdEnabled);
 
+void psramWriteBuffer(uint32_t addr, const uint8_t *buffer, size_t length);
+void psramReadBuffer(uint32_t addr, uint8_t *buffer, size_t length);
+void psramTest(void);
+
 #endif

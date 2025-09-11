@@ -80,6 +80,7 @@
 #define PIN_ANALOG_BTNS     27
 #define PIN_FLCC_OE         28
 
+/*
 // using digitalRead / digitalWrite from Arduino env to manipulate gpio
 #define BIT_IS_H(PIN)   (digitalRead(PIN) == HIGH)
 #define BIT_IS_L(PIN)   (digitalRead(PIN) == LOW)
@@ -87,25 +88,15 @@
 
 #define BIT_SET(PIN)    digitalWrite(PIN, HIGH)
 #define BIT_CLR(PIN)    digitalWrite(PIN, LOW)
-
-/*
-// using esp32 regs to read / set / clear gpio bits
-#define BIT_IS_H(PIN)   ((REG_READ(GPIO_IN_REG) & (1 << PIN)) == (1 << PIN))
-#define BIT_IS_L(PIN)   ((REG_READ(GPIO_IN_REG) & (1 << PIN)) == 0)
-#define BIT_LEVEL(PIN)  (BIT_IS_L(PIN) ? LOW : HIGH)
-
-// for bits 0-31
-#define BIT_SET(PIN)    REG_WRITE(GPIO_OUT_W1TS_REG, (1 << PIN))
-#define BIT_CLR(PIN)    REG_WRITE(GPIO_OUT_W1TC_REG, (1 << PIN))
-
-// for bits 32-48, but needs to subtract 32
-#define BIT_SET1(PIN)    REG_WRITE(GPIO_OUT1_W1TS_REG, (1 << (PIN - 32)))
-#define BIT_CLR1(PIN)    REG_WRITE(GPIO_OUT1_W1TC_REG, (1 << (PIN - 32)))
-
-#define BIT_IS_H1(PIN)   ((REG_READ(GPIO_IN1_REG) & (1 << (PIN - 32))) == (1 << (PIN - 32)))
-#define BIT_IS_L1(PIN)   ((REG_READ(GPIO_IN1_REG) & (1 << (PIN - 32))) == 0)
-#define BIT_LEVEL1(PIN)  (BIT_IS_L1(PIN) ? LOW : HIGH)
 */
+
+// using pico 2 regs to read / set / clear gpio bits
+#define BIT_IS_H(PIN)   (gpio_get(PIN) != 0)
+#define BIT_IS_L(PIN)   (gpio_get(PIN) == 0)
+#define BIT_LEVEL(PIN)  (BIT_IS_L(PIN) ? LOW : HIGH)
+#define BIT_SET(PIN)    gpio_set_mask(1 << PIN)
+#define BIT_CLR(PIN)    gpio_clr_mask(1 << PIN)
+
 
 #define WRITEBUFFER_SIZE    1300
 
