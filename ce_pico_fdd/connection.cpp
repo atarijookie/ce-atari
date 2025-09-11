@@ -4,6 +4,7 @@
 #include "utils.h"
 #include "captive_portal.h"
 #include "display.h"
+#include "psram.h"
 
 WiFiMulti multi;
 
@@ -31,7 +32,6 @@ extern volatile bool ikbdEnabled;   // if true, should send data to host; otherw
 
 THeader fddHeader;      // keep the header global to preserve syncTag between calls
 
-extern SingleTrack tracks[2 * MAX_TRACKS];
 extern uint8_t imgTracks, imgSides, imgSectorsPerTrack;
 extern char imageFileName[32];
 extern bool diskChanged;
@@ -436,13 +436,8 @@ void handleTrackReceived(void)
     int trackNo = MIN(tmpTrackBfr[0], MAX_TRACKS - 1);
     int sideNo = MIN(tmpTrackBfr[1], 1);
 
-    // store the track and side into struct and copy in the data from temp buffer
-    int index = trackNo * 2 + sideNo;
-    tracks[index].loaded = true;
-    tracks[index].track = trackNo;
-    tracks[index].side = sideNo;
-
-    memcpy(tracks[index].data, tmpTrackBfr + 2, lenData - 2);
+    // store the track track data into PSRAM
+    psramStoreTrack(trackNo, sideNo, tmpTrackBfr + 2);
 
     Serial.print("Rx ");
     Serial.print(trackNo);

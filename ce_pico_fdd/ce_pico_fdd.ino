@@ -9,6 +9,7 @@
 #include "ikbd.h"
 #include "buttons.h"
 #include "mfm.h"
+#include "psram.h"
 
 /*
     Arduino IDE: 2.3.6
@@ -28,9 +29,11 @@ void requestWholeImage(void);
 
 SStreamed posStreamed, hwPosition, posWritten;
 
+uint8_t trackData0[READTRACKDATA_SIZE_BYTES];
+uint8_t trackData1[READTRACKDATA_SIZE_BYTES];
+
 extern bool connected;
 
-SingleTrack tracks[2 * MAX_TRACKS];
 int imageState = IMAGE_NOT_LOADED;
 uint8_t imgTracks, imgSides, imgSectorsPerTrack;
 char imageFileName[32];
@@ -119,7 +122,7 @@ void floppyStepISR(uint gpio, uint32_t event_mask)
             hwPosition.track--;
         }
     } else  {                // direction is Low? track++
-        if(hwPosition.track < 85) {
+        if(hwPosition.track < MAX_TRACKS) {
             hwPosition.track++;
         }
     }
@@ -167,24 +170,6 @@ void setup(void)
 
     psramTest();
 
-    /*
-    // allocate and init tracks
-    for(int trackNo=0; trackNo<MAX_TRACKS; trackNo++) {
-        for(int sideNo=0; sideNo<2; sideNo++) {
-            int index = trackNo*2 + sideNo;
-            tracks[index].loaded = false;
-            tracks[index].track = trackNo;
-            tracks[index].side = sideNo;
-            tracks[index].data = (uint8_t*) ps_malloc(READTRACKDATA_SIZE_BYTES);
-
-            if(tracks[index].data == NULL) {
-                Serial.println("ps_malloc() failed! HALT!");
-                while(1);
-            }
-        }
-    }
-    */
-
     readTrackData_goToStart();
 
     ikbdEnabled = getIkbdEnabled();
@@ -223,68 +208,6 @@ void readTrackData_goToStart(void)
     timeTrackStart = millis();                  // time of track start to now
 }
 
-void getMfmDataToBuffer(uint8_t* bfr, int len)
-{
-    static int prevTrackIndex = 255;
-
-    // update SIDE var
-    hwPosition.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1; // get the current SIDE
-
-    // get current track and side we should be streaming, limit them to maximum values
-    int trackNo = MIN(hwPosition.track, MAX_TRACKS);
-    int sideNo = MIN(hwPosition.side, 1);
-
-    // find out from track and side vars which track we should stream, then in that track find the pointer to next position
-    int trackIndex = trackNo * 2 + sideNo;                       // track + side create index into tracks array
-
-    if(prevTrackIndex != trackIndex) {      // track or side changed? restart stream
-        readTrackData_goToStart();
-    }
-    prevTrackIndex = trackIndex;
-
-    uint8_t* pTrackData = &tracks[trackIndex].data[dataIndexInTrack];  // copy data from here
-    uint8_t* pTrackDataEnd = &tracks[trackIndex].data[READTRACKDATA_SIZE_BYTES - 1];
-
-    memset(bfr, 0x55, len);                // init all values to 0x55
-
-    for(int i=0; i<len; ) {
-        uint8_t val = *pTrackData;
-
-        // end of array or end-of-track marker? we've at the end, don't copy anything more
-        if(pTrackData >= pTrackDataEnd || val == CMD_TRACK_STREAM_END) {
-            break;
-        }
-
-        pTrackData++;
-
-        // skip empty bytes
-        if(val == 0) {
-            continue;
-        }
-
-        // skip data part of the sector marker
-        if(val == CMD_DATA_PART_OF_SECTOR) {
-            continue;
-        }
-
-        // current sector marker?
-        if(val == CMD_CURRENT_SECTOR) {
-            posStreamed.side = *pTrackData++;
-            posStreamed.track = *pTrackData++;
-            posStreamed.sector = *pTrackData++;
-            continue;
-        }
-
-        // val is just mfm data, store it
-        bfr[i] = val;
-        i++;
-    }
-
-    // now we got 'len' bytes in the bfr, we just need to update data retrieval index
-    uint8_t* pTrackDataStart = tracks[trackIndex].data;
-    dataIndexInTrack = pTrackData - pTrackDataStart;
-}
-
 void logFailedToWrite(uint8_t side, uint8_t track, uint8_t sector)
 {
     Serial.print("Failed to write side: ");
@@ -304,13 +227,12 @@ void storeWrittenSectorDataToTrackLocally(uint8_t side, uint8_t track, uint8_t s
         return;
     }
 
-    // get pointer to start and end of track
-    int trackIndex = track * 2 + side;            // track + side create index into tracks array
-    uint8_t* pData = &tracks[trackIndex].data[0];
-    uint8_t* pDataEnd = &tracks[trackIndex].data[READTRACKDATA_SIZE_BYTES - 1];
+    uint8_t* pTrackStart = (side == 0) ? trackData0 : trackData1;
+    uint8_t* pDataEnd = pTrackStart + READTRACKDATA_SIZE_BYTES - 1;
+    uint8_t* pData = pTrackStart;
 
     uint8_t* pStreamTableItem = pData + (sector * 2);       // calc pointer to where the offset to sector is - in the stream table
-    uint32_t offsetToSector = getWord(pStreamTableItem);   // get offset to sector in stream from stream table
+    uint32_t offsetToSector = getWord(pStreamTableItem);    // get offset to sector in stream from stream table
 
     // make sure that offset to sector is still within the track data
     if(offsetToSector >= READTRACKDATA_SIZE_BYTES) {
@@ -369,13 +291,18 @@ void storeWrittenSectorDataToTrackLocally(uint8_t side, uint8_t track, uint8_t s
     int dataSizeBytes = pSectorEnd - pSectorDataStart;  // how many bytes are allocated in buffer for the sector data (from end to start) - should be about 1100 bytes
     int copySize = MIN(len, dataSizeBytes);         // pick smaller of these sizes, so we won't overwrite the start of next sector
 
-    int dataSizeToClear = dataSizeBytes - copySize; // how many bytes should be cleared 
+    int dataSizeToClear = dataSizeBytes - copySize; // how many bytes should be cleared
+    dataSizeToClear = MAX(dataSizeToClear, 0);      // make sure it's not negative
 
-    memcpy(pData, bfr, copySize);                   // copy new data at the start of data part of the sector
+    memcpy(pSectorDataStart, bfr, copySize);        // copy new data at the start of data part of the sector
 
     if(dataSizeToClear > 0) {
-        memset(pData + len, 0, dataSizeToClear);    // clear the bytes up to end of sector data
+        memset(pSectorDataStart + copySize, 0, dataSizeToClear);    // clear the bytes up to end of sector data
     }
+
+    // copy the new data to psram
+    int byteOffsetFromTrackStart = pSectorDataStart - pTrackStart;  // calculate the byte offset of the written sector data from start of the track
+    psramStoreSector(track, side, byteOffsetFromTrackStart, bfr, copySize, dataSizeToClear);
 }
 
 void processMfmWriteBuffer(uint8_t* bfr, int len)
@@ -432,41 +359,12 @@ void processMfmWriteBuffer(uint8_t* bfr, int len)
     }
 }
 
-void refillMfmStreamer(void)
-{
-    #define SPI_CHUNK_SIZE  256
-
-    uint8_t bufferOut[SPI_CHUNK_SIZE];
-    uint8_t bufferIn[SPI_CHUNK_SIZE];
-
-    // get stream data into buffer - duration: 24 us
-    getMfmDataToBuffer(bufferOut, SPI_CHUNK_SIZE);
-
-    // send data over SPI to mfm streamer - duration 262 us when SPI running at 8 MHz
-    digitalWrite(PIN_CS, LOW);
-    // SPI.transferBytes(bufferOut, bufferIn, SPI_CHUNK_SIZE);
-    digitalWrite(PIN_CS, HIGH);
-
-    // check bufferIn for any data, process non-zero bytes (sector written data) between start and stop tags
-    processMfmWriteBuffer(bufferIn, SPI_CHUNK_SIZE);
-}
-
 void BIT_INVERT(int pin)
 {
-    if(pin < 32) {
-        if(BIT_IS_H(pin)) {
-            BIT_CLR(pin);
-        } else {
-            BIT_SET(pin);
-        }
-    }
-    else
-    {
-        if(BIT_IS_H(pin)) {
-            BIT_CLR(pin);
-        } else {
-            BIT_SET(pin);
-        }
+    if(BIT_IS_H(pin)) {
+        BIT_CLR(pin);
+    } else {
+        BIT_SET(pin);
     }
 }
 
@@ -492,6 +390,11 @@ void loop(void)
 
         // handle any data incoming
         handleIncommingData();
+
+        // MFM read buffer should be refilled?
+        if(fillWhat != FILL_NONE) {
+            fillHalfMfmBuffer();
+        }
 
         bool stWantsTheStream = BIT_IS_L(PIN_DRIVE_SEL) && BIT_IS_L(PIN_MOT_EN);
 
@@ -529,13 +432,6 @@ void loop(void)
         } else {    // other cases? DISABLE stream
             BIT_SET(PIN_FLCC_OE);
         }
-
-        /* TODO:
-        // if the mfm streamer needs more data
-        if(digitalRead(PIN_MFM_RXE) == HIGH) {
-            refillMfmStreamer();
-        }
-        */
 
         // when disk change happened
         if(diskChanged) {

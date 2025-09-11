@@ -4,6 +4,7 @@
 #include "connection.h"
 #include "utils.h"
 #include "display.h"
+#include "psram.h"
 
 #include <stdio.h>
 #include "pico/stdlib.h"
@@ -13,11 +14,25 @@
 
 #define MFM_BUFFER_SIZE         512   // half of mfmBuffer is 256 items, which gives about 1 ms (256 items * 4 us per item) of time to refill half before the other half is used
 #define MFM_BUFFER_HALF_SIZE    (MFM_BUFFER_SIZE / 2)
+#define MFM_READ_SIZE_FILLS     (MFM_BUFFER_HALF_SIZE / 4)
 
 __attribute__((aligned(512))) uint16_t mfmBuffer[MFM_BUFFER_SIZE];
 
 int dmaChannel;
 volatile bool halfDone = false;
+
+#define FILL_NONE   0
+#define FILL_LOWER  1
+#define FILL_UPPER  2
+
+volatile uint8_t fillWhat = FILL_NONE;
+
+extern uint8_t trackData0[READTRACKDATA_SIZE_BYTES];
+extern uint8_t trackData1[READTRACKDATA_SIZE_BYTES];
+extern uint32_t dataIndexInTrack;
+
+extern SStreamed posStreamed, hwPosition, posWritten;
+void readTrackData_goToStart(void);
 
 void __isr dmaHandlerMfm(void);
 
@@ -73,17 +88,99 @@ void __isr dmaHandlerMfm(void)
     // Clear the interrupt
     dma_hw->ints0 = 1u << dmaChannel;
 
-    // Flip half flag
-    halfDone = !halfDone;
+    halfDone = !halfDone;   // Flip half flag
 
-    if (halfDone)   // First half finished
-    {
-        
+    fillWhat = halfDone ? FILL_LOWER : FILL_UPPER;
+}
 
+void getMfmDataToBuffer(uint8_t* bfr, int len)
+{
+    static int prevTrackNo = 255;
+
+    // update SIDE var
+    hwPosition.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1; // get the current SIDE
+
+    // get current track and side we should be streaming, limit them to maximum values
+    int trackNo = MIN(hwPosition.track, MAX_TRACKS);
+    int sideNo = MIN(hwPosition.side, 1);
+
+    if(prevTrackNo != trackNo) {      // track changed? load new data from psram, restart stream
+        psramLoadTrack(hwPosition.track, 0, trackData0);
+        psramLoadTrack(hwPosition.track, 1, trackData1);
+
+        readTrackData_goToStart();
     }
-    else            // Second half finished
-    {
-        
+    prevTrackNo = trackNo;
 
+    uint8_t* pTrackDataStart = (sideNo == 0) ? trackData0 : trackData1;
+    uint8_t* pTrackData = &pTrackDataStart[dataIndexInTrack];  // copy data from here
+    uint8_t* pTrackDataEnd = &pTrackDataStart[READTRACKDATA_SIZE_BYTES - 1];
+
+    memset(bfr, 0x55, len);                // init all values to 0x55
+
+    for(int i=0; i<len; ) {
+        uint8_t val = *pTrackData;
+
+        // end of array or end-of-track marker? we've at the end, don't copy anything more
+        if(pTrackData >= pTrackDataEnd || val == CMD_TRACK_STREAM_END) {
+            break;
+        }
+
+        pTrackData++;
+
+        // skip empty bytes
+        if(val == 0) {
+            continue;
+        }
+
+        // skip data part of the sector marker
+        if(val == CMD_DATA_PART_OF_SECTOR) {
+            continue;
+        }
+
+        // current sector marker?
+        if(val == CMD_CURRENT_SECTOR) {
+            posStreamed.side = *pTrackData++;
+            posStreamed.track = *pTrackData++;
+            posStreamed.sector = *pTrackData++;
+            continue;
+        }
+
+        // val is just mfm data, store it
+        bfr[i] = val;
+        i++;
+    }
+
+    // now we got 'len' bytes in the bfr, we just need to update data retrieval index
+    dataIndexInTrack = pTrackData - pTrackDataStart;
+}
+
+const uint16_t arrValues[4] = {7, 7, 11, 15};       // conversion table from mfm packed symbol to timer ARR value (for 0 us, 4 us, 6 us, 8 us)
+
+void fillHalfMfmBuffer(void)
+{
+    if(fillWhat == FILL_NONE) {     // nothing to fill? quit
+        return;
+    }
+
+    uint16_t* bfr = (fillWhat == FILL_LOWER) ? &mfmBuffer[0] : &mfmBuffer[MFM_BUFFER_HALF_SIZE];
+    fillWhat = FILL_NONE;
+
+    // from the track buffer (with all the additional data and spaces) extract 
+    // just MFM_READ_SIZE_FILLS bytes which can be transformed into MFM intervals
+    uint8_t rawMfmData[MFM_READ_SIZE_FILLS];
+    getMfmDataToBuffer(rawMfmData, MFM_READ_SIZE_FILLS);
+
+    for(int i=0; i<MFM_READ_SIZE_FILLS; i++) {
+        // get one byte with 4 intervals
+        uint8_t streamByte = rawMfmData[i];
+
+        // unpack intervals into 4 items of uint16_t
+        bfr[0] = arrValues[ ((streamByte >> 6) & 3) ];
+        bfr[1] = arrValues[ ((streamByte >> 4) & 3) ];
+        bfr[2] = arrValues[ ((streamByte >> 2) & 3) ];
+        bfr[3] = arrValues[ ((streamByte     ) & 3) ];
+
+        bfr += 4;
     }
 }

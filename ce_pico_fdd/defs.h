@@ -126,13 +126,6 @@ typedef struct {
 #define IMAGE_REQUESTED     1
 #define IMAGE_LOADED        2
 
-typedef struct {
-    bool loaded;
-    int track;
-    int side;
-    uint8_t* data;
-} SingleTrack;
-
 #define STREAM_TABLE_ITEMS  20
 #define STREAM_TABLE_SIZE   STREAM_TABLE_ITEMS
 
