@@ -1,27 +1,29 @@
-#include <SPI.h>
+#include <cstring>
+
+#include "pico/stdlib.h"
+#include "hardware/spi.h"
+#include "hardware/dma.h"
 
 #include "defs.h"
 #include "utils.h"
 
-SPISettings spisettings(16000000, MSBFIRST, SPI_MODE0);
-
 void spiTxAsync(const uint8_t* bfr, size_t length)
 {
-    SPI.transferAsync(bfr, nullptr, length);
-    while (!SPI.finishedAsync());
+    // SPI.transferAsync(bfr, nullptr, length);
+    // while (!SPI.finishedAsync());
 }
 
 void spiRxAsync(uint8_t* bfr, size_t length)
 {
-    SPI.transferAsync(nullptr, bfr, length);
-    while (!SPI.finishedAsync());
+    // SPI.transferAsync(nullptr, bfr, length);
+    // while (!SPI.finishedAsync());
 }
 
 // Write a buffer to PSRAM
 void psramWriteBuffer(uint32_t addr, const uint8_t *buffer, size_t length)
 {
-    SPI.beginTransaction(spisettings);
-    BIT_CLR(PIN_CS);
+    // SPI.beginTransaction(spisettings);
+    gpio_put(PIN_CS, 0);
 
     uint8_t cmd[4];
     cmd[0] = 0x02;                  // Write command
@@ -32,15 +34,15 @@ void psramWriteBuffer(uint32_t addr, const uint8_t *buffer, size_t length)
     spiTxAsync(cmd, 4);
     spiTxAsync(buffer, length);
 
-    BIT_SET(PIN_CS);
-    SPI.endTransaction();
+    gpio_put(PIN_CS, 1);
+    // SPI.endTransaction();
 }
 
 // Read a buffer from PSRAM
 void psramReadBuffer(uint32_t addr, uint8_t *buffer, size_t length)
 {
-    SPI.beginTransaction(spisettings);
-    BIT_CLR(PIN_CS);
+    // SPI.beginTransaction(spisettings);
+    gpio_put(PIN_CS, 0);
 
     uint8_t cmd[4];
     cmd[0] = 0x03;                  // read command
@@ -51,15 +53,15 @@ void psramReadBuffer(uint32_t addr, uint8_t *buffer, size_t length)
     spiTxAsync(cmd, 4);
     spiRxAsync(buffer, length);
 
-    BIT_SET(PIN_CS);
-    SPI.endTransaction();
+    gpio_put(PIN_CS, 1);
+    // SPI.endTransaction();
 }
 
 // Read ID of PSRAM
 void psramReadId(void)
 {
-    SPI.beginTransaction(spisettings);
-    BIT_CLR(PIN_CS);
+    // SPI.beginTransaction(spisettings);
+    gpio_put(PIN_CS, 0);
 
     uint8_t cmd[4];
     cmd[0] = 0x9f;                  // 'Read ID' command
@@ -72,17 +74,15 @@ void psramReadId(void)
     uint8_t resp[3];
     spiRxAsync(resp, 3);
 
-    BIT_SET(PIN_CS);
-    SPI.endTransaction();
+    gpio_put(PIN_CS, 1);
+    // SPI.endTransaction();
 
     if(resp[0] != 0x0d) {
-        Serial.print("PSRAM init - bad PSRAM ID: ");
-        Serial.print(resp[0], HEX);
-        Serial.println(" Will fail to work! HALT!");
+        printf("PSRAM init - bad PSRAM ID: %02x. Will fail to work! HALT!\n", resp[0]);
         while(1);
     }
 
-    Serial.println("PSRAM init - OK");
+    printf("PSRAM init - OK\n");
 }
 
 void psramTest(void)
@@ -93,7 +93,7 @@ void psramTest(void)
 
     uint8_t writeBfr[TEST_BFR_SIZE];
     for(int i=0; i<TEST_BFR_SIZE; i++) {                // full buffer with random data
-        writeBfr[i] = random(255);
+        writeBfr[i] = random();
     }
 
     psramWriteBuffer(0, writeBfr, TEST_BFR_SIZE);       // write to psram
@@ -104,11 +104,11 @@ void psramTest(void)
 
     if(memcmp(writeBfr, readBfr, TEST_BFR_SIZE) != 0)   // write and read buffers mismatch? fail and halt
     {
-        Serial.println("PSRAM not working correctly! HALT");
+        printf("PSRAM not working correctly! HALT\n");
         while(1);
     } 
 
-    Serial.println("PSRAM used and working");
+    printf("PSRAM used and working\n");
 
     // clear the psram block used in test
     memset(writeBfr, 0, TEST_BFR_SIZE);

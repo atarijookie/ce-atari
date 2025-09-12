@@ -1,13 +1,11 @@
-#include "WiFi.h"
-
 #include "defs.h"
 #include "connection.h"
 #include "utils.h"
 #include "ikbd.h"
 
-extern WiFiClient clientIkbd;
+// extern WiFiClient clientIkbd;
 
-extern String hostIpString;
+extern std::string hostIpString;
 extern uint16_t hostPortIkbd;
 extern bool connected;              // if true, wifi is connected
 
@@ -22,6 +20,7 @@ void onIkdbDisabled(void)
 {
     // ikbd not sending data (chip not present) or ikbd not enabled, but the ikbd socket is connected, then disconnect
     // if any data comming from host via socket is available, read and and drop it
+/*
     while(clientIkbd.available() > 0)
     {
         int available = clientIkbd.available();
@@ -29,7 +28,6 @@ void onIkdbDisabled(void)
         clientIkbd.read(buffer, readSize);
     }
 
-    /* TODO:
     while(Serial1.available() > 0)  // got data from KEYB_TX_ORIG? just send it back to KEYB_TX
     {
         uint8_t data = Serial1.read();
@@ -76,12 +74,13 @@ void onIkbdEnabled(void)
 
 void ikbdConnectDisconnect(void)
 {
+    /*
     if(ikbdEnabled)
     {
         // ikbd is enabled, ikdb chip is sending data (chip present), wifi is connected, but our ikbd socket is NOT connected, connect now
         if(connected && !clientIkbd.connected())
         {
-            Serial.println("I connect");
+            printf("I connect\n");
             clientIkbd.connect(hostIpString.c_str(), hostPortIkbd);
             clientIkbd.setNoDelay(true);
         }
@@ -91,16 +90,17 @@ void ikbdConnectDisconnect(void)
         // ikbd not sending data (chip not present) or ikbd not enabled, but the ikbd socket is connected, then disconnect
         if(clientIkbd.connected())
         {
-            Serial.println("I disconnect");
+            printf("I disconnect\n");
             clientIkbd.stop();
         }
     }
+    */
 }
 
 void taskIkbd(void* pvParameters)
 {
     uint32_t lastReceivedTime = 0xffff0000;     // when was some data last received from ikdb
-    Serial.println("I starting");
+    printf("I starting\n");
 
     uint32_t lastStatus = 0;
 
@@ -108,7 +108,7 @@ void taskIkbd(void* pvParameters)
     {
         // TODO:
         // vTaskDelay(20);          // intentionally process only once a while
-
+/*
         uint32_t now = millis();
 
         if((now - lastStatus) >= 1000)  // once per second
@@ -121,7 +121,7 @@ void taskIkbd(void* pvParameters)
                 clientIkbd.write(UARTMARK_ALIVE);
             }
 
-            // Serial.print("I enabled "); Serial.print(ikbdEnabled); Serial.print(" connected "); Serial.println(clientIkbd.connected());
+            // printf("I enabled %d, connected: %d\n", ikbdEnabled, clientIkbd.connected());
         }
 
         ikbdConnectDisconnect();
@@ -135,6 +135,7 @@ void taskIkbd(void* pvParameters)
         {
             onIkdbDisabled();
         }
+*/
     }
 }
 

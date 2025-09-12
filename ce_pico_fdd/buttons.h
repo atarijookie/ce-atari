@@ -1,8 +1,6 @@
 #ifndef __BUTTONS_H__
 #define __BUTTONS_H__
 
-#include <arduino.h>
-
 #define BTN_PRESS_SHORT     500
 #define BTN_PRESS_SAVE      2000
 #define BTN_PRESS_CAPTIVE   5000

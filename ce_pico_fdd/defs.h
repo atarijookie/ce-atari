@@ -1,7 +1,7 @@
 #ifndef DEFS_H_
 #define DEFS_H_
 
-#include <arduino.h>
+#include <cstdint>
 
 #define LOG_MORE    1
 
@@ -53,6 +53,10 @@
 
 ///////////////////////////
 
+#define SPI_PORT spi0
+#define I2C_PORT i2c0
+
+
 #define PIN_TXD_DEBUG       0
 #define PIN_RXD_DEBUG       1
 #define PIN_DRIVE_SEL       2
@@ -80,23 +84,9 @@
 #define PIN_ANALOG_BTNS     27
 #define PIN_FLCC_OE         28
 
-/*
-// using digitalRead / digitalWrite from Arduino env to manipulate gpio
-#define BIT_IS_H(PIN)   (digitalRead(PIN) == HIGH)
-#define BIT_IS_L(PIN)   (digitalRead(PIN) == LOW)
-#define BIT_LEVEL(PIN)  digitalRead(PIN)
-
-#define BIT_SET(PIN)    digitalWrite(PIN, HIGH)
-#define BIT_CLR(PIN)    digitalWrite(PIN, LOW)
-*/
-
-// using pico 2 regs to read / set / clear gpio bits
 #define BIT_IS_H(PIN)   (gpio_get(PIN) != 0)
 #define BIT_IS_L(PIN)   (gpio_get(PIN) == 0)
-#define BIT_LEVEL(PIN)  (BIT_IS_L(PIN) ? LOW : HIGH)
-#define BIT_SET(PIN)    gpio_set_mask(1 << PIN)
-#define BIT_CLR(PIN)    gpio_clr_mask(1 << PIN)
-
+#define BIT_LEVEL(PIN)  ( (gpio_get(PIN) == 0) ? 0 : 1)
 
 #define WRITEBUFFER_SIZE    1300
 

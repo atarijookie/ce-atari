@@ -1,7 +1,8 @@
 #ifndef __UTILS_H__
 #define __UTILS_H__
 
-#include <arduino.h>
+#include <string>
+#include <cstdint>
 
 uint16_t getWord(uint8_t *bfr);
 uint32_t getDword(uint8_t *bfr);
@@ -13,9 +14,9 @@ void storeHeader(uint8_t *bfr, uint16_t atnCode, uint32_t txLen);
 
 extern uint32_t timerEndMillis;
 extern volatile uint8_t hasTimedOut;
-void timeoutClear(void);
-void timeoutStart(uint32_t durationMs);
-void cmdTimeoutChangeLength(uint32_t newPeriod);
+// void timeoutClear(void);
+// void timeoutStart(uint32_t durationMs);
+// void cmdTimeoutChangeLength(uint32_t newPeriod);
 
 #define SETTINGS_VALID  0xCAFE
 
@@ -30,9 +31,10 @@ typedef struct {
 
 void loadSettingsFromEeprom(void);
 void saveSettingsToEeprom(void);
-void getSsidAndPassword(String& argSsid, String& argPassword);
-void storeSsidAndPassword(String& argSsid, String& argPassword);
+void getSsidAndPassword(std::string& argSsid, std::string& argPassword);
+void storeSsidAndPassword(std::string& argSsid, std::string& argPassword);
 bool getIkbdEnabled(void);
 void storeIkbdEnabled(bool argIkbdEnabled);
+uint32_t millis(void);
 
 #endif

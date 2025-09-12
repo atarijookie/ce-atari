@@ -1,8 +1,6 @@
 #ifndef __IKBD_H__
 #define __IKBD_H__
 
-#include <arduino.h>
-
 // tags to distinguish keyboard data from ST commands
 #define UARTMARK_STCMD      0xAA
 #define UARTMARK_KEYBDATA   0xBB

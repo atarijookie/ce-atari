@@ -1,16 +1,16 @@
-#include "WiFi.h"
+#include <stdio.h>
+#include <cstring>
+#include "pico/stdlib.h"
+#include "pico/time.h"
+#include "hardware/irq.h"
+#include "hardware/pwm.h"
+#include "hardware/dma.h"
 
 #include "defs.h"
 #include "connection.h"
 #include "utils.h"
 #include "display.h"
 #include "psram.h"
-
-#include <stdio.h>
-#include "pico/stdlib.h"
-#include "pico/time.h"
-#include "hardware/irq.h"
-#include "hardware/pwm.h"
 
 #define MFM_BUFFER_SIZE         512   // half of mfmBuffer is 256 items, which gives about 1 ms (256 items * 4 us per item) of time to refill half before the other half is used
 #define MFM_BUFFER_HALF_SIZE    (MFM_BUFFER_SIZE / 2)

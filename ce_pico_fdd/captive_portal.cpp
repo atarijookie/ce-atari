@@ -1,17 +1,15 @@
-#include "WiFi.h"
-
-#include <WebServer.h>
-#include <DNSServer.h>
+// #include <WebServer.h>
+// #include <DNSServer.h>
 
 #include "utils.h"
 #include "display.h"
 #include "defs.h"
 
-DNSServer dnsServer;
-WebServer server(80);
+// DNSServer dnsServer;
+// WebServer server(80);
 
-extern String ssid;
-extern String password;
+extern std::string ssid;
+extern std::string password;
 
 bool newSettingsSaved;
 
@@ -64,76 +62,73 @@ const char saved_html[] = R"rawliteral(
 
 void handleIndex(void)
 {
-    server.send(200, "text/html", index_html);
+    // server.send(200, "text/html", index_html);
 }
 
 void handleSave(void)
 {
-    if (server.hasArg("ssid") && server.hasArg("password")) {
-        ssid = server.arg("ssid");
-        password = server.arg("password");
+    // if (server.hasArg("ssid") && server.hasArg("password")) {
+    //     ssid = server.arg("ssid");
+    //     password = server.arg("password");
 
-        Serial.print("handleSave() - ssid: ");
-        Serial.print(ssid);
-        Serial.print(", password: ");
-        Serial.println(password);
+    //     printf("handleSave() - ssid: %s, password: %s\n", ssid, password);
 
-        // store credentials to eeprom
-        storeSsidAndPassword(ssid, password);
+    //     // store credentials to eeprom
+    //     storeSsidAndPassword(ssid, password);
 
-        // mark that we now have new settings
-        newSettingsSaved = true;
+    //     // mark that we now have new settings
+    //     newSettingsSaved = true;
 
-        server.send(200, "text/html", saved_html);
-    } else {
-        Serial.print("handleSave() - no ssid and/or password in request");
-        server.send(200, "text/html", index_html);
-    }
+    //     server.send(200, "text/html", saved_html);
+    // } else {
+    //     printf("handleSave() - no ssid and/or password in request");
+    //     server.send(200, "text/html", index_html);
+    // }
 }
 
 void handleNotFound(void)
 {
-    server.sendHeader("Location", "/", true);
-    server.send(302, "text/plain", "");
+    // server.sendHeader("Location", "/", true);
+    // server.send(302, "text/plain", "");
 }
 
 void runCaptivePortal(void)
 {
-    Serial.println("runCaptivePortal() - now starting");
-    displayMessage("Captive portal running", "Connect to this AP:", WIFI_CAPTIVE_AP_NAME);
+    // printf("runCaptivePortal() - now starting\n");
+    // displayMessage("Captive portal running", "Connect to this AP:", WIFI_CAPTIVE_AP_NAME);
 
-    // switch to access point mode
-    WiFi.mode(WIFI_AP);
-    WiFi.softAP(WIFI_CAPTIVE_AP_NAME);
+    // // switch to access point mode
+    // WiFi.mode(WIFI_AP);
+    // WiFi.softAP(WIFI_CAPTIVE_AP_NAME);
 
-    // start dns and web server
-    dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
-    dnsServer.setTTL(300);
-    dnsServer.start(53, "*", WiFi.softAPIP());
+    // // start dns and web server
+    // dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
+    // dnsServer.setTTL(300);
+    // dnsServer.start(53, "*", WiFi.softAPIP());
 
-    server.on("/", handleIndex);
-    server.on("/save", handleSave);
-    server.onNotFound(handleNotFound);
+    // server.on("/", handleIndex);
+    // server.on("/save", handleSave);
+    // server.onNotFound(handleNotFound);
 
-    server.begin();
+    // server.begin();
 
-    Serial.println("Captive Portal started");
+    // printf("Captive Portal started\n");
 
-    // user didn't save the new settings yet
-    newSettingsSaved = false;
+    // // user didn't save the new settings yet
+    // newSettingsSaved = false;
 
-    // handle requests until settings saved
-    while(!newSettingsSaved)
-    {
-        dnsServer.processNextRequest();
-        server.handleClient();
-    }
+    // // handle requests until settings saved
+    // while(!newSettingsSaved)
+    // {
+    //     dnsServer.processNextRequest();
+    //     server.handleClient();
+    // }
 
-    Serial.println("Captive Portal - settings saved, will restart");
+    // printf("Captive Portal - settings saved, will restart\n");
 
-    // give enough time to serve last page with success message
-    delay(1000);
+    // // give enough time to serve last page with success message
+    // delay(1000);
 
-    rp2040.reboot();
-    delay(1000);
+    // rp2040.reboot();
+    // delay(1000);
 }

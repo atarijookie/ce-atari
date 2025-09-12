@@ -1,8 +1,6 @@
 #ifndef __CONNECTION_H__
 #define __CONNECTION_H__
 
-#include <arduino.h>
-
 void showRunningStateOnDisplay(void);
 
 void connectToHost(void);

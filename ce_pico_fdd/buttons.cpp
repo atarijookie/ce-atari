@@ -1,5 +1,3 @@
-#include "WiFi.h"
-
 #include "defs.h"
 #include "connection.h"
 #include "utils.h"
@@ -13,7 +11,8 @@ void handleAnalogButtons(uint32_t now)
 {
     static uint8_t prevWhichButton = BTN_NONE;
 
-    uint16_t val = analogRead(PIN_ANALOG_BTNS);
+    // uint16_t val = analogRead(PIN_ANALOG_BTNS);
+    uint16_t val = 5000;
     uint8_t whichButton = BTN_NONE;
 
     // convert analog value to specific button
@@ -37,15 +36,14 @@ void handleAnalogButtons(uint32_t now)
     }
 
     // TODO: handle on button released
-    Serial.print("analog button: ");
-    Serial.println(whichButton);
+    printf("analog button: %d\n", whichButton);
 }
 
-// This gets called on button pressed (current button state LOW) or released (current button state HIGH)
+// This gets called on button pressed (current button state 0) or released (current button state HIGH)
 void onButtonStateChanged(int buttonState, uint32_t now, uint32_t& buttonPressTime)
 {
     // button state change to low, so button just pressed - store time, nothing more to do
-    if(buttonState == LOW)
+    if(buttonState == 0)
     {
         buttonPressTime = now;
         return;
@@ -102,10 +100,10 @@ void duringButtonPressed(uint32_t now, uint32_t& buttonPressTime)
 // handle the states of the button connected to GPIO0 (boot pin)
 void handleBootButton(uint32_t now)
 {
-    static int lastButtonState = HIGH;
+    static int lastButtonState = 1;
     static uint32_t buttonPressTime = 0;
 
-    int buttonState = HIGH;     // TODO:
+    int buttonState = 1;     // TODO:
     // int buttonState = digitalRead(PIN_BOOT_BTN);    // read button
 
     bool buttonStateChanged = (lastButtonState != buttonState);
@@ -117,7 +115,7 @@ void handleBootButton(uint32_t now)
     }
     else        // button state not changed (stayed released, stayed pressed)
     {
-        if(buttonState == LOW)
+        if(buttonState == 0)
         {
             duringButtonPressed(now, buttonPressTime);
         }
@@ -137,7 +135,7 @@ void handleAllButtons(void)
     }
     lastCheck = now;
 
-    handleBootButton(now);
+    // handleBootButton(now);
     // TODO: uncomment when there's at least a pull up on analog buttons pin
     //handleAnalogButtons(now);
 }
