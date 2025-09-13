@@ -45,6 +45,7 @@ add_executable(ce_pico_fdd_vsc
         mfm.cpp
         psram.cpp
         utils.cpp
+        fifo.cpp
         )
 
 pico_set_program_name(ce_pico_fdd_vsc "ce_pico_fdd_vsc")
@@ -56,7 +57,8 @@ pico_enable_stdio_usb(ce_pico_fdd_vsc 0)
 
 # Add the standard library to the build
 target_link_libraries(ce_pico_fdd_vsc
-        pico_stdlib)
+        pico_stdlib
+        )
 
 # Add the standard include files to the build
 target_include_directories(ce_pico_fdd_vsc PRIVATE

@@ -6,12 +6,17 @@
 #include "lwip/ip4_addr.h"
 #include "lwip/tcp.h "
 
+#include "pico/stdlib.h"
+#include "lwip/sockets.h"
+#include "lwip/inet.h"
+
 #include "defs.h"
 #include "connection.h"
 #include "utils.h"
 #include "captive_portal.h"
 #include "display.h"
 #include "psram.h"
+#include "fifo.h"
 
 bool wifiSettingsLoaded;
 std::string ssid;
@@ -50,6 +55,14 @@ extern bool diskChanged;
 extern int imageState;
 
 void storeMacAddress(void);
+
+#define FDD_FIFO_SIZE   65536
+uint8_t fddFifoBuffer[FDD_FIFO_SIZE];
+Fifo fddFifo(fddFifoBuffer, FDD_FIFO_SIZE);
+
+#define FDD_FIFO_PBUF_SIZE_BYTES  (PBUF_POOL_SIZE * 8)          // how many pbufs can lwip have * 8 bytes (2 addresses) per item
+uint8_t fddFifoPbufBuffer[FDD_FIFO_PBUF_SIZE_BYTES];
+Fifo fddFifoPbuf(fddFifoPbufBuffer, FDD_FIFO_PBUF_SIZE_BYTES);
 
 void showRunningStateOnDisplay(void)
 {
@@ -269,6 +282,82 @@ TConnection* pcbToConnection(tcp_pcb* tpcb)
     return NULL;
 }
 
+void pbufPush(struct tcp_pcb *tpcb, struct pbuf* p)
+{
+    uint8_t bfr[8];
+    storeDword(bfr    , (uint32_t) tpcb);
+    storeDword(bfr + 4, (uint32_t) p);
+
+    fddFifoPbuf.push(bfr, 8);
+}
+
+void copyFromPbufToFifo(struct tcp_pcb *tpcb, struct pbuf* p)
+{
+    size_t freeInFifo = fddFifo.get_free();
+
+    // received data will fit in out fifo?
+    if(p->tot_len <= freeInFifo)
+    {
+        // get how big the 1st and 2nd chunk need to be
+        uint32_t chunk1Addr, chunk2Addr;
+        size_t chunk1Size, chunk2Size;
+        fddFifo.getPushChunks(&chunk1Addr, &chunk1Size, &chunk2Addr, &chunk2Size, p->tot_len);
+
+        // copy first chunk
+        pbuf_copy_partial(p, (void*) chunk1Addr, chunk1Size, 0);
+
+        // wraparound chunk
+        if (chunk2Size > 0) {
+            pbuf_copy_partial(p, (void*) chunk2Addr, chunk2Size, chunk1Size);
+        }
+
+        fddFifo.updateIndicesAfterPush(chunk1Size + chunk2Size);
+
+        tcp_recved(tpcb, p->tot_len);
+        pbuf_free(p);
+    }
+    else    // received data will not fit into linear data fifo - store pbuf into pbuf fifo
+    {
+        pbufPush(tpcb, p);
+    }
+}
+
+// If something is waiting in pbuf fifo, now got some free space, pop it to linear data fifo.
+// Call this function everytime the fddFifo has poped some data, so the pbuf fifo can refill fddFifo and free the buffers.
+void pbufPopToFifo(void)
+{
+    while(1) {
+        // get free space in linear data fifo, if no space then just quit
+        size_t sizeFree = fddFifo.get_free();
+        if(sizeFree == 0) {
+            return;
+        }
+
+        // if we don't have anything in the pbuf fifo, nothing more to do
+        if(fddFifoPbuf.get_length() == 0) {
+            return;
+        }
+
+        // get tpcb and pbuf from pbuf fifo by peeking - don't advance yet, because we might not use it
+        uint8_t bfr[8];
+        memset(bfr, 0, 8);
+
+        fddFifoPbuf.pop(bfr, 8, 0, true);       // peek the data - get them, but don't advance the indices yet
+        struct tcp_pcb * tpcb = (struct tcp_pcb*) getDword(bfr);
+        struct pbuf* p = (struct pbuf*) getDword(bfr + 4);
+
+        // if the pbuf fill not fit into fddFifo, quit because nothing can be copied
+        if(p->tot_len > sizeFree) {
+            return;
+        }
+
+        // copy from this pbuf to linear data fifo, will also call tcp_recved() and pbuf_free()
+        copyFromPbufToFifo(tpcb, p);
+
+        fddFifoPbuf.updateIndicesAfterPop(8);
+    }
+}
+
 // Called when data is received from the server
 static err_t tcp_client_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
 {
@@ -281,15 +370,10 @@ static err_t tcp_client_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, er
         printf("Connection closed by remote host\n");
         tcp_close(con->pcb);
         con->connected = false;
-        return ERR_OK;
+        return ERR_CLSD;
     }
 
-    // printf("Received %d bytes: %.*s\n", p->len, p->len, (char *)p->payload);
-
-    // Tell lwIP we've consumed the data
-    tcp_recved(con->pcb, p->len);
-    pbuf_free(p);
-
+    copyFromPbufToFifo(tpcb, p);
     return ERR_OK;
 }
 
@@ -415,9 +499,9 @@ void connectToHost(void)
     connectToCEhost();
 }
 
-bool getIncommingHeader(TConnection* client, uint32_t expectedSyncTag, THeader* header)
+bool getIncommingHeader(void)
 {
-    if(!client->connected)    // client not connected, no header received
+    if(!clientFdd.connected)    // clientFdd not connected, no header received
     {
         return false;
     }
@@ -427,15 +511,15 @@ bool getIncommingHeader(TConnection* client, uint32_t expectedSyncTag, THeader* 
         // Determine how many bytes are needed to be received, if we want to get 10 bytes of header.
         // If we already got some bytes in the syncTag, we need less than 10 bytes.
         int needed = 10;
-        if((header->syncTag & 0xffffff) == (expectedSyncTag >> 8))      // got c050d1 (3 bytes) already? need only 7 more
+        if((fddHeader.syncTag & 0xffffff) == (SYNC_TAG_FDD >> 8))      // got c050d1 (3 bytes) already? need only 7 more
         {
             needed = 7;
         }
-        else if((header->syncTag & 0xffff) == (expectedSyncTag >> 16))  // got c050 (2 bytes) already? need only 8 more
+        else if((fddHeader.syncTag & 0xffff) == (SYNC_TAG_FDD >> 16))  // got c050 (2 bytes) already? need only 8 more
         {
             needed = 8;
         }
-        else if((header->syncTag & 0xff) == (expectedSyncTag >> 24))    // got c0 (1 bytes) already? need only 9 more
+        else if((fddHeader.syncTag & 0xff) == (SYNC_TAG_FDD >> 24))    // got c0 (1 bytes) already? need only 9 more
         {
             needed = 9;
         }
@@ -445,24 +529,24 @@ bool getIncommingHeader(TConnection* client, uint32_t expectedSyncTag, THeader* 
         }
 
         // not enough data for full header, no header received
-        // int available = client->available();     // TODO:
-        int available = 0;
+        int available = fddFifo.get_length();
         if(available < needed)
         {
             return false;
         }
 
-        // uint32_t data = ((uint8_t) client->read()); // read byte TODO:
-        uint32_t data = 0;
-        header->syncTag = header->syncTag << 8;     // shift previous sync tag one byte up
-        header->syncTag |= data;                    // add lowest byte to syncTag
+        uint32_t data = fddFifo.popByte();              // read byte
+        fddHeader.syncTag = fddHeader.syncTag << 8;     // shift previous sync tag one byte up
+        fddHeader.syncTag |= data;                      // add lowest byte to syncTag
 
-        if(header->syncTag == expectedSyncTag)      // found expected syncTag
+        if(fddHeader.syncTag == SYNC_TAG_FDD)           // found expected syncTag
         {
-            uint8_t rest[6];
-            // client->read(rest, 6);               // read rest of header      // TODO:
-            header->cmdCode = getWord(rest);
-            header->len = getDword(rest + 2);
+            uint8_t restOfHeader[6];
+            fddFifo.pop(restOfHeader, 6, 1000, false);  // we know we got enough data, so reading 6 bytes here shouldn't wait for it
+            pbufPopToFifo();                            // if something is waiting in pbuf fifo, now got some free space, pop it to linear data fifo
+
+            fddHeader.cmdCode = getWord(restOfHeader);
+            fddHeader.len = getDword(restOfHeader + 2);
 
             return true;                        // got complete header
         }
@@ -500,28 +584,8 @@ uint8_t tmpTrackBfr[READTRACKDATA_SIZE_BYTES];
 void handleTrackReceived(void)
 {
     int lenData = MIN(READTRACKDATA_SIZE_BYTES, fddHeader.len);  // limit read length to buffer length
-
-    int len = lenData;
-    uint8_t* pBfr = tmpTrackBfr;        // read into temp track buffer
-
-    uint32_t start = millis();
-    while(len > 0)
-    {
-        uint32_t now = millis();
-        if((now - start) > 2000) {
-            printf("handleTrackReceived TIMEOUT!\n");
-            return;
-        }
-
-        // int readLen = clientFdd.read(pBfr, len);    // read data
-        int readLen = 0;
-    
-        if(readLen > 0)     // something was read? decrease size of what we need to read, advance in buffer
-        {
-            len -= readLen;
-            pBfr += readLen;
-        }
-    }
+    fddFifo.pop(tmpTrackBfr, lenData, 500, false);  // read into tmpTrackBuffer size lenData, wait max specified timeout
+    pbufPopToFifo();                                // if something is waiting in pbuf fifo, now got some free space, pop it to linear data fifo
 
     // read track # and side # from bfr
     int trackNo = MIN(tmpTrackBfr[0], MAX_TRACKS - 1);
@@ -542,7 +606,8 @@ void handleTrackReceived(void)
 void handleImageReceived(void)
 {
     int lenData = MIN(READTRACKDATA_SIZE_BYTES, fddHeader.len);  // limit read length to buffer length
-    // clientFdd.read(tmpTrackBfr, lenData);
+    fddFifo.pop(tmpTrackBfr, lenData, 500, false);  // read into tmpTrackBuffer size lenData, wait max specified timeout
+    pbufPopToFifo();                                // if something is waiting in pbuf fifo, now got some free space, pop it to linear data fifo
 
     if(tmpTrackBfr[0] == 1)     // image receiving finished?
     {
@@ -568,7 +633,7 @@ void handleImageReceived(void)
 
 void handleIncommingData(void)
 {
-    if(getIncommingHeader(&clientFdd, SYNC_TAG_FDD, &fddHeader))   // if got valid hdd header
+    if(getIncommingHeader())        // if got valid hdd header
     {
         fddHeader.syncTag = 0;      // clear sync tag
 

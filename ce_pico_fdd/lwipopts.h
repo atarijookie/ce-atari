@@ -5,14 +5,8 @@
 // Common settings used in most of the pico_w examples
 // (see https://www.nongnu.org/lwip/2_1_x/group__lwip__opts.html for details)
 
-// allow override in some examples
-#ifndef NO_SYS
 #define NO_SYS                      1
-#endif
-// allow override in some examples
-#ifndef LWIP_SOCKET
 #define LWIP_SOCKET                 0
-#endif
 #if PICO_CYW43_ARCH_POLL
 #define MEM_LIBC_MALLOC             1
 #else
