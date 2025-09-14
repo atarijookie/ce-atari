@@ -31,10 +31,6 @@ typedef struct {
 
 void loadSettingsFromEeprom(void);
 void saveSettingsToEeprom(void);
-void getSsidAndPassword(std::string& argSsid, std::string& argPassword);
-void storeSsidAndPassword(std::string& argSsid, std::string& argPassword);
-bool getIkbdEnabled(void);
-void storeIkbdEnabled(bool argIkbdEnabled);
 uint32_t millis(void);
 
 #endif

@@ -5,7 +5,7 @@
 #include "display.h"
 #include "buttons.h"
 
-extern volatile bool ikbdEnabled;   // if true, should send data to host; otherwise just loopback ikdb data back
+extern Settings_t Settings;
 
 void handleAnalogButtons(uint32_t now)
 {
@@ -55,13 +55,13 @@ void onButtonStateChanged(int buttonState, uint32_t now, uint32_t& buttonPressTi
 
     if(pressDuration < BTN_PRESS_SHORT)     // on short press, ikbd enable / disable
     {
-        ikbdEnabled = !ikbdEnabled;
+
     }
 
     // on longer press, save ikbd enabled flag
     if(pressDuration >= BTN_PRESS_SAVE && pressDuration < BTN_PRESS_CAPTIVE)
     {
-        storeIkbdEnabled(ikbdEnabled);
+
     }
 
     // on longest press, run captive portal

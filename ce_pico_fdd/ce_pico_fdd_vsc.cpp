@@ -22,8 +22,6 @@ uint8_t atnSendFwVersion[ATN_SENDFWVERSION_LEN_TX];
 uint8_t atnSendTrackRequest[ATN_SENDTRACK_REQ_LEN_TX]; 
 uint8_t atnSendWholeImageRequest[TX_HEADER_SIZE];
 
-extern volatile bool ikbdEnabled;   // if true, should send data to host; otherwise just loopback ikdb data back
-
 void setupAtnBuffers(void);
 void requestTrack(uint8_t side, uint8_t track);
 void requestWholeImage(void);
@@ -47,6 +45,8 @@ uint32_t dataIndexInTrack = STREAM_START_OFFSET;
 uint8_t wrPosCnt, wrPosStore, wrPosLoad;
 uint16_t writePos[WRPOS_SIZE];
 uint32_t lastPosPutTime;
+
+extern Settings_t Settings;
 
 void wrPosClear(void)
 {
@@ -145,6 +145,7 @@ void readTrackData_goToStart(void)
 void setup(void)
 {
     stdio_init_all();
+    printf("setup() starting\n");
 
     // Initialise the Wi-Fi chip
     if (cyw43_arch_init()) {
@@ -163,7 +164,7 @@ void setup(void)
     Serial1.begin(7812, SERIAL_8N1, PIN_KEYB_TX_ORIG, PIN_KEYB_TX); // uart1 for IKBD - RXD PIN, TXD PIN
     Serial2.begin(7812, SERIAL_8N1, PIN_KEYB_RX, PIN_TXD2);         // uart2 for IKBD - RXD PIN, TXD PIN
 */
-    printf("setup() starting\n");
+    loadSettingsFromEeprom();
 
     #define INPUTS_COUNT 7
     int inputs[INPUTS_COUNT] = {PIN_DRIVE_SEL, PIN_MOT_EN, PIN_DIR, PIN_STEP, PIN_WGATE, PIN_SIDE1};
@@ -195,8 +196,6 @@ void setup(void)
     // psramTest();
 
     readTrackData_goToStart();
-
-    ikbdEnabled = getIkbdEnabled();
 
     setupAtnBuffers();
     wrPosClear();
@@ -379,6 +378,99 @@ void sendFwReport(uint32_t now)
     sendHeaderAndDataToHost(atnSendFwVersion, ATN_SENDFWVERSION_LEN_TX - TX_HEADER_SIZE);
 }
 
+void getString(char* buffer, int maxLen)
+{
+    memset(buffer, 0, maxLen);
+
+    int i=0;
+    while(1)
+    {
+        int key = getchar_timeout_us(1000);
+
+        if(key == PICO_ERROR_TIMEOUT) {
+            continue;
+        }
+
+        if(key == '\n' || key == '\r' || i >= (maxLen-1)) {
+            break;
+        }
+
+        putchar(key);       // echo back to console
+
+        buffer[i] = key;
+        i++;
+    }
+}
+
+void serialConfigLoop(void)
+{
+    bool ssidChanged = false, pswdChanged = false, ikbdChanged = false;
+
+    loadSettingsFromEeprom();
+
+    printf("\n\nEntering configuration mode.\nCurrent settings are:\n");
+    printf("--------------------------------------\n");
+    printf("SSID    : %s\n", Settings.ssid);
+    printf("password: %s\n", Settings.password);
+    printf("ikbd    : %s\n", Settings.ikbdEnabled ? "enabled" : "disabled");
+    printf("--------------------------------------\n");
+    printf("Press 'S' to set SSID, 'P' to set password, 'I' to enable/disable IKBD, 'Q' to save.\n");
+
+    while(true)
+    {
+        int key = getchar_timeout_us(1000);
+
+        if(key == '\n' || key == '\r') {
+            printf("Press 'S' to set SSID, 'P' to set password, 'I' to enable/disable IKBD, 'Q' to save.\n");
+        }
+
+        if(key == 's' || key == 'S') {
+            printf("\nEnter SSID, finish by Enter key.\n");
+            getString(Settings.ssid, MAX_SETTINGS_STRING_LEN);
+            printf("\nNew SSID: %s\n", Settings.ssid);
+            ssidChanged = true;
+        }
+
+        if(key == 'p' || key == 'P') {
+            printf("\nEnter password, finish by Enter key.\n");
+            getString(Settings.password, MAX_SETTINGS_STRING_LEN);
+            printf("\nNew password: %s\n", Settings.password);
+            pswdChanged = true;
+        }
+
+        if(key == 'i' || key == 'I') {
+            printf("\nEnter 'E' to enable IKBD, 'D' to disable IKBD.\n");
+            char ed[2];
+            getString(ed, 2);
+
+            if(ed[0] == 'e' || ed[0] == 'E') {
+                Settings.ikbdEnabled = true;
+                ikbdChanged = true;
+            }
+
+            if(ed[0] == 'd' || ed[0] == 'D') {
+                Settings.ikbdEnabled = false;
+                ikbdChanged = true;
+            }
+
+            printf("\nIKBD: %s\n", Settings.ikbdEnabled ? "enabled" : "disabled");
+        }
+
+
+        if(key == 'q' || key == 'Q') {
+            break;
+        }
+    }
+
+    if(!ssidChanged && !pswdChanged && !ikbdChanged) {
+        printf("No settings changed.\n\n");
+        return;
+    }
+
+    printf("Saving settings.\n\n");
+    // saveSettingsToEeprom();      // TODO:
+}
+
 int main()
 {
     setup();
@@ -390,6 +482,11 @@ int main()
 
     while(1)
     {
+        int key = getchar_timeout_us(0);
+        if(key == '\n' || key == '\r') {
+            serialConfigLoop();
+        }
+
         // connect to wifi, discover CE server, connect to CE server
         connectToHost();
 

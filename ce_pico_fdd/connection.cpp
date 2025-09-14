@@ -18,12 +18,10 @@
 #include "psram.h"
 #include "fifo.h"
 
-bool wifiSettingsLoaded;
-std::string ssid;
-std::string password;
-
 #define SERVER_UDP_PORT 7200 // port number where CE listens for client requests
 #define CLIENT_UDP_PORT 7201 // port where this client should listen for CE responses
+
+extern Settings_t Settings;
 
 // WiFiUDP udp;
 bool udpInitialized;
@@ -45,7 +43,6 @@ uint16_t hostPortFdd;
 uint16_t hostPortIkbd;
 
 bool connected;
-extern volatile bool ikbdEnabled;   // if true, should send data to host; otherwise just loopback ikdb data back
 
 THeader fddHeader;      // keep the header global to preserve syncTag between calls
 
@@ -67,10 +64,10 @@ Fifo fddFifoPbuf(fddFifoPbufBuffer, FDD_FIFO_PBUF_SIZE_BYTES);
 void showRunningStateOnDisplay(void)
 {
     char msg1[128];
-    sprintf(msg1, "ssid: %s", ssid.c_str());
+    sprintf(msg1, "ssid: %s", Settings.ssid);
 
     char msg2[64];
-    sprintf(msg2, "host: %s %c", hostIpString.c_str(), ikbdEnabled ? 'I' : ' ');
+    sprintf(msg2, "host: %s %c", hostIpString.c_str(), Settings.ikbdEnabled ? 'I' : ' ');
 
     char msg3[64];
     sprintf(msg3, "image: %s", imageFileName);
@@ -170,36 +167,22 @@ void connectToWifi(void)
         return;
     }
 
-    // read wifi settings if they aren't loaded yet
-    if (!wifiSettingsLoaded)
-    {
-        wifiSettingsLoaded = true;
-        getSsidAndPassword(ssid, password);
-    }
-
-    printf("connectToWifi - ssid: %s, password: %s\n", ssid, password);
+    printf("connectToWifi - ssid: %s, password: %s\n", Settings.ssid, Settings.password);
 
     char msg[128];
 
-    // no ssid and no passowrd? run captive portal
-    if(ssid.length() == 0 && password.length() == 0) {
-        printf("connectToWifi - no wifi settings, starting captive portal");
-        runCaptivePortal();
-    }
-
     // no wifi SSID stored? cannot connect
-    if (ssid.length() == 0)
-    {
+    if (strlen(Settings.ssid) == 0) {
         return;
     }
 
-    sprintf(msg, "ssid: %s", ssid.c_str());
+    sprintf(msg, "ssid: %s", Settings.ssid);
     displayMessage("wifi connecting", msg);
 
-    printf("connectToWifi - ssid: %s\n", ssid);
+    printf("connectToWifi - ssid: %s\n", Settings.ssid);
 
     // not connected to wifi yet, try to connect
-    cyw43_arch_wifi_connect_async(ssid.c_str(), password.c_str(), CYW43_AUTH_WPA2_AES_PSK);
+    cyw43_arch_wifi_connect_async(Settings.ssid, Settings.password, CYW43_AUTH_WPA2_AES_PSK);
 
     storeMacAddress();      // copy wifi mac address to fw report buffer
 }
@@ -209,6 +192,11 @@ void ceDiscoverySend(void)
 {
     static uint32_t lastAttempt = 0xffff0000; // -65k
     static bool whichBroadcastAddr = false;
+
+    if(cyw43_wifi_link_status(&cyw43_state, CYW43_ITF_STA) != CYW43_LINK_UP)    // wifi not connected? no need to send discovery packets
+    {
+        return;
+    }
 
     // already got hostIp and port? don't do discovery
     if (hostIp[0] != 0 && hostPortFdd != 0)
@@ -236,14 +224,11 @@ void ceDiscoverySend(void)
 
     if(whichBroadcastAddr)      // send to subnet broadcast addr?
     {
-        struct netif *netif = netif_default;
-        const ip4_addr_t *ip = netif_ip4_addr(netif);
-        const ip4_addr_t *netmask = netif_ip4_netmask(netif);
-
         ip4_addr_t bcast;
-        u32_t ip_u32 = ip4_addr_get_u32(ip);
-        u32_t mask_u32 = ip4_addr_get_u32(netmask);
+        u32_t ip_u32 = ip4_addr_get_u32(netif_ip_addr4(netif_default));
+        u32_t mask_u32 = ip4_addr_get_u32(netif_ip4_netmask(netif_default));
         u32_t bcast_u32 = (ip_u32 & mask_u32) | (~mask_u32);
+        printf("ip_u32: %08x, mask_u32: %08x\n", ip_u32, mask_u32);
 
         ip4_addr_set_u32(&bcast, bcast_u32);
         printf("ceDiscoverySend to %d.%d.%d.%d\n", (bcast_u32 >> 24) & 0xff, (bcast_u32 >> 16) & 0xff, (bcast_u32 >> 8) & 0xff, bcast_u32 & 0xff);

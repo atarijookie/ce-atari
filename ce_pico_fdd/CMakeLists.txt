@@ -73,6 +73,8 @@ target_link_libraries(ce_pico_fdd_vsc
         hardware_pwm
         hardware_timer
         pico_cyw43_arch_lwip_threadsafe_background
+        pico_multicore
+        hardware_flash
         )
 
 pico_add_extra_outputs(ce_pico_fdd_vsc)

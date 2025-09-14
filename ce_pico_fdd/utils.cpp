@@ -1,7 +1,10 @@
 #include <cstring>
 #include "pico/stdlib.h"
 #include "pico/time.h"
+#include "hardware/flash.h"
 #include "hardware/timer.h"
+#include "hardware/sync.h"
+#include "pico/multicore.h"
 
 #include "defs.h"
 #include "utils.h"
@@ -126,82 +129,31 @@ void storeHeader(uint8_t *bfr, uint16_t atnCode, uint32_t txLen)
     storeDword(bfr + 6, txLen);     //  6..9: txLen (4 bytes)
 }
 
+#define FLASH_PAGE_SIZE_4K      4096
+#define FLASH_TARGET_OFFSET     ((4 * 1024 * 1024) - FLASH_PAGE_SIZE_4K)
+const uint8_t *flash_target_contents = (const uint8_t *) (XIP_BASE + FLASH_TARGET_OFFSET);
+
 // load settings from eeprom into struct
 void loadSettingsFromEeprom(void)
 {
-    // EEPROM.begin(256);      // makes a copy of the emulated EEPROM sector in RAM to allow random update and access
+    memset(&Settings, 0, sizeof(Settings));
+    memcpy(&Settings, flash_target_contents, sizeof(Settings));
 
-    // uint8_t* pSettings = (uint8_t*) &Settings;
-    // for(int i=0; i<sizeof(Settings); i++) {
-    //     pSettings[i] = EEPROM.read(i);
-    // }
-
-    // EEPROM.end();           // frees all memory used
+    if(Settings.isValid != SETTINGS_VALID) {
+        memset(&Settings, 0, sizeof(Settings));
+    }
 }
 
 void saveSettingsToEeprom(void)
 {
-    // EEPROM.begin(256);      // makes a copy of the emulated EEPROM sector in RAM to allow random update and access
-    // Settings.isValid = SETTINGS_VALID;
+    uint32_t ints = save_and_disable_interrupts();
+    multicore_lockout_start_blocking();
 
-    // uint8_t* pSettings = (uint8_t*) &Settings;
-    // for(int i=0; i<sizeof(Settings); i++) {
-    //     EEPROM.write(i, pSettings[i]);
-    // }
+    flash_range_erase(FLASH_TARGET_OFFSET, FLASH_PAGE_SIZE_4K);
+    flash_range_program(FLASH_TARGET_OFFSET, (const uint8_t *) &Settings, sizeof(Settings));
 
-    // EEPROM.commit();        // writes the updated data to flash
-    // EEPROM.end();           // frees all memory used
-}
-
-void getSsidAndPassword(std::string& argSsid, std::string& argPassword)
-{
-    loadSettingsFromEeprom();
-
-    if(Settings.isValid == SETTINGS_VALID) {
-        argSsid = std::string(Settings.ssid);
-        argPassword = std::string(Settings.password);
-    } else {
-        argSsid = "";
-        argPassword = "";
-    }
-}
-
-void storeSsidAndPassword(std::string& argSsid, std::string& argPassword)
-{
-    loadSettingsFromEeprom();
-
-    if(Settings.isValid != SETTINGS_VALID) {
-        Settings.isValid = SETTINGS_VALID;
-        Settings.ikbdEnabled = 1;
-    }
-
-    strncpy(Settings.ssid, argSsid.c_str(), MIN(argSsid.length(), MAX_SETTINGS_STRING_LEN - 1));
-    Settings.ssid[MAX_SETTINGS_STRING_LEN - 1] = 0;
-
-    strncpy(Settings.password, argPassword.c_str(), MIN(argPassword.length(), MAX_SETTINGS_STRING_LEN - 1));
-    Settings.password[MAX_SETTINGS_STRING_LEN - 1] = 0;
-
-    saveSettingsToEeprom();
-}
-
-bool getIkbdEnabled(void)
-{
-    loadSettingsFromEeprom();
-    return ((Settings.isValid == SETTINGS_VALID) ? Settings.ikbdEnabled : true);
-}
-
-void storeIkbdEnabled(bool argIkbdEnabled)
-{
-    loadSettingsFromEeprom();
-
-    if(Settings.isValid != SETTINGS_VALID) {
-        Settings.isValid = SETTINGS_VALID;
-        memset(Settings.ssid, 0, MAX_SETTINGS_STRING_LEN);
-        memset(Settings.password, 0, MAX_SETTINGS_STRING_LEN);
-    }
-
-    Settings.ikbdEnabled = argIkbdEnabled;
-    saveSettingsToEeprom();
+    multicore_lockout_end_blocking();
+    restore_interrupts(ints);
 }
 
 uint32_t millis(void)

@@ -9,7 +9,7 @@ extern std::string hostIpString;
 extern uint16_t hostPortIkbd;
 extern bool connected;              // if true, wifi is connected
 
-volatile bool ikbdEnabled = true;   // if true, should send data to host; otherwise just loopback ikdb data back
+extern Settings_t Settings;
 
 // TaskHandle_t xIkbdTask;
 
