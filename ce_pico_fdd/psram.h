@@ -9,4 +9,8 @@ void psramStoreTrack(int track, int side, uint8_t* data);
 void psramLoadTrack(int track, int side, uint8_t* data);
 void psramStoreSector(int track, int side, int byteOffsetFromTrackStart, uint8_t* data, uint32_t copyLength, uint32_t clearLength);
 
+void psramConfigFlagSet(void);
+void psramConfigFlagClear(void);
+bool psramConfigFlagGet(void);
+
 #endif

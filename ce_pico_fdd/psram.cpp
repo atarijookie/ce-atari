@@ -6,6 +6,7 @@
 
 #include "defs.h"
 #include "utils.h"
+#include "serial_config.h"
 
 void spiTxAsync(const uint8_t* bfr, size_t length)
 {
@@ -151,4 +152,27 @@ void psramStoreSector(int track, int side, int byteOffsetFromTrackStart, uint8_t
         address += copyLength;                  // address will now point beyond written sector data
         psramWriteBuffer(address, clearBfr, clearLength);
     }
+}
+
+void psramConfigFlagSet(void)
+{
+    uint8_t bfr[4];
+    storeDword(bfr, RUN_CONFIG_AFTER_RESTART);
+    psramWriteBuffer(0, bfr, 4);
+}
+
+void psramConfigFlagClear(void)
+{
+    uint8_t bfr[4];
+    memset(bfr, 0, 4);
+    psramWriteBuffer(0, bfr, 4);
+}
+
+bool psramConfigFlagGet(void)
+{
+    uint8_t bfr[4];
+    psramReadBuffer(0, bfr, 4);
+    uint32_t flag = getDword(bfr);
+
+    return (flag == RUN_CONFIG_AFTER_RESTART);
 }

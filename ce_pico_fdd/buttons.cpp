@@ -1,7 +1,6 @@
 #include "defs.h"
 #include "connection.h"
 #include "utils.h"
-#include "captive_portal.h"
 #include "display.h"
 #include "buttons.h"
 
@@ -67,7 +66,7 @@ void onButtonStateChanged(int buttonState, uint32_t now, uint32_t& buttonPressTi
     // on longest press, run captive portal
     if(pressDuration >= BTN_PRESS_CAPTIVE)
     {
-        runCaptivePortal();
+
     }
 
     showRunningStateOnDisplay();

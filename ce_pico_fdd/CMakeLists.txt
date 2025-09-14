@@ -38,7 +38,7 @@ pico_sdk_init()
 add_executable(ce_pico_fdd_vsc 
         ce_pico_fdd_vsc.cpp
         buttons.cpp
-        captive_portal.cpp
+        serial_config.cpp
         connection.cpp
         display.cpp
         ikbd.cpp
@@ -76,6 +76,8 @@ target_link_libraries(ce_pico_fdd_vsc
         pico_multicore
         hardware_flash
         )
+
+pico_set_linker_script(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/memmap_custom.ld)
 
 pico_add_extra_outputs(ce_pico_fdd_vsc)
 

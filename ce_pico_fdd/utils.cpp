@@ -5,6 +5,8 @@
 #include "hardware/timer.h"
 #include "hardware/sync.h"
 #include "pico/multicore.h"
+#include "pico/flash.h"
+#include "hardware/flash.h"
 
 #include "defs.h"
 #include "utils.h"
@@ -80,48 +82,6 @@ void store24bits(uint8_t *bfr, uint32_t val)
     bfr[2] = val;
 }
 
-// int64_t onTimer(alarm_id_t id, void *user_data)
-// {
-//     if(alarmId == id) {
-//         hasTimedOut = true;
-//     }
-
-//     return 0; // return 0 == one-shot, don’t reschedule
-// }
-
-// void timeoutStart(uint32_t durationMs)
-// {
-// // #ifdef LOG_MORE
-// //     printf("timeoutStart %d at %d\n", durationMs, millis());
-// // #endif
-
-//     if(alarmId > 0) // if timer running, stop it first
-//     {
-//         cancel_alarm(alarmId);
-//         alarmId = -1;
-//     }
-
-//     hasTimedOut = false;
-//     alarmId = add_alarm_in_ms(durationMs, onTimer, NULL, true);
-// }
-
-// void timeoutClear(void)
-// {
-// // #ifdef LOG_MORE
-// //     printf("timeoutClear");
-// // #endif
-
-//     hasTimedOut = false;
-//     cancel_alarm(alarmId);
-//     alarmId = -1;
-// }
-
-// void cmdTimeoutChangeLength(uint32_t newPeriod)
-// {
-//     timeoutClear();
-//     timeoutStart(newPeriod);
-// }
-
 void storeHeader(uint8_t *bfr, uint16_t atnCode, uint32_t txLen)
 {
     storeDword(bfr, SYNC_TAG_FDD);  //  0..3: 0xc050fdd0 [COSmOFDD0] (4 bytes)
@@ -129,8 +89,7 @@ void storeHeader(uint8_t *bfr, uint16_t atnCode, uint32_t txLen)
     storeDword(bfr + 6, txLen);     //  6..9: txLen (4 bytes)
 }
 
-#define FLASH_PAGE_SIZE_4K      4096
-#define FLASH_TARGET_OFFSET     ((4 * 1024 * 1024) - FLASH_PAGE_SIZE_4K)
+#define FLASH_TARGET_OFFSET (PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE)
 const uint8_t *flash_target_contents = (const uint8_t *) (XIP_BASE + FLASH_TARGET_OFFSET);
 
 // load settings from eeprom into struct
@@ -144,16 +103,34 @@ void loadSettingsFromEeprom(void)
     }
 }
 
+// This function will be called when it's safe to call flash_range_erase
+static void call_flash_range_erase(void *param) {
+    flash_range_erase(FLASH_TARGET_OFFSET, FLASH_SECTOR_SIZE);
+}
+
+// This function will be called when it's safe to call flash_range_program
+static void call_flash_range_program(void *param) {
+    uint8_t* data = (uint8_t*) param;
+    flash_range_program(FLASH_TARGET_OFFSET, data, FLASH_SECTOR_SIZE);
+}
+
 void saveSettingsToEeprom(void)
 {
-    uint32_t ints = save_and_disable_interrupts();
-    multicore_lockout_start_blocking();
+    uint8_t buf[FLASH_SECTOR_SIZE];
+    memset(buf, 0, FLASH_SECTOR_SIZE);                          // clear 4k
+    memcpy(buf, (const uint8_t *) &Settings, sizeof(Settings)); // copy just the settings - about 68 B
 
-    flash_range_erase(FLASH_TARGET_OFFSET, FLASH_PAGE_SIZE_4K);
-    flash_range_program(FLASH_TARGET_OFFSET, (const uint8_t *) &Settings, sizeof(Settings));
+    int rc = flash_safe_execute(call_flash_range_erase, (void*) FLASH_TARGET_OFFSET, UINT32_MAX);
+    if(rc != PICO_OK) {
+        printf("flash_range_erase failed, settings not stored\n");
+        return;
+    }
 
-    multicore_lockout_end_blocking();
-    restore_interrupts(ints);
+    rc = flash_safe_execute(call_flash_range_program, (void*) buf, UINT32_MAX);
+    if(rc != PICO_OK) {
+        printf("flash_range_erase failed, settings not stored\n");
+        return;
+    }
 }
 
 uint32_t millis(void)

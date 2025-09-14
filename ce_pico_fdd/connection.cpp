@@ -13,7 +13,6 @@
 #include "defs.h"
 #include "connection.h"
 #include "utils.h"
-#include "captive_portal.h"
 #include "display.h"
 #include "psram.h"
 #include "fifo.h"
@@ -167,19 +166,18 @@ void connectToWifi(void)
         return;
     }
 
-    printf("connectToWifi - ssid: %s, password: %s\n", Settings.ssid, Settings.password);
-
     char msg[128];
 
     // no wifi SSID stored? cannot connect
     if (strlen(Settings.ssid) == 0) {
+        printf("connectToWifi - not connecting to WIFI yet, because no SSID stored\n");
         return;
     }
 
+    printf("connectToWifi - ssid: %s, password: %s\n", Settings.ssid, Settings.password);
+
     sprintf(msg, "ssid: %s", Settings.ssid);
     displayMessage("wifi connecting", msg);
-
-    printf("connectToWifi - ssid: %s\n", Settings.ssid);
 
     // not connected to wifi yet, try to connect
     cyw43_arch_wifi_connect_async(Settings.ssid, Settings.password, CYW43_AUTH_WPA2_AES_PSK);

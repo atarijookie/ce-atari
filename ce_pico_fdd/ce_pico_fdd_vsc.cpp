@@ -6,16 +6,17 @@
 #include "hardware/timer.h"
 #include "pico/cyw43_arch.h"
 #include "hardware/uart.h"
+#include "hardware/watchdog.h"
 
-#include "defs.h"
-#include "utils.h"
 #include "connection.h"
-#include "captive_portal.h"
 #include "display.h"
 #include "ikbd.h"
 #include "buttons.h"
 #include "mfm.h"
 #include "psram.h"
+#include "defs.h"
+#include "utils.h"
+#include "serial_config.h"
 
 uint16_t version[2] = {0xf025, 0x0901}; // this means: Franz, 2025-09-01
 uint8_t atnSendFwVersion[ATN_SENDFWVERSION_LEN_TX];
@@ -147,18 +148,26 @@ void setup(void)
     stdio_init_all();
     printf("setup() starting\n");
 
-    // Initialise the Wi-Fi chip
-    if (cyw43_arch_init()) {
-        printf("Wi-Fi init failed\n");
-        while(1);
-    }
-
     // SPI initialisation.
     spi_init(SPI_PORT, 16000000);
     gpio_set_function(PIN_MISO, GPIO_FUNC_SPI);
     gpio_set_function(PIN_CS,   GPIO_FUNC_SIO);
     gpio_set_function(PIN_SCK,  GPIO_FUNC_SPI);
     gpio_set_function(PIN_MOSI, GPIO_FUNC_SPI);
+
+    // init PSRAM, read ID, test read and write
+    psramTest();
+
+    if(psramConfigFlagGet()) {
+        psramConfigFlagClear();
+        serialConfigLoop();
+    }
+
+    // Initialise the Wi-Fi chip
+    if (cyw43_arch_init()) {
+        printf("Wi-Fi init failed\n");
+        while(1);
+    }
 
 /*  // TODO:
     Serial1.begin(7812, SERIAL_8N1, PIN_KEYB_TX_ORIG, PIN_KEYB_TX); // uart1 for IKBD - RXD PIN, TXD PIN
@@ -191,9 +200,6 @@ void setup(void)
     gpio_set_function(PIN_SCL, GPIO_FUNC_I2C);
     gpio_pull_up(PIN_SDA);
     gpio_pull_up(PIN_SCL);
-
-    // init PSRAM, read ID, test read and write
-    // psramTest();
 
     readTrackData_goToStart();
 
@@ -378,99 +384,6 @@ void sendFwReport(uint32_t now)
     sendHeaderAndDataToHost(atnSendFwVersion, ATN_SENDFWVERSION_LEN_TX - TX_HEADER_SIZE);
 }
 
-void getString(char* buffer, int maxLen)
-{
-    memset(buffer, 0, maxLen);
-
-    int i=0;
-    while(1)
-    {
-        int key = getchar_timeout_us(1000);
-
-        if(key == PICO_ERROR_TIMEOUT) {
-            continue;
-        }
-
-        if(key == '\n' || key == '\r' || i >= (maxLen-1)) {
-            break;
-        }
-
-        putchar(key);       // echo back to console
-
-        buffer[i] = key;
-        i++;
-    }
-}
-
-void serialConfigLoop(void)
-{
-    bool ssidChanged = false, pswdChanged = false, ikbdChanged = false;
-
-    loadSettingsFromEeprom();
-
-    printf("\n\nEntering configuration mode.\nCurrent settings are:\n");
-    printf("--------------------------------------\n");
-    printf("SSID    : %s\n", Settings.ssid);
-    printf("password: %s\n", Settings.password);
-    printf("ikbd    : %s\n", Settings.ikbdEnabled ? "enabled" : "disabled");
-    printf("--------------------------------------\n");
-    printf("Press 'S' to set SSID, 'P' to set password, 'I' to enable/disable IKBD, 'Q' to save.\n");
-
-    while(true)
-    {
-        int key = getchar_timeout_us(1000);
-
-        if(key == '\n' || key == '\r') {
-            printf("Press 'S' to set SSID, 'P' to set password, 'I' to enable/disable IKBD, 'Q' to save.\n");
-        }
-
-        if(key == 's' || key == 'S') {
-            printf("\nEnter SSID, finish by Enter key.\n");
-            getString(Settings.ssid, MAX_SETTINGS_STRING_LEN);
-            printf("\nNew SSID: %s\n", Settings.ssid);
-            ssidChanged = true;
-        }
-
-        if(key == 'p' || key == 'P') {
-            printf("\nEnter password, finish by Enter key.\n");
-            getString(Settings.password, MAX_SETTINGS_STRING_LEN);
-            printf("\nNew password: %s\n", Settings.password);
-            pswdChanged = true;
-        }
-
-        if(key == 'i' || key == 'I') {
-            printf("\nEnter 'E' to enable IKBD, 'D' to disable IKBD.\n");
-            char ed[2];
-            getString(ed, 2);
-
-            if(ed[0] == 'e' || ed[0] == 'E') {
-                Settings.ikbdEnabled = true;
-                ikbdChanged = true;
-            }
-
-            if(ed[0] == 'd' || ed[0] == 'D') {
-                Settings.ikbdEnabled = false;
-                ikbdChanged = true;
-            }
-
-            printf("\nIKBD: %s\n", Settings.ikbdEnabled ? "enabled" : "disabled");
-        }
-
-
-        if(key == 'q' || key == 'Q') {
-            break;
-        }
-    }
-
-    if(!ssidChanged && !pswdChanged && !ikbdChanged) {
-        printf("No settings changed.\n\n");
-        return;
-    }
-
-    printf("Saving settings.\n\n");
-    // saveSettingsToEeprom();      // TODO:
-}
-
 int main()
 {
     setup();
@@ -484,7 +397,8 @@ int main()
     {
         int key = getchar_timeout_us(0);
         if(key == '\n' || key == '\r') {
-            serialConfigLoop();
+            psramConfigFlagSet();
+            watchdog_reboot(0, 0, 0);
         }
 
         // connect to wifi, discover CE server, connect to CE server
