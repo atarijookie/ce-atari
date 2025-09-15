@@ -32,7 +32,7 @@ SStreamed posStreamed, hwPosition, posWritten;
 uint8_t trackData0[READTRACKDATA_SIZE_BYTES];
 uint8_t trackData1[READTRACKDATA_SIZE_BYTES];
 
-extern bool connected;
+extern bool connectedToHost;
 uint32_t timeTrackStart;
 
 int imageState = IMAGE_NOT_LOADED;
@@ -426,7 +426,7 @@ int main()
 
         // send heartbeat (fw version) once a second
         uint32_t now = millis();
-        if (connected && (now - lastSendFwTime) >= 1000)
+        if (connectedToHost && (now - lastSendFwTime) >= 1000)
         {
             // if(stWantsTheStream) {
             //     hwPosition.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1; // get the current SIDE
@@ -438,7 +438,7 @@ int main()
         }
 
         // request whole image if no image loaded
-        if(connected && imageState == IMAGE_NOT_LOADED)
+        if(connectedToHost && imageState == IMAGE_NOT_LOADED)
         {
             // before requesting the whole image, send fw report, so the host will get mac address, 
             // which he will use to identify this device
@@ -547,8 +547,8 @@ void setupAtnBuffers(void)
 
 void storeMacAddress(void)
 {
-    memset(atnSendFwVersion + TX_HEADER_SIZE + 6, 0, 6);
-    cyw43_ll_wifi_get_mac(&cyw43_state.cyw43_ll, atnSendFwVersion + TX_HEADER_SIZE + 6);
-    printf("mac: %02X:%02X:%02X:%02X:%02X:%02X\n", atnSendFwVersion[TX_HEADER_SIZE + 6], atnSendFwVersion[TX_HEADER_SIZE + 7], atnSendFwVersion[TX_HEADER_SIZE + 8], 
-                                                   atnSendFwVersion[TX_HEADER_SIZE + 9], atnSendFwVersion[TX_HEADER_SIZE + 10], atnSendFwVersion[TX_HEADER_SIZE + 11]);
+    uint8_t* pMac = atnSendFwVersion + TX_HEADER_SIZE + 6;
+    memset(pMac, 0, 6);
+    cyw43_hal_get_mac(CYW43_HAL_MAC_WLAN0, pMac);
+    printf("mac: %02X:%02X:%02X:%02X:%02X:%02X\n", pMac[0], pMac[1], pMac[2], pMac[3], pMac[4], pMac[5]);
 }

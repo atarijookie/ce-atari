@@ -41,7 +41,8 @@ uint16_t hostPortHdd;
 uint16_t hostPortFdd;
 uint16_t hostPortIkbd;
 
-bool connected;
+bool connectedToWifi;
+bool connectedToHost;
 
 THeader fddHeader;      // keep the header global to preserve syncTag between calls
 
@@ -161,11 +162,6 @@ void connectToWifi(void)
     // we're connecting now
     lastAttempt = millis();
 
-    // already connected to wifi? quit
-    if(cyw43_wifi_link_status(&cyw43_state, CYW43_ITF_STA) == CYW43_LINK_UP) {
-        return;
-    }
-
     char msg[128];
 
     // no wifi SSID stored? cannot connect
@@ -174,13 +170,21 @@ void connectToWifi(void)
         return;
     }
 
-    printf("connectToWifi - ssid: %s, password: %s\n", Settings.ssid, Settings.password);
-
-    sprintf(msg, "ssid: %s", Settings.ssid);
-    displayMessage("wifi connecting", msg);
-
     // not connected to wifi yet, try to connect
-    cyw43_arch_wifi_connect_async(Settings.ssid, Settings.password, CYW43_AUTH_WPA2_AES_PSK);
+    int new_status = cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA);
+
+    if (new_status != CYW43_LINK_UP) {      // not connected? connect now
+        printf("connectToWifi - connecting, ssid: %s, password: %s\n", Settings.ssid, Settings.password);
+
+        sprintf(msg, "ssid: %s", Settings.ssid);
+        displayMessage("wifi connecting", msg);
+
+        cyw43_arch_wifi_connect_async(Settings.ssid, Settings.password, CYW43_AUTH_WPA2_AES_PSK);
+    } 
+    else
+    {
+        printf("connectToWifi - not connecting, status: %d\n", new_status);
+    }
 
     storeMacAddress();      // copy wifi mac address to fw report buffer
 }
@@ -190,11 +194,6 @@ void ceDiscoverySend(void)
 {
     static uint32_t lastAttempt = 0xffff0000; // -65k
     static bool whichBroadcastAddr = false;
-
-    if(cyw43_wifi_link_status(&cyw43_state, CYW43_ITF_STA) != CYW43_LINK_UP)    // wifi not connected? no need to send discovery packets
-    {
-        return;
-    }
 
     // already got hostIp and port? don't do discovery
     if (hostIp[0] != 0 && hostPortFdd != 0)
@@ -207,8 +206,17 @@ void ceDiscoverySend(void)
     {
         return;
     }
-
     lastAttempt = millis();
+
+    // get ip, mask, create broadcast address
+    u32_t ip_u32 = ip4_addr_get_u32(netif_ip_addr4(netif_default));
+    u32_t mask_u32 = ip4_addr_get_u32(netif_ip4_netmask(netif_default));
+    u32_t bcast_u32 = (ip_u32 & mask_u32) | (~mask_u32);
+
+    if(ip_u32 == 0) {   // no ip? don't send broadcast
+        printf("ceDiscoverySend - no IP yet\n");
+        return;
+    }
 
     udpInitialize();
 
@@ -223,13 +231,8 @@ void ceDiscoverySend(void)
     if(whichBroadcastAddr)      // send to subnet broadcast addr?
     {
         ip4_addr_t bcast;
-        u32_t ip_u32 = ip4_addr_get_u32(netif_ip_addr4(netif_default));
-        u32_t mask_u32 = ip4_addr_get_u32(netif_ip4_netmask(netif_default));
-        u32_t bcast_u32 = (ip_u32 & mask_u32) | (~mask_u32);
-        printf("ip_u32: %08x, mask_u32: %08x\n", ip_u32, mask_u32);
-
         ip4_addr_set_u32(&bcast, bcast_u32);
-        printf("ceDiscoverySend to %d.%d.%d.%d\n", (bcast_u32 >> 24) & 0xff, (bcast_u32 >> 16) & 0xff, (bcast_u32 >> 8) & 0xff, bcast_u32 & 0xff);
+        printf("ceDiscoverySend to %d.%d.%d.%d\n", bcast_u32 & 0xff, (bcast_u32 >> 8) & 0xff, (bcast_u32 >> 16) & 0xff, (bcast_u32 >> 24) & 0xff);
         udp_sendto(pcbUpd, p, &bcast, SERVER_UDP_PORT);                 // broadcast to subnet devices (e.g. 192.168.1.255)
     } 
     else        // send to generic broadcast addr
@@ -453,27 +456,36 @@ void connectToCEhost(void)
 
 void connectToHost(void)
 {
-    static bool prevConnected = false;
-    connected = clientFdd.connected && (cyw43_wifi_link_status(&cyw43_state, CYW43_ITF_STA) == CYW43_LINK_UP);
+    static bool prevConnectedToHost = false;
+    static bool prevConnectedToWifi = false;
+
+    connectedToWifi = cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA) == CYW43_LINK_UP;
+    connectedToHost = clientFdd.connected && connectedToWifi;
+
+    if(prevConnectedToWifi != connectedToWifi) {    // connectedToWifi changed since last time? log it
+        prevConnectedToWifi = connectedToWifi;
+        printf("connectedToWifi: %d\n", connectedToWifi);
+    }
 
     // on connected state changed
-    if(prevConnected != connected)
+    if(prevConnectedToHost != connectedToHost)
     {
-        prevConnected = connected;
+        prevConnectedToHost = connectedToHost;
 
-        if(connected) {     // now in connected state, display state on display
+        if(connectedToHost) {     // now in connected state, display state on display
             imageState = IMAGE_NOT_LOADED;
             showRunningStateOnDisplay();
         }
     }
 
-    // socket connected, wifi connected? just quit
-    if(connected)
+    if(!connectedToWifi) {
+        connectToWifi();
+    }
+
+    if(connectedToHost)     // we're connected to host? don't send discovery packets
     {
         return;
     }
-
-    connectToWifi();
 
     // device connected to wifi, do discovery if needed
     ceDiscoverySend();
