@@ -146,34 +146,7 @@ void readTrackData_goToStart(void)
 void setup(void)
 {
     stdio_init_all();
-    printf("setup() starting\n");
-
-    // SPI initialisation.
-    spi_init(SPI_PORT, 16000000);
-    gpio_set_function(PIN_MISO, GPIO_FUNC_SPI);
-    gpio_set_function(PIN_CS,   GPIO_FUNC_SIO);
-    gpio_set_function(PIN_SCK,  GPIO_FUNC_SPI);
-    gpio_set_function(PIN_MOSI, GPIO_FUNC_SPI);
-
-    // init PSRAM, read ID, test read and write
-    psramTest();
-
-    if(psramConfigFlagGet()) {
-        psramConfigFlagClear();
-        serialConfigLoop();
-    }
-
-    // Initialise the Wi-Fi chip
-    if (cyw43_arch_init()) {
-        printf("Wi-Fi init failed\n");
-        while(1);
-    }
-
-/*  // TODO:
-    Serial1.begin(7812, SERIAL_8N1, PIN_KEYB_TX_ORIG, PIN_KEYB_TX); // uart1 for IKBD - RXD PIN, TXD PIN
-    Serial2.begin(7812, SERIAL_8N1, PIN_KEYB_RX, PIN_TXD2);         // uart2 for IKBD - RXD PIN, TXD PIN
-*/
-    loadSettingsFromEeprom();
+    printf("\n\nsetup() starting\n");
 
     #define INPUTS_COUNT 7
     int inputs[INPUTS_COUNT] = {PIN_DRIVE_SEL, PIN_MOT_EN, PIN_DIR, PIN_STEP, PIN_WGATE, PIN_SIDE1};
@@ -201,19 +174,52 @@ void setup(void)
     gpio_pull_up(PIN_SDA);
     gpio_pull_up(PIN_SCL);
 
+    displayInit();
+
+    // SPI initialisation.
+    spi_init(SPI_PORT, 16000000);
+    gpio_set_function(PIN_MISO, GPIO_FUNC_SPI);
+    gpio_set_function(PIN_CS,   GPIO_FUNC_SIO);
+    gpio_set_function(PIN_SCK,  GPIO_FUNC_SPI);
+    gpio_set_function(PIN_MOSI, GPIO_FUNC_SPI);
+
+    // init PSRAM, read ID, test read and write
+    // psramTest();
+
+    loadSettingsFromEeprom();
+
+    // If the flag to enter config mode is set, or there is no ssid stored, enter the config mode.
+    // In order for flashing to work, we must ensure that only 1 core is writing to flash and running, so
+    // we must enter config mode and storing to flash before we call cyw43_arch_init(), 
+    // which runs on other core.
+    if(psramConfigFlagGet() || strlen(Settings.ssid) == 0) {
+        printf("Starting serial config - configFlag: %d, SSID length: %d\n", psramConfigFlagGet(), strlen(Settings.ssid));
+        psramConfigFlagClear();
+        serialConfigLoop();
+    }
+
     readTrackData_goToStart();
 
     setupAtnBuffers();
     wrPosClear();
-
-    createIkbdTask();   // this task sends ikdb data to host and back
-    displayInit();
 
     // start mfm output
     setupPwmOutput();
     setupDmaToPwm();
 
     gpio_set_irq_enabled_with_callback(PIN_STEP, GPIO_IRQ_EDGE_FALL, true, floppyStepISR);
+
+/*  // TODO:
+    Serial1.begin(7812, SERIAL_8N1, PIN_KEYB_TX_ORIG, PIN_KEYB_TX); // uart1 for IKBD - RXD PIN, TXD PIN
+    Serial2.begin(7812, SERIAL_8N1, PIN_KEYB_RX, PIN_TXD2);         // uart2 for IKBD - RXD PIN, TXD PIN
+*/
+    createIkbdTask();   // this task sends ikdb data to host and back
+
+    // Initialise the Wi-Fi chip
+    if (cyw43_arch_init()) {
+        printf("Wi-Fi init failed\n");
+        while(1);
+    }
 
     // Enable wifi station
     cyw43_arch_enable_sta_mode();
@@ -397,6 +403,10 @@ int main()
     {
         int key = getchar_timeout_us(0);
         if(key == '\n' || key == '\r') {
+            // In order for flashing to work, we must ensure that only 1 core is writing to flash and running, so
+            // we must enter config mode and storing to flash before we call cyw43_arch_init(), 
+            // which runs on other core. For this to happen we set a flag in the external PSRAM
+            // which will not get cleared on pico restart, and we do the restart. The config then happens after restart.
             psramConfigFlagSet();
             watchdog_reboot(0, 0, 0);
         }

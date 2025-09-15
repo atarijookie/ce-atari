@@ -120,6 +120,9 @@ void saveSettingsToEeprom(void)
     memset(buf, 0, FLASH_SECTOR_SIZE);                          // clear 4k
     memcpy(buf, (const uint8_t *) &Settings, sizeof(Settings)); // copy just the settings - about 68 B
 
+    // writing to flash needs other core to be initialized with flash_safe_execute_core_init(), 
+    // see serial_config.cpp for more details.
+
     int rc = flash_safe_execute(call_flash_range_erase, (void*) FLASH_TARGET_OFFSET, UINT32_MAX);
     if(rc != PICO_OK) {
         printf("flash_range_erase failed, settings not stored\n");
