@@ -45,7 +45,7 @@ add_executable(ce_pico_fdd_vsc
         mfm.cpp
         psram.cpp
         utils.cpp
-        tcp_client_context.cpp
+        client_context.h
         )
 
 pico_set_program_name(ce_pico_fdd_vsc "ce_pico_fdd_vsc")

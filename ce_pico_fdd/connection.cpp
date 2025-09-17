@@ -15,22 +15,20 @@
 #include "utils.h"
 #include "display.h"
 #include "psram.h"
-#include "tcp_client_context.h"
+#include "client_context.h"
 
 #define SERVER_UDP_PORT 7200 // port number where CE listens for client requests
 #define CLIENT_UDP_PORT 7201 // port where this client should listen for CE responses
 
 extern Settings_t Settings;
 
-// WiFiUDP udp;
 bool udpInitialized;
 
 struct udp_pcb* pcbUpd;
 
 typedef struct {
     struct tcp_pcb *pcb;
-    bool connected;
-    ClientContext clientContext;
+    ClientContext *cc;
 } TConnection;
 
 TConnection clientFdd;
@@ -38,6 +36,7 @@ TConnection clientIkbd;
 
 uint8_t hostIp[4];
 std::string hostIpString;
+ip_addr_t hostIpAddr;
 uint16_t hostPortHdd;
 uint16_t hostPortFdd;
 uint16_t hostPortIkbd;
@@ -94,6 +93,7 @@ static void udp_recv_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p, co
     // CELR found at start
     if (strncmp((const char *) payload, "CELR", 4) == 0)
     {
+        hostIpAddr = *addr;
         uint32_t sender_ip = lwip_ntohl(ip4_addr_get_u32(ip_2_ip4(addr)));
 
         int shift = 24;
@@ -123,8 +123,6 @@ void udpInitialize(void)
     }
 
     pcbUpd = udp_new();
-
-    // udp_set_flags(pcbUpd, UDP_FLAGS_BROADCAST);
 
     // Bind to any IP, given port
     err_t err = udp_bind(pcbUpd, IP_ADDR_ANY, CLIENT_UDP_PORT);
@@ -237,17 +235,14 @@ void ceDiscoverySend(void)
     pbuf_free(p);
 }
 
-uint32_t tcp_client_write(TConnection* con, uint8_t* data, uint32_t len)
+size_t clientFddWrite(const uint8_t *buf, size_t size)
 {
-    err_t wr_err = tcp_write(con->pcb, data, len, TCP_WRITE_FLAG_COPY);
-
-    if (wr_err == ERR_OK) {
-        tcp_output(con->pcb);
-        return len;
+    if (!clientFdd.cc || !size) {
+        return 0;
     }
-    
-    printf("tcp_write failed: %d\n", wr_err);
-    return 0;
+
+    clientFdd.cc->setTimeout(500);
+    return clientFdd.cc->write((const char*)buf, size);
 }
 
 TConnection* pcbToConnection(tcp_pcb* tpcb)
@@ -261,64 +256,22 @@ TConnection* pcbToConnection(tcp_pcb* tpcb)
     return NULL;
 }
 
-// Called when data is received from the server
-static err_t tcp_client_recv_fdd(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
+bool clientFddAvailable(void)
 {
-    return clientFdd.clientContext._recv(tpcb, p, err);
+    if(!clientFdd.cc || !clientFdd.cc->availableForWrite()) {
+        return false;
+    }
+
+    return true;
 }
 
-// Called when connection is successfully established
-static err_t tcp_client_connected(void *arg, struct tcp_pcb *tpcb, err_t err)
+bool clientFddConnected(void)
 {
-    TConnection* con = pcbToConnection(tpcb);
-    if(!con) {
-        return ERR_OK;
+    if (!clientFdd.cc || clientFdd.cc->state() == CLOSED) {
+        return false;
     }
 
-    if(err != ERR_OK) {
-        con->connected = false;
-        printf("Connection failed: %d\n", err);
-        return err;
-    }
-
-    con->connected = true;
-
-    // Set receive callback
-    con->clientContext.setPcb(tpcb);
-    tcp_recv(con->pcb, tcp_client_recv_fdd);
-
-    return ERR_OK;
-}
-
-// Called on fatal errors (connection reset, timeout, etc.)
-static void tcp_client_error(void *arg, err_t err)
-{
-    printf("TCP connection aborted, err=%d\n", err);
-}
-
-void tcp_client_connect(const char *remote_ip, uint16_t remote_port, TConnection* con)
-{
-    ip_addr_t server_addr;
-
-    if (!ip4addr_aton(remote_ip, &server_addr)) {
-        printf("Invalid IP address: %s\n", remote_ip);
-        return;
-    }
-
-    con->pcb = tcp_new_ip_type(IPADDR_TYPE_V4);
-
-    if (!con->pcb) {
-        printf("Failed to create PCB\n");
-        return;
-    }
-
-    // Register error callback
-    tcp_err(con->pcb, tcp_client_error);
-
-    printf("Connecting to %s:%u\n", remote_ip, remote_port);
-
-    // Initiate connection (async)
-    tcp_connect(con->pcb, &server_addr, remote_port, tcp_client_connected);
+    return clientFdd.cc->state() == ESTABLISHED || clientFddAvailable();
 }
 
 void connectToCEhost(void)
@@ -326,8 +279,8 @@ void connectToCEhost(void)
     static uint32_t lastAttempt = 0xffff0000; // -65k
     static bool loggedOnce = false;
 
-    if (clientFdd.connected)
-    { // already connected? quit
+    if (clientFddConnected())   // already connected? quit
+    { 
         if(!loggedOnce) {
             printf("connectToCEhost - connected!\n");
             loggedOnce = true;
@@ -356,7 +309,26 @@ void connectToCEhost(void)
     printf("connectToCEhost - IP: %s, port: %d\n", hostIpString.c_str(), hostPortFdd);
 
     // start connection attempt
-    tcp_client_connect(hostIpString.c_str(), hostPortFdd, &clientFdd);
+
+    if (clientFdd.cc) {
+        clientFdd.cc->close();
+        clientFdd.cc->unref();
+        clientFdd.cc = nullptr;
+    }
+
+    tcp_pcb* pcb = tcp_new();
+    if (!pcb) {
+        return;
+    }
+
+    clientFdd.cc = new ClientContext(pcb, nullptr, nullptr);
+    clientFdd.cc->ref();
+    clientFdd.cc->setTimeout(5000);
+
+    clientFdd.cc->connectAsync(&hostIpAddr, hostPortFdd);
+
+    clientFdd.cc->setSync(true);
+    clientFdd.cc->setNoDelay(true);
 }
 
 void connectToHost(void)
@@ -365,7 +337,7 @@ void connectToHost(void)
     static bool prevConnectedToWifi = false;
 
     connectedToWifi = cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA) == CYW43_LINK_UP;
-    connectedToHost = clientFdd.connected && connectedToWifi;
+    connectedToHost = connectedToWifi && clientFddConnected();
 
     if(prevConnectedToWifi != connectedToWifi) {    // connectedToWifi changed since last time? log it
         prevConnectedToWifi = connectedToWifi;
@@ -401,8 +373,7 @@ void connectToHost(void)
 
 bool getIncommingHeader(void)
 {
-    if(!clientFdd.connected)    // clientFdd not connected, no header received
-    {
+    if(!clientFddConnected()) {   // clientFdd not connected, no header received
         return false;
     }
 
@@ -429,20 +400,20 @@ bool getIncommingHeader(void)
         }
 
         // not enough data for full header, no header received
-        int available = clientFdd.clientContext.getSize();
+        int available = clientFdd.cc->getSize();
         if(available < needed)
         {
             return false;
         }
 
-        uint32_t data = clientFdd.clientContext.read(); // read byte
+        uint32_t data = clientFdd.cc->read(); // read byte
         fddHeader.syncTag = fddHeader.syncTag << 8;     // shift previous sync tag one byte up
         fddHeader.syncTag |= data;                      // add lowest byte to syncTag
 
         if(fddHeader.syncTag == SYNC_TAG_FDD)           // found expected syncTag
         {
             uint8_t restOfHeader[6];
-            clientFdd.clientContext.read(restOfHeader, 6);  // read rest of the header
+            clientFdd.cc->read(restOfHeader, 6);  // read rest of the header
 
             fddHeader.cmdCode = getWord(restOfHeader);
             fddHeader.len = getDword(restOfHeader + 2);
@@ -482,8 +453,12 @@ uint8_t tmpTrackBfr[READTRACKDATA_SIZE_BYTES];
 
 void handleTrackReceived(void)
 {
+    if(!clientFddConnected()) {   // clientFdd not connected, no header received
+        return;
+    }
+
     int lenData = MIN(READTRACKDATA_SIZE_BYTES, fddHeader.len);  // limit read length to buffer length
-    clientFdd.clientContext.read(tmpTrackBfr, lenData, 500);    // read into tmpTrackBuffer size lenData, wait max specified timeout
+    clientFdd.cc->read(tmpTrackBfr, lenData, 500);    // read into tmpTrackBuffer size lenData, wait max specified timeout
 
     // read track # and side # from bfr
     int trackNo = MIN(tmpTrackBfr[0], MAX_TRACKS - 1);
@@ -503,8 +478,12 @@ void handleTrackReceived(void)
 
 void handleImageReceived(void)
 {
+    if(!clientFddConnected()) {   // clientFdd not connected, no header received
+        return;
+    }
+
     int lenData = MIN(READTRACKDATA_SIZE_BYTES, fddHeader.len);  // limit read length to buffer length
-    clientFdd.clientContext.read(tmpTrackBfr, lenData, 500);    // read into tmpTrackBuffer size lenData, wait max specified timeout
+    clientFdd.cc->read(tmpTrackBfr, lenData, 500);    // read into tmpTrackBuffer size lenData, wait max specified timeout
 
     if(tmpTrackBfr[0] == 1)     // image receiving finished?
     {
@@ -550,12 +529,12 @@ void handleIncommingData(void)
 */
 bool sendDataToHost(uint8_t *bfr, uint32_t dataSizeBytes)
 {
-    if(!clientFdd.connected)
+    if(!clientFddConnected())
     {
         return false;
     }
 
-    uint32_t writtenCount = tcp_client_write(&clientFdd, bfr, dataSizeBytes);
+    uint32_t writtenCount = clientFddWrite(bfr, dataSizeBytes);
     return (writtenCount == dataSizeBytes);
 }
 
