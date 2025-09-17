@@ -74,8 +74,6 @@ static void udp_recv_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p, co
         return;
     }
 
-    printf("Received UDP packet from %s:%u, length %d\n", ip4addr_ntoa(ip_2_ip4(addr)), port, p->len);
-
     if(p->len < 10) {       // too short?
         return;
     }

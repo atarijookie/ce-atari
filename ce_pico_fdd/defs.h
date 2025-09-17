@@ -93,7 +93,7 @@
 typedef struct 
 {
     uint8_t buffer[WRITEBUFFER_SIZE];  // buffer for the written data
-    uint16_t count;                    // count of WORDs in buffer 
+    uint16_t count;                    // count of WORDs in buffer
 } TWriteBuffer;
 
 typedef struct {

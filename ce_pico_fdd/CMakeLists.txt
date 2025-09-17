@@ -46,6 +46,9 @@ add_executable(ce_pico_fdd_vsc
         psram.cpp
         utils.cpp
         client_context.h
+        adafruit_gfx.cpp
+        lcdfont.cpp
+        ssd1306.cpp
         )
 
 pico_set_program_name(ce_pico_fdd_vsc "ce_pico_fdd_vsc")
