@@ -32,5 +32,6 @@ typedef struct {
 void loadSettingsFromEeprom(void);
 void saveSettingsToEeprom(void);
 uint32_t millis(void);
+void xprintf(const char *format, ...);
 
 #endif

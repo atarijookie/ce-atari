@@ -79,11 +79,11 @@ void psramReadId(void)
     // SPI.endTransaction();
 
     if(resp[0] != 0x0d) {
-        printf("PSRAM init - bad PSRAM ID: %02x. Will fail to work! HALT!\n", resp[0]);
+        xprintf("PSRAM init - bad PSRAM ID: %02x. Will fail to work! HALT!\n", resp[0]);
         while(1);
     }
 
-    printf("PSRAM init - OK\n");
+    xprintf("PSRAM init - OK\n");
 }
 
 void psramTest(void)
@@ -105,11 +105,11 @@ void psramTest(void)
 
     if(memcmp(writeBfr, readBfr, TEST_BFR_SIZE) != 0)   // write and read buffers mismatch? fail and halt
     {
-        printf("PSRAM not working correctly! HALT\n");
+        xprintf("PSRAM not working correctly! HALT\n");
         while(1);
     } 
 
-    printf("PSRAM used and working\n");
+    xprintf("PSRAM used and working\n");
 
     // clear the psram block used in test
     memset(writeBfr, 0, TEST_BFR_SIZE);

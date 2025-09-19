@@ -27,7 +27,7 @@ void setupAtnBuffers(void);
 void requestTrack(uint8_t side, uint8_t track);
 void requestWholeImage(void);
 
-SStreamed posStreamed, hwPosition, posWritten;
+SStreamed posStreamed, hwPosition;
 
 uint8_t trackData0[READTRACKDATA_SIZE_BYTES];
 uint8_t trackData1[READTRACKDATA_SIZE_BYTES];
@@ -42,65 +42,7 @@ bool diskChanged = false;
 uint32_t diskChangeEnd;
 uint32_t dataIndexInTrack = STREAM_START_OFFSET;
 
-#define WRPOS_SIZE  4
-uint8_t wrPosCnt, wrPosStore, wrPosLoad;
-uint16_t writePos[WRPOS_SIZE];
-uint32_t lastPosPutTime;
-
 extern Settings_t Settings;
-
-void wrPosClear(void)
-{
-    wrPosCnt = 0;
-    wrPosStore = 0;
-    wrPosLoad = 0;
-}
-
-void wrPosPut(uint8_t side, uint8_t track, uint8_t sector)
-{
-    // buffer full? don't store
-    if(wrPosCnt >= WRPOS_SIZE) {
-        return;
-    }
-
-    // pack track, side, sector into single uint16_t
-    uint16_t sideTrack = track | ((side != 0) ? 0x80 : 0);
-    uint16_t sideTrackSector = (sideTrack << 8) | sector;
-
-    // store and update storing position
-    writePos[wrPosStore] = sideTrackSector;
-    wrPosStore++;
-
-    if(wrPosStore >= WRPOS_SIZE) {
-        wrPosStore = 0;
-    }
-
-    wrPosCnt++;
-}
-
-void wrPosGet(uint8_t* pSideTrack, uint8_t* pSector)
-{
-    // got anything stored? get it
-    if(wrPosCnt > 0) {
-        uint16_t sideTrackSector = writePos[wrPosLoad];
-        wrPosLoad++;
-
-        if(wrPosLoad >= WRPOS_SIZE) {
-           wrPosLoad = 0;
-        }
-
-        wrPosCnt--;
-
-        *pSideTrack = (uint8_t) (sideTrackSector >> 8);
-        *pSector = (uint8_t) sideTrackSector;
-    }
-    // nothing stored? return zeros
-    else
-    {
-        *pSideTrack = 0;
-        *pSector = 0;
-    }
-}
 
 TWriteBuffer wrBuffer;  // buffer for written sectors
 
@@ -146,7 +88,7 @@ void readTrackData_goToStart(void)
 void setup(void)
 {
     stdio_init_all();
-    printf("\n\nsetup() starting\n");
+    xprintf("\n\nsetup() starting\n");
 
     #define INPUTS_COUNT 7
     int inputs[INPUTS_COUNT] = {PIN_DRIVE_SEL, PIN_MOT_EN, PIN_DIR, PIN_STEP, PIN_WGATE, PIN_SIDE1};
@@ -185,7 +127,8 @@ void setup(void)
     // we must enter config mode and storing to flash before we call cyw43_arch_init(), 
     // which runs on other core.
     if(psramConfigFlagGet() || strlen(Settings.ssid) == 0) {
-        printf("Starting serial config - configFlag: %d, SSID length: %d\n", psramConfigFlagGet(), strlen(Settings.ssid));
+        xprintf("Starting serial config - configFlag: %d, SSID length: %d\n", psramConfigFlagGet(), strlen(Settings.ssid));
+        displayMessage("...now running...", "SERIAL CONFIG");
         psramConfigFlagClear();
         serialConfigLoop();
     }
@@ -193,13 +136,17 @@ void setup(void)
     readTrackData_goToStart();
 
     setupAtnBuffers();
-    wrPosClear();
 
     // start mfm output
     setupPwmOutput();
     setupDmaToPwm();
 
     gpio_set_irq_enabled_with_callback(PIN_STEP, GPIO_IRQ_EDGE_FALL, true, floppyStepISR);
+
+    // Initialise UART 1
+    gpio_set_function(PIN_KEYB_TX, UART_FUNCSEL_NUM(uart1, PIN_KEYB_TX));
+    gpio_set_function(PIN_KEYB_TX_ORIG, UART_FUNCSEL_NUM(uart1, PIN_KEYB_TX_ORIG));
+    uart_init(uart1, 7812);
 
 /*  // TODO:
     Serial1.begin(7812, SERIAL_8N1, PIN_KEYB_TX_ORIG, PIN_KEYB_TX); // uart1 for IKBD - RXD PIN, TXD PIN
@@ -209,7 +156,7 @@ void setup(void)
 
     // Initialise the Wi-Fi chip
     if (cyw43_arch_init()) {
-        printf("Wi-Fi init failed\n");
+        xprintf("Wi-Fi init failed\n");
         while(1);
     }
 
@@ -226,7 +173,7 @@ void requestTrack(uint8_t side, uint8_t track)
 
 void requestWholeImage(void)
 {
-    printf("requestWholeImage");
+    xprintf("requestWholeImage");
     sendHeaderAndDataToHost(atnSendWholeImageRequest, 0);
 }
 
@@ -234,7 +181,7 @@ void storeWrittenSectorDataToTrackLocally(uint8_t side, uint8_t track, uint8_t s
 {
     // track / side / sector out of bounds?
     if(side > 1 || track >= MAX_TRACKS || sector >= 12) {
-        printf("Failed to write side: %d, track: %d, sector: %d - TriSiSe out of bounds!\n", side, track, sector);
+        xprintf("Failed to write side: %d, track: %d, sector: %d - TriSiSe out of bounds!\n", side, track, sector);
         return;
     }
 
@@ -247,7 +194,7 @@ void storeWrittenSectorDataToTrackLocally(uint8_t side, uint8_t track, uint8_t s
 
     // make sure that offset to sector is still within the track data
     if(offsetToSector >= READTRACKDATA_SIZE_BYTES) {
-        printf("Failed to write side: %d, track: %d, sector: %d - bad sector offset!\n", side, track, sector);
+        xprintf("Failed to write side: %d, track: %d, sector: %d - bad sector offset!\n", side, track, sector);
         return;
     }
 
@@ -293,7 +240,7 @@ void storeWrittenSectorDataToTrackLocally(uint8_t side, uint8_t track, uint8_t s
 
     // if we didn't find everything needed, fail
     if(lookingFor != NOTHING) {
-        printf("Failed to write side: %d, track: %d, sector: %d - no data start found!\n", side, track, sector);
+        xprintf("Failed to write side: %d, track: %d, sector: %d - no data start found!\n", side, track, sector);
         return;
     }
 
@@ -323,9 +270,13 @@ void processMfmWriteBuffer(uint8_t* bfr, int len)
         uint8_t val = bfr[i];
 
         if(val == TAG_WRITE_START) {    // on START tag found - now we're receiving write data
-            // printf("START");
+            wrBuffer.buffer[10] = (((posStreamed.side > 0) ? 0x80 : 0) | posStreamed.track);
+            wrBuffer.buffer[11] = posStreamed.sector;
+
             receivingWriteData = true;
             wrBuffer.count = 12;        // start with 12 bytes in the buffer - 10 for header, 2 for track + side + sector
+
+            // xprintf("START");
             continue;
         }
 
@@ -333,20 +284,10 @@ void processMfmWriteBuffer(uint8_t* bfr, int len)
             if(receivingWriteData) {    // this END tag is the first END tag found after START tag, so we're done with receiving this sector
                 receivingWriteData = false;     //  not receiving anymore
 
-                uint8_t sideTrack, sector;
-                wrPosGet(&sideTrack, &sector);  // get side, track and sector number from the write-positions buffer
-                wrBuffer.buffer[10] = sideTrack;
-                wrBuffer.buffer[11] = sector;
-
-                posWritten.side = ((sideTrack) & 0x80) ? 1 : 0;
-                posWritten.track = sideTrack & 0x7f;
-                posWritten.sector = sector;
-
-                // printf("END");
-                // printf(wrBuffer.count);
-
                 sendHeaderAndDataToHost(wrBuffer.buffer, wrBuffer.count - TX_HEADER_SIZE);      // send sector to host
-                storeWrittenSectorDataToTrackLocally(((sideTrack & 0x80) ? 1 : 0), (sideTrack & 0x7f), sector, wrBuffer.buffer, wrBuffer.count);
+                storeWrittenSectorDataToTrackLocally(posStreamed.side, posStreamed.track, posStreamed.sector, wrBuffer.buffer, wrBuffer.count);
+
+                // xprintf("END");
             }
 
             continue;
@@ -423,7 +364,7 @@ int main()
             // if(stWantsTheStream) {
             //     hwPosition.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1; // get the current SIDE
 
-            //     printf("S %d %d\n", hwPosition.side, hwPosition.track);
+            //     xprintf("S %d %d\n", hwPosition.side, hwPosition.track);
             // }
 
             sendFwReport(now);
@@ -457,7 +398,7 @@ int main()
             BIT_INVERT(PIN_DSKCHG);
 
             diskChangeEnd = now + 1000; // at this upcomming time invert back
-            // printf("DSK CHG start");
+            // xprintf("DSK CHG start");
         }
 
         // after enough time passed since the disk change, need to invert pins back
@@ -467,7 +408,7 @@ int main()
             BIT_INVERT(PIN_DENSITY);    // invert pins
             BIT_INVERT(PIN_WPROTECT);
             BIT_INVERT(PIN_DSKCHG);
-            // printf("DSK CHG end");
+            // xprintf("DSK CHG end");
         }
 
         //-------------------------------------------------
@@ -484,18 +425,9 @@ int main()
                 if(WGateNow == 0)     // on write start
                 {
                     posStreamed.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1;                // get the current SIDE
-                    wrPosPut(posStreamed.side, posStreamed.track, posStreamed.sector);   // store side, track, sector into write positions buffer
-                    lastPosPutTime = now;
+                    // posStreamed.side, posStreamed.track, posStreamed.sector   // store side, track, sector into write positions buffer
                 }
             }
-        }
-
-        // if passed enough time to get the written data from the mfm streamer, but this hasn't happened and 
-        // we still have some positions stored in the wrPos FIFO, clear it and log a message
-        if((now - lastPosPutTime) > 50 && wrPosCnt > 0) {
-            printf("Probably missed %d written sector(s)\n", wrPosCnt);
-
-            wrPosClear();       // clear the written positions, they are probably useless now
         }
 
         //------------
@@ -542,5 +474,5 @@ void storeMacAddress(void)
     uint8_t* pMac = atnSendFwVersion + TX_HEADER_SIZE + 6;
     memset(pMac, 0, 6);
     cyw43_hal_get_mac(CYW43_HAL_MAC_WLAN0, pMac);
-    printf("mac: %02X:%02X:%02X:%02X:%02X:%02X\n", pMac[0], pMac[1], pMac[2], pMac[3], pMac[4], pMac[5]);
+    xprintf("mac: %02X:%02X:%02X:%02X:%02X:%02X\n", pMac[0], pMac[1], pMac[2], pMac[3], pMac[4], pMac[5]);
 }

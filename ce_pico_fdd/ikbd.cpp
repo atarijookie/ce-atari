@@ -1,3 +1,5 @@
+#include "hardware/uart.h"
+
 #include "defs.h"
 #include "connection.h"
 #include "utils.h"
@@ -28,16 +30,17 @@ void onIkdbDisabled(void)
         clientIkbd.read(buffer, readSize);
     }
 
-    while(Serial1.available() > 0)  // got data from KEYB_TX_ORIG? just send it back to KEYB_TX
+    while(uart_is_readable())           // got data from KEYB_TX_ORIG? just send it back to KEYB_TX
     {
-        uint8_t data = Serial1.read();
-        Serial1.write(data);
+        uint8_t data = uart_getc(uart1);
+        uart_putc(uart1, data);
     }
 
     while(Serial2.available() > 0) {    // got data from Atari? Just read it and ignore it
         Serial2.read();
     }
     */
+
 }
 
 void onIkbdEnabled(void)
@@ -47,11 +50,11 @@ void onIkbdEnabled(void)
 
     /* TODO:
     // keep sending forwarding data around until all the sources are empty
-    while(Serial1.available() || clientIkbd.available())
+    while(uart_is_readable() || clientIkbd.available())
     {
-        if(Serial1.available() > 0)     // got data from KEYB_TX_ORIG? send it to host with tag
+        if(uart_is_readable())          // got data from KEYB_TX_ORIG? send it to host with tag
         {
-            data = Serial1.read();
+            data = uart_getc(uart1);
             clientIkbd.write(UARTMARK_KEYBDATA);
             clientIkbd.write(data);
         }
@@ -66,7 +69,7 @@ void onIkbdEnabled(void)
         if(clientIkbd.available() > 0)  // got data from host? send it to Atari
         {
             data = clientIkbd.read();
-            Serial1.write(data);
+            uart_putc(uart1, data);
         }
     }
     */
@@ -80,7 +83,7 @@ void ikbdConnectDisconnect(void)
         // ikbd is enabled, ikdb chip is sending data (chip present), wifi is connected, but our ikbd socket is NOT connected, connect now
         if(connected && !clientIkbd.connected())
         {
-            printf("I connect\n");
+            xprintf("I connect\n");
             clientIkbd.connect(hostIpString.c_str(), hostPortIkbd);
             clientIkbd.setNoDelay(true);
         }
@@ -90,7 +93,7 @@ void ikbdConnectDisconnect(void)
         // ikbd not sending data (chip not present) or ikbd not enabled, but the ikbd socket is connected, then disconnect
         if(clientIkbd.connected())
         {
-            printf("I disconnect\n");
+            xprintf("I disconnect\n");
             clientIkbd.stop();
         }
     }
@@ -100,7 +103,7 @@ void ikbdConnectDisconnect(void)
 void taskIkbd(void* pvParameters)
 {
     uint32_t lastReceivedTime = 0xffff0000;     // when was some data last received from ikdb
-    printf("I starting\n");
+    xprintf("I starting\n");
 
     uint32_t lastStatus = 0;
 
@@ -121,7 +124,7 @@ void taskIkbd(void* pvParameters)
                 clientIkbd.write(UARTMARK_ALIVE);
             }
 
-            // printf("I enabled %d, connected: %d\n", ikbdEnabled, clientIkbd.connected());
+            // xprintf("I enabled %d, connected: %d\n", ikbdEnabled, clientIkbd.connected());
         }
 
         ikbdConnectDisconnect();

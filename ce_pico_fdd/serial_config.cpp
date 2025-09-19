@@ -64,38 +64,38 @@ void serialConfigLoop(void)
 
     loadSettingsFromEeprom();
 
-    printf("\n\nEntering configuration mode.\nCurrent settings are:\n");
-    printf("--------------------------------------\n");
-    printf("SSID    : %s\n", Settings.ssid);
-    printf("password: %s\n", Settings.password);
-    printf("ikbd    : %s\n", Settings.ikbdEnabled ? "enabled" : "disabled");
-    printf("--------------------------------------\n");
-    printf("Press 'S' to set SSID, 'P' to set password, 'I' to enable/disable IKBD, 'Q' to save.\n");
+    xprintf("\n\nEntering configuration mode.\nCurrent settings are:\n");
+    xprintf("--------------------------------------\n");
+    xprintf("SSID    : %s\n", Settings.ssid);
+    xprintf("password: %s\n", Settings.password);
+    xprintf("ikbd    : %s\n", Settings.ikbdEnabled ? "enabled" : "disabled");
+    xprintf("--------------------------------------\n");
+    xprintf("Press 'S' to set SSID, 'P' to set password, 'I' to enable/disable IKBD, 'Q' to save.\n");
 
     while(true)
     {
         int key = getchar_timeout_us(1000);
 
         if(key == '\n' || key == '\r') {
-            printf("Press 'S' to set SSID, 'P' to set password, 'I' to enable/disable IKBD, 'Q' to save.\n");
+            xprintf("Press 'S' to set SSID, 'P' to set password, 'I' to enable/disable IKBD, 'Q' to save.\n");
         }
 
         if(key == 's' || key == 'S') {
-            printf("\nEnter SSID, finish by Enter key.\n");
+            xprintf("\nEnter SSID, finish by Enter key.\n");
             getString(Settings.ssid, MAX_SETTINGS_STRING_LEN);
-            printf("\nNew SSID: %s\n", Settings.ssid);
+            xprintf("\nNew SSID: %s\n", Settings.ssid);
             ssidChanged = true;
         }
 
         if(key == 'p' || key == 'P') {
-            printf("\nEnter password, finish by Enter key.\n");
+            xprintf("\nEnter password, finish by Enter key.\n");
             getString(Settings.password, MAX_SETTINGS_STRING_LEN);
-            printf("\nNew password: %s\n", Settings.password);
+            xprintf("\nNew password: %s\n", Settings.password);
             pswdChanged = true;
         }
 
         if(key == 'i' || key == 'I') {
-            printf("\nEnter 'E' to enable IKBD, 'D' to disable IKBD.\n");
+            xprintf("\nEnter 'E' to enable IKBD, 'D' to disable IKBD.\n");
             char ed[2];
             getString(ed, 2);
 
@@ -109,7 +109,7 @@ void serialConfigLoop(void)
                 ikbdChanged = true;
             }
 
-            printf("\nIKBD: %s\n", Settings.ikbdEnabled ? "enabled" : "disabled");
+            xprintf("\nIKBD: %s\n", Settings.ikbdEnabled ? "enabled" : "disabled");
         }
 
 
@@ -119,14 +119,14 @@ void serialConfigLoop(void)
     }
 
     if(!ssidChanged && !pswdChanged && !ikbdChanged) {
-        printf("No settings changed.\n\n");
+        xprintf("No settings changed.\n\n");
         return;
     }
 
-    printf("Starting core1 for flashing.\n");
+    xprintf("Starting core1 for flashing.\n");
     multicore_launch_core1(core1_entry_for_flashing);
 
-    printf("Saving settings.\n\n");
+    xprintf("Saving settings.\n\n");
     Settings.isValid = SETTINGS_VALID;  // load the isValid flag with the magic number
     saveSettingsToEeprom();
     watchdog_reboot(0, 0, 0);

@@ -125,13 +125,13 @@ void saveSettingsToEeprom(void)
 
     int rc = flash_safe_execute(call_flash_range_erase, (void*) FLASH_TARGET_OFFSET, UINT32_MAX);
     if(rc != PICO_OK) {
-        printf("flash_range_erase failed, settings not stored\n");
+        xprintf("flash_range_erase failed, settings not stored\n");
         return;
     }
 
     rc = flash_safe_execute(call_flash_range_program, (void*) buf, UINT32_MAX);
     if(rc != PICO_OK) {
-        printf("flash_range_erase failed, settings not stored\n");
+        xprintf("flash_range_erase failed, settings not stored\n");
         return;
     }
 }
@@ -139,4 +139,12 @@ void saveSettingsToEeprom(void)
 uint32_t millis(void)
 {
     return to_ms_since_boot(get_absolute_time());
+}
+
+void xprintf(const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    vprintf(format, args);
+    va_end(args);
 }
