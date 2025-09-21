@@ -34,4 +34,6 @@ void saveSettingsToEeprom(void);
 uint32_t millis(void);
 void xprintf(const char *format, ...);
 
+void BIT_INVERT(int pin);
+
 #endif

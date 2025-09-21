@@ -16,6 +16,7 @@
 #include "display.h"
 #include "psram.h"
 #include "client_context.h"
+#include "utils.h"
 
 #define SERVER_UDP_PORT 7200 // port number where CE listens for client requests
 #define CLIENT_UDP_PORT 7201 // port where this client should listen for CE responses
@@ -26,13 +27,7 @@ bool udpInitialized;
 
 struct udp_pcb* pcbUpd;
 
-typedef struct {
-    struct tcp_pcb *pcb;
-    ClientContext *cc;
-} TConnection;
-
-TConnection clientFdd;
-TConnection clientIkbd;
+TConnection connectionFdd;
 
 uint8_t hostIp[4];
 std::string hostIpString;
@@ -233,43 +228,58 @@ void ceDiscoverySend(void)
     pbuf_free(p);
 }
 
-size_t clientFddWrite(const uint8_t *buf, size_t size)
+size_t conWrite(TConnection* con, const uint8_t *buf, size_t size)
 {
-    if (!clientFdd.cc || !size) {
+    if (!con->cc || !size) {
         return 0;
     }
 
-    clientFdd.cc->setTimeout(500);
-    return clientFdd.cc->write((const char*)buf, size);
+    con->cc->setTimeout(500);
+    return con->cc->write((const char*)buf, size);
 }
 
-TConnection* pcbToConnection(tcp_pcb* tpcb)
+bool connectionAvailable(TConnection* con)
 {
-    if(tpcb == clientFdd.pcb) {
-        return &clientFdd;
-    } else if(tpcb == clientIkbd.pcb) {
-        return &clientIkbd;
-    }
-
-    return NULL;
-}
-
-bool clientFddAvailable(void)
-{
-    if(!clientFdd.cc || !clientFdd.cc->availableForWrite()) {
+    if(!con->cc || !con->cc->availableForWrite()) {
         return false;
     }
 
     return true;
 }
 
-bool clientFddConnected(void)
+bool isConnected(TConnection* con)
 {
-    if (!clientFdd.cc || clientFdd.cc->state() == CLOSED) {
+    if (!con->cc || con->cc->state() == CLOSED) {
         return false;
     }
 
-    return clientFdd.cc->state() == ESTABLISHED || clientFddAvailable();
+    return con->cc->state() == ESTABLISHED || connectionAvailable(con);
+}
+
+size_t connectionCanReadBytes(TConnection* con)
+{
+    return con->cc->getSize();
+}
+
+bool flush(TConnection* con, unsigned int maxWaitMs) {
+    if (!con->cc) {
+        return true;
+    }
+
+    if (maxWaitMs == 0) {
+        maxWaitMs = WIFICLIENT_MAX_FLUSH_WAIT_MS;
+    }
+    return con->cc->wait_until_acked(maxWaitMs);
+}
+
+void stop(TConnection* con)
+{
+    if (!con->cc) {
+        return;
+    }
+
+    flush(con, 0);
+    con->cc->close();
 }
 
 void connectToCEhost(void)
@@ -277,7 +287,7 @@ void connectToCEhost(void)
     static uint32_t lastAttempt = 0xffff0000; // -65k
     static bool loggedOnce = false;
 
-    if (clientFddConnected())   // already connected? quit
+    if (isConnected(&connectionFdd))   // already connected? quit
     { 
         if(!loggedOnce) {
             xprintf("connectToCEhost - connected!\n");
@@ -307,26 +317,30 @@ void connectToCEhost(void)
     xprintf("connectToCEhost - IP: %s, port: %d\n", hostIpString.c_str(), hostPortFdd);
 
     // start connection attempt
+    connect(&connectionFdd, &hostIpAddr, hostPortFdd);
+}
 
-    if (clientFdd.cc) {
-        clientFdd.cc->close();
-        clientFdd.cc->unref();
-        clientFdd.cc = nullptr;
+void connect(TConnection* con, ip_addr_t* addr, uint16_t port)
+{
+    if (con->cc) {
+        con->cc->close();
+        con->cc->unref();
+        con->cc = nullptr;
     }
 
-    tcp_pcb* pcb = tcp_new();
-    if (!pcb) {
+    con->pcb = tcp_new();
+    if (!con->pcb) {
         return;
     }
 
-    clientFdd.cc = new ClientContext(pcb, nullptr, nullptr);
-    clientFdd.cc->ref();
-    clientFdd.cc->setTimeout(5000);
+    con->cc = new ClientContext(con->pcb, nullptr, nullptr);
+    con->cc->ref();
+    con->cc->setTimeout(5000);
 
-    clientFdd.cc->connectAsync(&hostIpAddr, hostPortFdd);
+    con->cc->connectAsync(&hostIpAddr, hostPortFdd);
 
-    clientFdd.cc->setSync(true);
-    clientFdd.cc->setNoDelay(true);
+    con->cc->setSync(true);
+    con->cc->setNoDelay(true);
 }
 
 void connectToHost(void)
@@ -335,7 +349,7 @@ void connectToHost(void)
     static bool prevConnectedToWifi = false;
 
     connectedToWifi = cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA) == CYW43_LINK_UP;
-    connectedToHost = connectedToWifi && clientFddConnected();
+    connectedToHost = connectedToWifi && isConnected(&connectionFdd);
 
     if(prevConnectedToWifi != connectedToWifi) {    // connectedToWifi changed since last time? log it
         prevConnectedToWifi = connectedToWifi;
@@ -371,7 +385,7 @@ void connectToHost(void)
 
 bool getIncommingHeader(void)
 {
-    if(!clientFddConnected()) {   // clientFdd not connected, no header received
+    if(!isConnected(&connectionFdd)) {   // connectionFdd not connected, no header received
         return false;
     }
 
@@ -398,20 +412,20 @@ bool getIncommingHeader(void)
         }
 
         // not enough data for full header, no header received
-        int available = clientFdd.cc->getSize();
+        int available = connectionCanReadBytes(&connectionFdd);
         if(available < needed)
         {
             return false;
         }
 
-        uint32_t data = clientFdd.cc->read(); // read byte
+        uint32_t data = connectionFdd.cc->read(); // read byte
         fddHeader.syncTag = fddHeader.syncTag << 8;     // shift previous sync tag one byte up
         fddHeader.syncTag |= data;                      // add lowest byte to syncTag
 
         if(fddHeader.syncTag == SYNC_TAG_FDD)           // found expected syncTag
         {
             uint8_t restOfHeader[6];
-            clientFdd.cc->read(restOfHeader, 6);  // read rest of the header
+            connectionFdd.cc->read(restOfHeader, 6);  // read rest of the header
 
             fddHeader.cmdCode = getWord(restOfHeader);
             fddHeader.len = getDword(restOfHeader + 2);
@@ -451,12 +465,12 @@ uint8_t tmpTrackBfr[READTRACKDATA_SIZE_BYTES];
 
 void handleTrackReceived(void)
 {
-    if(!clientFddConnected()) {   // clientFdd not connected, no header received
+    if(!isConnected(&connectionFdd)) {   // connectionFdd not connected, no header received
         return;
     }
 
     int lenData = MIN(READTRACKDATA_SIZE_BYTES, fddHeader.len);  // limit read length to buffer length
-    clientFdd.cc->read(tmpTrackBfr, lenData, 500);    // read into tmpTrackBuffer size lenData, wait max specified timeout
+    connectionFdd.cc->read(tmpTrackBfr, lenData, 500);    // read into tmpTrackBuffer size lenData, wait max specified timeout
 
     // read track # and side # from bfr
     int trackNo = MIN(tmpTrackBfr[0], MAX_TRACKS - 1);
@@ -476,12 +490,12 @@ void handleTrackReceived(void)
 
 void handleImageReceived(void)
 {
-    if(!clientFddConnected()) {   // clientFdd not connected, no header received
+    if(!isConnected(&connectionFdd)) {   // connectionFdd not connected, no header received
         return;
     }
 
     int lenData = MIN(READTRACKDATA_SIZE_BYTES, fddHeader.len);  // limit read length to buffer length
-    clientFdd.cc->read(tmpTrackBfr, lenData, 500);    // read into tmpTrackBuffer size lenData, wait max specified timeout
+    connectionFdd.cc->read(tmpTrackBfr, lenData, 500);    // read into tmpTrackBuffer size lenData, wait max specified timeout
 
     if(tmpTrackBfr[0] == 1)     // image receiving finished?
     {
@@ -527,12 +541,12 @@ void handleIncommingData(void)
 */
 bool sendDataToHost(uint8_t *bfr, uint32_t dataSizeBytes)
 {
-    if(!clientFddConnected())
+    if(!isConnected(&connectionFdd))
     {
         return false;
     }
 
-    uint32_t writtenCount = clientFddWrite(bfr, dataSizeBytes);
+    uint32_t writtenCount = conWrite(&connectionFdd, bfr, dataSizeBytes);
     return (writtenCount == dataSizeBytes);
 }
 

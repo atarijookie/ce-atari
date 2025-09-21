@@ -148,3 +148,12 @@ void xprintf(const char *format, ...)
     vprintf(format, args);
     va_end(args);
 }
+
+void BIT_INVERT(int pin)
+{
+    if(BIT_IS_H(pin)) {
+        gpio_put(pin, 0);
+    } else {
+        gpio_put(pin, 1);
+    }
+}

@@ -5,13 +5,13 @@
 #include "utils.h"
 #include "ikbd.h"
 
-// extern WiFiClient clientIkbd;
-
+extern ip_addr_t hostIpAddr;
 extern std::string hostIpString;
 extern uint16_t hostPortIkbd;
-extern bool connected;              // if true, wifi is connected
+extern bool connectedToWifi;              // if true, wifi is connected
 
 extern Settings_t Settings;
+TConnection connectionIkbd;
 
 // TaskHandle_t xIkbdTask;
 
@@ -22,82 +22,82 @@ void onIkdbDisabled(void)
 {
     // ikbd not sending data (chip not present) or ikbd not enabled, but the ikbd socket is connected, then disconnect
     // if any data comming from host via socket is available, read and and drop it
-/*
-    while(clientIkbd.available() > 0)
+    while(1)
     {
-        int available = clientIkbd.available();
+        int available = connectionCanReadBytes(&connectionIkbd);
+        if(available <= 0) {    // nothing more to read here? quit this loop
+            break;
+        }
+
         int readSize = MIN(available, IKBD_BFR_SIZE);
-        clientIkbd.read(buffer, readSize);
+        connectionIkbd.cc->read(buffer, readSize);
     }
 
-    while(uart_is_readable())           // got data from KEYB_TX_ORIG? just send it back to KEYB_TX
+    while(uart_is_readable(uart1))           // got data from KEYB_TX_ORIG? just send it back to KEYB_TX
     {
         uint8_t data = uart_getc(uart1);
         uart_putc(uart1, data);
     }
 
+    /*
     while(Serial2.available() > 0) {    // got data from Atari? Just read it and ignore it
         Serial2.read();
     }
     */
-
 }
 
 void onIkbdEnabled(void)
 {
-    int readSize;
-    uint8_t data;
+    uint8_t data[16];
 
-    /* TODO:
     // keep sending forwarding data around until all the sources are empty
-    while(uart_is_readable() || clientIkbd.available())
+    while(uart_is_readable(uart1) || connectionCanReadBytes(&connectionIkbd))
     {
-        if(uart_is_readable())          // got data from KEYB_TX_ORIG? send it to host with tag
+        if(uart_is_readable(uart1))          // got data from KEYB_TX_ORIG? send it to host with tag
         {
-            data = uart_getc(uart1);
-            clientIkbd.write(UARTMARK_KEYBDATA);
-            clientIkbd.write(data);
+            data[0] = UARTMARK_KEYBDATA;
+            data[1] = uart_getc(uart1);
+            conWrite(&connectionIkbd, data, 2);
         }
 
+        /*
+        TODO:
         if(Serial2.available() > 0)     // got data from KEYB_RX? send it to host with tag
         {
-            data = Serial2.read();
-            clientIkbd.write(UARTMARK_STCMD);
-            clientIkbd.write(data);
+            data[0] = UARTMARK_STCMD;
+            data[1] = Serial2.read();
+            conWrite(&connectionIkbd, data, 2);
         }
+        */
 
-        if(clientIkbd.available() > 0)  // got data from host? send it to Atari
+        int readSize = MIN(connectionCanReadBytes(&connectionIkbd), sizeof(data));
+        if(readSize > 0)  // got data from host? send it to Atari
         {
-            data = clientIkbd.read();
-            uart_putc(uart1, data);
+            connectionIkbd.cc->read(data, readSize);
+            uart_write_blocking(uart1, data, readSize);
         }
     }
-    */
 }
-
 void ikbdConnectDisconnect(void)
 {
-    /*
-    if(ikbdEnabled)
+    if(Settings.ikbdEnabled)
     {
         // ikbd is enabled, ikdb chip is sending data (chip present), wifi is connected, but our ikbd socket is NOT connected, connect now
-        if(connected && !clientIkbd.connected())
+        if(connectedToWifi && !isConnected(&connectionIkbd))
         {
             xprintf("I connect\n");
-            clientIkbd.connect(hostIpString.c_str(), hostPortIkbd);
-            clientIkbd.setNoDelay(true);
+            connect(&connectionIkbd, &hostIpAddr, hostPortIkbd);
         }
     }
     else
     {
         // ikbd not sending data (chip not present) or ikbd not enabled, but the ikbd socket is connected, then disconnect
-        if(clientIkbd.connected())
+        if(isConnected(&connectionIkbd))
         {
             xprintf("I disconnect\n");
-            clientIkbd.stop();
+            stop(&connectionIkbd);
         }
     }
-    */
 }
 
 void taskIkbd(void* pvParameters)
@@ -111,26 +111,26 @@ void taskIkbd(void* pvParameters)
     {
         // TODO:
         // vTaskDelay(20);          // intentionally process only once a while
-/*
+
         uint32_t now = millis();
 
         if((now - lastStatus) >= 1000)  // once per second
         {
             lastStatus = now;
 
-            if(clientIkbd.connected())  // if connected, send ALIVE mark and value every second
+            if(isConnected(&connectionIkbd))  // if connected, send ALIVE mark and value every second
             {
-                clientIkbd.write(UARTMARK_ALIVE);
-                clientIkbd.write(UARTMARK_ALIVE);
+                uint8_t data[2] = {UARTMARK_ALIVE, UARTMARK_ALIVE};
+                conWrite(&connectionIkbd, data, 2);
             }
 
-            // xprintf("I enabled %d, connected: %d\n", ikbdEnabled, clientIkbd.connected());
+            // xprintf("I enabled %d, connected: %d\n", Settings.ikbdEnabled, isConnected(&connectionIkbd));
         }
 
         ikbdConnectDisconnect();
 
         // ikbd enabled and ikbd socket is connected? send and get data to/from host
-        if(ikbdEnabled && clientIkbd.connected())
+        if(Settings.ikbdEnabled && isConnected(&connectionIkbd))
         {
             onIkbdEnabled();
         } 
@@ -138,7 +138,6 @@ void taskIkbd(void* pvParameters)
         {
             onIkdbDisabled();
         }
-*/
     }
 }
 

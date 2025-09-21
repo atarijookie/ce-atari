@@ -35,6 +35,7 @@
 #include "lwip/sockets.h"
 #include "lwip/inet.h"
 #include "lwip/timeouts.h"
+#include "utils.h"
 
 #define WIFICLIENT_MAX_PACKET_SIZE TCP_MSS
 #define WIFICLIENT_MAX_FLUSH_WAIT_MS 300

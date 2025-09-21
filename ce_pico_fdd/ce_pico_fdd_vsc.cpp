@@ -47,7 +47,7 @@ extern Settings_t Settings;
 TWriteBuffer wrBuffer;  // buffer for written sectors
 
 // interrupt handler for STEP signal
-void floppyStepISR(uint gpio, uint32_t event_mask)
+void __isr floppyStepISR(uint gpio, uint32_t event_mask)
 {
     static uint32_t lastStepTime = 0;
 
@@ -261,60 +261,6 @@ void storeWrittenSectorDataToTrackLocally(uint8_t side, uint8_t track, uint8_t s
     psramStoreSector(track, side, byteOffsetFromTrackStart, bfr, copySize, dataSizeToClear);
 }
 
-void processMfmWriteBuffer(uint8_t* bfr, int len)
-{
-    static bool receivingWriteData = false;
-
-    for(int i=0; i<len; i++)
-    {
-        uint8_t val = bfr[i];
-
-        if(val == TAG_WRITE_START) {    // on START tag found - now we're receiving write data
-            wrBuffer.buffer[10] = (((posStreamed.side > 0) ? 0x80 : 0) | posStreamed.track);
-            wrBuffer.buffer[11] = posStreamed.sector;
-
-            receivingWriteData = true;
-            wrBuffer.count = 12;        // start with 12 bytes in the buffer - 10 for header, 2 for track + side + sector
-
-            // xprintf("START");
-            continue;
-        }
-
-        if(val == TAG_WRITE_END) {      // on END tag found - we're no longer receiving write data
-            if(receivingWriteData) {    // this END tag is the first END tag found after START tag, so we're done with receiving this sector
-                receivingWriteData = false;     //  not receiving anymore
-
-                sendHeaderAndDataToHost(wrBuffer.buffer, wrBuffer.count - TX_HEADER_SIZE);      // send sector to host
-                storeWrittenSectorDataToTrackLocally(posStreamed.side, posStreamed.track, posStreamed.sector, wrBuffer.buffer, wrBuffer.count);
-
-                // xprintf("END");
-            }
-
-            continue;
-        }
-
-        // we're not between START and END tag? ignore the data
-        if(!receivingWriteData) {
-            continue;
-        }
-
-        // buffer not full and the value is not a zero? store
-        if(wrBuffer.count < WRITEBUFFER_SIZE) {
-            wrBuffer.buffer[wrBuffer.count] = val;
-            wrBuffer.count++;
-        }
-    }
-}
-
-void BIT_INVERT(int pin)
-{
-    if(BIT_IS_H(pin)) {
-        gpio_put(pin, 0);
-    } else {
-        gpio_put(pin, 1);
-    }
-}
-
 uint32_t lastSendFwTime;
 
 void sendFwReport(uint32_t now)
@@ -327,21 +273,29 @@ int main()
 {
     setup();
 
-    lastSendFwTime = millis();
-    timeTrackStart = millis();
+    uint32_t now = millis();
+    lastSendFwTime = now;
+    timeTrackStart = now;
+    uint32_t lastInputCheck = now;
 
     int WGatePrev = 1;
 
     while(1)
     {
-        int key = getchar_timeout_us(0);
-        if(key == '\n' || key == '\r') {
-            // In order for flashing to work, we must ensure that only 1 core is writing to flash and running, so
-            // we must enter config mode and storing to flash before we call cyw43_arch_init(), 
-            // which runs on other core. For this to happen we set a flag in the external PSRAM
-            // which will not get cleared on pico restart, and we do the restart. The config then happens after restart.
-            psramConfigFlagSet();
-            watchdog_reboot(0, 0, 0);
+        now = millis();
+
+        if((now - lastInputCheck) > 1000) {
+            lastInputCheck = now;
+
+            int key = getchar_timeout_us(0);
+            if(key == '\n' || key == '\r') {
+                // In order for flashing to work, we must ensure that only 1 core is writing to flash and running, so
+                // we must enter config mode and storing to flash before we call cyw43_arch_init(), 
+                // which runs on other core. For this to happen we set a flag in the external PSRAM
+                // which will not get cleared on pico restart, and we do the restart. The config then happens after restart.
+                psramConfigFlagSet();
+                watchdog_reboot(0, 0, 0);
+            }
         }
 
         // connect to wifi, discover CE server, connect to CE server
@@ -358,12 +312,10 @@ int main()
         bool stWantsTheStream = BIT_IS_L(PIN_DRIVE_SEL) && BIT_IS_L(PIN_MOT_EN);
 
         // send heartbeat (fw version) once a second
-        uint32_t now = millis();
         if (connectedToHost && (now - lastSendFwTime) >= 1000)
         {
             // if(stWantsTheStream) {
             //     hwPosition.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1; // get the current SIDE
-
             //     xprintf("S %d %d\n", hwPosition.side, hwPosition.track);
             // }
 
@@ -418,14 +370,27 @@ int main()
         {
             int WGateNow = BIT_LEVEL(PIN_WGATE);
 
+            // if(wrBuffer.count < WRITEBUFFER_SIZE) {
+            //     wrBuffer.buffer[wrBuffer.count] = val;
+            //     wrBuffer.count++;
+            // }
+
             if(WGatePrev != WGateNow)   // write gate changed?
             {
                 WGatePrev = WGateNow;
 
-                if(WGateNow == 0)     // on write start
+                if(WGateNow == 0)       // on write start
                 {
                     posStreamed.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1;                // get the current SIDE
-                    // posStreamed.side, posStreamed.track, posStreamed.sector   // store side, track, sector into write positions buffer
+
+                    wrBuffer.buffer[10] = (((posStreamed.side > 0) ? 0x80 : 0) | posStreamed.track);    // store side, track, sector into write positions buffer
+                    wrBuffer.buffer[11] = posStreamed.sector;
+                    wrBuffer.count = 12;        // start with 12 bytes in the buffer - 10 for header, 2 for track + side + sector
+                }
+                else                    // on write end
+                {
+                    sendHeaderAndDataToHost(wrBuffer.buffer, wrBuffer.count - TX_HEADER_SIZE);      // send sector to host
+                    storeWrittenSectorDataToTrackLocally(posStreamed.side, posStreamed.track, posStreamed.sector, wrBuffer.buffer, wrBuffer.count);
                 }
             }
         }
