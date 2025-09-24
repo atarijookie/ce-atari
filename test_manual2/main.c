@@ -232,14 +232,26 @@ void largeRead(void)
         return;
     }
 
-    uint32_t testSizeMBs = getIntFromUserMinMax("How much MBs should be transferred: ", 1, memSizeMBs);
+    (void) Cconws("Specify start offset in RAM in MBs (0-");
+    showInt(memSizeMBs, 2);
+    (void) Cconws("):");
+    uint32_t offsetMBs = getIntFromUserMinMax(" ", 0, memSizeMBs);
+    uint32_t offsetBytes = offsetMBs * 1024 * 1024;
+
+    uint32_t maxTransferSize = memSizeMBs - offsetMBs;
+    (void) Cconws("How much MBs should be transferred (1-");
+    showInt(maxTransferSize, 2);
+    (void) Cconws("):");
+    uint32_t testSizeMBs = getIntFromUserMinMax(" ", 1, maxTransferSize);
     uint32_t testSizeSectors = (testSizeMBs * 1024 * 1024) / 512;   // test size from MBs to count of sectors
 
     uint32_t timeoutSecs = testSizeMBs * 3;       // mega bytes to seconds
 
     (void) Cconws("READ(10) - dev: ");
     showInt(deviceID, 1);
-    (void) Cconws(", size: ");
+    (void) Cconws(", offset: ");
+    showInt(offsetMBs, 2);
+    (void) Cconws(" MB, size: ");
     showInt(testSizeMBs, 2);
     (void) Cconws(" MB, timeout: ");
     showInt(timeoutSecs, 2);
@@ -253,7 +265,7 @@ void largeRead(void)
     commandLong[8] = (uint8_t) (testSizeSectors >> 8);
     commandLong[9] = (uint8_t) (testSizeSectors     );
     
-    hdIfCmdAsUser(1, commandLong, 11, pBuffer, testSizeSectors);
+    hdIfCmdAsUser(1, commandLong, 11, pBuffer + offsetBytes, testSizeSectors);
 
     (void) Cconws("Command success: ");
     showHexByte(hdIf.success);
