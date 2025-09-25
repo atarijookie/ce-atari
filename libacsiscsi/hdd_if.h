@@ -50,6 +50,8 @@ typedef struct {
 
     uint8_t     scsiHostId;
     uint8_t     showLogs;
+
+    uint32_t    longTimeoutTicks;       // how long the timeout will be when timeout is set using scsiSetLongTimeout(). Default value SCSI_TIMEOUT_LONG.
 } THDif;
 
 extern THDif hdIf;

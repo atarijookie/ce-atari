@@ -8,6 +8,7 @@
 #include <stdio.h>
 
 #include "acsi.h"
+#include "scsi.h"
 #include "hdd_if.h"
 #include "stdlib.h"
 #include "mutex.h"
@@ -101,6 +102,7 @@ void hdd_if_select(int ifType)
 {
     hdIf.cmd = (THddIfCmd) hddIfCmd_withRetries_lock;
     hdIf.cmd_nolock = (THddIfCmd) hddIfCmd_withRetries_nolock;
+    hdIf.longTimeoutTicks = SCSI_TIMEOUT_LONG;
 
     switch(ifType) {
         case IF_ACSI:           // for ACSI

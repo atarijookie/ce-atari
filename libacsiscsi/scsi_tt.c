@@ -552,7 +552,7 @@ void scsiSetShortTimeout(void)
 void scsiSetLongTimeout(void)
 {
     uint32_t now = *HZ_200;
-    _cmdTimeOut = (now + SCSI_TIMEOUT_LONG);
+    _cmdTimeOut = (now + hdIf.longTimeoutTicks);
 }
 
 void setDmaAddr_TT(uint32_t addr)

@@ -24,6 +24,8 @@
 
 uint8_t deviceID;                          // bus ID from 0 to 7
 
+extern uint32_t _cmdTimeOut;
+
 void showHexByte (uint8_t val);
 void showHexWord (uint16_t val);
 void showHexDword(uint32_t val);
@@ -35,6 +37,7 @@ int getIntFromUser(uint8_t allowZero, uint8_t maxDigits);
 int getIntFromUserMinMax(const char* message, int minV, int maxV);
 char getHddInterfaceForTest(void);
 void largeRead(void);
+void incrementalRead(void);
 
 uint8_t showLogs = 1;
 void showMenu(void);
@@ -177,9 +180,13 @@ int main(void)
 
     showMenu();
 
+    hdIf.maxRetriesCount = 0;
+
     //-----------------
     // main menu loop
     while(1) {
+        hdIf.longTimeoutTicks = SCSI_TIMEOUT_LONG;                  // 3 seconds timeout for data transfer
+
         scancode = Bconin(DEV_CONSOLE); 		                    // get char form keyboard, no echo on screen 
         char key = scancode & 0xff;
 
@@ -198,6 +205,10 @@ int main(void)
 
         if(key == 'l' || key == 'L') {
             largeRead();
+        }
+
+        if(key == 'i' || key == 'I') {
+            incrementalRead();
         }
 
         if(key == 'c' || key == 'C') {
@@ -219,6 +230,7 @@ void showMenu(void)
     
     (void) Cconws("X - SCSI reset\r\n");
     (void) Cconws("L - large read\r\n");
+    (void) Cconws("I - incremental read\r\n");
     (void) Cconws("C - clear screen\r\n");
     (void) Cconws("Q - quit\r\n\r\n");
 }
@@ -245,7 +257,7 @@ void largeRead(void)
     uint32_t testSizeMBs = getIntFromUserMinMax(" ", 1, maxTransferSize);
     uint32_t testSizeSectors = (testSizeMBs * 1024 * 1024) / 512;   // test size from MBs to count of sectors
 
-    uint32_t timeoutSecs = testSizeMBs * 3;       // mega bytes to seconds
+    hdIf.longTimeoutTicks = 30 * 200;   // 30 seconds timeout
 
     (void) Cconws("READ(10) - dev: ");
     showInt(deviceID, 1);
@@ -253,9 +265,7 @@ void largeRead(void)
     showInt(offsetMBs, 2);
     (void) Cconws(" MB, size: ");
     showInt(testSizeMBs, 2);
-    (void) Cconws(" MB, timeout: ");
-    showInt(timeoutSecs, 2);
-    (void) Cconws(" s\r\n");
+    (void) Cconws(" MB\r\n");
 
     memset(commandLong, 0, sizeof(commandLong));
 
@@ -274,6 +284,59 @@ void largeRead(void)
     (void) Cconws("SCSI result    : ");
     showHexByte(hdIf.statusByte);
     (void) Cconws("\r\n");
+}
+
+void incrementalRead(void)
+{
+    if(memSizeMBs < 1) {
+        (void) Cconws("Not enough RAM allocated for large read.\r\n");
+        return;
+    }
+
+    (void) Cconws("\r\n\r\nTest will do read from START size,\r\n");
+    (void) Cconws("increase by INCREMENT, end when fails.\r\n");
+
+    (void) Cconws("Enter starting tranfer size in sectors (1-");
+    showInt(memSizeSectors, 5);
+    (void) Cconws("):");
+    uint32_t transferSizeSectors = getIntFromUserMinMax(" ", 1, memSizeSectors);
+
+    (void) Cconws("Enter tranfer size increment in sectors (1-");
+    showInt(memSizeSectors, 5);
+    (void) Cconws("):");
+    uint32_t transferSizeIncrementSectors = getIntFromUserMinMax(" ", 1, memSizeSectors);
+
+    hdIf.longTimeoutTicks = 30 * 200;   // 30 seconds timeout
+
+    while(transferSizeSectors < memSizeSectors) {
+        (void) Cconws("Read ");
+        showInt(transferSizeSectors, 5);
+        (void) Cconws(" sectors: ");
+
+        memset(commandLong, 0, sizeof(commandLong));
+
+        commandLong[0] = (deviceID << 5) | 0x1f;
+        commandLong[1] = SCSI_C_READ10;
+
+        commandLong[8] = (uint8_t) (transferSizeSectors >> 8);
+        commandLong[9] = (uint8_t) (transferSizeSectors     );
+
+        hdIfCmdAsUser(1, commandLong, 11, pBuffer, transferSizeSectors);
+
+        if(hdIf.success) {
+            (void) Cconws("OK\r\n");
+            transferSizeSectors += transferSizeIncrementSectors;
+        } else {
+            (void) Cconws("FAIL\r\n");
+            break;
+        }
+    }
+
+    if(hdIf.success) {
+        (void) Cconws("Test stopped after reaching maximum size.\r\n");
+    } else {
+        (void) Cconws("Test stopped after fail.\r\nConsider doing SCSI reset of Falcon reset.\r\n");
+    }
 }
 
 //--------------------------------------------
