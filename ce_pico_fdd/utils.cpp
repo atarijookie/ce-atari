@@ -16,6 +16,8 @@ volatile uint8_t hasTimedOut = false;
 // alarm_id_t alarmId = -1;
 Settings_t Settings;
 
+extern bool usbConnected;
+
 uint16_t getWord(uint8_t *bfr)
 {
     uint16_t val = 0;
@@ -143,6 +145,10 @@ uint32_t millis(void)
 
 void xprintf(const char *format, ...)
 {
+    if(!usbConnected) {     // don't printf if usb not connected
+        return;
+    }
+
     va_list args;
     va_start(args, format);
     vprintf(format, args);

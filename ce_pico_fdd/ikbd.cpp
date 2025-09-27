@@ -39,11 +39,9 @@ void onIkdbDisabled(void)
         uart_putc(uart1, data);
     }
 
-    /*
-    while(Serial2.available() > 0) {    // got data from Atari? Just read it and ignore it
-        Serial2.read();
+    while(uart_is_readable(uart0) > 0) {    // got data from Atari? Just read it and ignore it
+        uart_getc(uart0);
     }
-    */
 }
 
 void onIkbdEnabled(void)
@@ -60,15 +58,12 @@ void onIkbdEnabled(void)
             conWrite(&connectionIkbd, data, 2);
         }
 
-        /*
-        TODO:
-        if(Serial2.available() > 0)     // got data from KEYB_RX? send it to host with tag
+        if(uart_is_readable(uart0) > 0)     // got data from KEYB_RX? send it to host with tag
         {
             data[0] = UARTMARK_STCMD;
-            data[1] = Serial2.read();
+            data[1] = uart_getc(uart0);
             conWrite(&connectionIkbd, data, 2);
         }
-        */
 
         int readSize = MIN(connectionCanReadBytes(&connectionIkbd), sizeof(data));
         if(readSize > 0)  // got data from host? send it to Atari
@@ -78,6 +73,7 @@ void onIkbdEnabled(void)
         }
     }
 }
+
 void ikbdConnectDisconnect(void)
 {
     if(Settings.ikbdEnabled)

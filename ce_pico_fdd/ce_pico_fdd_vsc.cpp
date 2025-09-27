@@ -7,6 +7,7 @@
 #include "pico/cyw43_arch.h"
 #include "hardware/uart.h"
 #include "hardware/watchdog.h"
+// #include "tusb.h"
 
 #include "connection.h"
 #include "display.h"
@@ -45,6 +46,8 @@ uint32_t dataIndexInTrack = STREAM_START_OFFSET;
 extern Settings_t Settings;
 
 TWriteBuffer wrBuffer;  // buffer for written sectors
+
+bool usbConnected = false;
 
 // interrupt handler for STEP signal
 void __isr floppyStepISR(uint gpio, uint32_t event_mask)
@@ -88,7 +91,12 @@ void readTrackData_goToStart(void)
 void setup(void)
 {
     stdio_init_all();
+    usbConnected = true;    // TODO:
     xprintf("\n\nsetup() starting\n");
+
+    // it seems that get_absolute_time() returns 0 until the timer is used by sleep_ms() or similar, 
+    // doing short sleep_ms so that any additional millis() will work correctly.
+    sleep_ms(1);
 
     #define INPUTS_COUNT 7
     int inputs[INPUTS_COUNT] = {PIN_DRIVE_SEL, PIN_MOT_EN, PIN_DIR, PIN_STEP, PIN_WGATE, PIN_SIDE1};
@@ -111,14 +119,14 @@ void setup(void)
     displayInit();
 
     // SPI initialisation.
-    spi_init(SPI_PORT, 16000000);
+    spi_init(spi1, 16000000);
     gpio_set_function(PIN_MISO, GPIO_FUNC_SPI);
-    gpio_set_function(PIN_CS,   GPIO_FUNC_SIO);
     gpio_set_function(PIN_SCK,  GPIO_FUNC_SPI);
     gpio_set_function(PIN_MOSI, GPIO_FUNC_SPI);
+    gpio_set_function(PIN_CS,   GPIO_FUNC_SIO);     // set to SIO to be able to manually set/clear PIN_CS
 
     // init PSRAM, read ID, test read and write
-    // psramTest();
+    psramTest();
 
     loadSettingsFromEeprom();
 
@@ -143,15 +151,16 @@ void setup(void)
 
     gpio_set_irq_enabled_with_callback(PIN_STEP, GPIO_IRQ_EDGE_FALL, true, floppyStepISR);
 
+    // // Initialise UART 0
+    // gpio_set_function(PIN_TXD_DEBUG, UART_FUNCSEL_NUM(uart0, PIN_TXD_DEBUG));
+    // gpio_set_function(PIN_RXD_DEBUG, UART_FUNCSEL_NUM(uart0, PIN_RXD_DEBUG));
+    // uart_init(uart0, 7812);
+
     // Initialise UART 1
     gpio_set_function(PIN_KEYB_TX, UART_FUNCSEL_NUM(uart1, PIN_KEYB_TX));
     gpio_set_function(PIN_KEYB_TX_ORIG, UART_FUNCSEL_NUM(uart1, PIN_KEYB_TX_ORIG));
     uart_init(uart1, 7812);
 
-/*  // TODO:
-    Serial1.begin(7812, SERIAL_8N1, PIN_KEYB_TX_ORIG, PIN_KEYB_TX); // uart1 for IKBD - RXD PIN, TXD PIN
-    Serial2.begin(7812, SERIAL_8N1, PIN_KEYB_RX, PIN_TXD2);         // uart2 for IKBD - RXD PIN, TXD PIN
-*/
     createIkbdTask();   // this task sends ikdb data to host and back
 
     // Initialise the Wi-Fi chip
@@ -284,17 +293,22 @@ int main()
     {
         now = millis();
 
-        if((now - lastInputCheck) > 1000) {
+        if((now - lastInputCheck) > 500) {
             lastInputCheck = now;
 
-            int key = getchar_timeout_us(0);
-            if(key == '\n' || key == '\r') {
-                // In order for flashing to work, we must ensure that only 1 core is writing to flash and running, so
-                // we must enter config mode and storing to flash before we call cyw43_arch_init(), 
-                // which runs on other core. For this to happen we set a flag in the external PSRAM
-                // which will not get cleared on pico restart, and we do the restart. The config then happens after restart.
-                psramConfigFlagSet();
-                watchdog_reboot(0, 0, 0);
+            // usbConnected = tud_mounted();       // check if device is connected and configured
+            usbConnected = true;    // TODO:
+
+            if(usbConnected) {
+                int key = getchar_timeout_us(0);
+                if(key == '\n' || key == '\r') {
+                    // In order for flashing to work, we must ensure that only 1 core is writing to flash and running, so
+                    // we must enter config mode and storing to flash before we call cyw43_arch_init(), 
+                    // which runs on other core. For this to happen we set a flag in the external PSRAM
+                    // which will not get cleared on pico restart, and we do the restart. The config then happens after restart.
+                    psramConfigFlagSet();
+                    watchdog_reboot(0, 0, 0);
+                }
             }
         }
 
