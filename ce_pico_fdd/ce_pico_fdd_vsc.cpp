@@ -7,6 +7,7 @@
 #include "pico/cyw43_arch.h"
 #include "hardware/uart.h"
 #include "hardware/watchdog.h"
+#include "pico/multicore.h"
 #include "tusb.h"
 
 #include "connection.h"
@@ -159,10 +160,6 @@ void setup(void)
 
     setupAtnBuffers();
 
-    // start mfm output
-    setupPwmOutput();
-    setupDmaToPwm();
-
     gpio_set_irq_enabled_with_callback(PIN_STEP, GPIO_IRQ_EDGE_FALL, true, floppyStepISR);
 
     // // Initialise UART 0
@@ -175,7 +172,7 @@ void setup(void)
     gpio_set_function(PIN_KEYB_TX_ORIG, UART_FUNCSEL_NUM(uart1, PIN_KEYB_TX_ORIG));
     uart_init(uart1, 7812);
 
-    createIkbdTask();   // this task sends ikdb data to host and back
+    multicore_launch_core1(core1_main_loop);    // start core1 for mfm stream handling
 
     // Initialise the Wi-Fi chip
     if (cyw43_arch_init()) {
@@ -310,7 +307,7 @@ int main()
         if((now - lastInputCheck) > 250) {
             lastInputCheck = now;
 
-            if(tud_mounted()) {
+            if(tud_mounted()) {         // USB connected and ready?
                 int key = getchar_timeout_us(0);
                 if(key == '\n' || key == '\r' || strlen(Settings.ssid) == 0) {
                     serialConfigLoop();
@@ -323,11 +320,6 @@ int main()
 
         // handle any data incoming
         handleIncommingData();
-
-        // MFM read buffer should be refilled?
-        if(fillWhat != FILL_NONE) {
-            fillHalfMfmBuffer();
-        }
 
         bool stWantsTheStream = BIT_IS_L(PIN_DRIVE_SEL) && BIT_IS_L(PIN_MOT_EN);
 
@@ -354,12 +346,8 @@ int main()
             requestWholeImage();
         }
 
-        // ST wants the stream? ENABLE stream
-        if(stWantsTheStream) {
-            gpio_put(PIN_FLCC_OE, 0);
-        } else {    // other cases? DISABLE stream
-            gpio_put(PIN_FLCC_OE, 1);
-        }
+        // enable / disable stream output based on stWantsTheStream flag
+        gpio_put(PIN_FLCC_OE, stWantsTheStream ? 0 : 1);
 
         // when disk change happened
         if(diskChanged) {
@@ -418,11 +406,7 @@ int main()
         //------------
         uint32_t timeSinceTrackStart = now - timeTrackStart;
 
-        if(timeSinceTrackStart <= 195) {  // INDEX is H for time 0-195
-            gpio_put(PIN_INDEX, 1);
-        } else {                         // INDEX is H for times 196-200
-            gpio_put(PIN_INDEX, 0);
-        }
+        gpio_put(PIN_INDEX, (timeSinceTrackStart <= 195) ? 1 : 0);  // INDEX is H for time 0-195, index L for times 196-200
 
         if(timeSinceTrackStart >= 200) {    // track finished
             readTrackData_goToStart();      // move the pointer in the track stream to start
@@ -431,6 +415,9 @@ int main()
         //---------------------------
         // check the button state and press duration
         handleAllButtons();
+
+        // handle ikbd data transfer
+        ikbdHandling();
     }
 }
 

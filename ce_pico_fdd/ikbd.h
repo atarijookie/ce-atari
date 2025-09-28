@@ -6,6 +6,6 @@
 #define UARTMARK_KEYBDATA   0xBB
 #define UARTMARK_ALIVE      0xEE
 
-void createIkbdTask(void);
+void ikbdHandling(void);
 
 #endif

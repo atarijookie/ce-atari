@@ -17,24 +17,6 @@
 
 extern Settings_t Settings;
 
-/*
-    In order for flashing to work, we must ensure that only 1 core is writing to flash and running, so
-    we must enter config mode and storing to flash before we call cyw43_arch_init(), 
-    which runs on other core. 
-
-    When we decide to finally write to flash, we start the other core, which needs to execute
-    flash_safe_execute_core_init(), so when flash_safe_execute() starts, it can pause the core1.
-
-    After this, we restart pico, don't use core1 directly and init wifi to run on the other core
-    for the main code execution.
-*/
-
-void core1_entry_for_flashing(void)
-{
-    flash_safe_execute_core_init();     // call this for flash_safe_execute() to work
-    while(1);                           // do nothing until restarted and loaded with some other code
-}
-
 void getString(char* buffer, int maxLen)
 {
     memset(buffer, 0, maxLen);
@@ -142,9 +124,6 @@ void serialConfigLoop(void)
 
 void storeSettingsFromPSRAMtoEEPROM(void)
 {
-    debug("Starting core1 for flashing.\n");
-    multicore_launch_core1(core1_entry_for_flashing);
-
     debug("Loading settings from PSRAM.\n");
     loadSettingsFromPSRAM();
 

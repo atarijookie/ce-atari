@@ -238,6 +238,15 @@ size_t conWrite(TConnection* con, const uint8_t *buf, size_t size)
     return con->cc->write((const char*)buf, size);
 }
 
+size_t conRead(TConnection* con, uint8_t *buf, size_t size)
+{
+    if (!con->cc || !size) {
+        return 0;
+    }
+
+    return con->cc->read(buf, size);
+}
+
 bool connectionAvailable(TConnection* con)
 {
     if(!con->cc || !con->cc->availableForWrite()) {
@@ -258,6 +267,10 @@ bool isConnected(TConnection* con)
 
 size_t connectionCanReadBytes(TConnection* con)
 {
+    if(!con->cc || con->cc->state() == CLOSED) {
+        return 0;
+    }
+
     return con->cc->getSize();
 }
 

@@ -13,8 +13,6 @@ extern bool connectedToWifi;              // if true, wifi is connected
 extern Settings_t Settings;
 TConnection connectionIkbd;
 
-// TaskHandle_t xIkbdTask;
-
 #define IKBD_BFR_SIZE 128
 uint8_t buffer[IKBD_BFR_SIZE];
 
@@ -30,7 +28,7 @@ void onIkdbDisabled(void)
         }
 
         int readSize = MIN(available, IKBD_BFR_SIZE);
-        connectionIkbd.cc->read(buffer, readSize);
+        conRead(&connectionIkbd, buffer, readSize);
     }
 
     while(uart_is_readable(uart1))           // got data from KEYB_TX_ORIG? just send it back to KEYB_TX
@@ -68,7 +66,7 @@ void onIkbdEnabled(void)
         int readSize = MIN(connectionCanReadBytes(&connectionIkbd), sizeof(data));
         if(readSize > 0)  // got data from host? send it to Atari
         {
-            connectionIkbd.cc->read(data, readSize);
+            conRead(&connectionIkbd, data, readSize);
             uart_write_blocking(uart1, data, readSize);
         }
     }
@@ -96,49 +94,34 @@ void ikbdConnectDisconnect(void)
     }
 }
 
-void taskIkbd(void* pvParameters)
+void ikbdHandling(void)
 {
-    uint32_t lastReceivedTime = 0xffff0000;     // when was some data last received from ikdb
-    debug("I starting\n");
+    static uint32_t lastStatus = 0;
 
-    uint32_t lastStatus = 0;
+    uint32_t now = millis();
 
-    while(true)
+    if((now - lastStatus) >= 1000)  // once per second
     {
-        // TODO:
-        // vTaskDelay(20);          // intentionally process only once a while
+        lastStatus = now;
 
-        uint32_t now = millis();
-
-        if((now - lastStatus) >= 1000)  // once per second
+        if(isConnected(&connectionIkbd))  // if connected, send ALIVE mark and value every second
         {
-            lastStatus = now;
-
-            if(isConnected(&connectionIkbd))  // if connected, send ALIVE mark and value every second
-            {
-                uint8_t data[2] = {UARTMARK_ALIVE, UARTMARK_ALIVE};
-                conWrite(&connectionIkbd, data, 2);
-            }
-
-            // debug("I enabled %d, connected: %d\n", Settings.ikbdEnabled, isConnected(&connectionIkbd));
+            uint8_t data[2] = {UARTMARK_ALIVE, UARTMARK_ALIVE};
+            conWrite(&connectionIkbd, data, 2);
         }
 
-        ikbdConnectDisconnect();
-
-        // ikbd enabled and ikbd socket is connected? send and get data to/from host
-        if(Settings.ikbdEnabled && isConnected(&connectionIkbd))
-        {
-            onIkbdEnabled();
-        } 
-        else    // ikbd disabled or just socket not connected to host? send data directly to Atari
-        {
-            onIkdbDisabled();
-        }
+        // debug("I enabled %d, connected: %d\n", Settings.ikbdEnabled, isConnected(&connectionIkbd));
     }
-}
 
-void createIkbdTask(void)
-{
-    // BaseType_t xReturned;
-    // xReturned = xTaskCreatePinnedToCore(taskIkbd, "taskIkbd", 8192, (void *) NULL, /*priority*/ 2, &xIkbdTask, 0);
+    ikbdConnectDisconnect();
+
+    // ikbd enabled and ikbd socket is connected? send and get data to/from host
+    if(Settings.ikbdEnabled && isConnected(&connectionIkbd))
+    {
+        onIkbdEnabled();
+    }
+    else    // ikbd disabled or just socket not connected to host? send data directly to Atari
+    {
+        onIkdbDisabled();
+    }
 }

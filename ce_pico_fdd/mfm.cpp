@@ -5,6 +5,8 @@
 #include "hardware/irq.h"
 #include "hardware/pwm.h"
 #include "hardware/dma.h"
+#include "pico/flash.h"
+#include "pico/multicore.h"
 
 #include "defs.h"
 #include "connection.h"
@@ -182,5 +184,23 @@ void fillHalfMfmBuffer(void)
         bfr[3] = arrValues[ ((streamByte     ) & 3) ];
 
         bfr += 4;
+    }
+}
+
+void core1_main_loop(void)
+{
+    flash_safe_execute_core_init();     // call this for flash_safe_execute() to work
+
+    // start mfm output
+    setupPwmOutput();
+    setupDmaToPwm();
+
+    while(1)
+    {
+        // MFM read buffer should be refilled?
+        if(fillWhat != FILL_NONE) {
+            fillHalfMfmBuffer();
+        }
+
     }
 }

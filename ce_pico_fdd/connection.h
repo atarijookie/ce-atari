@@ -25,6 +25,8 @@ typedef struct {
 } TConnection;
 
 size_t conWrite(TConnection* client, const uint8_t *buf, size_t size);
+size_t conRead(TConnection* con, uint8_t *buf, size_t size);
+
 bool connectionAvailable(TConnection* client);
 bool isConnected(TConnection* client);
 size_t connectionCanReadBytes(TConnection* client);

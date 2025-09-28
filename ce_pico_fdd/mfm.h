@@ -12,4 +12,6 @@ void setupDmaToPwm(void);
 
 void fillHalfMfmBuffer(void);
 
+void core1_main_loop(void);
+
 #endif
