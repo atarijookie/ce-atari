@@ -13,4 +13,7 @@ void psramConfigFlagSet(void);
 void psramConfigFlagClear(void);
 bool psramConfigFlagGet(void);
 
+void loadSettingsFromPSRAM(void);
+void saveSettingsToPSRAM(void);
+
 #endif

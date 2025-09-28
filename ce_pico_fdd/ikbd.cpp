@@ -81,7 +81,7 @@ void ikbdConnectDisconnect(void)
         // ikbd is enabled, ikdb chip is sending data (chip present), wifi is connected, but our ikbd socket is NOT connected, connect now
         if(connectedToWifi && !isConnected(&connectionIkbd))
         {
-            xprintf("I connect\n");
+            debug("I connect\n");
             connect(&connectionIkbd, &hostIpAddr, hostPortIkbd);
         }
     }
@@ -90,7 +90,7 @@ void ikbdConnectDisconnect(void)
         // ikbd not sending data (chip not present) or ikbd not enabled, but the ikbd socket is connected, then disconnect
         if(isConnected(&connectionIkbd))
         {
-            xprintf("I disconnect\n");
+            debug("I disconnect\n");
             stop(&connectionIkbd);
         }
     }
@@ -99,7 +99,7 @@ void ikbdConnectDisconnect(void)
 void taskIkbd(void* pvParameters)
 {
     uint32_t lastReceivedTime = 0xffff0000;     // when was some data last received from ikdb
-    xprintf("I starting\n");
+    debug("I starting\n");
 
     uint32_t lastStatus = 0;
 
@@ -120,7 +120,7 @@ void taskIkbd(void* pvParameters)
                 conWrite(&connectionIkbd, data, 2);
             }
 
-            // xprintf("I enabled %d, connected: %d\n", Settings.ikbdEnabled, isConnected(&connectionIkbd));
+            // debug("I enabled %d, connected: %d\n", Settings.ikbdEnabled, isConnected(&connectionIkbd));
         }
 
         ikbdConnectDisconnect();

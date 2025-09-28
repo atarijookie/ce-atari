@@ -4,5 +4,6 @@
 #define RUN_CONFIG_AFTER_RESTART    0xdecafbad
 
 void serialConfigLoop(void);
+void storeSettingsFromPSRAMtoEEPROM(void);
 
 #endif

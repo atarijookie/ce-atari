@@ -102,7 +102,7 @@ static void udp_recv_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p, co
         hostPortFdd = getWord(payload + 6);
         hostPortIkbd = getWord(payload + 8);
 
-        xprintf("ceDiscoveryReceive - got host ip: %s, ports: %d, %d, %d\n", hostIpString.c_str(), hostPortHdd, hostPortFdd, hostPortIkbd);
+        debug("ceDiscoveryReceive - got host ip: %s, ports: %d, %d, %d\n", hostIpString.c_str(), hostPortHdd, hostPortFdd, hostPortIkbd);
     }
 
     // Free the buffer after processing
@@ -120,14 +120,14 @@ void udpInitialize(void)
     // Bind to any IP, given port
     err_t err = udp_bind(pcbUpd, IP_ADDR_ANY, CLIENT_UDP_PORT);
     if (err != ERR_OK) {
-        xprintf("udp_bind failed: %d\n", err);
+        debug("udp_bind failed: %d\n", err);
         udp_remove(pcbUpd);
         return;
     }
 
     // Register receive callback
     udp_recv(pcbUpd, udp_recv_callback, NULL);
-    xprintf("UDP receiver listening on port %u\n", CLIENT_UDP_PORT);
+    debug("UDP receiver listening on port %u\n", CLIENT_UDP_PORT);
 
     udpInitialized = true;
 }
@@ -150,7 +150,7 @@ void connectToWifi(void)
 
     // no wifi SSID stored? cannot connect
     if (strlen(Settings.ssid) == 0) {
-        xprintf("connectToWifi - not connecting to WIFI yet, because no SSID stored\n");
+        debug("connectToWifi - not connecting to WIFI yet, because no SSID stored\n");
         return;
     }
 
@@ -158,7 +158,7 @@ void connectToWifi(void)
     int new_status = cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA);
 
     if (new_status != CYW43_LINK_UP) {      // not connected? connect now
-        xprintf("connectToWifi - connecting, ssid: %s, password: %s\n", Settings.ssid, Settings.password);
+        debug("connectToWifi - connecting, ssid: %s, password: %s\n", Settings.ssid, Settings.password);
 
         sprintf(msg, "ssid: %s", Settings.ssid);
         displayMessage("wifi connecting", msg);
@@ -167,7 +167,7 @@ void connectToWifi(void)
     } 
     else
     {
-        xprintf("connectToWifi - not connecting, status: %d\n", new_status);
+        debug("connectToWifi - not connecting, status: %d\n", new_status);
     }
 
     storeMacAddress();      // copy wifi mac address to fw report buffer
@@ -198,7 +198,7 @@ void ceDiscoverySend(void)
     u32_t bcast_u32 = (ip_u32 & mask_u32) | (~mask_u32);
 
     if(ip_u32 == 0) {   // no ip? don't send broadcast
-        xprintf("ceDiscoverySend - no IP yet\n");
+        debug("ceDiscoverySend - no IP yet\n");
         return;
     }
 
@@ -216,12 +216,12 @@ void ceDiscoverySend(void)
     {
         ip4_addr_t bcast;
         ip4_addr_set_u32(&bcast, bcast_u32);
-        xprintf("ceDiscoverySend to %d.%d.%d.%d\n", bcast_u32 & 0xff, (bcast_u32 >> 8) & 0xff, (bcast_u32 >> 16) & 0xff, (bcast_u32 >> 24) & 0xff);
+        debug("ceDiscoverySend to %d.%d.%d.%d\n", bcast_u32 & 0xff, (bcast_u32 >> 8) & 0xff, (bcast_u32 >> 16) & 0xff, (bcast_u32 >> 24) & 0xff);
         udp_sendto(pcbUpd, p, &bcast, SERVER_UDP_PORT);                 // broadcast to subnet devices (e.g. 192.168.1.255)
     } 
     else        // send to generic broadcast addr
     {
-        xprintf("ceDiscoverySend to 255.255.255.255\n");
+        debug("ceDiscoverySend to 255.255.255.255\n");
         udp_sendto(pcbUpd, p, IP_ADDR_BROADCAST, SERVER_UDP_PORT);     // broadcast to all possible devices (255.255.255.255)
     }
 
@@ -290,7 +290,7 @@ void connectToCEhost(void)
     if (isConnected(&connectionFdd))   // already connected? quit
     { 
         if(!loggedOnce) {
-            xprintf("connectToCEhost - connected!\n");
+            debug("connectToCEhost - connected!\n");
             loggedOnce = true;
         }
 
@@ -314,7 +314,7 @@ void connectToCEhost(void)
     }
 
     displayMessage("wifi connected", "connecting to host:", hostIpString.c_str());
-    xprintf("connectToCEhost - IP: %s, port: %d\n", hostIpString.c_str(), hostPortFdd);
+    debug("connectToCEhost - IP: %s, port: %d\n", hostIpString.c_str(), hostPortFdd);
 
     // start connection attempt
     connect(&connectionFdd, &hostIpAddr, hostPortFdd);
@@ -353,7 +353,7 @@ void connectToHost(void)
 
     if(prevConnectedToWifi != connectedToWifi) {    // connectedToWifi changed since last time? log it
         prevConnectedToWifi = connectedToWifi;
-        xprintf("connectedToWifi: %d\n", connectedToWifi);
+        debug("connectedToWifi: %d\n", connectedToWifi);
     }
 
     // on connected state changed
@@ -479,7 +479,7 @@ void handleTrackReceived(void)
     // store the track track data into PSRAM
     psramStoreTrack(trackNo, sideNo, tmpTrackBfr + 2);
 
-    xprintf("Rx %d side %d\n", trackNo, sideNo);
+    debug("Rx %d side %d\n", trackNo, sideNo);
 
     receivedTracks++;
 
@@ -516,7 +516,7 @@ void handleImageReceived(void)
     memset(imageFileName, 0, 32);
     strncpy(imageFileName, (const char*) (tmpTrackBfr + 4), 31);        // store file name, up to 31 chars
 
-    xprintf("handleImageReceived %s, imgTracks: %d, imgSides: %d, imageFileName: %s\n", (tmpTrackBfr[0] == 1) ? "END" : "START", imgTracks, imgSides, imageFileName);
+    debug("handleImageReceived %s, imgTracks: %d, imgSides: %d, imageFileName: %s\n", (tmpTrackBfr[0] == 1) ? "END" : "START", imgTracks, imgSides, imageFileName);
 }
 
 void handleIncommingData(void)
@@ -528,7 +528,7 @@ void handleIncommingData(void)
         switch(fddHeader.cmdCode) {
             case ATN_SEND_TRACK: handleTrackReceived(); break;
             case ATN_SEND_WHOLE_IMAGE: handleImageReceived(); break;
-            default: xprintf("unknown cmdCode %x\n", fddHeader.cmdCode); break;
+            default: debug("unknown cmdCode %x\n", fddHeader.cmdCode); break;
         }
     }
 }

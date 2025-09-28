@@ -7,7 +7,7 @@
 #include "pico/cyw43_arch.h"
 #include "hardware/uart.h"
 #include "hardware/watchdog.h"
-// #include "tusb.h"
+#include "tusb.h"
 
 #include "connection.h"
 #include "display.h"
@@ -47,7 +47,19 @@ extern Settings_t Settings;
 
 TWriteBuffer wrBuffer;  // buffer for written sectors
 
-bool usbConnected = false;
+/*
+    Notes on stdio output via USB + UART
+
+    The stdio is currently configured to use USB and UART at the same time,
+    for easy configuration via USB cable, plus debug strings via UART.
+    But stdio functions (e.g. printf) may halt undefinitelly, if you 
+    don't have USB connected and the USB output buffer gets full.
+    This is solved by:
+    - using printf (goes to UART and USB) only on serial config mode
+    - using debug (gotes to UART only) when sending just debug strings
+    This way the serial config will work via USB, debug strings will
+    go through UART and should never block indefinitelly.
+*/
 
 // interrupt handler for STEP signal
 void __isr floppyStepISR(uint gpio, uint32_t event_mask)
@@ -91,8 +103,7 @@ void readTrackData_goToStart(void)
 void setup(void)
 {
     stdio_init_all();
-    usbConnected = true;    // TODO:
-    xprintf("\n\nsetup() starting\n");
+    debug("\n\nsetup() starting\n");
 
     // it seems that get_absolute_time() returns 0 until the timer is used by sleep_ms() or similar, 
     // doing short sleep_ms so that any additional millis() will work correctly.
@@ -130,15 +141,18 @@ void setup(void)
 
     loadSettingsFromEeprom();
 
-    // If the flag to enter config mode is set, or there is no ssid stored, enter the config mode.
+    // If the flag to enter config mode is set we must store settings from PSRAM to EEPROM.
     // In order for flashing to work, we must ensure that only 1 core is writing to flash and running, so
     // we must enter config mode and storing to flash before we call cyw43_arch_init(), 
     // which runs on other core.
-    if(psramConfigFlagGet() || strlen(Settings.ssid) == 0) {
-        xprintf("Starting serial config - configFlag: %d, SSID length: %d\n", psramConfigFlagGet(), strlen(Settings.ssid));
-        displayMessage("...now running...", "SERIAL CONFIG");
+    if(psramConfigFlagGet()) {
+        debug("Storing settings to EEPROM\n");
+        displayMessage("STORING SETTINGS");
+
         psramConfigFlagClear();
-        serialConfigLoop();
+        storeSettingsFromPSRAMtoEEPROM();
+
+        while(1);   // should not get here, because storeSettingsFromPSRAMtoEEPROM should restart
     }
 
     readTrackData_goToStart();
@@ -165,7 +179,7 @@ void setup(void)
 
     // Initialise the Wi-Fi chip
     if (cyw43_arch_init()) {
-        xprintf("Wi-Fi init failed\n");
+        debug("Wi-Fi init failed\n");
         while(1);
     }
 
@@ -182,7 +196,7 @@ void requestTrack(uint8_t side, uint8_t track)
 
 void requestWholeImage(void)
 {
-    xprintf("requestWholeImage");
+    debug("requestWholeImage");
     sendHeaderAndDataToHost(atnSendWholeImageRequest, 0);
 }
 
@@ -190,7 +204,7 @@ void storeWrittenSectorDataToTrackLocally(uint8_t side, uint8_t track, uint8_t s
 {
     // track / side / sector out of bounds?
     if(side > 1 || track >= MAX_TRACKS || sector >= 12) {
-        xprintf("Failed to write side: %d, track: %d, sector: %d - TriSiSe out of bounds!\n", side, track, sector);
+        debug("Failed to write side: %d, track: %d, sector: %d - TriSiSe out of bounds!\n", side, track, sector);
         return;
     }
 
@@ -203,7 +217,7 @@ void storeWrittenSectorDataToTrackLocally(uint8_t side, uint8_t track, uint8_t s
 
     // make sure that offset to sector is still within the track data
     if(offsetToSector >= READTRACKDATA_SIZE_BYTES) {
-        xprintf("Failed to write side: %d, track: %d, sector: %d - bad sector offset!\n", side, track, sector);
+        debug("Failed to write side: %d, track: %d, sector: %d - bad sector offset!\n", side, track, sector);
         return;
     }
 
@@ -249,7 +263,7 @@ void storeWrittenSectorDataToTrackLocally(uint8_t side, uint8_t track, uint8_t s
 
     // if we didn't find everything needed, fail
     if(lookingFor != NOTHING) {
-        xprintf("Failed to write side: %d, track: %d, sector: %d - no data start found!\n", side, track, sector);
+        debug("Failed to write side: %d, track: %d, sector: %d - no data start found!\n", side, track, sector);
         return;
     }
 
@@ -293,21 +307,13 @@ int main()
     {
         now = millis();
 
-        if((now - lastInputCheck) > 500) {
+        if((now - lastInputCheck) > 250) {
             lastInputCheck = now;
 
-            // usbConnected = tud_mounted();       // check if device is connected and configured
-            usbConnected = true;    // TODO:
-
-            if(usbConnected) {
+            if(tud_mounted()) {
                 int key = getchar_timeout_us(0);
-                if(key == '\n' || key == '\r') {
-                    // In order for flashing to work, we must ensure that only 1 core is writing to flash and running, so
-                    // we must enter config mode and storing to flash before we call cyw43_arch_init(), 
-                    // which runs on other core. For this to happen we set a flag in the external PSRAM
-                    // which will not get cleared on pico restart, and we do the restart. The config then happens after restart.
-                    psramConfigFlagSet();
-                    watchdog_reboot(0, 0, 0);
+                if(key == '\n' || key == '\r' || strlen(Settings.ssid) == 0) {
+                    serialConfigLoop();
                 }
             }
         }
@@ -330,7 +336,7 @@ int main()
         {
             // if(stWantsTheStream) {
             //     hwPosition.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1; // get the current SIDE
-            //     xprintf("S %d %d\n", hwPosition.side, hwPosition.track);
+            //     debug("S %d %d\n", hwPosition.side, hwPosition.track);
             // }
 
             sendFwReport(now);
@@ -364,7 +370,7 @@ int main()
             BIT_INVERT(PIN_DSKCHG);
 
             diskChangeEnd = now + 1000; // at this upcomming time invert back
-            // xprintf("DSK CHG start");
+            // debug("DSK CHG start");
         }
 
         // after enough time passed since the disk change, need to invert pins back
@@ -374,7 +380,7 @@ int main()
             BIT_INVERT(PIN_DENSITY);    // invert pins
             BIT_INVERT(PIN_WPROTECT);
             BIT_INVERT(PIN_DSKCHG);
-            // xprintf("DSK CHG end");
+            // debug("DSK CHG end");
         }
 
         //-------------------------------------------------
@@ -453,5 +459,5 @@ void storeMacAddress(void)
     uint8_t* pMac = atnSendFwVersion + TX_HEADER_SIZE + 6;
     memset(pMac, 0, 6);
     cyw43_hal_get_mac(CYW43_HAL_MAC_WLAN0, pMac);
-    xprintf("mac: %02X:%02X:%02X:%02X:%02X:%02X\n", pMac[0], pMac[1], pMac[2], pMac[3], pMac[4], pMac[5]);
+    debug("mac: %02X:%02X:%02X:%02X:%02X:%02X\n", pMac[0], pMac[1], pMac[2], pMac[3], pMac[4], pMac[5]);
 }

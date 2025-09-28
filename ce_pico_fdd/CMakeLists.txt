@@ -35,7 +35,7 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(ce_pico_fdd_vsc 
+add_executable(ce_pico_fdd_vsc
         ce_pico_fdd_vsc.cpp
         buttons.cpp
         serial_config.cpp
@@ -56,7 +56,7 @@ pico_set_program_version(ce_pico_fdd_vsc "0.1")
 
 # Modify the below lines to enable/disable output over UART/USB
 pico_enable_stdio_uart(ce_pico_fdd_vsc 1)
-pico_enable_stdio_usb(ce_pico_fdd_vsc 0)
+pico_enable_stdio_usb(ce_pico_fdd_vsc 1)
 
 # Add the standard library to the build
 target_link_libraries(ce_pico_fdd_vsc
@@ -66,6 +66,7 @@ target_link_libraries(ce_pico_fdd_vsc
 # Add the standard include files to the build
 target_include_directories(ce_pico_fdd_vsc PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
+        ${CMAKE_CURRENT_LIST_DIR}/stdio_usb/include
 )
 
 # Add any user requested libraries

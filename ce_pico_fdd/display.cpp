@@ -45,10 +45,10 @@ void displayInit(void)
     displayPresent = isDisplayConnected(DISPLAY_I2C_ADDRESS);
 
     if(!displayPresent) {
-        xprintf("displayInit - i2c display not connected\n");
+        debug("displayInit - i2c display not connected\n");
         return;
     }
-    xprintf("displayInit - i2c display found\n");
+    debug("displayInit - i2c display found\n");
 
     display = new SSD1306();
 

@@ -1,9 +1,9 @@
+#include "tusb.h"
 #include <stdio.h>
-#include "pico/stdlib.h"
+#include <stdlib.h>
+#include <pico/stdio.h>
+#include <pico/stdlib.h>
 #include "hardware/spi.h"
-#include "hardware/i2c.h"
-#include "hardware/dma.h"
-#include "hardware/timer.h"
 #include "pico/cyw43_arch.h"
 #include "hardware/uart.h"
 #include "hardware/watchdog.h"
@@ -12,7 +12,8 @@
 
 #include "defs.h"
 #include "utils.h"
-#include "connection.h"
+#include "psram.h"
+#include "display.h"
 
 extern Settings_t Settings;
 
@@ -58,44 +59,50 @@ void getString(char* buffer, int maxLen)
     }
 }
 
+void serialShowMenu(void)
+{
+    printf("Serial config mode. Current stored settings are:\n");
+    printf("--------------------------------------\n");
+    printf("SSID    : %s\n", Settings.ssid);
+    printf("password: %s\n", Settings.password);
+    printf("ikbd    : %s\n", Settings.ikbdEnabled ? "enabled" : "disabled");
+    printf("--------------------------------------\n");
+    printf("Press 'S' to set SSID, 'P' to set password, 'I' to enable/disable IKBD, 'Q' to save.\n");
+}
+
 void serialConfigLoop(void)
 {
     bool ssidChanged = false, pswdChanged = false, ikbdChanged = false;
 
+    displayMessage("CONFIG MODE");
+
     loadSettingsFromEeprom();
+    serialShowMenu();
 
-    xprintf("\n\nEntering configuration mode.\nCurrent settings are:\n");
-    xprintf("--------------------------------------\n");
-    xprintf("SSID    : %s\n", Settings.ssid);
-    xprintf("password: %s\n", Settings.password);
-    xprintf("ikbd    : %s\n", Settings.ikbdEnabled ? "enabled" : "disabled");
-    xprintf("--------------------------------------\n");
-    xprintf("Press 'S' to set SSID, 'P' to set password, 'I' to enable/disable IKBD, 'Q' to save.\n");
-
-    while(true)
-    {
-        int key = getchar_timeout_us(1000);
+    // main run loop
+    while (1) {
+        int key = getchar_timeout_us(10);
 
         if(key == '\n' || key == '\r') {
-            xprintf("Press 'S' to set SSID, 'P' to set password, 'I' to enable/disable IKBD, 'Q' to save.\n");
+            serialShowMenu();
         }
 
         if(key == 's' || key == 'S') {
-            xprintf("\nEnter SSID, finish by Enter key.\n");
+            printf("\nEnter SSID, finish by Enter key.\n");
             getString(Settings.ssid, MAX_SETTINGS_STRING_LEN);
-            xprintf("\nNew SSID: %s\n", Settings.ssid);
+            printf("\nNew SSID: %s\n", Settings.ssid);
             ssidChanged = true;
         }
 
         if(key == 'p' || key == 'P') {
-            xprintf("\nEnter password, finish by Enter key.\n");
+            printf("\nEnter password, finish by Enter key.\n");
             getString(Settings.password, MAX_SETTINGS_STRING_LEN);
-            xprintf("\nNew password: %s\n", Settings.password);
+            printf("\nNew password: %s\n", Settings.password);
             pswdChanged = true;
         }
 
         if(key == 'i' || key == 'I') {
-            xprintf("\nEnter 'E' to enable IKBD, 'D' to disable IKBD.\n");
+            printf("\nEnter 'E' to enable IKBD, 'D' to disable IKBD.\n");
             char ed[2];
             getString(ed, 2);
 
@@ -109,25 +116,43 @@ void serialConfigLoop(void)
                 ikbdChanged = true;
             }
 
-            xprintf("\nIKBD: %s\n", Settings.ikbdEnabled ? "enabled" : "disabled");
+            printf("\nIKBD: %s\n", Settings.ikbdEnabled ? "enabled" : "disabled");
         }
 
-
+        // on Q key
         if(key == 'q' || key == 'Q') {
             break;
         }
     }
 
+    // if no settings change is detected, just quit
     if(!ssidChanged && !pswdChanged && !ikbdChanged) {
-        xprintf("No settings changed.\n\n");
+        printf("No settings changed.\n\n");
         return;
     }
 
-    xprintf("Starting core1 for flashing.\n");
+    // some setting was changed, we must store it
+    saveSettingsToPSRAM();      // store setting to PSRAM
+    psramConfigFlagSet();       // set the flag that we should store data into EEPROM
+
+    debug("RESETing!\n");
+    sleep_ms(20);
+    watchdog_reboot(0, 0, 0);
+}
+
+void storeSettingsFromPSRAMtoEEPROM(void)
+{
+    debug("Starting core1 for flashing.\n");
     multicore_launch_core1(core1_entry_for_flashing);
 
-    xprintf("Saving settings.\n\n");
+    debug("Loading settings from PSRAM.\n");
+    loadSettingsFromPSRAM();
+
+    debug("Saving settings to EEPROM.\n\n");
     Settings.isValid = SETTINGS_VALID;  // load the isValid flag with the magic number
     saveSettingsToEeprom();
+
+    debug("RESETing!\n");
+    sleep_ms(20);
     watchdog_reboot(0, 0, 0);
 }

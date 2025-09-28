@@ -16,8 +16,6 @@ volatile uint8_t hasTimedOut = false;
 // alarm_id_t alarmId = -1;
 Settings_t Settings;
 
-extern bool usbConnected;
-
 uint16_t getWord(uint8_t *bfr)
 {
     uint16_t val = 0;
@@ -127,13 +125,13 @@ void saveSettingsToEeprom(void)
 
     int rc = flash_safe_execute(call_flash_range_erase, (void*) FLASH_TARGET_OFFSET, UINT32_MAX);
     if(rc != PICO_OK) {
-        xprintf("flash_range_erase failed, settings not stored\n");
+        debug("flash_range_erase failed, settings not stored\n");
         return;
     }
 
     rc = flash_safe_execute(call_flash_range_program, (void*) buf, UINT32_MAX);
     if(rc != PICO_OK) {
-        xprintf("flash_range_erase failed, settings not stored\n");
+        debug("flash_range_erase failed, settings not stored\n");
         return;
     }
 }
@@ -143,23 +141,29 @@ uint32_t millis(void)
     return to_ms_since_boot(get_absolute_time());
 }
 
-void xprintf(const char *format, ...)
-{
-    if(!usbConnected) {     // don't printf if usb not connected
-        return;
-    }
-
-    va_list args;
-    va_start(args, format);
-    vprintf(format, args);
-    va_end(args);
-}
-
 void BIT_INVERT(int pin)
 {
     if(BIT_IS_H(pin)) {
         gpio_put(pin, 0);
     } else {
         gpio_put(pin, 1);
+    }
+}
+
+void debug(const char *fmt, ...)
+{
+    char buf[256];
+    va_list args;
+    va_start(args, fmt);
+    int len = vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+
+    for(int i=0; i<len; i++) {
+        if(buf[i] == '\n') {
+            uart_putc_raw(uart0, '\n');
+            uart_putc_raw(uart0, '\r');
+        } else {
+            uart_putc_raw(uart0, buf[i]);
+        }
     }
 }

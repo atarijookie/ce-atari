@@ -85,7 +85,7 @@ public:
 
     err_t abort() {
         if (_pcb) {
-            // xprintf(":abort\r\n");
+            // debug(":abort\r\n");
             tcp_arg(_pcb, nullptr);
             tcp_sent(_pcb, nullptr);
             tcp_recv(_pcb, nullptr);
@@ -100,7 +100,7 @@ public:
     err_t close() {
         err_t err = ERR_OK;
         if (_pcb) {
-            // xprintf(":close\r\n");
+            // debug(":close\r\n");
             tcp_arg(_pcb, nullptr);
             tcp_sent(_pcb, nullptr);
             tcp_recv(_pcb, nullptr);
@@ -108,7 +108,7 @@ public:
             tcp_poll(_pcb, nullptr, 0);
             err = tcp_close(_pcb);
             if (err != ERR_OK) {
-                // xprintf(":tc err %d\r\n", (int) err);
+                // debug(":tc err %d\r\n", (int) err);
                 tcp_abort(_pcb);
                 err = ERR_ABRT;
             }
@@ -131,18 +131,18 @@ public:
 
     void ref() {
         ++_refcnt;
-        // xprintf(":ref %d\r\n", _refcnt);
+        // debug(":ref %d\r\n", _refcnt);
     }
 
     void unref() {
-        // xprintf(":ur %d\r\n", _refcnt);
+        // debug(":ur %d\r\n", _refcnt);
         if (--_refcnt == 0) {
             discard_received();
             close();
             if (_discard_cb) {
                 _discard_cb(_discard_cb_arg, this);
             }
-            // xprintf(":del\r\n");
+            // debug(":del\r\n");
             delete this;
         }
     }
@@ -178,11 +178,11 @@ public:
         }, 1);
         _connect_pending = false;
         if (!_pcb) {
-            // xprintf(":cabrt\r\n");
+            // debug(":cabrt\r\n");
             return 0;
         }
         if (state() != ESTABLISHED) {
-            // xprintf(":ctmo\r\n");
+            // debug(":ctmo\r\n");
             abort();
             return 0;
         }
@@ -310,12 +310,12 @@ public:
         size_t max_size = _rx_buf->tot_len - _rx_buf_offset;
         size = (size < max_size) ? size : max_size;
 
-        // xprintf(":rd %d, %d, %d\r\n", size, _rx_buf->tot_len, _rx_buf_offset);
+        // debug(":rd %d, %d, %d\r\n", size, _rx_buf->tot_len, _rx_buf_offset);
         size_t size_read = 0;
         while (size) {
             size_t buf_size = _rx_buf->len - _rx_buf_offset;
             size_t copy_size = (size < buf_size) ? size : buf_size;
-            // xprintf(":rdi %d, %d\r\n", buf_size, copy_size);
+            // debug(":rdi %d, %d\r\n", buf_size, copy_size);
             memcpy(dst, reinterpret_cast<char*>(_rx_buf->payload) + _rx_buf_offset, copy_size);
             dst += copy_size;
             _consume(copy_size);
@@ -341,16 +341,16 @@ public:
         size_t max_size = _rx_buf->tot_len - _rx_buf_offset;
         size = (size < max_size) ? size : max_size;
 
-        // xprintf(":pd %d, %d, %d\r\n", size, _rx_buf->tot_len, _rx_buf_offset);
+        // debug(":pd %d, %d, %d\r\n", size, _rx_buf->tot_len, _rx_buf_offset);
         size_t buf_size = _rx_buf->len - _rx_buf_offset;
         size_t copy_size = (size < buf_size) ? size : buf_size;
-        // xprintf(":rpi %d, %d\r\n", buf_size, copy_size);
+        // debug(":rpi %d, %d\r\n", buf_size, copy_size);
         memcpy(dst, reinterpret_cast<char*>(_rx_buf->payload) + _rx_buf_offset, copy_size);
         return copy_size;
     }
 
     void discard_received() {
-        // xprintf(":dsrcv %d\n", _rx_buf ? _rx_buf->tot_len : 0);
+        // debug(":dsrcv %d\n", _rx_buf ? _rx_buf->tot_len : 0);
         if (!_rx_buf) {
             return;
         }
@@ -486,7 +486,7 @@ public:
         (void) err;
         if (pb == 0) {
             // connection closed by peer
-            // xprintf(":rcl pb=%p sz=%d\r\n", _rx_buf, _rx_buf ? _rx_buf->tot_len : -1);
+            // debug(":rcl pb=%p sz=%d\r\n", _rx_buf, _rx_buf ? _rx_buf->tot_len : -1);
             _notify_error();
             if (_rx_buf && _rx_buf->tot_len) {
                 // there is still something to read
@@ -501,10 +501,10 @@ public:
         }
 
         if (_rx_buf) {
-            // xprintf(":rch %d, %d\r\n", _rx_buf->tot_len, pb->tot_len);
+            // debug(":rch %d, %d\r\n", _rx_buf->tot_len, pb->tot_len);
             pbuf_cat(_rx_buf, pb);
         } else {
-            // xprintf(":rn %d\r\n", pb->tot_len);
+            // debug(":rn %d\r\n", pb->tot_len);
             _rx_buf = pb;
             _rx_buf_offset = 0;
         }
@@ -540,7 +540,7 @@ protected:
 
             if (_written == _datalen || _is_timeout() || state() == CLOSED) {
                 if (_is_timeout()) {
-                    // xprintf(":wtmo\r\n");
+                    // debug(":wtmo\r\n");
                 }
                 _datasource = nullptr;
                 _datalen = 0;
@@ -568,7 +568,7 @@ protected:
             return false;
         }
 
-        // xprintf(":wr %d %d\r\n", _datalen - _written, _written);
+        // debug(":wr %d %d\r\n", _datalen - _written, _written);
 
         bool has_written = false;
         int scale = 0;
@@ -616,7 +616,7 @@ protected:
             }
             err_t err = tcp_write(_pcb, buf, next_chunk_size, flags);
 
-            // xprintf(":wrc %d %d %d\r\n", next_chunk_size, remaining, (int)err);
+            // debug(":wrc %d %d %d\r\n", next_chunk_size, remaining, (int)err);
 
             if (err == ERR_OK) {
                 _written += next_chunk_size;
@@ -656,7 +656,7 @@ protected:
     err_t _acked(tcp_pcb* pcb, uint16_t len) {
         (void) pcb;
         (void) len;
-        // xprintf(":ack %d\r\n", len);
+        // debug(":ack %d\r\n", len);
         _write_some_from_cb();
         return ERR_OK;
     }
@@ -666,13 +666,13 @@ protected:
         if (left > 0) {
             _rx_buf_offset += size;
         } else if (!_rx_buf->next) {
-            // xprintf(":c0 %d, %d\r\n", size, _rx_buf->tot_len);
+            // debug(":c0 %d, %d\r\n", size, _rx_buf->tot_len);
             auto head = _rx_buf;
             _rx_buf = 0;
             _rx_buf_offset = 0;
             pbuf_free(head);
         } else {
-            // xprintf(":c %d, %d, %d\r\n", size, _rx_buf->len, _rx_buf->tot_len);
+            // debug(":c %d, %d, %d\r\n", size, _rx_buf->len, _rx_buf->tot_len);
             auto head = _rx_buf;
             _rx_buf = _rx_buf->next;
             _rx_buf_offset = 0;
@@ -686,7 +686,7 @@ protected:
 
     void _error(err_t err) {
         (void) err;
-        // xprintf(":er %d 0x%08lx\r\n", (int) err, (uint32_t) _datasource);
+        // debug(":er %d 0x%08lx\r\n", (int) err, (uint32_t) _datasource);
         tcp_arg(_pcb, nullptr);
         tcp_sent(_pcb, nullptr);
         tcp_recv(_pcb, nullptr);

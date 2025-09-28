@@ -35,7 +35,7 @@ void handleAnalogButtons(uint32_t now)
     }
 
     // TODO: handle on button released
-    xprintf("analog button: %d\n", whichButton);
+    debug("analog button: %d\n", whichButton);
 }
 
 // This gets called on button pressed (current button state 0) or released (current button state HIGH)
