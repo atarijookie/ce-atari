@@ -14,11 +14,11 @@
 #include "display.h"
 #include "psram.h"
 
-#define MFM_BUFFER_SIZE         512   // half of mfmBuffer is 256 items, which gives about 1 ms (256 items * 4 us per item) of time to refill half before the other half is used
+#define MFM_BUFFER_SIZE         2048                                // 12 address bits masked for ring mode (4096 bytes == 2048 words)
 #define MFM_BUFFER_HALF_SIZE    (MFM_BUFFER_SIZE / 2)
 #define MFM_READ_SIZE_FILLS     (MFM_BUFFER_HALF_SIZE / 4)
 
-__attribute__((aligned(512))) uint16_t mfmBuffer[MFM_BUFFER_SIZE];
+__attribute__((aligned(4096))) uint16_t mfmBuffer[MFM_BUFFER_SIZE]; // must align to 4096 for ring mode to work correctly
 
 int dmaChannel;
 volatile bool halfDone = false;
@@ -55,10 +55,6 @@ void setupPwmOutput(void)
 
 void setupDmaToPwm(void)
 {
-    for (int i = 0; i < MFM_BUFFER_SIZE; i++) {
-        mfmBuffer[i] = 7;
-    }
-
     uint pwmChannel = pwm_gpio_to_channel(PIN_RDATA);
     uint pwmSliceNum = pwm_gpio_to_slice_num(PIN_RDATA); 
 
@@ -69,9 +65,9 @@ void setupDmaToPwm(void)
     channel_config_set_read_increment(&c, true);                // Source increments through mfmBuffer
     channel_config_set_write_increment(&c, false);              // Destination is fixed (PWM CC register)
     channel_config_set_dreq(&c, pwm_get_dreq(pwmSliceNum));     // Pace by PWM slice DREQ (fires at counter wrap)
-    channel_config_set_ring(&c, false, 10);                     // enable ring mode, on read side, after 1024 bytes (== 1 << 10) (because we have 512 uint16_t items in buffer)
+    channel_config_set_ring(&c, false, 12);                     // enable ring mode, on read side, 12 address bits masked for ring mode (4096 bytes == 2048 words)
 
-    // dma_encode_endless_transfer_count() vs MFM_BUFFER_HALT_SIZE
+    // dma_encode_endless_transfer_count() vs MFM_BUFFER_HALF_SIZE
     dma_channel_configure(dmaChannel, &c, (volatile void *) 
                             (&pwm_hw->slice[pwmSliceNum].top),
                             mfmBuffer, 
@@ -191,6 +187,11 @@ void core1_main_loop(void)
 {
     flash_safe_execute_core_init();     // call this for flash_safe_execute() to work
 
+    // set whole output buffer to same value
+    for (int i = 0; i < MFM_BUFFER_SIZE; i++) {
+        mfmBuffer[i] = 7;
+    }
+
     // start mfm output
     setupPwmOutput();
     setupDmaToPwm();
@@ -201,6 +202,5 @@ void core1_main_loop(void)
         if(fillWhat != FILL_NONE) {
             fillHalfMfmBuffer();
         }
-
     }
 }

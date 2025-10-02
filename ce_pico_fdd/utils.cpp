@@ -143,11 +143,7 @@ uint32_t millis(void)
 
 void BIT_INVERT(int pin)
 {
-    if(BIT_IS_H(pin)) {
-        gpio_put(pin, 0);
-    } else {
-        gpio_put(pin, 1);
-    }
+    gpio_put(pin, BIT_IS_H(pin) ? 0 : 1);
 }
 
 void debug(const char *fmt, ...)

@@ -115,17 +115,19 @@ void setup(void)
 
     for (int i = 0; i < INPUTS_COUNT; i++)
     {
+        gpio_set_function(inputs[i], GPIO_FUNC_SIO);
         gpio_set_dir(inputs[i], GPIO_IN);
     }
 
-    #define OUTPUTS_COUNT 7
-    int outputs[OUTPUTS_COUNT] = {PIN_DENSITY, PIN_INDEX, PIN_TRACK00, PIN_WPROTECT, PIN_DSKCHG, PIN_FLCC_OE, PIN_CS};
-    int levels[OUTPUTS_COUNT]  = {          0,         0,           0,            1,          0,           1,      1};
+    #define OUTPUTS_COUNT 6
+    int outputs[OUTPUTS_COUNT] = {PIN_DENSITY, PIN_INDEX, PIN_TRACK00, PIN_WPROTECT, PIN_DSKCHG, PIN_FLCC_OE};
+    int levels[OUTPUTS_COUNT]  = {          0,         1,           0,            1,          0,           1};
 
     for (int i = 0; i < OUTPUTS_COUNT; i++)
     {
+        gpio_set_function(outputs[i], GPIO_FUNC_SIO);
         gpio_set_dir(outputs[i], GPIO_OUT);
-        gpio_put(outputs[i], 1);
+        gpio_put(outputs[i], levels[i]);
     }
 
     displayInit();
