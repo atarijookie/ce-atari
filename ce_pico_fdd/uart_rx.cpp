@@ -1,0 +1,94 @@
+/**
+ * Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "pico/stdlib.h"
+#include "pico/multicore.h"
+#include "hardware/pio.h"
+#include "hardware/uart.h"
+#include "uart_rx.pio.h"
+#include "pico/util/queue.h"
+#include "pico/async_context_threadsafe_background.h"
+#include "uart_rx.pio.h"
+
+#include "defs.h"
+
+#define FIFO_SIZE 64
+
+static PIO pioUart;
+static uint smUart;
+static int8_t pioIrqUart;
+static queue_t fifoUart;
+static uint offsetUart;
+
+static void async_worker_func(async_context_t *async_context, async_when_pending_worker_t *worker);
+
+// An async context is notified by the irq to "do some work"
+static async_context_threadsafe_background_t async_context;
+static async_when_pending_worker_t worker = { .do_work = async_worker_func };
+
+// IRQ called when the pio fifo is not empty, i.e. there are some characters on the uart
+// This needs to run as quickly as possible or else you will lose characters (in particular don't printf!)
+static void pio_irq_func(void) 
+{
+    while(!pio_sm_is_rx_fifo_empty(pioUart, smUart)) {
+        char c = uart_rx_program_getc(pioUart, smUart);
+        if (!queue_try_add(&fifoUart, &c)) {
+            // panic("fifoUart full");
+        }
+    }
+    // Tell the async worker that there are some characters waiting for us
+    async_context_set_work_pending(&async_context.core, &worker);
+}
+
+// Process characters
+static void async_worker_func(__unused async_context_t *async_context, __unused async_when_pending_worker_t *worker) {
+    while(!queue_is_empty(&fifoUart)) {
+        char c;
+        if (!queue_try_remove(&fifoUart, &c)) {
+            panic("fifoUart empty");
+        }
+        putchar(c); // Display character in the console
+    }
+}
+
+void pio_uart_setup(void)
+{
+    // create a queue so the irq can save the data somewhere
+    queue_init(&fifoUart, 1, FIFO_SIZE);
+
+    // Setup an async context and worker to perform work when needed
+    if (!async_context_threadsafe_background_init_with_defaults(&async_context)) {
+        panic("failed to setup context");
+    }
+    async_context_add_when_pending_worker(&async_context.core, &worker);
+   
+    // This will find a free pio and state machine for our program and load it for us
+    // We use pio_claim_free_sm_and_add_program_for_gpio_range (for_gpio_range variant)
+    // so we will get a PIO instance suitable for addressing gpios >= 32 if needed and supported by the hardware
+    bool success = pio_claim_free_sm_and_add_program_for_gpio_range(&uart_rx_program, &pioUart, &smUart, &offsetUart, PIN_KEYB_RX, 1, true);
+    hard_assert(success);
+
+    uart_rx_program_init(pioUart, smUart, offsetUart, PIN_KEYB_RX, 7812);
+
+    // Find a free irq
+    pioIrqUart = pio_get_irq_num(pioUart, 0);
+    if (irq_get_exclusive_handler(pioIrqUart)) {
+        pioIrqUart++;
+        if (irq_get_exclusive_handler(pioIrqUart)) {
+            panic("All IRQs are in use");
+        }
+    }
+
+    // Enable interrupt
+    irq_add_shared_handler(pioIrqUart, pio_irq_func, PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY); // Add a shared IRQ handler
+    irq_set_enabled(pioIrqUart, true); // Enable the IRQ
+    const uint irq_index = pioIrqUart - pio_get_irq_num(pioUart, 0); // Get index of the IRQ
+    pio_set_irqn_source_enabled(pioUart, irq_index, pio_get_rx_fifo_not_empty_interrupt_source(smUart), true); // Set pio to tell us when the FIFO is NOT empty
+}
+

@@ -5,8 +5,6 @@
 
 #define LOG_MORE    1
 
-#define WIFI_CAPTIVE_AP_NAME    "CosmosEx AP"
-
 #ifndef TRUE
     #define TRUE 1
 #endif

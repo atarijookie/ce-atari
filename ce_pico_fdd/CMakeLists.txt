@@ -33,6 +33,8 @@ project(ce_pico_fdd_vsc C CXX ASM)
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 
+# target_sources(ce_pico_fdd_vsc PRIVATE uart_rx.c)
+
 # Add executable. Default name is the project name, version 0.1
 
 add_executable(ce_pico_fdd_vsc
@@ -49,7 +51,10 @@ add_executable(ce_pico_fdd_vsc
         adafruit_gfx.cpp
         lcdfont.cpp
         ssd1306.cpp
+        uart_rx.cpp
         )
+
+pico_generate_pio_header(ce_pico_fdd_vsc ${CMAKE_CURRENT_LIST_DIR}/uart_rx.pio)
 
 pico_set_program_name(ce_pico_fdd_vsc "ce_pico_fdd_vsc")
 pico_set_program_version(ce_pico_fdd_vsc "0.1")
@@ -76,9 +81,10 @@ target_link_libraries(ce_pico_fdd_vsc
         hardware_dma
         hardware_pwm
         hardware_timer
+        hardware_flash
+        hardware_pio
         pico_cyw43_arch_lwip_threadsafe_background
         pico_multicore
-        hardware_flash
         )
 
 pico_set_linker_script(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/memmap_custom.ld)
