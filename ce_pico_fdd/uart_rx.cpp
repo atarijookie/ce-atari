@@ -9,12 +9,12 @@
 
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
-#include "hardware/pio.h"
-#include "hardware/uart.h"
-#include "uart_rx.pio.h"
 #include "pico/util/queue.h"
 #include "pico/async_context_threadsafe_background.h"
+#include "hardware/pio.h"
+#include "hardware/uart.h"
 
+#include "uart_rx.pio.h"
 #include "defs.h"
 
 #define FIFO_SIZE 64
@@ -22,8 +22,8 @@
 static PIO pioUart;
 static uint smUart;
 static int8_t pioIrqUart;
-static queue_t fifoUart;
 static uint offsetUart;
+queue_t fifoUart;
 
 // IRQ called when the pio fifo is not empty, i.e. there are some characters on the uart
 static void pio_uart_irq_func(void)

@@ -1,5 +1,7 @@
 #include "hardware/uart.h"
 
+#include "pico/util/queue.h"
+
 #include "defs.h"
 #include "connection.h"
 #include "utils.h"
@@ -12,6 +14,8 @@ extern bool connectedToWifi;              // if true, wifi is connected
 
 extern Settings_t Settings;
 TConnection connectionIkbd;
+
+extern queue_t fifoUart;
 
 #define IKBD_BFR_SIZE 128
 uint8_t buffer[IKBD_BFR_SIZE];
@@ -37,8 +41,9 @@ void onIkdbDisabled(void)
         uart_putc(uart1, data);
     }
 
-    while(uart_is_readable(uart0) > 0) {    // got data from Atari? Just read it and ignore it
-        uart_getc(uart0);
+    while(!queue_is_empty(&fifoUart)) {     // got data from Atari? Just read it and ignore it
+        uint8_t data;
+        queue_try_remove(&fifoUart, &data);
     }
 }
 
@@ -47,7 +52,7 @@ void onIkbdEnabled(void)
     uint8_t data[16];
 
     // keep sending forwarding data around until all the sources are empty
-    while(uart_is_readable(uart1) || connectionCanReadBytes(&connectionIkbd))
+    while(uart_is_readable(uart1) || !queue_is_empty(&fifoUart) || connectionCanReadBytes(&connectionIkbd))
     {
         if(uart_is_readable(uart1))          // got data from KEYB_TX_ORIG? send it to host with tag
         {
@@ -56,11 +61,12 @@ void onIkbdEnabled(void)
             conWrite(&connectionIkbd, data, 2);
         }
 
-        if(uart_is_readable(uart0) > 0)     // got data from KEYB_RX? send it to host with tag
+        if(!queue_is_empty(&fifoUart))     // got data from KEYB_RX? send it to host with tag
         {
             data[0] = UARTMARK_STCMD;
-            data[1] = uart_getc(uart0);
-            conWrite(&connectionIkbd, data, 2);
+            if(queue_try_remove(&fifoUart, &data[1])) {
+                conWrite(&connectionIkbd, data, 2);
+            }
         }
 
         int readSize = MIN(connectionCanReadBytes(&connectionIkbd), sizeof(data));

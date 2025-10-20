@@ -23,7 +23,7 @@
 
 uint16_t version[2] = {0xf025, 0x0901}; // this means: Franz, 2025-09-01
 uint8_t atnSendFwVersion[ATN_SENDFWVERSION_LEN_TX];
-uint8_t atnSendTrackRequest[ATN_SENDTRACK_REQ_LEN_TX]; 
+uint8_t atnSendTrackRequest[ATN_SENDTRACK_REQ_LEN_TX];
 uint8_t atnSendWholeImageRequest[TX_HEADER_SIZE];
 
 void setupAtnBuffers(void);
@@ -47,6 +47,8 @@ uint32_t dataIndexInTrack = STREAM_START_OFFSET;
 
 queue_t fifoMfmWrite;
 
+void pio_uart_setup(void);
+
 extern Settings_t Settings;
 
 TWriteBuffer wrBuffer;  // buffer for written sectors
@@ -56,7 +58,7 @@ TWriteBuffer wrBuffer;  // buffer for written sectors
 
     The stdio is currently configured to use USB and UART at the same time,
     for easy configuration via USB cable, plus debug strings via UART.
-    But stdio functions (e.g. printf) may halt undefinitelly, if you 
+    But stdio functions (e.g. printf) may halt undefinitelly, if you
     don't have USB connected and the USB output buffer gets full.
     This is solved by:
     - using printf (goes to UART and USB) only on serial config mode
@@ -109,7 +111,7 @@ void setup(void)
     stdio_init_all();
     debug("\n\nsetup() starting\n");
 
-    // it seems that get_absolute_time() returns 0 until the timer is used by sleep_ms() or similar, 
+    // it seems that get_absolute_time() returns 0 until the timer is used by sleep_ms() or similar,
     // doing short sleep_ms so that any additional millis() will work correctly.
     sleep_ms(1);
 
@@ -149,7 +151,7 @@ void setup(void)
 
     // If the flag to enter config mode is set we must store settings from PSRAM to EEPROM.
     // In order for flashing to work, we must ensure that only 1 core is writing to flash and running, so
-    // we must enter config mode and storing to flash before we call cyw43_arch_init(), 
+    // we must enter config mode and storing to flash before we call cyw43_arch_init(),
     // which runs on other core.
     if(psramConfigFlagGet()) {
         debug("Storing settings to EEPROM\n");
@@ -172,6 +174,9 @@ void setup(void)
     gpio_set_function(PIN_KEYB_TX_ORIG, UART_FUNCSEL_NUM(uart1, PIN_KEYB_TX_ORIG));
     uart_init(uart1, 7812);
 
+    // initialize additional UART RX via PIO and IRQ
+    pio_uart_setup();
+
     queue_init(&fifoMfmWrite, 1, 64);
 
     multicore_launch_core1(core1_main_loop);    // start core1 for mfm stream handling
@@ -185,7 +190,7 @@ void setup(void)
     // Enable wifi station
     cyw43_arch_enable_sta_mode();
 }
-    
+
 void requestTrack(uint8_t side, uint8_t track)
 {
     atnSendTrackRequest[TX_HEADER_SIZE + 0] = side;
@@ -339,7 +344,7 @@ int main()
         // request whole image if no image loaded
         if(connectedToHost && imageState == IMAGE_NOT_LOADED)
         {
-            // before requesting the whole image, send fw report, so the host will get mac address, 
+            // before requesting the whole image, send fw report, so the host will get mac address,
             // which he will use to identify this device
             sendFwReport(now);
 
