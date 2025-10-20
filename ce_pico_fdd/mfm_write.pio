@@ -1,0 +1,49 @@
+.pio_version 0 // only requires PIO version 0
+
+.program mfm_write
+
+start:
+    ; Wait for pin 0 to become L, init X and wait total
+    ; 1.5  us (first symbol, first 3 instructions) or
+    ; 1.65 us (other symbols, last 3 instructions + first 3 instructions)
+
+    wait 0 pin 0        ; wait for pin to become L
+
+    set y, 0            ; y = 0
+    mov x, ~y [27]      ; x = ~y = 0xffffffff
+
+    ; loop waits while the PIN is H; decrementing X while waiting,
+    ; with first 1.5-1.65 us cut away by previous wait
+
+wait_hi:
+    jmp x-- nx          ; decrement x, go to next line
+nx: jmp pin wait_hi     ; jump while pin is H
+
+; now x contains count of jumps we did after initial L + wait
+    mov isr, X          ; isr = x
+    push                ; push the contents of the ISR into the RX FIFO
+
+
+% c-sdk {
+#include "hardware/clocks.h"
+#include "hardware/gpio.h"
+
+static inline void mfm_write_program_init(PIO pio, uint sm, uint offset, uint pin) {
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, false);
+    pio_gpio_init(pio, pin);
+    gpio_pull_up(pin);
+
+    pio_sm_config c = mfm_write_program_get_default_config(offset);
+    sm_config_set_in_pins(&c, pin);                 // for WAIT, IN
+    sm_config_set_jmp_pin(&c, pin);                 // for JMP
+    sm_config_set_in_shift(&c, true, false, 32);    // Shift to right, autopush disabled
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_RX);  // Deeper FIFO as we're not doing any TX
+
+    float div = (float)clock_get_hz(clk_sys) / 20000000;    // calc divider for 20 MHz, that's 0.05 us per instruction
+    sm_config_set_clkdiv(&c, div);
+
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+}
+
+%}

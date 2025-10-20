@@ -52,9 +52,11 @@ add_executable(ce_pico_fdd_vsc
         lcdfont.cpp
         ssd1306.cpp
         uart_rx.cpp
+        mfm_write.cpp
         )
 
 pico_generate_pio_header(ce_pico_fdd_vsc ${CMAKE_CURRENT_LIST_DIR}/uart_rx.pio)
+pico_generate_pio_header(ce_pico_fdd_vsc ${CMAKE_CURRENT_LIST_DIR}/mfm_write.pio)
 
 pico_set_program_name(ce_pico_fdd_vsc "ce_pico_fdd_vsc")
 pico_set_program_version(ce_pico_fdd_vsc "0.1")

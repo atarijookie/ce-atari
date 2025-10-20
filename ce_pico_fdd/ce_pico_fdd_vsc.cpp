@@ -1,13 +1,14 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
+#include "pico/cyw43_arch.h"
+#include "pico/multicore.h"
+#include "pico/util/queue.h"
 #include "hardware/spi.h"
 #include "hardware/i2c.h"
 #include "hardware/dma.h"
 #include "hardware/timer.h"
-#include "pico/cyw43_arch.h"
 #include "hardware/uart.h"
 #include "hardware/watchdog.h"
-#include "pico/multicore.h"
 #include "tusb.h"
 
 #include "connection.h"
@@ -43,6 +44,8 @@ char imageFileName[32];
 bool diskChanged = false;
 uint32_t diskChangeEnd;
 uint32_t dataIndexInTrack = STREAM_START_OFFSET;
+
+queue_t fifoMfmWrite;
 
 extern Settings_t Settings;
 
@@ -164,15 +167,12 @@ void setup(void)
 
     gpio_set_irq_enabled_with_callback(PIN_STEP, GPIO_IRQ_EDGE_FALL, true, floppyStepISR);
 
-    // // Initialise UART 0
-    // gpio_set_function(PIN_TXD_DEBUG, UART_FUNCSEL_NUM(uart0, PIN_TXD_DEBUG));
-    // gpio_set_function(PIN_RXD_DEBUG, UART_FUNCSEL_NUM(uart0, PIN_RXD_DEBUG));
-    // uart_init(uart0, 7812);
-
     // Initialise UART 1
     gpio_set_function(PIN_KEYB_TX, UART_FUNCSEL_NUM(uart1, PIN_KEYB_TX));
     gpio_set_function(PIN_KEYB_TX_ORIG, UART_FUNCSEL_NUM(uart1, PIN_KEYB_TX_ORIG));
     uart_init(uart1, 7812);
+
+    queue_init(&fifoMfmWrite, 1, 64);
 
     multicore_launch_core1(core1_main_loop);    // start core1 for mfm stream handling
 
@@ -376,14 +376,20 @@ int main()
         //-------------------------------------------------
         now = millis();
 
+        // something in the MFM WRITE FIFO? Get it, add it to wrBuffer
+        while(!queue_is_empty(&fifoMfmWrite)) {
+            uint8_t wrStreamByte;
+            if (queue_try_remove(&fifoMfmWrite, &wrStreamByte)) {   // succeeded getting value?
+                if(wrBuffer.count < WRITEBUFFER_SIZE) {             // write buffer not full? add byte
+                    wrBuffer.buffer[wrBuffer.count] = wrStreamByte;
+                    wrBuffer.count++;
+                }
+            }
+        }
+
         if(stWantsTheStream)
         {
             int WGateNow = BIT_LEVEL(PIN_WGATE);
-
-            // if(wrBuffer.count < WRITEBUFFER_SIZE) {
-            //     wrBuffer.buffer[wrBuffer.count] = val;
-            //     wrBuffer.count++;
-            // }
 
             if(WGatePrev != WGateNow)   // write gate changed?
             {

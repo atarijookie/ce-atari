@@ -7,6 +7,7 @@
 #include "hardware/dma.h"
 #include "pico/flash.h"
 #include "pico/multicore.h"
+#include "pico/util/queue.h"
 
 #include "defs.h"
 #include "connection.h"
@@ -68,9 +69,9 @@ void setupDmaToPwm(void)
     channel_config_set_ring(&c, false, 12);                     // enable ring mode, on read side, 12 address bits masked for ring mode (4096 bytes == 2048 words)
 
     // dma_encode_endless_transfer_count() vs MFM_BUFFER_HALF_SIZE
-    dma_channel_configure(dmaChannel, &c, (volatile void *) 
-                            (&pwm_hw->slice[pwmSliceNum].top),
-                            mfmBuffer, 
+    dma_channel_configure(  dmaChannel, &c,
+                            (volatile void *) (&pwm_hw->slice[pwmSliceNum].top),
+                            mfmBuffer,
                             dma_encode_transfer_count_with_self_trigger(MFM_BUFFER_HALF_SIZE), 
                             true);
 
