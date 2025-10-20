@@ -22,9 +22,9 @@ uint8_t buffer[IKBD_BFR_SIZE];
 
 void onIkdbDisabled(void)
 {
-    // ikbd not sending data (chip not present) or ikbd not enabled, but the ikbd socket is connected, then disconnect
-    // if any data comming from host via socket is available, read and and drop it
-    while(1)
+    // If any data comming from host via socket is available, read and and drop it.
+    // Pass all data from KEYB_TX_ORIG to KEYB_TX.
+    while(uart_is_readable(uart1) || !queue_is_empty(&fifoUart) || connectionCanReadBytes(&connectionIkbd))
     {
         int available = connectionCanReadBytes(&connectionIkbd);
         if(available <= 0) {    // nothing more to read here? quit this loop
@@ -51,7 +51,7 @@ void onIkbdEnabled(void)
 {
     uint8_t data[16];
 
-    // keep sending forwarding data around until all the sources are empty
+    // keep sending data around until all the sources are empty
     while(uart_is_readable(uart1) || !queue_is_empty(&fifoUart) || connectionCanReadBytes(&connectionIkbd))
     {
         if(uart_is_readable(uart1))          // got data from KEYB_TX_ORIG? send it to host with tag

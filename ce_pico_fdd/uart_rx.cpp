@@ -56,9 +56,9 @@ void pio_uart_setup(void)
         }
     }
 
-    // Enable interrupt
-    irq_add_shared_handler(pioIrqUart, pio_uart_irq_func, PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY); // Add a shared IRQ handler
+    irq_set_exclusive_handler(pioIrqUart, pio_uart_irq_func);
     irq_set_enabled(pioIrqUart, true); // Enable the IRQ
+
     const uint irq_index = pioIrqUart - pio_get_irq_num(pioUart, 0); // Get index of the IRQ
     pio_set_irqn_source_enabled(pioUart, irq_index, pio_get_rx_fifo_not_empty_interrupt_source(smUart), true); // Set pio to tell us when the FIFO is NOT empty
 }
