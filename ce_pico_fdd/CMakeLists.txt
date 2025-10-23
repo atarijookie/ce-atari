@@ -2,6 +2,8 @@
 
 cmake_minimum_required(VERSION 3.13)
 
+add_compile_options(-finput-charset=UTF-8 -fexec-charset=UTF-8)
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -44,7 +46,7 @@ add_executable(ce_pico_fdd_vsc
         connection.cpp
         display.cpp
         ikbd.cpp
-        mfm.cpp
+        mfm_read.cpp
         psram.cpp
         utils.cpp
         client_context.h
@@ -77,7 +79,7 @@ target_include_directories(ce_pico_fdd_vsc PRIVATE
 )
 
 # Add any user requested libraries
-target_link_libraries(ce_pico_fdd_vsc 
+target_link_libraries(ce_pico_fdd_vsc
         hardware_spi
         hardware_i2c
         hardware_dma

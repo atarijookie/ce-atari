@@ -15,7 +15,7 @@
 #include "display.h"
 #include "ikbd.h"
 #include "buttons.h"
-#include "mfm.h"
+#include "mfm_read.h"
 #include "psram.h"
 #include "defs.h"
 #include "utils.h"
@@ -175,7 +175,7 @@ void setup(void)
     uart_init(uart1, 7812);
 
     // initialize additional UART RX via PIO and IRQ
-    pio_uart_setup();
+    // pio_uart_setup();
 
     queue_init(&fifoMfmWrite, 1, 64);
 

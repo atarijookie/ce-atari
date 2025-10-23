@@ -42,9 +42,9 @@ void __isr dmaHandlerMfm(void);
 void setupPwmOutput(void)
 {
   gpio_set_function(PIN_RDATA, GPIO_FUNC_PWM);
-  uint pwmSliceNum = pwm_gpio_to_slice_num(PIN_RDATA); 
+  uint pwmSliceNum = pwm_gpio_to_slice_num(PIN_RDATA);
   uint pwmChannel = pwm_gpio_to_channel(PIN_RDATA);
- 
+
   pwm_set_clkdiv_int_frac(pwmSliceNum, 75, 0);      // 150 MHz / 75 = 2 MHz -- 1 tick is 0.5 us
   pwm_set_output_polarity(pwmSliceNum, true, true);
 
@@ -57,7 +57,7 @@ void setupPwmOutput(void)
 void setupDmaToPwm(void)
 {
     uint pwmChannel = pwm_gpio_to_channel(PIN_RDATA);
-    uint pwmSliceNum = pwm_gpio_to_slice_num(PIN_RDATA); 
+    uint pwmSliceNum = pwm_gpio_to_slice_num(PIN_RDATA);
 
     dmaChannel = dma_claim_unused_channel(true);
     dma_channel_config c = dma_channel_get_default_config(dmaChannel);
@@ -72,7 +72,7 @@ void setupDmaToPwm(void)
     dma_channel_configure(  dmaChannel, &c,
                             (volatile void *) (&pwm_hw->slice[pwmSliceNum].top),
                             mfmBuffer,
-                            dma_encode_transfer_count_with_self_trigger(MFM_BUFFER_HALF_SIZE), 
+                            dma_encode_transfer_count_with_self_trigger(MFM_BUFFER_HALF_SIZE),
                             true);
 
     // Enable DMA interrupt
@@ -165,7 +165,7 @@ void fillHalfMfmBuffer(void)
     uint16_t* bfr = (fillWhat == FILL_LOWER) ? &mfmBuffer[0] : &mfmBuffer[MFM_BUFFER_HALF_SIZE];
     fillWhat = FILL_NONE;
 
-    // from the track buffer (with all the additional data and spaces) extract 
+    // from the track buffer (with all the additional data and spaces) extract
     // just MFM_READ_SIZE_FILLS bytes which can be transformed into MFM intervals
     uint8_t rawMfmData[MFM_READ_SIZE_FILLS];
     getMfmDataToBuffer(rawMfmData, MFM_READ_SIZE_FILLS);
