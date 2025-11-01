@@ -35,6 +35,7 @@ extern uint8_t trackData1[READTRACKDATA_SIZE_BYTES];
 extern uint32_t dataIndexInTrack;
 
 extern SStreamed posStreamed, hwPosition, posWritten;
+volatile bool reloadTrackSide0 = false, reloadTrackSide1 = false;
 void readTrackData_goToStart(void);
 
 void __isr dmaHandlerMfm(void);
@@ -199,6 +200,16 @@ void core1_main_loop(void)
 
     while(1)
     {
+        if(reloadTrackSide0) {      // track side 0 needs reload?
+            reloadTrackSide0 = false;
+            psramLoadTrack(hwPosition.track, 0, trackData0);
+        }
+
+        if(reloadTrackSide1) {      // track side 1 needs reload?
+            reloadTrackSide1 = false;
+            psramLoadTrack(hwPosition.track, 1, trackData1);
+        }
+
         // MFM read buffer should be refilled?
         if(fillWhat != FILL_NONE) {
             fillHalfMfmBuffer();

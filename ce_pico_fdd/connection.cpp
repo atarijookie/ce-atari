@@ -46,6 +46,9 @@ extern char imageFileName[32];
 extern bool diskChanged;
 extern int imageState;
 
+extern SStreamed posStreamed, hwPosition;
+extern volatile bool reloadTrackSide0, reloadTrackSide1;
+
 void storeMacAddress(void);
 
 void showRunningStateOnDisplay(void)
@@ -164,7 +167,7 @@ void connectToWifi(void)
         displayMessage("wifi connecting", msg);
 
         cyw43_arch_wifi_connect_async(Settings.ssid, Settings.password, CYW43_AUTH_WPA2_AES_PSK);
-    } 
+    }
     else
     {
         debug("connectToWifi - not connecting, status: %d\n", new_status);
@@ -218,7 +221,7 @@ void ceDiscoverySend(void)
         ip4_addr_set_u32(&bcast, bcast_u32);
         debug("ceDiscoverySend to %d.%d.%d.%d\n", bcast_u32 & 0xff, (bcast_u32 >> 8) & 0xff, (bcast_u32 >> 16) & 0xff, (bcast_u32 >> 24) & 0xff);
         udp_sendto(pcbUpd, p, &bcast, SERVER_UDP_PORT);                 // broadcast to subnet devices (e.g. 192.168.1.255)
-    } 
+    }
     else        // send to generic broadcast addr
     {
         debug("ceDiscoverySend to 255.255.255.255\n");
@@ -301,7 +304,7 @@ void connectToCEhost(void)
     static bool loggedOnce = false;
 
     if (isConnected(&connectionFdd))   // already connected? quit
-    { 
+    {
         if(!loggedOnce) {
             debug("connectToCEhost - connected!\n");
             loggedOnce = true;
@@ -491,6 +494,14 @@ void handleTrackReceived(void)
 
     // store the track track data into PSRAM
     psramStoreTrack(trackNo, sideNo, tmpTrackBfr + 2);
+
+    if(trackNo == hwPosition.track) {   // we've just received the track that is being streamed out?
+        if(sideNo) {                    // must reload side 1
+            reloadTrackSide1 = true;
+        } else {                        // must reload side 0
+            reloadTrackSide0 = true;
+        }
+    }
 
     debug("Rx %d side %d\n", trackNo, sideNo);
 

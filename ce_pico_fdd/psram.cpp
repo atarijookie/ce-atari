@@ -2,6 +2,7 @@
 
 #include "pico/stdlib.h"
 #include "pico/binary_info.h"
+#include "pico/critical_section.h"
 #include "hardware/spi.h"
 #include "hardware/dma.h"
 
@@ -10,6 +11,7 @@
 #include "serial_config.h"
 
 extern Settings_t Settings;
+critical_section_t spi_critical_section;
 
 // Write a buffer to PSRAM
 void psramWriteBuffer(uint32_t addr, const uint8_t *buffer, size_t length)
@@ -54,6 +56,8 @@ void psramReadId(void)
 
 void psramTest(void)
 {
+    critical_section_init(&spi_critical_section);
+
     psramReadId();
 
     #define TEST_BFR_SIZE   13800
@@ -64,7 +68,7 @@ void psramTest(void)
     }
 
     psramWriteBuffer(0, writeBfr, TEST_BFR_SIZE);       // write to psram
-    
+
     uint8_t readBfr[TEST_BFR_SIZE];
     memset(readBfr, 0, TEST_BFR_SIZE);                  // clear the read buffer
 
@@ -76,7 +80,7 @@ void psramTest(void)
     {
         debug("PSRAM not working correctly! HALT\n");
         while(1);
-    } 
+    }
 
     debug("PSRAM used and working, read takes %d ms\n", end - start);
 
@@ -87,24 +91,34 @@ void psramTest(void)
 
 void psramStoreTrack(int track, int side, uint8_t* data)
 {
+    critical_section_enter_blocking(&spi_critical_section);
+
     side = (side == 0) ? 0 : 1;     // limit side to values 0 and 1
     track = MIN(track, MAX_TRACKS); // limit track to MAX_TRACKS
     uint32_t address = ((track * 2) + side) * READTRACKDATA_SIZE_BYTES;
 
     psramWriteBuffer(address, data, READTRACKDATA_SIZE_BYTES);
+
+    critical_section_exit(&spi_critical_section);
 }
 
 void psramLoadTrack(int track, int side, uint8_t* data)
 {
+    critical_section_enter_blocking(&spi_critical_section);
+
     side = (side == 0) ? 0 : 1;     // limit side to values 0 and 1
     track = MIN(track, MAX_TRACKS); // limit track to MAX_TRACKS
     uint32_t address = ((track * 2) + side) * READTRACKDATA_SIZE_BYTES;
 
     psramReadBuffer(address, data, READTRACKDATA_SIZE_BYTES);
+
+    critical_section_exit(&spi_critical_section);
 }
 
 void psramStoreSector(int track, int side, int byteOffsetFromTrackStart, uint8_t* data, uint32_t copyLength, uint32_t clearLength)
 {
+    critical_section_enter_blocking(&spi_critical_section);
+
     side = (side == 0) ? 0 : 1;     // limit side to values 0 and 1
     track = MIN(track, MAX_TRACKS); // limit track to MAX_TRACKS
     uint32_t address = ((track * 2) + side) * READTRACKDATA_SIZE_BYTES;
@@ -121,6 +135,8 @@ void psramStoreSector(int track, int side, int byteOffsetFromTrackStart, uint8_t
         address += copyLength;                  // address will now point beyond written sector data
         psramWriteBuffer(address, clearBfr, clearLength);
     }
+
+    critical_section_exit(&spi_critical_section);
 }
 
 #define PSRAM_ADDR_FLAG     100000
