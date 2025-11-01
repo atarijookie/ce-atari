@@ -115,7 +115,7 @@ void setup(void)
     // doing short sleep_ms so that any additional millis() will work correctly.
     sleep_ms(1);
 
-    #define INPUTS_COUNT 7
+    #define INPUTS_COUNT 6
     int inputs[INPUTS_COUNT] = {PIN_DRIVE_SEL, PIN_MOT_EN, PIN_DIR, PIN_STEP, PIN_WGATE, PIN_SIDE1};
 
     for (int i = 0; i < INPUTS_COUNT; i++)
@@ -124,9 +124,9 @@ void setup(void)
         gpio_set_dir(inputs[i], GPIO_IN);
     }
 
-    #define OUTPUTS_COUNT 6
-    int outputs[OUTPUTS_COUNT] = {PIN_DENSITY, PIN_INDEX, PIN_TRACK00, PIN_WPROTECT, PIN_DSKCHG, PIN_FLCC_OE};
-    int levels[OUTPUTS_COUNT]  = {          0,         1,           0,            1,          0,           1};
+    #define OUTPUTS_COUNT 7
+    int outputs[OUTPUTS_COUNT] = {PIN_DENSITY, PIN_INDEX, PIN_TRACK00, PIN_WPROTECT, PIN_DSKCHG, PIN_FLCC_OE, PIN_CS};
+    int levels[OUTPUTS_COUNT]  = {          0,         1,           0,            1,          0,           1,      1};
 
     for (int i = 0; i < OUTPUTS_COUNT; i++)
     {
@@ -142,7 +142,6 @@ void setup(void)
     gpio_set_function(PIN_MISO, GPIO_FUNC_SPI);
     gpio_set_function(PIN_SCK,  GPIO_FUNC_SPI);
     gpio_set_function(PIN_MOSI, GPIO_FUNC_SPI);
-    gpio_set_function(PIN_CS,   GPIO_FUNC_SIO);     // set to SIO to be able to manually set/clear PIN_CS
 
     // init PSRAM, read ID, test read and write
     psramTest();
@@ -430,7 +429,7 @@ int main()
         handleAllButtons();
 
         // handle ikbd data transfer
-        ikbdHandling();
+        // ikbdHandling();
     }
 }
 
