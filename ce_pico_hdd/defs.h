@@ -6,8 +6,6 @@
 #define LOG_MORE    1
 #define ALWAYS_INLINE inline __attribute__((always_inline))
 
-#define WIFI_CAPTIVE_AP_NAME    "CosmosEx AP"
-
 // #define RW_TASKS
 
 #define DELAY_NS   asm("nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop;");
@@ -74,32 +72,30 @@
 
 ///////////////////////////
 
-#define PIN_D0          1
-#define PIN_D1          2
-#define PIN_D2          3
-#define PIN_D3          4
-#define PIN_D4          5
-#define PIN_D5          6
-#define PIN_D6          7
-#define PIN_D7          8
+#define PIN_TXD_DEBUG   0
+#define PIN_RXD_DEBUG   1
 
-#define PIN_CMD1ST      9       // input
-#define PIN_EOT         10      // input
-#define PIN_OUT_OE      11      // output
-#define PIN_DRQ_TRIG    12      // output
-#define PIN_FF12D       13      // output
-#define PIN_INT_TRIG    14      // output
+#define PIN_D0          2
+#define PIN_D1          3
+#define PIN_D2          4
+#define PIN_D3          5
+#define PIN_D4          6
+#define PIN_D5          7
+#define PIN_D6          8
+#define PIN_D7          9
 
-#define PIN_SCL             15      // output
-#define PIN_SDA             16      // input/output
-#define PIN_KEYB_TX         17
-#define PIN_KEYB_TX_ORIG    18
-#define PIN_KEYB_RX         19
-#define PIN_TXD2            20
-#define PIN_TXD_DEBUG       43
-#define PIN_RXD_DEBUG       44
+#define PIN_DATA_DIR    10      // out
+#define PIN_CS          11      // in
+#define PIN_INT         12      // out
+#define PIN_DRQ         13      // out
+#define PIN_A1          22      // in
+#define PIN_ACK         26      // in
+#define PIN_RESET       27      // in
 
-#define PIN_BOOT_BTN    0       // input
+#define PIN_ANALOG_BTNS 28      // in analog
+
+#define PIN_SDA         14      // input/output
+#define PIN_SCL         15      // output
 
 #define BIT_IS_H(PIN)   (gpio_get(PIN) != 0)
 #define BIT_IS_L(PIN)   (gpio_get(PIN) == 0)
@@ -107,7 +103,6 @@
 
 #define BIT_SET(PIN)    gpio_put(PIN, true)
 #define BIT_CLR(PIN)    gpio_put(PIN, false)
-
 
 #define HDD_ACSI    1
 

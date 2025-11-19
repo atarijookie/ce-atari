@@ -45,18 +45,16 @@ void setup(void)
 
     Serial.println("setup() starting");
 
-    #define INPUTS_COUNT 12
-    int inputs[INPUTS_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_CMD1ST, PIN_EOT, PIN_SDA, PIN_BOOT_BTN};
+    #define INPUTS_COUNT 13
+    int inputs[INPUTS_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_CS, PIN_A1, PIN_ACK, PIN_RESET, PIN_SDA};
 
     for (int i = 0; i < INPUTS_COUNT; i++)
     {
         pinMode(inputs[i], INPUT);
     }
 
-    pinMode(PIN_BOOT_BTN, INPUT_PULLUP);
-
-    #define OUTPUTS_COUNT 5
-    int outputs[OUTPUTS_COUNT] = {PIN_OUT_OE, PIN_FF12D, PIN_INT_TRIG, PIN_DRQ_TRIG, PIN_SCL};
+    #define OUTPUTS_COUNT 4
+    int outputs[OUTPUTS_COUNT] = {PIN_DATA_DIR, PIN_INT, PIN_DRQ, PIN_SCL};
 
     for (int i = 0; i < OUTPUTS_COUNT; i++)
     {
@@ -316,20 +314,20 @@ void handleButton(void)
     }
     lastCheck = now;
 
-    int buttonState = digitalRead(PIN_BOOT_BTN);    // read button
+    // int buttonState = digitalRead(PIN_BOOT_BTN);    // read button
 
-    bool buttonStateChanged = (lastButtonState != buttonState);
-    lastButtonState = buttonState;
+    // bool buttonStateChanged = (lastButtonState != buttonState);
+    // lastButtonState = buttonState;
 
-    if(buttonStateChanged)      // button state changed? (e.g. pressed, released)
-    {
-        onButtonStateChanged(buttonState, now, buttonPressTime);
-    }
-    else        // button state not changed (stayed released, stayed pressed)
-    {
-        if(buttonState == LOW)
-        {
-            duringButtonPressed(now, buttonPressTime);
-        }
-    }
+    // if(buttonStateChanged)      // button state changed? (e.g. pressed, released)
+    // {
+    //     onButtonStateChanged(buttonState, now, buttonPressTime);
+    // }
+    // else        // button state not changed (stayed released, stayed pressed)
+    // {
+    //     if(buttonState == LOW)
+    //     {
+    //         duringButtonPressed(now, buttonPressTime);
+    //     }
+    // }
 }
