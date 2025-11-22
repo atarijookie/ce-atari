@@ -73,14 +73,7 @@ void ceDiscoverySend(void)
 
     lastAttempt = millis();
 
-    // if UDP not initialized, do that now
-    if (!udpInitialized)
-    {
-        udp.begin(CLIENT_UDP_PORT);
-        udpInitialized = true;
-    }
-
-    displayMessage("wifi connected", "CE host discovery");
+    displayMessage("eth connected", "CE host discovery");
 
     // send upd broadcast
     uint8_t updPacket[5];
@@ -91,27 +84,27 @@ void ceDiscoverySend(void)
     if(whichBroadcastAddr)      // send to subnet broadcast addr?
     {
         // get local ip and mask, create broadcast ip
-        // IPAddress ip = WiFi.localIP();
-        // uint32_t ip32 = (((uint32_t)ip[0]) << 24) | (((uint32_t)ip[1]) << 16) | (((uint32_t)ip[2]) << 8) | (((uint32_t)ip[3]));
+        IPAddress ip = Ethernet.localIP();
+        uint32_t ip32 = (((uint32_t)ip[0]) << 24) | (((uint32_t)ip[1]) << 16) | (((uint32_t)ip[2]) << 8) | (((uint32_t)ip[3]));
 
-        // IPAddress mask = WiFi.subnetMask();
-        // uint32_t mask32 = (((uint32_t)mask[0]) << 24) | (((uint32_t)mask[1]) << 16) | (((uint32_t)mask[2]) << 8) | (((uint32_t)mask[3]));
-        // uint32_t mask32inv = ~mask32;
+        IPAddress mask = Ethernet.subnetMask();
+        uint32_t mask32 = (((uint32_t)mask[0]) << 24) | (((uint32_t)mask[1]) << 16) | (((uint32_t)mask[2]) << 8) | (((uint32_t)mask[3]));
+        uint32_t mask32inv = ~mask32;
 
-        // uint32_t ip32broadcast = ip32 | mask32inv; // create broadcast addr by setting all subnet bits to 1
+        uint32_t ip32broadcast = ip32 | mask32inv; // create broadcast addr by setting all subnet bits to 1
 
-        // IPAddress addrBroadcast((uint8_t) (ip32broadcast >> 24), (uint8_t) (ip32broadcast >> 16), (uint8_t) (ip32broadcast >> 8), (uint8_t) ip32broadcast);    // from uint32_t to object
+        IPAddress addrBroadcast((uint8_t) (ip32broadcast >> 24), (uint8_t) (ip32broadcast >> 16), (uint8_t) (ip32broadcast >> 8), (uint8_t) ip32broadcast);    // from uint32_t to object
 
-        // debug("ceDiscoverySend to %s\n", addrBroadcast.toString().c_str());
+        debug("ceDiscoverySend to %s\n", addrBroadcast.toString().c_str());
 
-        // // broadcast to subnet devices (e.g. 192.168.1.255)
-        // udp.beginPacket(addrBroadcast.toString().c_str(), SERVER_UDP_PORT);
-        // udp.write(updPacket, 4);
-        // udp.endPacket();
+        // broadcast to subnet devices (e.g. 192.168.1.255)
+        udp.beginPacket(addrBroadcast.toString().c_str(), SERVER_UDP_PORT);
+        udp.write(updPacket, 4);
+        udp.endPacket();
     }
     else        // send to generic broadcast addr
     {
-        debug("ceDiscoverySend to 255.255.255.255");
+        debug("ceDiscoverySend to 255.255.255.255\n");
 
         // broadcast to all possible devices (255.255.255.255)
         udp.beginPacket("255.255.255.255", SERVER_UDP_PORT);
@@ -133,13 +126,6 @@ void ceDiscoveryReceive(void)
     }
 
     lastAttempt = millis();
-
-    // if UDP not initialized, do that now
-    if (!udpInitialized)
-    {
-        udp.begin(CLIENT_UDP_PORT);
-        udpInitialized = true;
-    }
 
     // check if any udp packet was received, handle it
     while (true)
@@ -219,7 +205,7 @@ void connectToCEhost(void)
         return;
     }
 
-    displayMessage("wifi connected", "connecting to host:", hostIpString.c_str());
+    displayMessage("eth connected", "connecting to host:", hostIpString.c_str());
 
     debug("connectToCEhost - IP: %s, port: %d\n", hostIpString.c_str(), hostPortHdd);
 
@@ -228,6 +214,26 @@ void connectToCEhost(void)
     // clientHdd.setNoDelay(true);
 
     // clientIkbd.connect(hostIpString.c_str(), hostPortIkbd);
+}
+
+// if UDP not initialized, do that now
+void udpSocketOpen(void)
+{
+    if (!udpInitialized)
+    {
+        udp.begin(CLIENT_UDP_PORT);
+        udpInitialized = true;
+    }
+}
+
+// if UDP is initialized, deinitialize
+void udpSocketClose(void)
+{
+    if(udpInitialized)
+    {
+        udp.stop();
+        udpInitialized = false;
+    }
 }
 
 void connectToHost(void)
@@ -245,15 +251,27 @@ void connectToHost(void)
         }
     }
 
-    // socket connected, wifi connected? just quit
+    // socket connected? just quit
     if(connected)
     {
+        udpSocketClose();
         return;
     }
 
-    // device connected to wifi, do discovery if needed
-    ceDiscoverySend();
-    ceDiscoveryReceive();
+    // do discovery if needed
+    if(hostIp[0] == 0 || hostPortHdd == 0)
+    {
+        udpSocketOpen();
+
+        ceDiscoverySend();
+        ceDiscoveryReceive();
+    }
+
+    // if got ip and port, then before connecting, close udp socket
+    if(hostIp[0] != 0 && hostPortHdd != 0)
+    {
+        udpSocketClose();
+    }
 
     // connect to CE server
     connectToCEhost();

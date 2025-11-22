@@ -115,7 +115,7 @@ void loop(void)
 
     while(1)
     {
-        // connect to wifi, discover CE server, connect to CE server
+        // discover CE server, connect to CE server
         connectToHost();
 
         // handle any data incoming

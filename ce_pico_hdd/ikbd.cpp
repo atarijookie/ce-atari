@@ -7,7 +7,7 @@
 
 extern String hostIpString;
 extern uint16_t hostPortIkbd;
-extern bool connected;              // if true, wifi is connected
+extern bool connected;              // true if connected
 
 #define IKBD_BFR_SIZE 128
 uint8_t buffer[IKBD_BFR_SIZE];
@@ -68,7 +68,7 @@ void ikbdConnectDisconnect(void)
 {
     // if(settings.ikbdEnabled)
     // {
-    //     // ikbd is enabled, ikdb chip is sending data (chip present), wifi is connected, but our ikbd socket is NOT connected, connect now
+    //     // ikbd is enabled, ikdb chip is sending data (chip present), eth is connected, but our ikbd socket is NOT connected, connect now
     //     if(connected && !clientIkbd.connected())
     //     {
     //         debug("I connect");
