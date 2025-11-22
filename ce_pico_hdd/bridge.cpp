@@ -19,6 +19,13 @@ static PIO pioCmdFirst, pioCmdWrite, pioCmdRead;
 static uint smCmdFirst, smCmdWrite, smCmdRead;
 static uint offsetCmdFirst, offsetCmdWrite, offsetCmdRead;
 
+io_rw_8* cmdFirstFifo;      // first cmd byte will be stored here 
+
+io_rw_32* cmdWriteTxFifo;   // write N-1 count of bytes to write here
+io_rw_8*  cmdWriteRxFifo;   // read N count of bytes from here
+
+io_rw_8* cmdReadTxFifo;     // write bytes here to make them to be read by ST
+
 void configCmdWriteForPIO(void);
 void configCmdWriteForDMA(void);
 void configCmdReadForPIO(void);
@@ -33,12 +40,17 @@ void pioConfigAll(void)
     cmd_first_program_init(pioCmdFirst, smCmdFirst, offsetCmdFirst, PIN_CS, PIN_A1);
 
     success = pio_claim_free_sm_and_add_program_for_gpio_range(&cmd_write_program, &pioCmdWrite, &smCmdWrite, &offsetCmdWrite, PIN_D0, 26, true);
-    if(!success) { debug("Failed to claim PIO SM 1\n"); while(1); }
+    if(!success) { debug("Failed to claim PIO SM 2\n"); while(1); }
     cmd_write_program_init(pioCmdWrite, smCmdWrite, offsetCmdWrite, PIN_D0, PIN_INT, PIN_CS);
 
     success = pio_claim_free_sm_and_add_program_for_gpio_range(&cmd_read_program, &pioCmdRead, &smCmdRead, &offsetCmdRead, PIN_D0, 26, true);
-    if(!success) { debug("Failed to claim PIO SM 1\n"); while(1); }
+    if(!success) { debug("Failed to claim PIO SM 3\n"); while(1); }
     cmd_read_program_init(pioCmdRead, smCmdRead, offsetCmdRead, PIN_D0, PIN_INT, PIN_CS);
+
+    cmdFirstFifo = (io_rw_8*) &pioCmdFirst->rxf[smCmdFirst] + 3;
+    cmdWriteTxFifo = (io_rw_32*) &pioCmdWrite->txf[smCmdWrite];
+    cmdWriteRxFifo = (io_rw_8*) &pioCmdWrite->rxf[smCmdWrite] + 3;
+    cmdReadTxFifo = (io_rw_8*) &pioCmdRead->txf[smCmdRead] + 3;
 }
 
 void pioConfig(int newMode)
@@ -54,6 +66,8 @@ void pioConfig(int newMode)
     {
         case MODE_CMD_FIRST:
         {
+            setDataDirection(DIR_RECV); // data as inputs (write)
+
             pio_sm_set_enabled(pioCmdWrite, smCmdWrite, false);
             pio_sm_set_enabled(pioCmdRead, smCmdRead, false);
             pio_sm_set_enabled(pioCmdFirst, smCmdFirst, true);
@@ -61,6 +75,8 @@ void pioConfig(int newMode)
 
         case MODE_CMD_REST:
         {
+            setDataDirection(DIR_RECV); // data as inputs (write)
+
             pio_sm_set_enabled(pioCmdFirst, smCmdFirst, false);
             pio_sm_set_enabled(pioCmdRead, smCmdRead, false);
 
@@ -71,6 +87,8 @@ void pioConfig(int newMode)
 
         case MODE_DMA_READ:
         {
+            setDataDirection(DIR_SEND); // data as outputs (read)
+
             pio_sm_set_enabled(pioCmdFirst, smCmdFirst, false);
             pio_sm_set_enabled(pioCmdWrite, smCmdWrite, false);
 
@@ -81,6 +99,8 @@ void pioConfig(int newMode)
 
         case MODE_DMA_WRITE:
         {
+            setDataDirection(DIR_RECV); // data as inputs (write)
+
             pio_sm_set_enabled(pioCmdFirst, smCmdFirst, false);
             pio_sm_set_enabled(pioCmdRead, smCmdRead, false);
 
@@ -91,6 +111,8 @@ void pioConfig(int newMode)
 
         case MODE_STATUS:
         {
+            setDataDirection(DIR_SEND); // data as outputs (read)
+
             pio_sm_set_enabled(pioCmdFirst, smCmdFirst, false);
             pio_sm_set_enabled(pioCmdWrite, smCmdWrite, false);
 
@@ -104,9 +126,7 @@ void pioConfig(int newMode)
 uint8_t PIO_gotFirstCmdByte(void)
 {
     pioConfig(MODE_CMD_FIRST);
-
-    return false;
-    // return BIT_IS_H(PIN_CMD1ST);
+    return !pio_sm_is_rx_fifo_empty(pioCmdFirst, smCmdFirst);
 }
 
 // get 1st CMD byte from ST  -- without setting INT
@@ -114,43 +134,43 @@ uint8_t PIO_writeFirst(void)
 {
     uint8_t val;
 
-    // BIT_CLR(PIN_FF12D);         // FF12D must be L for generating INT / DRQ signals
+    timeoutStart();             // start the timeout timer
 
-    // timeoutStart();             // start the timeout timer
-    // setDataDirection(DIR_RECV); // data as inputs (write)
-
-    // init vars,
-    brStat = E_OK;   // init bridge status to E_OK
-    return 0;        // read data after EOT
+    brStat = E_OK;              // init bridge status to E_OK
+    return ((uint8_t) *cmdFirstFifo);
 }
 
 // get next CMD byte from ST -- with setting INT to LOW and waiting for CS
 uint8_t PIO_write(void)
 {
-    // BIT_SET(PIN_INT_TRIG);          // do CLK pulse
-    // DELAY_NS;
-    // BIT_CLR(PIN_INT_TRIG);          // CLK back to L
+    *cmdWriteTxFifo = 0;        // write N-1 count of bytes to write here
 
-    // if (!waitForEOT())
-    // {                       // EOT didn't come?
-    //     brStat = E_TimeOut; // set the bridge status
-    //     return 0;
-    // }
+    while(1)
+    {
+        if(hasTimedOut) {       // on timeout
+            brStat = E_TimeOut; // set the bridge status
+            return 0;
+        }
 
-    // return dataIn(); // read data after EOT
-    return 0;
+        // on rx fifo has data
+        if(!pio_sm_is_rx_fifo_empty(pioCmdWrite, smCmdWrite)) {
+            break;
+        }
+    }
+
+    return ((uint8_t) *cmdWriteRxFifo);
 }
 
 // send status byte to host, and on SCSI also to MSG IN byte
 void PIO_read(uint8_t scsiStatusByte)
 {
-    // pioReadFailed = FALSE; // didn't fail (yet)
+    pioReadFailed = FALSE; // didn't fail (yet)
 
-    // if (brStat != E_TimeOut)
-    // {                                        // if we didn't have bridge timeout, we can try to send STATUS byte
-    //     lastScsiStatusByte = scsiStatusByte; // store last SCSI status byte - for debugging purpose
-    //     PIO_read_solely(scsiStatusByte);     // this sends only STATUS byte to host - both in ACSI and SCSI
-    // }
+    if (brStat != E_TimeOut)
+    {                                        // if we didn't have bridge timeout, we can try to send STATUS byte
+        lastScsiStatusByte = scsiStatusByte; // store last SCSI status byte - for debugging purpose
+        PIO_read_solely(scsiStatusByte);     // this sends only STATUS byte to host - both in ACSI and SCSI
+    }
 
     // if (!isAcsiNotScsi)
     // { // if it's SCSI, send also MSG IN to host
@@ -160,27 +180,22 @@ void PIO_read(uint8_t scsiStatusByte)
     //     }
     // }
 
-    // if (brStat != E_OK)
-    // { // if some timeout occured, then failed
-    //     pioReadFailed = TRUE;
-    // }
+    if (brStat != E_OK)
+    { // if some timeout occured, then failed
+        pioReadFailed = TRUE;
+    }
 
-    // resetBridge();              // reset XILINX - put BSY, C/D, I/O in released states - needed for SCSI, doesn't harm anything in ACSI
-    // setDataDirection(DIR_RECV); // data as inputs (write)
+    // resetBridge();               // reset XILINX - put BSY, C/D, I/O in released states - needed for SCSI, doesn't harm anything in ACSI
+    setDataDirection(DIR_RECV);     // data as inputs (write)
 }
 
 void PIO_read_solely(uint8_t val)
 {
     pioConfig(MODE_STATUS);
 
-    // setDataDirection(DIR_SEND); // finish with send status
-    // dataOut(val);               // output data to GPIO pins
+    *cmdReadTxFifo = val;
 
-    // BIT_SET(PIN_INT_TRIG);      // do CLK pulse
-    // DELAY_NS;
-    // BIT_CLR(PIN_INT_TRIG);      // CLK back to L
-
-    // uint8_t ok = waitForEOT(); // try to wait for EOT and return success / failure
+    // TODO: wait for data to be transfered
 
     // if (!ok)
     // {
