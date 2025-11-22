@@ -55,7 +55,7 @@ static inline void cmd_first_program_init(PIO pio, uint sm, uint offset, uint pi
     float div = (float)clock_get_hz(clk_sys) / 33250000;    // calc divider for 33.25 MHz, that's 30.08 ns per instruction
     sm_config_set_clkdiv(&c, div);
     pio_sm_init(pio, sm, offset, &c);
-    pio_sm_set_enabled(pio, sm, true);
+    // pio_sm_set_enabled(pio, sm, true);
 }
 
 #endif

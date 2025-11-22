@@ -15,8 +15,96 @@ uint8_t pioReadFailed;
 
 const int dataPins[8] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7};
 
+static PIO pioCmdFirst, pioCmdWrite, pioCmdRead;
+static uint smCmdFirst, smCmdWrite, smCmdRead;
+static uint offsetCmdFirst, offsetCmdWrite, offsetCmdRead;
+
+void configCmdWriteForPIO(void);
+void configCmdWriteForDMA(void);
+void configCmdReadForPIO(void);
+void configCmdReadForDMA(void);
+
+void pioConfigAll(void)
+{
+    bool success;
+ 
+    success = pio_claim_free_sm_and_add_program_for_gpio_range(&cmd_first_program, &pioCmdFirst, &smCmdFirst, &offsetCmdFirst, PIN_D0, 26, true);
+    if(!success) { debug("Failed to claim PIO SM 1\n"); while(1); }
+    cmd_first_program_init(pioCmdFirst, smCmdFirst, offsetCmdFirst, PIN_CS, PIN_A1);
+
+    success = pio_claim_free_sm_and_add_program_for_gpio_range(&cmd_write_program, &pioCmdWrite, &smCmdWrite, &offsetCmdWrite, PIN_D0, 26, true);
+    if(!success) { debug("Failed to claim PIO SM 1\n"); while(1); }
+    cmd_write_program_init(pioCmdWrite, smCmdWrite, offsetCmdWrite, PIN_D0, PIN_INT, PIN_CS);
+
+    success = pio_claim_free_sm_and_add_program_for_gpio_range(&cmd_read_program, &pioCmdRead, &smCmdRead, &offsetCmdRead, PIN_D0, 26, true);
+    if(!success) { debug("Failed to claim PIO SM 1\n"); while(1); }
+    cmd_read_program_init(pioCmdRead, smCmdRead, offsetCmdRead, PIN_D0, PIN_INT, PIN_CS);
+}
+
+void pioConfig(int newMode)
+{
+    static int currentMode = MODE_UNKNOWN;
+
+    if(newMode == currentMode) {
+        return;
+    }
+    currentMode = newMode;
+
+    switch(newMode) 
+    {
+        case MODE_CMD_FIRST:
+        {
+            pio_sm_set_enabled(pioCmdWrite, smCmdWrite, false);
+            pio_sm_set_enabled(pioCmdRead, smCmdRead, false);
+            pio_sm_set_enabled(pioCmdFirst, smCmdFirst, true);
+        }; break;
+
+        case MODE_CMD_REST:
+        {
+            pio_sm_set_enabled(pioCmdFirst, smCmdFirst, false);
+            pio_sm_set_enabled(pioCmdRead, smCmdRead, false);
+
+            pio_sm_set_enabled(pioCmdWrite, smCmdWrite, false);
+            configCmdWriteForPIO();
+            pio_sm_set_enabled(pioCmdWrite, smCmdWrite, true);
+        }; break;
+
+        case MODE_DMA_READ:
+        {
+            pio_sm_set_enabled(pioCmdFirst, smCmdFirst, false);
+            pio_sm_set_enabled(pioCmdWrite, smCmdWrite, false);
+
+            pio_sm_set_enabled(pioCmdRead, smCmdRead, false);
+            configCmdReadForDMA();
+            pio_sm_set_enabled(pioCmdRead, smCmdRead, true);
+        }; break;
+
+        case MODE_DMA_WRITE:
+        {
+            pio_sm_set_enabled(pioCmdFirst, smCmdFirst, false);
+            pio_sm_set_enabled(pioCmdRead, smCmdRead, false);
+
+            pio_sm_set_enabled(pioCmdWrite, smCmdWrite, false);
+            configCmdWriteForDMA();
+            pio_sm_set_enabled(pioCmdWrite, smCmdWrite, true);
+        }; break;
+
+        case MODE_STATUS:
+        {
+            pio_sm_set_enabled(pioCmdFirst, smCmdFirst, false);
+            pio_sm_set_enabled(pioCmdWrite, smCmdWrite, false);
+
+            pio_sm_set_enabled(pioCmdRead, smCmdRead, false);
+            configCmdReadForPIO();
+            pio_sm_set_enabled(pioCmdRead, smCmdRead, true);
+        }; break;
+    }
+}
+
 uint8_t PIO_gotFirstCmdByte(void)
 {
+    pioConfig(MODE_CMD_FIRST);
+
     return false;
     // return BIT_IS_H(PIN_CMD1ST);
 }
@@ -33,7 +121,7 @@ uint8_t PIO_writeFirst(void)
 
     // init vars,
     brStat = E_OK;   // init bridge status to E_OK
-    return dataIn(); // read data after EOT
+    return 0;        // read data after EOT
 }
 
 // get next CMD byte from ST -- with setting INT to LOW and waiting for CS
@@ -83,6 +171,8 @@ void PIO_read(uint8_t scsiStatusByte)
 
 void PIO_read_solely(uint8_t val)
 {
+    pioConfig(MODE_STATUS);
+
     // setDataDirection(DIR_SEND); // finish with send status
     // dataOut(val);               // output data to GPIO pins
 
@@ -216,70 +306,4 @@ void setDataDirection(uint8_t sendNotRecv)
     {
         BIT_CLR(PIN_DATA_DIR);
     }
-}
-
-/*
-    This method waits for EOT (end-of-transfer) to become H, after it's been set to L by chip and
-    will be reset back to H by Atari after each transfered byte. It's waiting up to the timeout time
-    and can fail if Atari doesn't transfer the current byte.
-*/
-uint8_t waitForEOT(void)
-{
-    while(!hasTimedOut)
-    {
-
-    }
-
-    return FALSE;               // timeout? fail
-}
-
-/*
-    This method waits for the EOT (which is INT & DRQ) to reach specified level, but only for a short while.
-    It's used after doing rising CLK on TRIG_INT or TRIG_DRQ, and it's just waiting for the CLK to propagate
-    the FF12D value through D flip-flow to Q output (either INT or DRQ), so we don't return TRIG to L too quickly.
-    This doesn't wait for Atari response, but just for flip-flop response and should always succeed.
-*/
-void waitForEOTlevel(int level)
-{
-    for (int i = 0; i < 1000; i++)
-    {
-
-    }
-}
-
-uint8_t dataIn(void)
-{
-    uint8_t data = 0;
-
-    uint32_t gpioValue = gpio_get_all();    // read all GPIO pins
-    data = (gpioValue >> 2);                // shift 2 bits down to get data in the right place
-
-    return data;
-}
-
-void dataOut(uint8_t data)
-{
-    uint32_t data32 = ((uint32_t) data) << 2;
-    gpio_put_masked(0x3fc, data32);
-}
-
-void dumpPinStates(void)
-{
-    // Serial.print("CMD1ST: ");
-    // Serial.print(BIT_IS_H(PIN_CMD1ST));
-
-    // Serial.print(", EOT: ");
-    // Serial.print(BIT_IS_H(PIN_EOT));
-
-    // Serial.print(", OUT_OE: ");
-    // Serial.print(BIT_IS_H(PIN_DATA_DIR));
-
-    // Serial.print(", DRQ_TRIG: ");
-    // Serial.print(BIT_IS_H(PIN_DRQ_TRIG));
-
-    // Serial.print(", FF12D: ");
-    // Serial.print(BIT_IS_H(PIN_FF12D));
-
-    // Serial.print(", INT_TRIG: ");
-    // Serial.println(BIT_IS_H(PIN_INT_TRIG));
 }

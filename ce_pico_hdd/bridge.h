@@ -14,6 +14,15 @@
 #define DIR_RECV 0
 #define DIR_SEND 1
 
+#define MODE_UNKNOWN    0
+#define MODE_CMD_FIRST  1
+#define MODE_CMD_REST   2
+#define MODE_DMA_READ   3
+#define MODE_DMA_WRITE  4
+#define MODE_STATUS     5
+
+void pioConfig(int newMode);
+
 void resetBridge(void);
 void getBridgeStatus(void);
 uint8_t isBusIdle(void);
@@ -32,11 +41,6 @@ void PIO_read_solely(uint8_t val);
 
 // internal functions
 void setDataDirection(uint8_t sendNotRecv);
-uint8_t waitForEOT(void);
-void waitForEOTlevel(int level);
-uint8_t dataIn(void);
-void dataOut(uint8_t data);
-
 void dumpPinStates(void);
 
 #endif

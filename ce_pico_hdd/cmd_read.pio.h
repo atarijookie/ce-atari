@@ -47,18 +47,29 @@ static inline pio_sm_config cmd_read_program_get_default_config(uint offset) {
 
 #include "hardware/clocks.h"
 #include "hardware/gpio.h"
+pio_sm_config cRead;
 static inline void cmd_read_program_init(PIO pio, uint sm, uint offset, uint pinOut, uint pinSet, uint pinJmp)
 {
-    pio_sm_config c = cmd_read_program_get_default_config(offset);
-    sm_config_set_out_pins(&c, pinOut, 8);          // for OUT
-    sm_config_set_set_pins(&c, pinSet, 1);          // for SET
-    sm_config_set_jmp_pin(&c, pinJmp);              // for JMP
-    sm_config_set_out_shift(&c, true, false, 32);   // Shift to right, autopush disabled
-    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);  // Deeper FIFO as we're not doing any RX
+    cRead = cmd_read_program_get_default_config(offset);
+    sm_config_set_out_pins(&cRead, pinOut, 8);          // for OUT
+    sm_config_set_set_pins(&cRead, pinSet, 1);          // for SET
+    sm_config_set_jmp_pin(&cRead, pinJmp);              // for JMP
+    sm_config_set_out_shift(&cRead, true, false, 32);   // Shift to right, autopush disabled
+    sm_config_set_fifo_join(&cRead, PIO_FIFO_JOIN_TX);  // Deeper FIFO as we're not doing any RX
     float div = (float)clock_get_hz(clk_sys) / 50000000;    // calc divider for 50 MHz, that's 20 ns per instruction
-    sm_config_set_clkdiv(&c, div);
-    pio_sm_init(pio, sm, offset, &c);
-    pio_sm_set_enabled(pio, sm, true);
+    sm_config_set_clkdiv(&cRead, div);
+    pio_sm_init(pio, sm, offset, &cRead);
+    // pio_sm_set_enabled(pio, sm, true);
+}
+void configCmdReadForPIO(void)
+{
+    sm_config_set_set_pins(&cRead, PIN_INT, 1);        // for SET
+    sm_config_set_jmp_pin(&cRead, PIN_CS);             // for JMP
+}
+void configCmdReadForDMA(void)
+{
+    sm_config_set_set_pins(&cRead, PIN_DRQ, 1);        // for SET
+    sm_config_set_jmp_pin(&cRead, PIN_ACK);            // for JMP
 }
 
 #endif

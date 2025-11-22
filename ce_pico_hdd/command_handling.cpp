@@ -76,6 +76,8 @@ uint8_t onGetCommandAcsi(void)
         return 0;
     }
 
+    pioConfig(MODE_CMD_REST);
+
     cmdLen = 6; // maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
 
     for (i = 1; i < cmdLen; i++)
@@ -179,6 +181,8 @@ uint8_t onDataRead(uint8_t withStatus)
         PIO_read(statusByte);
         return STATE_GET_COMMAND;   // next state: get next command
     }
+
+    pioConfig(MODE_DMA_READ);
 
     uint32_t start = millis();
     while(!dataReceived)
@@ -297,6 +301,8 @@ uint8_t onDataWrite(void)
 
     // get data from Atari and send it to host by sector sized chunks
     setDataDirection(DIR_RECV);     // data direction for reading
+
+    pioConfig(MODE_DMA_WRITE);
 
     while (dataCnt > 0)             // something to write?
     {
