@@ -3,6 +3,10 @@
 .program cmd_write
 
 start:  
+        pull                ; load from the TX FIFO into the OSR
+        mov x, osr          ; X = OSR
+
+more:
         set pins, 0         ; set INT to L
 
         ; wait for CS to become L, keep looping while it's still H
@@ -13,13 +17,22 @@ wait4L: jmp pin wait4L
         push                ; push the contents of the ISR into the RX FIFO
 
         ; wait for CS to become H, keep looping while it's still L
-wait4H: jmp pin start
+wait4H: jmp pin jump_if_more
         jmp wait4H
+
+        ; if X is not zero, decrement and jump to get one more byte
+        ; x must be loaded to value N-1, if you want to load N bytes 
+jump_if_more:
+        jmp x-- more
+
+        jmp start
 
 
 % c-sdk {
 #include "hardware/clocks.h"
 #include "hardware/gpio.h"
+
+// to read N bytes, you must put N-1 into TX FIFO (one less)
 
 static inline void cmd_write_program_init(PIO pio, uint sm, uint offset, uint pinIn, uint pinSet, uint pinJmp)
 {
@@ -28,7 +41,7 @@ static inline void cmd_write_program_init(PIO pio, uint sm, uint offset, uint pi
     sm_config_set_set_pins(&c, pinSet, 1);          // for SET
     sm_config_set_jmp_pin(&c, pinJmp);              // for JMP
     sm_config_set_in_shift(&c, true, false, 32);    // Shift to right, autopush disabled
-    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_RX);  // Deeper FIFO as we're not doing any TX
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_NONE);  // no fifo
 
     float div = (float)clock_get_hz(clk_sys) / 50000000;    // calc divider for 50 MHz, that's 20 ns per instruction
     sm_config_set_clkdiv(&c, div);
