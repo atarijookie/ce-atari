@@ -26,9 +26,6 @@
     #define MAX(X,Y)    ((X > Y) ? X : Y)
 #endif
 
-#define PREFERENCES_RW_MODE false
-#define PREFERENCES_RO_MODE true
-
 #define CMD_TIMEOUT_SECS_PER_MB 3
 #define CMD_TIMEOUT_ONESECOND   1000
 #define CMD_TIMEOUT_SHORT       (CMD_TIMEOUT_ONESECOND / 2)     // this period will be 0.5 second

@@ -1,9 +1,14 @@
+#include <EEPROM.h>
+
+#include "utils.h"
 #include "defs.h"
 
 // hw_timer_t *timer = NULL;
 volatile uint8_t hasTimedOut = false;
 uint8_t timerRunning = false;
 uint32_t timerEndMillis = 0;
+
+struct TSettings settings;
 
 uint16_t getWord(uint8_t *bfr)
 {
@@ -133,4 +138,40 @@ void storeHeader(uint8_t *bfr, uint16_t atnCode, uint32_t txLen)
     storeDword(bfr, 0xc050d1c5); //  0..3: 0xc050d1c5 [COSmODICS] (4 bytes)
     storeWord(bfr + 4, atnCode); //  4..5: ATN code (2 bytes)
     storeDword(bfr + 6, txLen);  //  6..9: txLen (4 bytes)
+}
+
+void saveSettings(void)
+{
+    settings.magic = SETTINGS_MAGIC;
+
+    uint8_t* pSettings = (uint8_t*) &settings;
+    for(int i=0; i<sizeof(settings); i++) {
+        EEPROM.write(i, pSettings[i]);
+    }
+
+    EEPROM.commit();
+}
+
+void loadSettings(void)
+{
+    EEPROM.begin(512);
+
+    // read settings from eeprom
+    uint8_t* pSettings = (uint8_t*) &settings;
+    for(int i=0; i<sizeof(settings); i++) {
+        pSettings[i] = EEPROM.read(i);
+    }
+
+    // if settings are not stored yet, store default settings
+    if(settings.magic != SETTINGS_MAGIC) {
+        settings.magic = SETTINGS_MAGIC;
+        settings.enabledIDs = 1;
+
+        for(int i=0; i<6; i++) {
+            settings.mac[i] = random(255);
+        }
+        settings.mac[0] = (settings.mac[0] & 0xFE) | 0x02;   // LAA + unicast
+
+        saveSettings();
+    }
 }

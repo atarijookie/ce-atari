@@ -2,6 +2,7 @@
 #define __UTILS_H__
 
 #include <arduino.h>
+#include "defs.h"
 
 uint16_t getWord(uint8_t *bfr);
 uint32_t getDword(uint8_t *bfr);
@@ -18,10 +19,18 @@ void timeoutStart(uint32_t durationMs = CMD_TIMEOUT_SHORT);
 void longTimeout_basedOnSectorCount(uint16_t sectorCount);
 void cmdTimeoutChangeLength(uint32_t newPeriod);
 
-#define SETTING_SSID 'S'
-#define SETTING_PSWD 'P'
-#define SETTING_IDS 'I'
-void getSetting(uint8_t settingId, uint8_t *settingBfr, uint8_t settingMaxLen);
-void setSetting(uint8_t settingId, uint8_t *settingBfr, uint8_t settingMaxLen);
+#define SETTINGS_MAGIC  0xcafebabe
+
+struct __attribute__((packed)) TSettings
+{
+    uint32_t magic;
+    uint8_t mac[8];
+    uint8_t enabledIDs;
+    uint8_t ikbdEnabled;
+};
+
+extern TSettings settings;
+void loadSettings(void);
+void saveSettings(void);
 
 #endif

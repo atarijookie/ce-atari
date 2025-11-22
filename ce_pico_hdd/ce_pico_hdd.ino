@@ -1,4 +1,5 @@
 #include <Ethernet.h>
+#include <EEPROM.h>
 
 #include "defs.h"
 #include "bridge.h"
@@ -24,12 +25,8 @@ uint8_t cmdLen;  // length of received command
 uint8_t brStat;  // status from bridge
 uint8_t lastScsiStatusByte;
 
-uint8_t enabledIDs;
-
 uint8_t isAcsiNotScsi;
 uint8_t busIdle;
-
-extern volatile bool ikbdEnabled;   // if true, should send data to host; otherwise just loopback ikdb data back
 
 void handleButton(void);
 
@@ -44,6 +41,8 @@ void setup(void)
     // Serial2.begin(7812, SERIAL_8N1, /* rxd pin */ PIN_KEYB_RX, /* txd pin */ PIN_TXD2);         // uart2 for IKBD
 
     Serial.println("setup() starting");
+
+    loadSettings();
 
     #define INPUTS_COUNT 13
     int inputs[INPUTS_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_CS, PIN_A1, PIN_ACK, PIN_RESET, PIN_SDA};
@@ -61,17 +60,8 @@ void setup(void)
         pinMode(outputs[i], OUTPUT);
     }
 
-    // read acsi ids
-    // preferences.begin("acsi", PREFERENCES_RO_MODE);
-    // enabledIDs = preferences.getUChar("ids", 0);
-    // preferences.end();
-
-    // preferences.begin("ikbd", PREFERENCES_RO_MODE);
-    // ikbdEnabled = preferences.getUChar("enabled", 1);
-    // preferences.end();
-
     Ethernet.init(17);      // WIZnet W6100-EVB-Pico
-    Ethernet.begin(mac);    // set mac, get IP via hdcp
+    Ethernet.begin(settings.mac);    // set mac, get IP via hdcp
 
     if(Ethernet.hardwareStatus() == EthernetNoHardware) {
         Serial.println("No ethernet. HALT!");
@@ -92,7 +82,7 @@ void setup(void)
     resetBridge();
 
     Serial.print("setup() done, enabledIDs: ");
-    Serial.print(enabledIDs, HEX);
+    Serial.print(settings.enabledIDs, HEX);
     Serial.println("");
 
 #ifdef RW_TASKS
@@ -260,15 +250,13 @@ void onButtonStateChanged(int buttonState, uint32_t now, uint32_t& buttonPressTi
 
     if(pressDuration < BTN_PRESS_SHORT)     // on short press, ikbd enable / disable
     {
-        ikbdEnabled = !ikbdEnabled;
+        settings.ikbdEnabled = !settings.ikbdEnabled;
     }
 
     // on longer press, save ikbd enabled flag
     if(pressDuration >= BTN_PRESS_SAVE)
     {
-        // preferences.begin("ikbd", PREFERENCES_RW_MODE);
-        // preferences.putUChar("enabled", ikbdEnabled);
-        // preferences.end();
+        saveSettings();
     }
 
     showRunningStateOnDisplay();

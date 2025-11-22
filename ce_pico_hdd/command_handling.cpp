@@ -1,5 +1,4 @@
 #include <Ethernet.h>
-#include <splash.h>
 
 #include "defs.h"
 #include "bridge.h"
@@ -30,8 +29,6 @@ extern uint8_t *cmd;   // received command bytes, should point beyond the header
 extern uint8_t cmdLen; // length of received command
 extern uint8_t brStat; // status from bridge
 extern uint8_t lastScsiStatusByte;
-
-extern uint8_t enabledIDs;
 
 extern uint8_t isAcsiNotScsi;
 extern uint8_t busIdle;
@@ -424,5 +421,5 @@ uint8_t idIsEnabled(uint8_t id)
         return FALSE;
     }
 
-    return (enabledIDs & (1 << id));
+    return (settings.enabledIDs & (1 << id));
 }

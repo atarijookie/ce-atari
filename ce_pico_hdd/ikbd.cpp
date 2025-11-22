@@ -9,8 +9,6 @@ extern String hostIpString;
 extern uint16_t hostPortIkbd;
 extern bool connected;              // if true, wifi is connected
 
-volatile bool ikbdEnabled = true;   // if true, should send data to host; otherwise just loopback ikdb data back
-
 #define IKBD_BFR_SIZE 128
 uint8_t buffer[IKBD_BFR_SIZE];
 
@@ -68,7 +66,7 @@ void onIkbdEnabled(void)
 
 void ikbdConnectDisconnect(void)
 {
-    // if(ikbdEnabled)
+    // if(settings.ikbdEnabled)
     // {
     //     // ikbd is enabled, ikdb chip is sending data (chip present), wifi is connected, but our ikbd socket is NOT connected, connect now
     //     if(connected && !clientIkbd.connected())
@@ -112,13 +110,13 @@ void taskIkbd(void* pvParameters)
     //             clientIkbd.write(UARTMARK_ALIVE);
     //         }
 
-    //         // Serial.print("I enabled "); Serial.print(ikbdEnabled); Serial.print(" connected "); Serial.println(clientIkbd.connected());
+    //         // Serial.print("I enabled "); Serial.print(settings.ikbdEnabled); Serial.print(" connected "); Serial.println(clientIkbd.connected());
     //     }
 
     //     ikbdConnectDisconnect();
 
     //     // ikbd enabled and ikbd socket is connected? send and get data to/from host
-    //     if(ikbdEnabled && clientIkbd.connected())
+    //     if(settings.ikbdEnabled && clientIkbd.connected())
     //     {
     //         onIkbdEnabled();
     //     }

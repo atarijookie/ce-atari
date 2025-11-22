@@ -5,8 +5,6 @@
 #include "utils.h"
 #include "display.h"
 
-extern uint8_t enabledIDs;
-
 #define SERVER_UDP_PORT 7200 // port number where CE listens for client requests
 #define CLIENT_UDP_PORT 7201 // port where this client should listen for CE responses
 
@@ -30,8 +28,6 @@ extern bool dataReceived;
 
 bool connected;
 
-extern volatile bool ikbdEnabled;   // if true, should send data to host; otherwise just loopback ikdb data back
-
 THeader hddHeader;      // keep the header global to preserve syncTag between calls
 
 void storeMacAddress(void);
@@ -46,13 +42,13 @@ void showRunningStateOnDisplay(void)
 
     String msg3 = "devs: ";
     for(int i=0; i<8; i++) {
-        if(enabledIDs & (1 << i)) {     // if ID bit enabled, add to string
+        if(settings.enabledIDs & (1 << i)) {     // if ID bit enabled, add to string
             msg3 += i;
             msg3 += " ";
         }
     }
 
-    if(ikbdEnabled) {       // if ikbd is enabled
+    if(settings.ikbdEnabled) {       // if ikbd is enabled
         msg3 += "IKBD";
     }
 
@@ -89,7 +85,7 @@ void ceDiscoverySend(void)
     displayMessage("wifi connected", "CE host discovery");
 
     // send upd broadcast
-    uint8_t updPacket[4];
+    uint8_t updPacket[5];
     strcpy((char *)updPacket, "CELC");
 
     whichBroadcastAddr = !whichBroadcastAddr;   // toggle this flag
@@ -345,16 +341,14 @@ void handleAcsiConfig(uint32_t len)
             i++;    // move 1 more byte forward, as we've read it
 
             // check if new config different from previous, then write settings
-            if(enabledIDs != newAcsiIds) {
-                enabledIDs = newAcsiIds;
+            if(settings.enabledIDs != newAcsiIds) {
+                settings.enabledIDs = newAcsiIds;
 
                 Serial.print("handleAcsiConfig - storing new ids: ");
                 Serial.print(newAcsiIds, HEX);
                 Serial.println("");
 
-                // preferences.begin("acsi", PREFERENCES_RW_MODE);
-                // preferences.putUChar("ids", newAcsiIds);
-                // preferences.end();
+                saveSettings();
 
                 showRunningStateOnDisplay();
             }
