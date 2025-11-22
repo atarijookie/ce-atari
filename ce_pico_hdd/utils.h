@@ -33,4 +33,6 @@ extern TSettings settings;
 void loadSettings(void);
 void saveSettings(void);
 
+void debug(const char *fmt, ...);
+
 #endif

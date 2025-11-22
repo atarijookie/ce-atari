@@ -71,7 +71,7 @@ void ikbdConnectDisconnect(void)
     //     // ikbd is enabled, ikdb chip is sending data (chip present), wifi is connected, but our ikbd socket is NOT connected, connect now
     //     if(connected && !clientIkbd.connected())
     //     {
-    //         Serial.println("I connect");
+    //         debug("I connect");
     //         clientIkbd.connect(hostIpString.c_str(), hostPortIkbd);
     //         clientIkbd.setNoDelay(true);
     //     }
@@ -81,7 +81,7 @@ void ikbdConnectDisconnect(void)
     //     // ikbd not sending data (chip not present) or ikbd not enabled, but the ikbd socket is connected, then disconnect
     //     if(clientIkbd.connected())
     //     {
-    //         Serial.println("I disconnect");
+    //         debug("I disconnect");
     //         clientIkbd.stop();
     //     }
     // }
@@ -90,7 +90,7 @@ void ikbdConnectDisconnect(void)
 void taskIkbd(void* pvParameters)
 {
     // uint32_t lastReceivedTime = 0xffff0000;     // when was some data last received from ikdb
-    // Serial.println("I starting");
+    // debug("I starting");
 
     // uint32_t lastStatus = 0;
 
@@ -110,7 +110,7 @@ void taskIkbd(void* pvParameters)
     //             clientIkbd.write(UARTMARK_ALIVE);
     //         }
 
-    //         // Serial.print("I enabled "); Serial.print(settings.ikbdEnabled); Serial.print(" connected "); Serial.println(clientIkbd.connected());
+    //         // debug("I enabled: %d, connected: %d\n", settings.ikbdEnabled, clientIkbd.connected());
     //     }
 
     //     ikbdConnectDisconnect();

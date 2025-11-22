@@ -30,8 +30,6 @@ bool connected;
 
 THeader hddHeader;      // keep the header global to preserve syncTag between calls
 
-void storeMacAddress(void);
-
 void showRunningStateOnDisplay(void)
 {
     char msg1[128];
@@ -104,8 +102,7 @@ void ceDiscoverySend(void)
 
         // IPAddress addrBroadcast((uint8_t) (ip32broadcast >> 24), (uint8_t) (ip32broadcast >> 16), (uint8_t) (ip32broadcast >> 8), (uint8_t) ip32broadcast);    // from uint32_t to object
 
-        // Serial.print("ceDiscoverySend to ");
-        // Serial.println(addrBroadcast.toString().c_str());
+        // debug("ceDiscoverySend to %s\n", addrBroadcast.toString().c_str());
 
         // // broadcast to subnet devices (e.g. 192.168.1.255)
         // udp.beginPacket(addrBroadcast.toString().c_str(), SERVER_UDP_PORT);
@@ -114,7 +111,7 @@ void ceDiscoverySend(void)
     }
     else        // send to generic broadcast addr
     {
-        Serial.println("ceDiscoverySend to 255.255.255.255");
+        debug("ceDiscoverySend to 255.255.255.255");
 
         // broadcast to all possible devices (255.255.255.255)
         udp.beginPacket("255.255.255.255", SERVER_UDP_PORT);
@@ -187,14 +184,7 @@ void ceDiscoveryReceive(void)
         hostPortFdd = getWord(buffer + 6);
         hostPortIkbd = getWord(buffer + 8);
 
-        Serial.print("ceDiscoveryReceive - got host ip: ");
-        Serial.print(hostIpString);
-        Serial.print(", ports: ");
-        Serial.print(hostPortHdd);
-        Serial.print(", ");
-        Serial.print(hostPortFdd);
-        Serial.print(", ");
-        Serial.println(hostPortIkbd);
+        debug("ceDiscoveryReceive - got host ip: %s, ports: %d, %d, %d\n", hostIpString, hostPortHdd, hostPortFdd, hostPortIkbd);
     }
 }
 
@@ -206,7 +196,7 @@ void connectToCEhost(void)
     if (clientHdd.connected())  // && clientIkbd.connected())
     { // already connected? quit
         if(!loggedOnce) {
-            Serial.println("connectToCEhost - connected!");
+            debug("connectToCEhost - connected!\n");
             loggedOnce = true;
         }
 
@@ -231,10 +221,7 @@ void connectToCEhost(void)
 
     displayMessage("wifi connected", "connecting to host:", hostIpString.c_str());
 
-    Serial.print("connectToCEhost - IP: ");
-    Serial.print(hostIpString.c_str());
-    Serial.print(", port: ");
-    Serial.println(hostPortHdd);
+    debug("connectToCEhost - IP: %s, port: %d\n", hostIpString.c_str(), hostPortHdd);
 
     // start connection attempt
     clientHdd.connect(hostIpString.c_str(), hostPortHdd);
@@ -344,9 +331,7 @@ void handleAcsiConfig(uint32_t len)
             if(settings.enabledIDs != newAcsiIds) {
                 settings.enabledIDs = newAcsiIds;
 
-                Serial.print("handleAcsiConfig - storing new ids: ");
-                Serial.print(newAcsiIds, HEX);
-                Serial.println("");
+                debug("handleAcsiConfig - storing new ids: %02X\n", newAcsiIds);
 
                 saveSettings();
 
@@ -406,7 +391,7 @@ void handleIncommingData(void)
             case CMD_DATA_MARKER: handleReadDataReceived(); break;
             case CMD_DATA_WRITE: handleWriteStart(); break;
             case CMD_SEND_STATUS: handleSendStatus(); break;
-            default: Serial.print("unknown cmdCode "); Serial.println(hddHeader.cmdCode); break;
+            default: debug("unknown cmdCode %d\n", hddHeader.cmdCode); break;
         }
     }
 }

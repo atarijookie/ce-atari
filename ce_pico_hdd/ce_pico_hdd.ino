@@ -30,7 +30,6 @@ uint8_t busIdle;
 
 void handleButton(void);
 
-uint8_t mac[6] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
 EthernetClient client;
 
 void setup(void)
@@ -40,7 +39,7 @@ void setup(void)
     // Serial1.begin(7812, SERIAL_8N1, /* rxd pin */ PIN_KEYB_TX_ORIG, /* txd pin */ PIN_KEYB_TX); // uart1 for IKBD
     // Serial2.begin(7812, SERIAL_8N1, /* rxd pin */ PIN_KEYB_RX, /* txd pin */ PIN_TXD2);         // uart2 for IKBD
 
-    Serial.println("setup() starting");
+    debug("setup() starting\n");
 
     loadSettings();
 
@@ -60,19 +59,6 @@ void setup(void)
         pinMode(outputs[i], OUTPUT);
     }
 
-    Ethernet.init(17);      // WIZnet W6100-EVB-Pico
-    Ethernet.begin(settings.mac);    // set mac, get IP via hdcp
-
-    if(Ethernet.hardwareStatus() == EthernetNoHardware) {
-        Serial.println("No ethernet. HALT!");
-        while(1);
-    }
-
-    while (Ethernet.linkStatus() == LinkOFF) {
-        Serial1.println("cable not connected");
-        delay(1000);
-    }
-
     cmd = atnSendACSIcommand + TX_HEADER_SIZE;      // place command beyond the header
     state = STATE_GET_COMMAND;
 
@@ -81,9 +67,26 @@ void setup(void)
     getBridgeStatus();
     resetBridge();
 
-    Serial.print("setup() done, enabledIDs: ");
-    Serial.print(settings.enabledIDs, HEX);
-    Serial.println("");
+    debug("setup() done, enabledIDs: %02X\n", settings.enabledIDs);
+
+    Ethernet.init(17);              // WIZnet W6100-EVB-Pico
+    Ethernet.begin(settings.mac);   // set mac, get IP via hdcp
+
+    if(Ethernet.hardwareStatus() == EthernetNoHardware) {
+        debug("No ethernet. HALT!\n");
+        while(1);
+    }
+
+    while(Ethernet.linkStatus() == LinkOFF) {
+        debug("cable not connected\n");
+        delay(1000);
+    }
+
+    // store mac to fw version buffer
+    memcpy(atnSendFwVersion + TX_HEADER_SIZE + 6, settings.mac, 6);
+
+    debug("mac: %02X:%02X:%02X:%02X:%02X:%02X\n", atnSendFwVersion[TX_HEADER_SIZE + 6], atnSendFwVersion[TX_HEADER_SIZE + 7], atnSendFwVersion[TX_HEADER_SIZE + 8],
+                                                  atnSendFwVersion[TX_HEADER_SIZE + 9], atnSendFwVersion[TX_HEADER_SIZE + 10], atnSendFwVersion[TX_HEADER_SIZE + 11]);
 
 #ifdef RW_TASKS
     createTasks();      // create the read / write tasks
@@ -103,16 +106,6 @@ void setupAtnBuffers(void)
     storeWord(atnSendFwVersion + TX_HEADER_SIZE, version[0]);
     storeWord(atnSendFwVersion + TX_HEADER_SIZE + 2, version[1]);
     atnSendFwVersion[TX_HEADER_SIZE + 5] = 0x41;                    // v.4, ACSI
-}
-
-void storeMacAddress(void)
-{
-    // WiFi.STA.macAddress(atnSendFwVersion + TX_HEADER_SIZE + 6);
-
-    char msg[128];
-    sprintf(msg, "mac: %02X:%02X:%02X:%02X:%02X:%02X", atnSendFwVersion[TX_HEADER_SIZE + 6], atnSendFwVersion[TX_HEADER_SIZE + 7], atnSendFwVersion[TX_HEADER_SIZE + 8],
-                                                       atnSendFwVersion[TX_HEADER_SIZE + 9], atnSendFwVersion[TX_HEADER_SIZE + 10], atnSendFwVersion[TX_HEADER_SIZE + 11]);
-    Serial.println(msg);
 }
 
 void loop(void)
@@ -203,23 +196,15 @@ void loop(void)
             timeoutClear();
 
 #ifdef LOG_MORE
-            Serial.print("State: ");
-            Serial.print(state);
-            Serial.print(", cmd: ");
-            for(int i=0; i<12; i++) {
-                Serial.print(cmd[i], HEX);
-                Serial.print(" ");
-            }
-
-            Serial.print("timeout at ");
-            Serial.println(millis());
+            debug("State : %d, cmd: %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X, timeout at: %d\n",
+                state, cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7], cmd[8], cmd[9], cmd[10], cmd[11], millis());
 #endif
             state = STATE_GET_COMMAND;
 
             if (!isBusIdle())
             {
 #ifdef LOG_MORE
-                Serial.println("resetBridge!");
+                debug("resetBridge!\n");
 #endif
                 resetBridge();
             }

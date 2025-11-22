@@ -84,10 +84,7 @@ void store24bits(uint8_t *bfr, uint32_t val)
 void timeoutStart(uint32_t durationMs)
 {
 // #ifdef LOG_MORE
-//     Serial.print("timeoutStart ");
-//     Serial.print(durationMs);
-//     Serial.print(" at ");
-//     Serial.println(millis());
+//     debug("timeoutStart %d at %d", durationMs, millis());
 // #endif
 
     if(timerRunning)                                // if timer running, stop it first
@@ -109,7 +106,7 @@ void timeoutStart(uint32_t durationMs)
 void timeoutClear(void)
 {
 // #ifdef LOG_MORE
-//     Serial.println("timeoutClear");
+//  debug("timeoutClear\n");
 // #endif
 
     hasTimedOut = false;
@@ -173,5 +170,23 @@ void loadSettings(void)
         settings.mac[0] = (settings.mac[0] & 0xFE) | 0x02;   // LAA + unicast
 
         saveSettings();
+    }
+}
+
+void debug(const char *fmt, ...)
+{
+    char buf[256];
+    va_list args;
+    va_start(args, fmt);
+    int len = vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+
+    for(int i=0; i<len; i++) {
+        if(buf[i] == '\n') {
+            uart_putc_raw(uart0, '\n');
+            uart_putc_raw(uart0, '\r');
+        } else {
+            uart_putc_raw(uart0, buf[i]);
+        }
     }
 }
