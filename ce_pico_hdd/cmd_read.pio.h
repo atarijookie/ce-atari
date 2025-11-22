@@ -13,7 +13,7 @@
 // -------- //
 
 #define cmd_read_wrap_target 0
-#define cmd_read_wrap 5
+#define cmd_read_wrap 6
 #define cmd_read_pio_version 0
 
 static const uint16_t cmd_read_program_instructions[] = {
@@ -21,16 +21,17 @@ static const uint16_t cmd_read_program_instructions[] = {
     0x80a0, //  0: pull   block
     0x6008, //  1: out    pins, 8
     0xe000, //  2: set    pins, 0
-    0x2029, //  3: wait   0 pin, 9
+    0x00c3, //  3: jmp    pin, 3
     0xe001, //  4: set    pins, 1
-    0x20a9, //  5: wait   1 pin, 9
+    0x00c0, //  5: jmp    pin, 0
+    0x0005, //  6: jmp    5
             //     .wrap
 };
 
 #if !PICO_NO_HARDWARE
 static const struct pio_program cmd_read_program = {
     .instructions = cmd_read_program_instructions,
-    .length = 6,
+    .length = 7,
     .origin = -1,
     .pio_version = cmd_read_pio_version,
 #if PICO_PIO_VERSION > 0
@@ -46,14 +47,15 @@ static inline pio_sm_config cmd_read_program_get_default_config(uint offset) {
 
 #include "hardware/clocks.h"
 #include "hardware/gpio.h"
-static inline void cmd_read_program_init(PIO pio, uint sm, uint offset, uint pinWait, uint pinSet)
+static inline void cmd_read_program_init(PIO pio, uint sm, uint offset, uint pinOut, uint pinSet, uint pinJmp)
 {
     pio_sm_config c = cmd_read_program_get_default_config(offset);
-    sm_config_set_in_pins(&c, pinWait);             // for WAIT, IN
+    sm_config_set_out_pins(&c, pinOut, 8);          // for OUT
     sm_config_set_set_pins(&c, pinSet, 1);          // for SET
-    sm_config_set_in_shift(&c, true, false, 32);    // Shift to right, autopush disabled
+    sm_config_set_jmp_pin(&c, pinJmp);              // for JMP
+    sm_config_set_out_shift(&c, true, false, 32);   // Shift to right, autopush disabled
     sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);  // Deeper FIFO as we're not doing any RX
-    float div = (float)clock_get_hz(clk_sys) / 33250000;    // calc divider for 33.25 MHz, that's 30.08 ns per instruction
+    float div = (float)clock_get_hz(clk_sys) / 50000000;    // calc divider for 50 MHz, that's 20 ns per instruction
     sm_config_set_clkdiv(&c, div);
     pio_sm_init(pio, sm, offset, &c);
     pio_sm_set_enabled(pio, sm, true);

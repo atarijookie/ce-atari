@@ -25,7 +25,7 @@ static inline void cmd_first_program_init(PIO pio, uint sm, uint offset, uint pi
     sm_config_set_in_shift(&c, true, false, 32);    // Shift to right, autopush disabled
     sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_RX);  // Deeper FIFO as we're not doing any TX
 
-    float div = (float)clock_get_hz(clk_sys) / 33250000;    // calc divider for 33.25 MHz, that's 30.08 ns per instruction
+    float div = (float)clock_get_hz(clk_sys) / 50000000;    // calc divider for 50 MHz, that's 20 ns per instruction
     sm_config_set_clkdiv(&c, div);
 
     pio_sm_init(pio, sm, offset, &c);

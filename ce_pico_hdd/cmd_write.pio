@@ -2,28 +2,35 @@
 
 .program cmd_write
 
-start:
-    set pins, 0         ; set INT to L
-    wait 0 pin 9        ; wait for CS pin (gpio 11, minus 2 bits base) to become L
-    set pins, 1 [3]     ; set INT to H
-    in pins, 8          ; read 8 bits from gpio into isr
-    push                ; push the contents of the ISR into the RX FIFO
-    wait 1 pin 9        ; wait for CS pin (gpio 11, minus 2 bits base) to become H
+start:  
+        set pins, 0         ; set INT to L
+
+        ; wait for CS to become L, keep looping while it's still H
+wait4L: jmp pin wait4L
+
+        set pins, 1 [4]     ; set INT to H
+        in pins, 8          ; read 8 bits from gpio into ISR
+        push                ; push the contents of the ISR into the RX FIFO
+
+        ; wait for CS to become H, keep looping while it's still L
+wait4H: jmp pin start
+        jmp wait4H
 
 
 % c-sdk {
 #include "hardware/clocks.h"
 #include "hardware/gpio.h"
 
-static inline void cmd_write_program_init(PIO pio, uint sm, uint offset, uint pinWait, uint pinSet)
+static inline void cmd_write_program_init(PIO pio, uint sm, uint offset, uint pinIn, uint pinSet, uint pinJmp)
 {
     pio_sm_config c = cmd_write_program_get_default_config(offset);
-    sm_config_set_in_pins(&c, pinWait);             // for WAIT, IN
+    sm_config_set_in_pins(&c, pinIn);               // for WAIT, IN
     sm_config_set_set_pins(&c, pinSet, 1);          // for SET
+    sm_config_set_jmp_pin(&c, pinJmp);              // for JMP
     sm_config_set_in_shift(&c, true, false, 32);    // Shift to right, autopush disabled
     sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_RX);  // Deeper FIFO as we're not doing any TX
 
-    float div = (float)clock_get_hz(clk_sys) / 33250000;    // calc divider for 33.25 MHz, that's 30.08 ns per instruction
+    float div = (float)clock_get_hz(clk_sys) / 50000000;    // calc divider for 50 MHz, that's 20 ns per instruction
     sm_config_set_clkdiv(&c, div);
 
     pio_sm_init(pio, sm, offset, &c);
