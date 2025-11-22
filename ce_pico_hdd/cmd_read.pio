@@ -1,0 +1,33 @@
+.pio_version 0 // only requires PIO version 0
+
+.program cmd_read
+
+start:
+    pull                ; load from the TX FIFO into the OSR
+    out pins, 8         ; write 8 bits from OSR to gpio
+    set pins, 0         ; set INT to L
+    wait 0 pin 9        ; wait for CS pin (gpio 11, minus 2 bits base) to become L
+    set pins, 1         ; set INT to H
+    wait 1 pin 9        ; wait for CS pin (gpio 11, minus 2 bits base) to become H
+
+
+% c-sdk {
+#include "hardware/clocks.h"
+#include "hardware/gpio.h"
+
+static inline void cmd_read_program_init(PIO pio, uint sm, uint offset, uint pinWait, uint pinSet)
+{
+    pio_sm_config c = cmd_read_program_get_default_config(offset);
+    sm_config_set_in_pins(&c, pinWait);             // for WAIT, IN
+    sm_config_set_set_pins(&c, pinSet, 1);          // for SET
+    sm_config_set_in_shift(&c, true, false, 32);    // Shift to right, autopush disabled
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);  // Deeper FIFO as we're not doing any RX
+
+    float div = (float)clock_get_hz(clk_sys) / 33250000;    // calc divider for 33.25 MHz, that's 30.08 ns per instruction
+    sm_config_set_clkdiv(&c, div);
+
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+}
+
+%}

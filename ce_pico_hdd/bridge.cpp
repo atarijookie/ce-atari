@@ -2,6 +2,10 @@
 #include "bridge.h"
 #include "utils.h"
 
+#include "cmd_first.pio.h"
+#include "cmd_write.pio.h"
+#include "cmd_read.pio.h"
+
 extern uint8_t brStat; // status from bridge
 extern uint8_t isAcsiNotScsi;
 extern uint8_t lastScsiStatusByte;

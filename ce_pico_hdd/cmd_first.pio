@@ -1,0 +1,35 @@
+.pio_version 0 // only requires PIO version 0
+
+.program cmd_first
+
+start:
+    wait 0 pin 9        ; wait for CS pin (gpio 11, minus 2 bits base) to become L
+    jmp pin start       ; if A1 (jmp_pin) is H, ignore this CS being L
+
+    ; if got here, CS is L, A1 is L
+    in pins, 8          ; read 8 bits from gpio into isr
+    push                ; push the contents of the ISR into the RX FIFO
+
+    wait 1 pin 9        ; wait for CS pin (gpio 11, minus 2 bits base) to become H
+
+
+% c-sdk {
+#include "hardware/clocks.h"
+#include "hardware/gpio.h"
+
+static inline void cmd_first_program_init(PIO pio, uint sm, uint offset, uint pinWait, uint pinJmp)
+{
+    pio_sm_config c = cmd_first_program_get_default_config(offset);
+    sm_config_set_in_pins(&c, pinWait);             // for WAIT, IN
+    sm_config_set_jmp_pin(&c, pinJmp);              // for JMP
+    sm_config_set_in_shift(&c, true, false, 32);    // Shift to right, autopush disabled
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_RX);  // Deeper FIFO as we're not doing any TX
+
+    float div = (float)clock_get_hz(clk_sys) / 33250000;    // calc divider for 33.25 MHz, that's 30.08 ns per instruction
+    sm_config_set_clkdiv(&c, div);
+
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+}
+
+%}
