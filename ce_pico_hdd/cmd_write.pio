@@ -6,7 +6,7 @@ start:
         pull                ; load from the TX FIFO into the OSR
         mov x, osr          ; X = OSR
 
-more:
+one_more_byte:
         set pins, 0         ; set INT to L
 
         ; wait for CS to become L, keep looping while it's still H
@@ -14,18 +14,20 @@ wait4L: jmp pin wait4L
 
         set pins, 1 [4]     ; set INT to H
         in pins, 8          ; read 8 bits from gpio into ISR
-        push                ; push the contents of the ISR into the RX FIFO
 
         ; wait for CS to become H, keep looping while it's still L
-wait4H: jmp pin jump_if_more
+wait4H: jmp pin write_byte_end
         jmp wait4H
+
+write_byte_end:
+        ; Push the contents of the ISR into the RX FIFO.
+        ; This push is intentionally late in the routine,
+        ; so seeting it in the FIFO means that this transfer it done.
+        push
 
         ; if X is not zero, decrement and jump to get one more byte
         ; x must be loaded to value N-1, if you want to load N bytes
-jump_if_more:
-        jmp x-- more
-
-        jmp start
+        jmp x-- one_more_byte
 
 
 % c-sdk {

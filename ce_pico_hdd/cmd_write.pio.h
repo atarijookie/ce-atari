@@ -13,7 +13,7 @@
 // --------- //
 
 #define cmd_write_wrap_target 0
-#define cmd_write_wrap 10
+#define cmd_write_wrap 9
 #define cmd_write_pio_version 0
 
 static const uint16_t cmd_write_program_instructions[] = {
@@ -24,18 +24,17 @@ static const uint16_t cmd_write_program_instructions[] = {
     0x00c3, //  3: jmp    pin, 3
     0xe401, //  4: set    pins, 1                [4]
     0x4008, //  5: in     pins, 8
-    0x8020, //  6: push   block
-    0x00c9, //  7: jmp    pin, 9
-    0x0007, //  8: jmp    7
+    0x00c8, //  6: jmp    pin, 8
+    0x0006, //  7: jmp    6
+    0x8020, //  8: push   block
     0x0042, //  9: jmp    x--, 2
-    0x0000, // 10: jmp    0
             //     .wrap
 };
 
 #if !PICO_NO_HARDWARE
 static const struct pio_program cmd_write_program = {
     .instructions = cmd_write_program_instructions,
-    .length = 11,
+    .length = 10,
     .origin = -1,
     .pio_version = cmd_write_pio_version,
 #if PICO_PIO_VERSION > 0
@@ -60,7 +59,7 @@ static inline void cmd_write_program_init(PIO pio, uint sm, uint offset, uint pi
     sm_config_set_set_pins(&cWrite, pinSet, 1);          // for SET
     sm_config_set_jmp_pin(&cWrite, pinJmp);              // for JMP
     sm_config_set_in_shift(&cWrite, true, false, 32);    // Shift to right, autopush disabled
-    sm_config_set_fifo_join(&cWrite, PIO_FIFO_JOIN_NONE);  // no fifo
+    sm_config_set_fifo_join(&cWrite, PIO_FIFO_JOIN_NONE);   // no fifo joining, we need both fifos
     float div = (float)clock_get_hz(clk_sys) / 50000000;    // calc divider for 50 MHz, that's 20 ns per instruction
     sm_config_set_clkdiv(&cWrite, div);
     pio_sm_init(pio, sm, offset, &cWrite);

@@ -13,23 +13,24 @@
 // --------- //
 
 #define cmd_first_wrap_target 0
-#define cmd_first_wrap 4
+#define cmd_first_wrap 5
 #define cmd_first_pio_version 0
 
 static const uint16_t cmd_first_program_instructions[] = {
             //     .wrap_target
     0x2029, //  0: wait   0 pin, 9
     0x00c0, //  1: jmp    pin, 0
-    0x4008, //  2: in     pins, 8
-    0x8020, //  3: push   block
+    0xa442, //  2: nop                           [4]
+    0x4008, //  3: in     pins, 8
     0x20a9, //  4: wait   1 pin, 9
+    0x8020, //  5: push   block
             //     .wrap
 };
 
 #if !PICO_NO_HARDWARE
 static const struct pio_program cmd_first_program = {
     .instructions = cmd_first_program_instructions,
-    .length = 5,
+    .length = 6,
     .origin = -1,
     .pio_version = cmd_first_pio_version,
 #if PICO_PIO_VERSION > 0
@@ -52,7 +53,7 @@ static inline void cmd_first_program_init(PIO pio, uint sm, uint offset, uint pi
     sm_config_set_jmp_pin(&c, pinJmp);              // for JMP
     sm_config_set_in_shift(&c, true, false, 32);    // Shift to right, autopush disabled
     sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_RX);  // Deeper FIFO as we're not doing any TX
-    float div = (float)clock_get_hz(clk_sys) / 33250000;    // calc divider for 33.25 MHz, that's 30.08 ns per instruction
+    float div = (float)clock_get_hz(clk_sys) / 50000000;    // calc divider for 50 MHz, that's 20 ns per instruction
     sm_config_set_clkdiv(&c, div);
     pio_sm_init(pio, sm, offset, &c);
     // pio_sm_set_enabled(pio, sm, true);

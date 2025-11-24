@@ -13,8 +13,15 @@ wait4L: jmp pin wait4L
         set pins, 1         ; set INT to H
 
         ; wait for CS to become H, keep looping while it's still L
-wait4H: jmp pin start
+wait4H: jmp pin read_byte_end
         jmp wait4H
+
+read_byte_end:
+        nop [4]             ; additional delay to keep data longer present on ACSI bus
+
+        ; Push the contents of the ISR into the RX FIFO.
+        ; We don't care about the value, it's just a flag that the transfer has finished
+        push
 
 
 % c-sdk {
@@ -30,7 +37,7 @@ static inline void cmd_read_program_init(PIO pio, uint sm, uint offset, uint pin
     sm_config_set_set_pins(&cRead, pinSet, 1);          // for SET
     sm_config_set_jmp_pin(&cRead, pinJmp);              // for JMP
     sm_config_set_out_shift(&cRead, true, false, 32);   // Shift to right, autopush disabled
-    sm_config_set_fifo_join(&cRead, PIO_FIFO_JOIN_TX);  // Deeper FIFO as we're not doing any RX
+    sm_config_set_fifo_join(&cRead, PIO_FIFO_JOIN_NONE);  // no fifo joining
 
     float div = (float)clock_get_hz(clk_sys) / 50000000;    // calc divider for 50 MHz, that's 20 ns per instruction
     sm_config_set_clkdiv(&cRead, div);
