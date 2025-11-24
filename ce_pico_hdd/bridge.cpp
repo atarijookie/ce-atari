@@ -19,7 +19,7 @@ static PIO pioCmdFirst, pioCmdWrite, pioCmdRead;
 static uint smCmdFirst, smCmdWrite, smCmdRead;
 static uint offsetCmdFirst, offsetCmdWrite, offsetCmdRead;
 
-io_rw_8* cmdFirstFifo;      // first cmd byte will be stored here 
+io_rw_8* cmdFirstFifo;      // first cmd byte will be stored here
 
 io_rw_32* cmdWriteTxFifo;   // write N-1 count of bytes to write here
 io_rw_8*  cmdWriteRxFifo;   // read N count of bytes from here
@@ -34,10 +34,10 @@ void configCmdReadForDMA(void);
 void pioConfigAll(void)
 {
     bool success;
- 
+
     success = pio_claim_free_sm_and_add_program_for_gpio_range(&cmd_first_program, &pioCmdFirst, &smCmdFirst, &offsetCmdFirst, PIN_D0, 26, true);
     if(!success) { debug("Failed to claim PIO SM 1\n"); while(1); }
-    cmd_first_program_init(pioCmdFirst, smCmdFirst, offsetCmdFirst, PIN_CS, PIN_A1);
+    cmd_first_program_init(pioCmdFirst, smCmdFirst, offsetCmdFirst, PIN_D0, PIN_A1);
 
     success = pio_claim_free_sm_and_add_program_for_gpio_range(&cmd_write_program, &pioCmdWrite, &smCmdWrite, &offsetCmdWrite, PIN_D0, 26, true);
     if(!success) { debug("Failed to claim PIO SM 2\n"); while(1); }
@@ -53,74 +53,63 @@ void pioConfigAll(void)
     cmdReadTxFifo = (io_rw_8*) &pioCmdRead->txf[smCmdRead] + 3;
 }
 
-void pioConfig(int newMode)
+void pioConfig(int newMode, bool force)
 {
     static int currentMode = MODE_UNKNOWN;
 
-    if(newMode == currentMode) {
+    if(!force && newMode == currentMode) {    // no mode change? just quit
         return;
     }
     currentMode = newMode;
 
-    switch(newMode) 
+    // all state machines to halt
+    pio_sm_set_enabled(pioCmdFirst, smCmdFirst, false);
+    pio_sm_set_enabled(pioCmdRead, smCmdRead, false);
+    pio_sm_set_enabled(pioCmdWrite, smCmdWrite, false);
+
+    // data direction RECV for CMD and WRITE, data direction SEND for READ and STATUS
+    uint8_t sendNotRecv = (newMode == MODE_CMD_FIRST || newMode == MODE_CMD_REST || newMode == MODE_DMA_WRITE) ? DIR_RECV : DIR_SEND;
+    setDataDirection(sendNotRecv);
+
+    PIO whichPio;
+    uint whichSm;
+
+    switch(newMode)
     {
         case MODE_CMD_FIRST:
-        {
-            setDataDirection(DIR_RECV); // data as inputs (write)
-
-            pio_sm_set_enabled(pioCmdWrite, smCmdWrite, false);
-            pio_sm_set_enabled(pioCmdRead, smCmdRead, false);
-            pio_sm_set_enabled(pioCmdFirst, smCmdFirst, true);
-        }; break;
+            whichPio = pioCmdFirst;
+            whichSm = smCmdFirst;
+            break;
 
         case MODE_CMD_REST:
-        {
-            setDataDirection(DIR_RECV); // data as inputs (write)
-
-            pio_sm_set_enabled(pioCmdFirst, smCmdFirst, false);
-            pio_sm_set_enabled(pioCmdRead, smCmdRead, false);
-
-            pio_sm_set_enabled(pioCmdWrite, smCmdWrite, false);
             configCmdWriteForPIO();
-            pio_sm_set_enabled(pioCmdWrite, smCmdWrite, true);
-        }; break;
+            whichPio = pioCmdWrite;
+            whichSm = smCmdWrite;
+            break;
 
         case MODE_DMA_READ:
-        {
-            setDataDirection(DIR_SEND); // data as outputs (read)
-
-            pio_sm_set_enabled(pioCmdFirst, smCmdFirst, false);
-            pio_sm_set_enabled(pioCmdWrite, smCmdWrite, false);
-
-            pio_sm_set_enabled(pioCmdRead, smCmdRead, false);
             configCmdReadForDMA();
-            pio_sm_set_enabled(pioCmdRead, smCmdRead, true);
-        }; break;
+            whichPio = pioCmdRead;
+            whichSm = smCmdRead;
+            break;
 
         case MODE_DMA_WRITE:
-        {
-            setDataDirection(DIR_RECV); // data as inputs (write)
-
-            pio_sm_set_enabled(pioCmdFirst, smCmdFirst, false);
-            pio_sm_set_enabled(pioCmdRead, smCmdRead, false);
-
-            pio_sm_set_enabled(pioCmdWrite, smCmdWrite, false);
             configCmdWriteForDMA();
-            pio_sm_set_enabled(pioCmdWrite, smCmdWrite, true);
-        }; break;
+            whichPio = pioCmdWrite;
+            whichSm = smCmdWrite;
+            break;
 
         case MODE_STATUS:
-        {
-            setDataDirection(DIR_SEND); // data as outputs (read)
-
-            pio_sm_set_enabled(pioCmdFirst, smCmdFirst, false);
-            pio_sm_set_enabled(pioCmdWrite, smCmdWrite, false);
-
-            pio_sm_set_enabled(pioCmdRead, smCmdRead, false);
             configCmdReadForPIO();
-            pio_sm_set_enabled(pioCmdRead, smCmdRead, true);
-        }; break;
+            whichPio = pioCmdRead;
+            whichSm = smCmdRead;
+            break;
     }
+
+    // restart state machine, clear FIFOs, enable state machine
+    pio_sm_restart(whichPio, whichSm);
+    pio_sm_clear_fifos(whichPio, whichSm);
+    pio_sm_set_enabled(whichPio, whichSm, true);
 }
 
 uint8_t PIO_gotFirstCmdByte(void)
@@ -244,30 +233,8 @@ uint8_t DMA_write(void)
 
 void resetBridge(void)
 {
-    // setDataDirection(DIR_RECV);
-    // brStat = E_OK; // set bridge status to OK
-
-    // // disable all data driving (in and out), also reset CMD1ST
-    // BIT_SET(PIN_FF12D);             // FF12D must be H to allow capturing of CMD1ST
-
-    // // reset INT and DRQ if needed
-    // if (BIT_IS_L(PIN_EOT))
-    // {                                     // if DRQ or INT is L
-    //     BIT_SET(PIN_INT_TRIG);          // do CLK pulse
-    //     BIT_SET(PIN_DRQ_TRIG);
-
-    //     DELAY_NS;
-
-    //     // const char* eotLevel = BIT_IS_L(PIN_EOT) ? "LOW" : "HIGH";
-    //     // Debug::out(LOG_DEBUG, "GpioAcsi::reset - did RESET INT/DRQ, now it's %s", eotLevel);
-    // }
-    // else
-    // {
-    //     // Debug::out(LOG_DEBUG, "GpioAcsi::reset - skipped the RESET of INT/DRQ as it was HIGH");
-    // }
-
-    // BIT_CLR(PIN_INT_TRIG);      // CLK back to L
-    // BIT_CLR(PIN_DRQ_TRIG);
+    pioConfig(MODE_CMD_FIRST, true);
+    brStat = E_OK; // set bridge status to OK
 }
 
 void getBridgeStatus(void)
@@ -295,30 +262,25 @@ void setDataDirection(uint8_t sendNotRecv)
 {
     static uint8_t sendNotRecvNow = 0xff; // init with no data direction set yet
 
-    if (sendNotRecvNow == sendNotRecv)
-    { // direction not changed since last time? quit
+    if (sendNotRecvNow == sendNotRecv) { // direction not changed since last time? quit
         return;
     }
 
     sendNotRecvNow = sendNotRecv; // remember what we're just setting
 
-    // if output from esp, set OUT_OE to L before switching esp pins directions
-    if (sendNotRecv == DIR_SEND)
-    {
+    // if output from mcu, set OUT_OE to L before switching mcu pins directions
+    if (sendNotRecv == DIR_SEND) {
         BIT_SET(PIN_DATA_DIR);
     }
 
-    // set esp GPIO pins as outputs / inputs
-    uint32_t dir = (sendNotRecv == DIR_SEND) ? OUTPUT : INPUT;
-
-    for (int i = 0; i < 8; i++)
-    {
-        pinMode(dataPins[i], dir);
+    if(sendNotRecv == DIR_SEND) {   // outputs?
+        gpio_set_dir_out_masked(DATA_PINS_MASK);
+    } else {                        // inputs!
+        gpio_set_dir_in_masked(DATA_PINS_MASK);
     }
 
-    // if input to esp, set OUT_OE to H after switching esp pins directions
-    if (sendNotRecv == DIR_RECV)
-    {
+    // if input to mcu, set OUT_OE to H after switching mcu pins directions
+    if (sendNotRecv == DIR_RECV) {
         BIT_CLR(PIN_DATA_DIR);
     }
 }

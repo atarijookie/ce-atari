@@ -69,6 +69,8 @@
 
 ///////////////////////////
 
+#define DATA_PINS_MASK  0x3fc
+
 #define PIN_TXD_DEBUG   0
 #define PIN_RXD_DEBUG   1
 

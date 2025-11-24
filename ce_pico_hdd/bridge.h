@@ -21,7 +21,7 @@
 #define MODE_DMA_WRITE  4
 #define MODE_STATUS     5
 
-void pioConfig(int newMode);
+void pioConfig(int newMode, bool force=false);
 
 void resetBridge(void);
 void getBridgeStatus(void);

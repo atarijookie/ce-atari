@@ -2,7 +2,7 @@
 
 .program cmd_write
 
-start:  
+start:
         pull                ; load from the TX FIFO into the OSR
         mov x, osr          ; X = OSR
 
@@ -21,7 +21,7 @@ wait4H: jmp pin jump_if_more
         jmp wait4H
 
         ; if X is not zero, decrement and jump to get one more byte
-        ; x must be loaded to value N-1, if you want to load N bytes 
+        ; x must be loaded to value N-1, if you want to load N bytes
 jump_if_more:
         jmp x-- more
 
@@ -43,7 +43,7 @@ static inline void cmd_write_program_init(PIO pio, uint sm, uint offset, uint pi
     sm_config_set_set_pins(&cWrite, pinSet, 1);          // for SET
     sm_config_set_jmp_pin(&cWrite, pinJmp);              // for JMP
     sm_config_set_in_shift(&cWrite, true, false, 32);    // Shift to right, autopush disabled
-    sm_config_set_fifo_join(&cWrite, PIO_FIFO_JOIN_NONE);  // no fifo
+    sm_config_set_fifo_join(&cWrite, PIO_FIFO_JOIN_NONE);   // no fifo joining, we need both fifos
 
     float div = (float)clock_get_hz(clk_sys) / 50000000;    // calc divider for 50 MHz, that's 20 ns per instruction
     sm_config_set_clkdiv(&cWrite, div);
