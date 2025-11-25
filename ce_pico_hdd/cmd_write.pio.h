@@ -51,13 +51,24 @@ static inline pio_sm_config cmd_write_program_get_default_config(uint offset) {
 #include "hardware/clocks.h"
 #include "hardware/gpio.h"
 // to read N bytes, you must put N-1 into TX FIFO (one less)
-pio_sm_config cWrite;
-static inline void cmd_write_program_init(PIO pio, uint sm, uint offset, uint pinIn, uint pinSet, uint pinJmp)
+static pio_sm_config cWrite;
+static PIO cmdWritePio;
+static uint cmdWriteSm;
+static inline void cmd_write_program_init(PIO pio, uint sm, uint offset)
 {
+    cmdWritePio = pio;
+    cmdWriteSm = sm;
+    #define PIO_WRITE_COUNT 13
+    int pio_pins[PIO_WRITE_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_CS, PIN_A1, PIN_INT, PIN_DRQ, PIN_ACK};
+    int pio_dirs[PIO_WRITE_COUNT] = {     0,      0,      0,      0,      0,      0,      0,      0,      0,      0,       1,       1,       0};
+    for (int i = 0; i < PIO_WRITE_COUNT; i++) {
+        pio_gpio_init(pio, pio_pins[i]);
+        pio_sm_set_consecutive_pindirs(pio, sm, pio_pins[0], 1, pio_dirs[i]);
+    }
     cWrite = cmd_write_program_get_default_config(offset);
-    sm_config_set_in_pins(&cWrite, pinIn);               // for WAIT, IN
-    sm_config_set_set_pins(&cWrite, pinSet, 1);          // for SET
-    sm_config_set_jmp_pin(&cWrite, pinJmp);              // for JMP
+    sm_config_set_in_pins(&cWrite, PIN_D0);              // for WAIT, IN
+    sm_config_set_set_pins(&cWrite, PIN_INT, 1);         // for SET
+    sm_config_set_jmp_pin(&cWrite, PIN_CS);              // for JMP
     sm_config_set_in_shift(&cWrite, true, false, 32);    // Shift to right, autopush disabled
     sm_config_set_fifo_join(&cWrite, PIO_FIFO_JOIN_NONE);   // no fifo joining, we need both fifos
     float div = (float)clock_get_hz(clk_sys) / 50000000;    // calc divider for 50 MHz, that's 20 ns per instruction
@@ -67,11 +78,21 @@ static inline void cmd_write_program_init(PIO pio, uint sm, uint offset, uint pi
 }
 void configCmdWriteForPIO(void)
 {
+    // DRQ is controlled by gpio, always driving H
+    gpio_set_function(PIN_DRQ, GPIO_FUNC_SIO);
+    gpio_put(PIN_DRQ, 1);
+    // INT is controlled by PIO
+    pio_gpio_init(cmdWritePio, PIN_INT);
     sm_config_set_set_pins(&cWrite, PIN_INT, 1);        // for SET
     sm_config_set_jmp_pin(&cWrite, PIN_CS);             // for JMP
 }
 void configCmdWriteForDMA(void)
 {
+    // INT is controlled by gpio, always driving H
+    gpio_set_function(PIN_INT, GPIO_FUNC_SIO);
+    gpio_put(PIN_INT, 1);
+    // DRQ is controlled by PIO
+    pio_gpio_init(cmdWritePio, PIN_DRQ);
     sm_config_set_set_pins(&cWrite, PIN_DRQ, 1);        // for SET
     sm_config_set_jmp_pin(&cWrite, PIN_ACK);            // for JMP
 }

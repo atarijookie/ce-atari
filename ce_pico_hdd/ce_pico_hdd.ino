@@ -6,7 +6,6 @@
 #include "utils.h"
 #include "command_handling.h"
 #include "connection.h"
-#include "rw_tasks.h"
 #include "display.h"
 #include "ikbd.h"
 
@@ -25,7 +24,7 @@ uint8_t cmdLen;  // length of received command
 uint8_t brStat;  // status from bridge
 uint8_t lastScsiStatusByte;
 
-uint8_t isAcsiNotScsi;
+uint8_t isAcsiNotScsi = 1;
 uint8_t busIdle;
 
 void handleButton(void);
@@ -43,6 +42,7 @@ void setup(void)
 
     loadSettings();
 
+    // config pins as inputs
     #define INPUTS_COUNT 13
     int inputs[INPUTS_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_CS, PIN_A1, PIN_ACK, PIN_RESET, PIN_SDA};
 
@@ -51,12 +51,16 @@ void setup(void)
         pinMode(inputs[i], INPUT);
     }
 
+    // config pins as outputs
     #define OUTPUTS_COUNT 4
     int outputs[OUTPUTS_COUNT] = {PIN_DATA_DIR, PIN_INT, PIN_DRQ, PIN_SCL};
+    int levels[OUTPUTS_COUNT]  = {           0,       1,       1,       1};
 
     for (int i = 0; i < OUTPUTS_COUNT; i++)
     {
-        pinMode(outputs[i], OUTPUT);
+        gpio_set_function(outputs[i], GPIO_FUNC_SIO);
+        gpio_set_dir(outputs[i], GPIO_OUT);
+        gpio_put(outputs[i], levels[i]);
     }
 
     cmd = atnSendACSIcommand + TX_HEADER_SIZE;      // place command beyond the header
@@ -64,7 +68,6 @@ void setup(void)
 
     setupAtnBuffers(); // fill the ATN buffers with needed headers and terminators
 
-    getBridgeStatus();
     resetBridge();
 
     debug("setup() done, enabledIDs: %02X\n", settings.enabledIDs);
@@ -87,10 +90,6 @@ void setup(void)
 
     debug("mac: %02X:%02X:%02X:%02X:%02X:%02X\n", atnSendFwVersion[TX_HEADER_SIZE + 6], atnSendFwVersion[TX_HEADER_SIZE + 7], atnSendFwVersion[TX_HEADER_SIZE + 8],
                                                   atnSendFwVersion[TX_HEADER_SIZE + 9], atnSendFwVersion[TX_HEADER_SIZE + 10], atnSendFwVersion[TX_HEADER_SIZE + 11]);
-
-#ifdef RW_TASKS
-    createTasks();      // create the read / write tasks
-#endif
 
     createIkbdTask();   // this task sends ikdb data to host and back
 
@@ -200,14 +199,6 @@ void loop(void)
                 state, cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7], cmd[8], cmd[9], cmd[10], cmd[11], millis());
 #endif
             state = STATE_GET_COMMAND;
-
-            if (!isBusIdle())
-            {
-#ifdef LOG_MORE
-                debug("resetBridge!\n");
-#endif
-                resetBridge();
-            }
         }
 
         //---------------------------

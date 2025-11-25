@@ -25,11 +25,14 @@ io_rw_32* cmdWriteTxFifo;   // write N-1 count of bytes to write here
 io_rw_8*  cmdWriteRxFifo;   // read N count of bytes from here
 
 io_rw_8* cmdReadTxFifo;     // write bytes here to make them to be read by ST
+io_rw_8* cmdReadRxFifo;     // for each byte written in TX fifo, one junk byte will appear in RX fifo to let you know the transfer has finished
 
 void configCmdWriteForPIO(void);
 void configCmdWriteForDMA(void);
 void configCmdReadForPIO(void);
 void configCmdReadForDMA(void);
+
+int readInProgressCount = 0;
 
 void pioConfigAll(void)
 {
@@ -37,20 +40,23 @@ void pioConfigAll(void)
 
     success = pio_claim_free_sm_and_add_program_for_gpio_range(&cmd_first_program, &pioCmdFirst, &smCmdFirst, &offsetCmdFirst, PIN_D0, 26, true);
     if(!success) { debug("Failed to claim PIO SM 1\n"); while(1); }
-    cmd_first_program_init(pioCmdFirst, smCmdFirst, offsetCmdFirst, PIN_D0, PIN_A1);
+    cmd_first_program_init(pioCmdFirst, smCmdFirst, offsetCmdFirst);
 
     success = pio_claim_free_sm_and_add_program_for_gpio_range(&cmd_write_program, &pioCmdWrite, &smCmdWrite, &offsetCmdWrite, PIN_D0, 26, true);
     if(!success) { debug("Failed to claim PIO SM 2\n"); while(1); }
-    cmd_write_program_init(pioCmdWrite, smCmdWrite, offsetCmdWrite, PIN_D0, PIN_INT, PIN_CS);
+    cmd_write_program_init(pioCmdWrite, smCmdWrite, offsetCmdWrite);
 
     success = pio_claim_free_sm_and_add_program_for_gpio_range(&cmd_read_program, &pioCmdRead, &smCmdRead, &offsetCmdRead, PIN_D0, 26, true);
     if(!success) { debug("Failed to claim PIO SM 3\n"); while(1); }
-    cmd_read_program_init(pioCmdRead, smCmdRead, offsetCmdRead, PIN_D0, PIN_INT, PIN_CS);
+    cmd_read_program_init(pioCmdRead, smCmdRead, offsetCmdRead);
 
     cmdFirstFifo = (io_rw_8*) &pioCmdFirst->rxf[smCmdFirst] + 3;
+
     cmdWriteTxFifo = (io_rw_32*) &pioCmdWrite->txf[smCmdWrite];
     cmdWriteRxFifo = (io_rw_8*) &pioCmdWrite->rxf[smCmdWrite] + 3;
+
     cmdReadTxFifo = (io_rw_8*) &pioCmdRead->txf[smCmdRead] + 3;
+    cmdReadRxFifo = (io_rw_8*) &pioCmdRead->rxf[smCmdRead] + 3;
 }
 
 void pioConfig(int newMode, bool force)
@@ -77,30 +83,38 @@ void pioConfig(int newMode, bool force)
     switch(newMode)
     {
         case MODE_CMD_FIRST:
+            configCmdFirst();
+
             whichPio = pioCmdFirst;
             whichSm = smCmdFirst;
             break;
 
         case MODE_CMD_REST:
             configCmdWriteForPIO();
+
             whichPio = pioCmdWrite;
             whichSm = smCmdWrite;
             break;
 
         case MODE_DMA_READ:
             configCmdReadForDMA();
+
+            readInProgressCount = 0;        // no read bytes in progress
+
             whichPio = pioCmdRead;
             whichSm = smCmdRead;
             break;
 
         case MODE_DMA_WRITE:
             configCmdWriteForDMA();
+
             whichPio = pioCmdWrite;
             whichSm = smCmdWrite;
             break;
 
         case MODE_STATUS:
             configCmdReadForPIO();
+
             whichPio = pioCmdRead;
             whichSm = smCmdRead;
             break;
@@ -182,16 +196,24 @@ void PIO_read_solely(uint8_t val)
 {
     pioConfig(MODE_STATUS);
 
-    *cmdReadTxFifo = val;
+    *cmdReadTxFifo = val;       // write status byte to TX FIFO, the transfer will start
 
-    // TODO: wait for data to be transfered
+    // wait for data to be transfered
+    while(1)
+    {
+        if(hasTimedOut) {       // on timeout
+            brStat = E_TimeOut; // set the bridge status
+            return;
+        }
 
-    // if (!ok)
-    // {
-    //     brStat = E_TimeOut; // set the bridge status
-    // }
+        // on rx fifo has data, this means that transfer has finished with success
+        if(!pio_sm_is_rx_fifo_empty(pioCmdRead, smCmdRead)) {
+            val = ((uint8_t) *cmdReadRxFifo);   // read from FIFO just to empty it
+            break;
+        }
+    }
 
-    // resetBridge();
+    brStat = E_OK;
 }
 
 // send MESSAGE IN byte to ST
@@ -199,63 +221,87 @@ void MSG_read(uint8_t val)
 {
 }
 
+void DMA_read_waitForEnd(void)
+{
+    // wait while read is still in progress (from FIFO to Atari)
+    while(1) {
+        if(readInProgressCount <= 0) {  // nothing in progress? this the normal end
+            readInProgressCount = 0;
+            return;
+        }
+
+        // RX FIFO not empty? read it, decrement readInProgressCount
+        if(!pio_sm_is_rx_fifo_empty(pioCmdRead, smCmdRead)) {
+            uint8_t tmp = *cmdReadRxFifo;
+            readInProgressCount--;
+        }
+
+        if(hasTimedOut) {       // on timeout
+            brStat = E_TimeOut; // set the bridge status
+            return;
+        }
+    }
+}
+
 void DMA_read(uint8_t val)
 {
-    // dataOut(val);               // output data to GPIO pins
+    // wait for TX fifo not full, so we can put the current value in
+    while(1) {
+        // READ TX FIFO not full, we can continue
+        if(!pio_sm_is_tx_fifo_full(pioCmdRead, smCmdRead)) {
+            break;
+        }
 
-    // BIT_SET(PIN_DRQ_TRIG);      // do CLK pulse
-    // DELAY_NS;
-    // BIT_CLR(PIN_DRQ_TRIG);      // CLK back to L
+        // RX FIFO not empty? read it, decrement readInProgressCount
+        if(!pio_sm_is_rx_fifo_empty(pioCmdRead, smCmdRead)) {
+            uint8_t tmp = *cmdReadRxFifo;
+            readInProgressCount--;
+        }
 
-    // uint8_t ok = waitForEOT(); // try to wait for EOT and return success / failure
+        if(hasTimedOut) {       // on timeout
+            brStat = E_TimeOut; // set the bridge status
+            return;
+        }
+    }
 
-    // if (!ok)
-    // {
-    //     brStat = E_TimeOut; // set the bridge status
-    // }
+    // put current byte in TX FIFO, increment readInProgressCount
+    *cmdReadTxFifo = val;
+    readInProgressCount++;
+
+    // RX FIFO not empty? read it, decrement readInProgressCount
+    if(!pio_sm_is_rx_fifo_empty(pioCmdRead, smCmdRead)) {
+        uint8_t tmp = *cmdReadRxFifo;
+        readInProgressCount--;
+    }
+}
+
+void DMA_write_startWithCount(uint32_t transfersCount)
+{
+    *cmdWriteTxFifo = (transfersCount - 1);        // write N-1 count of bytes to write here
 }
 
 uint8_t DMA_write(void)
 {
-    // BIT_SET(PIN_DRQ_TRIG);      // do CLK pulse
-    // DELAY_NS;
-    // BIT_CLR(PIN_DRQ_TRIG);      // CLK back to L
+    while(1)
+    {
+        if(hasTimedOut) {       // on timeout
+            brStat = E_TimeOut; // set the bridge status
+            return 0;
+        }
 
-    // if (!waitForEOT())
-    // {                       // EOT didn't come?
-    //     brStat = E_TimeOut; // set the bridge status
-    //     return 0;
-    // }
+        // on rx fifo has data
+        if(!pio_sm_is_rx_fifo_empty(pioCmdWrite, smCmdWrite)) {
+            break;
+        }
+    }
 
-    // return dataIn(); // read data after EOT
-    return 0;
+    return ((uint8_t) *cmdWriteRxFifo);
 }
 
 void resetBridge(void)
 {
     pioConfig(MODE_CMD_FIRST, true);
     brStat = E_OK; // set bridge status to OK
-}
-
-void getBridgeStatus(void)
-{
-//     setDataDirection(DIR_RECV);
-
-// #ifdef HDD_ACSI
-//     // ACSI bus is idle if FF12D is 1, OUT_OE is 1 (== RECV, input to esp), INT_TRIG and DRQ_TRIG are L
-//     busIdle = BIT_IS_H(PIN_FF12D) && BIT_IS_H(PIN_OUT_OE) && BIT_IS_L(PIN_INT_TRIG) && BIT_IS_H(PIN_DRQ_TRIG);
-//     isAcsiNotScsi = 1;
-// #else
-//     busIdle = TRUE; // TODO: check if bus idle
-//     isAcsiNotScsi = 0;
-// #endif
-}
-
-uint8_t isBusIdle(void) // get if the SCSI bus is idle (BSY high, REQ high) or busy
-{
-    // getBridgeStatus();
-    // return busIdle;
-    return 0;
 }
 
 void setDataDirection(uint8_t sendNotRecv)

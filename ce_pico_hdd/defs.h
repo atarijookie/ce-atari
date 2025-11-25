@@ -6,8 +6,6 @@
 #define LOG_MORE    1
 #define ALWAYS_INLINE inline __attribute__((always_inline))
 
-// #define RW_TASKS
-
 #define DELAY_NS   asm("nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop;");
 
 #ifndef TRUE

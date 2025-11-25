@@ -18,11 +18,11 @@
 
 static const uint16_t cmd_first_program_instructions[] = {
             //     .wrap_target
-    0x2029, //  0: wait   0 pin, 9
+    0x200b, //  0: wait   0 gpio, 11
     0x00c0, //  1: jmp    pin, 0
     0xa442, //  2: nop                           [4]
     0x4008, //  3: in     pins, 8
-    0x20a9, //  4: wait   1 pin, 9
+    0x208b, //  4: wait   1 gpio, 11
     0x8020, //  5: push   block
             //     .wrap
 };
@@ -34,7 +34,7 @@ static const struct pio_program cmd_first_program = {
     .origin = -1,
     .pio_version = cmd_first_pio_version,
 #if PICO_PIO_VERSION > 0
-    .used_gpio_ranges = 0x0
+    .used_gpio_ranges = 0x1
 #endif
 };
 
@@ -46,13 +46,34 @@ static inline pio_sm_config cmd_first_program_get_default_config(uint offset) {
 
 #include "hardware/clocks.h"
 #include "hardware/gpio.h"
-static inline void cmd_first_program_init(PIO pio, uint sm, uint offset, uint pinWait, uint pinJmp)
+#include "defs.h"
+static PIO cmdFirstPio;
+static uint cmdFirstSm;
+void configCmdFirst(void)
 {
+    // INT is controlled by gpio, always driving H
+    gpio_set_function(PIN_INT, GPIO_FUNC_SIO);
+    gpio_put(PIN_INT, 1);
+    // DRQ is controlled by gpio, always driving H
+    gpio_set_function(PIN_DRQ, GPIO_FUNC_SIO);
+    gpio_put(PIN_DRQ, 1);
+}
+static inline void cmd_first_program_init(PIO pio, uint sm, uint offset)
+{
+    cmdFirstPio = pio;
+    cmdFirstSm = sm;
+    #define PIO_FIRST_COUNT 10
+    int pio_pins[PIO_FIRST_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_CS, PIN_A1};
+    int pio_dirs[PIO_FIRST_COUNT] = {     0,      0,      0,      0,      0,      0,      0,      0,      0,      0};
+    for (int i = 0; i < PIO_FIRST_COUNT; i++) {
+        pio_gpio_init(pio, pio_pins[i]);
+        pio_sm_set_consecutive_pindirs(pio, sm, pio_pins[0], 1, pio_dirs[i]);
+    }
     pio_sm_config c = cmd_first_program_get_default_config(offset);
-    sm_config_set_in_pins(&c, pinWait);             // for WAIT, IN
-    sm_config_set_jmp_pin(&c, pinJmp);              // for JMP
+    sm_config_set_in_pins(&c, PIN_D0);              // base index for WAIT, IN
+    sm_config_set_jmp_pin(&c, PIN_A1);              // for JMP
     sm_config_set_in_shift(&c, true, false, 32);    // Shift to right, autopush disabled
-    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_RX);  // Deeper FIFO as we're not doing any TX
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_NONE);  // no FIFO join
     float div = (float)clock_get_hz(clk_sys) / 50000000;    // calc divider for 50 MHz, that's 20 ns per instruction
     sm_config_set_clkdiv(&c, div);
     pio_sm_init(pio, sm, offset, &c);

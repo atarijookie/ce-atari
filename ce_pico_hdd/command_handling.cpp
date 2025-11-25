@@ -6,7 +6,6 @@
 #include "command_handling.h"
 #include "connection.h"
 #include "scsi.h"
-#include "rw_tasks.h"
 
 extern EthernetClient clientHdd;
 extern EthernetClient clientIkbd;
@@ -200,31 +199,12 @@ uint8_t onDataRead(uint8_t withStatus)
     // now start the double buffered transfer to ST
     setDataDirection(DIR_SEND); // data direction for reading
 
-#ifdef RW_TASKS
-    readerStart(dataCnt);       // tell reader to start receiving this much data
-#else
     #define BFR_SIZE    4096
     int rSize = 512;
     uint8_t data[BFR_SIZE];
-#endif
 
     while(dataCnt > 0)
     {
-#ifdef RW_TASKS
-        RWBuffer* buf = getNextFullReadBuffer();
-
-        if(!buf) {  // failed to get buffer?
-            debug("onDataRead TO 2\n");
-
-            readerStop();               // stop the reader, no futher data will be needed
-            setDataDirection(DIR_RECV); // data direction for writing, and quit
-            return STATE_GET_COMMAND;   // next state: get next command
-        }
-
-        uint8_t* data = buf->data;              // get pointer to data
-        uint32_t cntNow = buf->len;
-        dataCnt -= cntNow;
-#else
         uint32_t cntNow = MIN(rSize, dataCnt);
         int actualCnt = clientHdd.read(data, cntNow);   // try to read desired cntNow to buffer
 
@@ -239,7 +219,6 @@ uint8_t onDataRead(uint8_t withStatus)
         if(rSize < BFR_SIZE) {      // the requested read size not at the buffer size? increase it
             rSize = MIN(rSize * 2, BFR_SIZE);
         }
-#endif
 
         for(uint16_t i=0; i<cntNow; i++) {    // send all the data from buffer to Atari
             DMA_read(data[i]);
@@ -248,22 +227,21 @@ uint8_t onDataRead(uint8_t withStatus)
             {
                 debug("onDataRead TO 3\n");
 
-#ifdef RW_TASKS
-                readerStop();               // stop the reader, no futher data will be needed
-#endif
                 setDataDirection(DIR_RECV); // data direction for writing, and quit
                 return STATE_GET_COMMAND;   // next state: get next command
             }
         }
 
-#ifdef RW_TASKS
-        markReadBufferAsEmpty(buf);     // clear this buffer so it can be reused, will also unblock reader
-#endif
     }
 
-#ifdef RW_TASKS
-    readerStop();   // stop the reader, the read is over
-#endif
+    DMA_read_waitForEnd();
+
+    if (brStat == E_TimeOut)        // read failed to wait for end?
+    {
+        debug("onDataRead TO 4\n");
+        setDataDirection(DIR_RECV); // data direction for writing, and quit
+        return STATE_GET_COMMAND;   // next state: get next command
+    }
 
     // if should send status, then send status and go to STATE_GET_COMMAND
     if (withStatus)
@@ -282,43 +260,23 @@ uint8_t onDataWrite(void)
     debug("onDataWrite dataCnt: %d\n", dataCnt);
 #endif
 
-#ifdef RW_TASKS
-    // create and send one header at the start
-    writerStart();
-    RWBuffer* buf;
-
-    buf = getNextEmptyWriteBuffer();
-    storeHeader(buf->data, ATN_WRITE_MORE_DATA, dataCnt);  // store this ATN in a header
-    submitBufferForWrite(buf, TX_HEADER_SIZE);      // this buffer can be written to socket
-#else
     // create and send one header at the start
     uint8_t header[TX_HEADER_SIZE];
     storeHeader(header, ATN_WRITE_MORE_DATA, dataCnt);
     sendDataToHost(SOCK_HDD, header, TX_HEADER_SIZE);
 
     uint8_t data[512];
-#endif
 
     // get data from Atari and send it to host by sector sized chunks
     setDataDirection(DIR_RECV);     // data direction for reading
 
     pioConfig(MODE_DMA_WRITE);
 
+    DMA_write_startWithCount(dataCnt);      // let PIO program know the count of bytes we want to transfer
+
     while (dataCnt > 0)             // something to write?
     {
-#ifdef RW_TASKS
-        buf = getNextEmptyWriteBuffer();
-
-        if(!buf) {      // failed to get write buffer?
-            writerEnd();
-            debug("onDataWrite failed to get empty buffer for data\n");
-            return STATE_GET_COMMAND;
-        }
-        uint8_t* data = buf->data;     // the data should be stored here before sending
-        uint32_t cntNow = MIN(dataCnt, RW_BUFFER_SIZE);
-#else
         uint32_t cntNow = MIN(dataCnt, 512);
-#endif
 
         dataCnt -= cntNow;
 
@@ -328,9 +286,6 @@ uint8_t onDataWrite(void)
 
             if (brStat == E_TimeOut)
             {                              // if timeout occured
-#ifdef RW_TASKS
-               writerEnd();
-#endif
 
 #ifdef LOG_MORE
     debug("onDataWrite timeout on DMA_write");
@@ -339,11 +294,7 @@ uint8_t onDataWrite(void)
             }
         }
 
-#ifdef RW_TASKS
-        submitBufferForWrite(buf, cntNow);  // this buffer can be written to socket
-#else
         sendDataToHost(SOCK_HDD, data, cntNow);     // send to host
-#endif
     }
 
     return STATE_WAIT_FOR_STATUS_ARRIVAL;  // continue with sending the status
