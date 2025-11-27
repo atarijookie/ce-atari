@@ -67,7 +67,7 @@ static inline void cmd_first_program_init(PIO pio, uint sm, uint offset)
     int pio_dirs[PIO_FIRST_COUNT] = {     0,      0,      0,      0,      0,      0,      0,      0,      0,      0};
     for (int i = 0; i < PIO_FIRST_COUNT; i++) {
         pio_gpio_init(pio, pio_pins[i]);
-        pio_sm_set_consecutive_pindirs(pio, sm, pio_pins[0], 1, pio_dirs[i]);
+        pio_sm_set_consecutive_pindirs(pio, sm, pio_pins[i], 1, pio_dirs[i]);
     }
     pio_sm_config c = cmd_first_program_get_default_config(offset);
     sm_config_set_in_pins(&c, PIN_D0);              // base index for WAIT, IN

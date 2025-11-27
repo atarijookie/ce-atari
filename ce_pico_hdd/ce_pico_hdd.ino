@@ -63,6 +63,8 @@ void setup(void)
         gpio_put(outputs[i], levels[i]);
     }
 
+    pioConfigAll();     // configure all PIO state machines
+
     cmd = atnSendACSIcommand + TX_HEADER_SIZE;      // place command beyond the header
 
     setupAtnBuffers(); // fill the ATN buffers with needed headers and terminators
@@ -123,6 +125,10 @@ void loop(void)
 
         // handle any data incoming
         handleIncommingData();
+
+        if(BIT_IS_L(PIN_RESET)) {   // when ACSI RESET is L, enter reset mode - no PIO transfers
+            pioConfig(MODE_RESET);
+        }
 
         // get the command from ACSI and send it to host
         // IN  STATE: STATE_GET_COMMAND

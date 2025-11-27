@@ -38,7 +38,8 @@ uint8_t onGetCommand(void)
     //---------
     // retrieve the command. There are some slight differences between ACSI and SCSI part,
     // but the resulting commands should be the same (to make the rest of app work without further changes).
-    uint8_t good = isAcsiNotScsi ? onGetCommandAcsi() : onGetCommandScsi();
+    // uint8_t good = isAcsiNotScsi ? onGetCommandAcsi() : onGetCommandScsi();
+    uint8_t good = onGetCommandAcsi();
 
     if (!good)  // if failed to get the cmd, quit
     {

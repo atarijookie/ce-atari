@@ -17,14 +17,6 @@ static PIO pioCmdFirst, pioCmdWrite, pioCmdRead;
 static uint smCmdFirst, smCmdWrite, smCmdRead;
 static uint offsetCmdFirst, offsetCmdWrite, offsetCmdRead;
 
-io_rw_8* cmdFirstFifo;      // first cmd byte will be stored here
-
-io_rw_32* cmdWriteTxFifo;   // write N-1 count of bytes to write here
-io_rw_8*  cmdWriteRxFifo;   // read N count of bytes from here
-
-io_rw_8* cmdReadTxFifo;     // write bytes here to make them to be read by ST
-io_rw_8* cmdReadRxFifo;     // for each byte written in TX fifo, one junk byte will appear in RX fifo to let you know the transfer has finished
-
 void configCmdWriteForPIO(void);
 void configCmdWriteForDMA(void);
 void configCmdReadForPIO(void);
@@ -47,14 +39,6 @@ void pioConfigAll(void)
     success = pio_claim_free_sm_and_add_program_for_gpio_range(&cmd_read_program, &pioCmdRead, &smCmdRead, &offsetCmdRead, PIN_D0, 26, true);
     if(!success) { debug("Failed to claim PIO SM 3\n"); while(1); }
     cmd_read_program_init(pioCmdRead, smCmdRead, offsetCmdRead);
-
-    cmdFirstFifo = (io_rw_8*) &pioCmdFirst->rxf[smCmdFirst] + 3;
-
-    cmdWriteTxFifo = (io_rw_32*) &pioCmdWrite->txf[smCmdWrite];
-    cmdWriteRxFifo = (io_rw_8*) &pioCmdWrite->rxf[smCmdWrite] + 3;
-
-    cmdReadTxFifo = (io_rw_8*) &pioCmdRead->txf[smCmdRead] + 3;
-    cmdReadRxFifo = (io_rw_8*) &pioCmdRead->rxf[smCmdRead] + 3;
 }
 
 void pioConfig(int newMode, bool force)
@@ -72,8 +56,13 @@ void pioConfig(int newMode, bool force)
     pio_sm_set_enabled(pioCmdWrite, smCmdWrite, false);
 
     // data direction RECV for CMD and WRITE, data direction SEND for READ and STATUS
-    uint8_t sendNotRecv = (newMode == MODE_CMD_FIRST || newMode == MODE_CMD_REST || newMode == MODE_DMA_WRITE) ? DIR_RECV : DIR_SEND;
+    uint8_t sendNotRecv = (newMode == MODE_DMA_READ || newMode == MODE_STATUS) ? DIR_SEND : DIR_RECV;
     setDataDirection(sendNotRecv);
+
+    // if we're in the reset mode, don't enabble any PIO SM
+    if(newMode == MODE_RESET) {
+        return;
+    }
 
     PIO whichPio;
     uint whichSm;
@@ -142,13 +131,13 @@ uint8_t PIO_writeFirst(void)
     timeoutStart();             // start the timeout timer
 
     brStat = E_OK;              // init bridge status to E_OK
-    return ((uint8_t) *cmdFirstFifo);
+    return ((uint8_t) (pio_sm_get(pioCmdFirst, smCmdFirst) >> 24));
 }
 
 // get next CMD byte from ST -- with setting INT to LOW and waiting for CS
 uint8_t PIO_write(void)
 {
-    *cmdWriteTxFifo = 0;        // write N-1 count of bytes to write here
+    pio_sm_put(pioCmdWrite, smCmdWrite, 0);      // write N-1 count of bytes to write here
 
     while(1)
     {
@@ -163,7 +152,7 @@ uint8_t PIO_write(void)
         }
     }
 
-    return ((uint8_t) *cmdWriteRxFifo);
+    return ((uint8_t) (pio_sm_get(pioCmdWrite, smCmdWrite) >> 24));
 }
 
 // send status byte to host, and on SCSI also to MSG IN byte
@@ -196,7 +185,7 @@ void PIO_read_solely(uint8_t val)
 {
     pioConfig(MODE_STATUS);
 
-    *cmdReadTxFifo = val;       // write status byte to TX FIFO, the transfer will start
+    pio_sm_put(pioCmdRead, smCmdRead, val);     // write status byte to TX FIFO, the transfer will start
 
     // wait for data to be transfered
     while(1)
@@ -208,7 +197,7 @@ void PIO_read_solely(uint8_t val)
 
         // on rx fifo has data, this means that transfer has finished with success
         if(!pio_sm_is_rx_fifo_empty(pioCmdRead, smCmdRead)) {
-            val = ((uint8_t) *cmdReadRxFifo);   // read from FIFO just to empty it
+            uint32_t tmp = pio_sm_get(pioCmdRead, smCmdRead);
             break;
         }
     }
@@ -232,7 +221,7 @@ void DMA_read_waitForEnd(void)
 
         // RX FIFO not empty? read it, decrement readInProgressCount
         if(!pio_sm_is_rx_fifo_empty(pioCmdRead, smCmdRead)) {
-            uint8_t tmp = *cmdReadRxFifo;
+            uint32_t tmp = pio_sm_get(pioCmdRead, smCmdRead);
             readInProgressCount--;
         }
 
@@ -247,15 +236,18 @@ void DMA_read(uint8_t val)
 {
     // wait for TX fifo not full, so we can put the current value in
     while(1) {
-        // READ TX FIFO not full, we can continue
-        if(!pio_sm_is_tx_fifo_full(pioCmdRead, smCmdRead)) {
-            break;
-        }
-
         // RX FIFO not empty? read it, decrement readInProgressCount
         if(!pio_sm_is_rx_fifo_empty(pioCmdRead, smCmdRead)) {
-            uint8_t tmp = *cmdReadRxFifo;
+            uint32_t tmp = pio_sm_get(pioCmdRead, smCmdRead);
             readInProgressCount--;
+        }
+
+        // READ TX FIFO not full, we can push to fifo
+        if(!pio_sm_is_tx_fifo_full(pioCmdRead, smCmdRead)) {
+           // put current byte in TX FIFO, increment readInProgressCount
+           pio_sm_put(pioCmdRead, smCmdRead, val);
+           readInProgressCount++;
+           return;
         }
 
         if(hasTimedOut) {       // on timeout
@@ -263,21 +255,11 @@ void DMA_read(uint8_t val)
             return;
         }
     }
-
-    // put current byte in TX FIFO, increment readInProgressCount
-    *cmdReadTxFifo = val;
-    readInProgressCount++;
-
-    // RX FIFO not empty? read it, decrement readInProgressCount
-    if(!pio_sm_is_rx_fifo_empty(pioCmdRead, smCmdRead)) {
-        uint8_t tmp = *cmdReadRxFifo;
-        readInProgressCount--;
-    }
 }
 
 void DMA_write_startWithCount(uint32_t transfersCount)
 {
-    *cmdWriteTxFifo = (transfersCount - 1);        // write N-1 count of bytes to write here
+    pio_sm_put(pioCmdWrite, smCmdWrite, transfersCount - 1);        // write N-1 count of bytes to write here
 }
 
 uint8_t DMA_write(void)
@@ -295,7 +277,7 @@ uint8_t DMA_write(void)
         }
     }
 
-    return ((uint8_t) *cmdWriteRxFifo);
+    return ((uint8_t) (pio_sm_get(pioCmdWrite, smCmdWrite) >> 24));
 }
 
 void resetBridge(void)

@@ -15,12 +15,14 @@
 #define DIR_SEND 1
 
 #define MODE_UNKNOWN    0
-#define MODE_CMD_FIRST  1
-#define MODE_CMD_REST   2
-#define MODE_DMA_READ   3
-#define MODE_DMA_WRITE  4
-#define MODE_STATUS     5
+#define MODE_RESET      1
+#define MODE_CMD_FIRST  2
+#define MODE_CMD_REST   3
+#define MODE_DMA_READ   4
+#define MODE_DMA_WRITE  5
+#define MODE_STATUS     6
 
+void pioConfigAll(void);
 void pioConfig(int newMode, bool force=false);
 
 void resetBridge(void);
