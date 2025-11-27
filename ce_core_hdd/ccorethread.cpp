@@ -212,6 +212,8 @@ bool CCoreThread::handleHdd(uint8_t* inBuff)
         break;
     }
 
+    chipInterface->dropRestOfData();
+
     return isAcsiCommand;
 }
 
@@ -430,7 +432,7 @@ void CCoreThread::handleFwVersion_hans(void)
     if(hwConfig.changed) {
         hwConfig.changed = false;
 
-        setEnabledIDbits = true;                    // resend config 
+        setEnabledIDbits = true;                    // resend config
 
         pthread_mutex_lock(&shared.mtxHdd);
         shared.scsi->updateTranslatedBootMedia();   // also update CE_DD bootsector with proper SCSI ID

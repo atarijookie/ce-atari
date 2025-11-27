@@ -263,9 +263,9 @@ void ChipInterfaceNetwork::getFWversion(void)
     // fwResponseBfr should be filled with Hans config - by calling setHDDconfig() (and not calling anything else inbetween)
     sendHeaderAndDataToChip(CMD_ACSI_CONFIG, fwResponseBfr, response.currentLength);
 
-    uint8_t bfr[10];
-    memset(bfr, 0, 10);
-    recvFromClient(bfr, 10);
+    uint8_t bfr[12];
+    memset(bfr, 0, 12);
+    recvFromClient(bfr, 12);
 
     ChipInterface::convertXilinxInfo(bfr[5]);  // convert xilinx info into hwInfo struct
 
@@ -454,7 +454,7 @@ bool ChipInterfaceNetwork::sendHeaderAndDataToChip(uint16_t cmdCode, uint8_t* da
 
         good = sendDataToChip(data, len);
         Debug::out(LOG_DEBUG, "sendHeaderAndDataToChip - good: %d", good);
-    } 
+    }
     else                // for small data first copy data into buffers, then send with one write() command
     {
         if(fdClient < 0) {                      // no client socket? quit
@@ -506,4 +506,19 @@ uint32_t ChipInterfaceNetwork::recvFromClient(uint8_t* buf, int maxLen)
 
     bufReader.decreaseDataSize((uint32_t) received);    // decrease the remaining data by the size we have received
     return received;        // return total bytes received
+}
+
+void ChipInterfaceNetwork::dropRestOfData(void)
+{
+    while(true)
+    {
+        uint32_t dataSize = bufReader.dataSizeRest();
+        if(dataSize == 0) {     // nothing more to drop? quit
+            break;
+        }
+
+        uint32_t dropSize = MIN(dataSize, MFM_STREAM_SIZE);
+        recvFromClient(bufIn, dropSize);
+        Debug::out(LOG_WARNING, "dropping %d unused bytes", dropSize);
+    }
 }

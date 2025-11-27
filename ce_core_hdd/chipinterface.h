@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include "settings.h"
 
-// types of chip interface, as returned by 
+// types of chip interface, as returned by the individual chip interface classes
 #define CHIP_IF_DUMMY   -1
 #define CHIP_IF_V1_V2   1
 #define CHIP_IF_V3      3
@@ -12,7 +12,7 @@
 #define CHIP_IF_RASCSI  8
 #define CHIP_IF_NETWORK 9
 
-// The following commands are sent from device to host on chip interface v1 and v2, 
+// The following commands are sent from device to host on chip interface v1 and v2,
 // but as they are used for command identification in core thread and are reused
 // in chip interface v3 (even though that one doesn't really use them), it's moved here.
 
@@ -97,6 +97,7 @@ public:
     //----------------
     // if following function returns true, some command is waiting for action in the inBuf and hardNotFloppy flag distiguishes hard-drive or floppy-drive command
     virtual bool actionNeeded(uint8_t *inBuf) = 0;
+    virtual void dropRestOfData(void) = 0;
 
     // to handle FW version, first call setHDDconfig() to fill config into bufOut, then call getFWversion to get the FW version from chip
     virtual void getFWversion(void) = 0;

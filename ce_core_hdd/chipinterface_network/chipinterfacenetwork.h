@@ -26,6 +26,7 @@ public:
     //----------------
     // if following function returns true, some command is waiting for action in the inBuf and hardNotFloppy flag distiguishes hard-drive or floppy-drive command
     bool actionNeeded(uint8_t *inBuf);
+    void dropRestOfData(void);
 
     // to handle FW version, first call setHDDconfig() to fill config into bufOut, then call getFWversion to get the FW version from chip
     void getFWversion(void);
@@ -57,7 +58,7 @@ private:
     uint8_t *bufIn;
 
     uint8_t  gotAtnId;      // which chip wants to talk? Franz, Hans?
-    uint8_t  gotAtnCode;    // which command code chips sends? 
+    uint8_t  gotAtnCode;    // which command code chips sends?
     BufferedReader bufReader;
 
     void createListeningSocket(void);
@@ -71,7 +72,7 @@ private:
     bool waitForAtn(int atnIdWant, uint8_t atnCode, uint32_t timeoutMs, uint8_t *inBuf);
 
     bool sendHeaderToChip(uint16_t cmdCode, uint32_t futureDatalen);                // send header to chip
-    bool sendDataToChip(uint8_t* data, uint32_t len);                               // send data to chip  
+    bool sendDataToChip(uint8_t* data, uint32_t len);                               // send data to chip
     bool sendHeaderAndDataToChip(uint16_t cmdCode, uint8_t* data, uint32_t len);    // send header and data to chip
 
     void storeHeaderToBuffer(uint16_t cmdCode, uint32_t futureDatalen, uint8_t* buffer);
