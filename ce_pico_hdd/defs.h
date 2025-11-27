@@ -4,17 +4,6 @@
 #include <arduino.h>
 
 #define LOG_MORE    1
-#define ALWAYS_INLINE inline __attribute__((always_inline))
-
-#define DELAY_NS   asm("nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop; nop;");
-
-#ifndef TRUE
-    #define TRUE 1
-#endif
-
-#ifndef FALSE
-    #define FALSE 0
-#endif
 
 #ifndef MIN
     #define MIN(X,Y)    ((X < Y) ? X : Y)

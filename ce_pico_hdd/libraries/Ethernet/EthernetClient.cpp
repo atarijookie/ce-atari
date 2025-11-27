@@ -23,6 +23,8 @@
 #include "Dns.h"
 #include "w5100.h"
 
+void debug(const char *fmt, ...);
+
 int EthernetClient::connect(const char * host, uint16_t port)
 {
     DNSClient dns; // Look up the host first
@@ -153,11 +155,14 @@ void EthernetClient::stop()
 
 uint8_t EthernetClient::connected()
 {
-    if (sockindex >= MAX_SOCK_NUM) return 0;
+    if (sockindex >= MAX_SOCK_NUM) {
+        return 0;
+    }
 
     uint8_t s = Ethernet.socketStatus(sockindex);
-    return !(s == SnSR::LISTEN || s == SnSR::CLOSED || s == SnSR::FIN_WAIT ||
-        (s == SnSR::CLOSE_WAIT && !available()));
+
+    uint8_t ret = !(s == SnSR::LISTEN || s == SnSR::CLOSED || s == SnSR::FIN_WAIT || (s == SnSR::CLOSE_WAIT && !available()));
+    return ret;
 }
 
 uint8_t EthernetClient::status()

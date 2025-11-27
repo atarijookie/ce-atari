@@ -64,7 +64,6 @@ void setup(void)
     }
 
     cmd = atnSendACSIcommand + TX_HEADER_SIZE;      // place command beyond the header
-    state = STATE_GET_COMMAND;
 
     setupAtnBuffers(); // fill the ATN buffers with needed headers and terminators
 
@@ -85,15 +84,17 @@ void setup(void)
         delay(1000);
     }
 
+    debug("eth ip: %s\n", Ethernet.localIP().toString().c_str());
+
     // store mac to fw version buffer
     memcpy(atnSendFwVersion + TX_HEADER_SIZE + 6, settings.mac, 6);
 
     debug("mac: %02X:%02X:%02X:%02X:%02X:%02X\n", atnSendFwVersion[TX_HEADER_SIZE + 6], atnSendFwVersion[TX_HEADER_SIZE + 7], atnSendFwVersion[TX_HEADER_SIZE + 8],
                                                   atnSendFwVersion[TX_HEADER_SIZE + 9], atnSendFwVersion[TX_HEADER_SIZE + 10], atnSendFwVersion[TX_HEADER_SIZE + 11]);
 
-    createIkbdTask();   // this task sends ikdb data to host and back
+    // createIkbdTask();   // this task sends ikdb data to host and back
 
-    displayInit();
+    // displayInit();
 }
 
 void setupAtnBuffers(void)
@@ -111,6 +112,9 @@ void loop(void)
 {
     uint32_t lastSendFwTime = millis();
     uint32_t lastYield = millis();
+
+    state = STATE_GET_COMMAND;
+    debug("starting main loop\n");
 
     while(1)
     {

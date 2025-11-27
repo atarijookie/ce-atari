@@ -364,7 +364,7 @@ uint8_t idIsEnabled(uint8_t id)
 {
     if (id > 7)
     {
-        return FALSE;
+        return false;
     }
 
     return (settings.enabledIDs & (1 << id));

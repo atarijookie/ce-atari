@@ -11,8 +11,6 @@ extern uint8_t isAcsiNotScsi;
 extern uint8_t lastScsiStatusByte;
 extern uint8_t busIdle;
 
-uint8_t pioReadFailed;
-
 const int dataPins[8] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7};
 
 static PIO pioCmdFirst, pioCmdWrite, pioCmdRead;
@@ -128,6 +126,10 @@ void pioConfig(int newMode, bool force)
 
 uint8_t PIO_gotFirstCmdByte(void)
 {
+    if(BIT_IS_L(PIN_RESET)) {   // no new cmd bytes when ACSI RESET is L
+        return false;
+    }
+
     pioConfig(MODE_CMD_FIRST);
     return !pio_sm_is_rx_fifo_empty(pioCmdFirst, smCmdFirst);
 }
@@ -167,8 +169,6 @@ uint8_t PIO_write(void)
 // send status byte to host, and on SCSI also to MSG IN byte
 void PIO_read(uint8_t scsiStatusByte)
 {
-    pioReadFailed = FALSE; // didn't fail (yet)
-
     if (brStat != E_TimeOut)
     {                                        // if we didn't have bridge timeout, we can try to send STATUS byte
         lastScsiStatusByte = scsiStatusByte; // store last SCSI status byte - for debugging purpose
@@ -185,7 +185,7 @@ void PIO_read(uint8_t scsiStatusByte)
 
     if (brStat != E_OK)
     { // if some timeout occured, then failed
-        pioReadFailed = TRUE;
+
     }
 
     // resetBridge();               // reset XILINX - put BSY, C/D, I/O in released states - needed for SCSI, doesn't harm anything in ACSI

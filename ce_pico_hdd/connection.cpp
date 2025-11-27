@@ -170,25 +170,13 @@ void ceDiscoveryReceive(void)
         hostPortFdd = getWord(buffer + 6);
         hostPortIkbd = getWord(buffer + 8);
 
-        debug("ceDiscoveryReceive - got host ip: %s, ports: %d, %d, %d\n", hostIpString, hostPortHdd, hostPortFdd, hostPortIkbd);
+        debug("ceDiscoveryReceive - got host ip: %s, ports: %d, %d, %d\n", hostIpString.c_str(), hostPortHdd, hostPortFdd, hostPortIkbd);
     }
 }
 
 void connectToCEhost(void)
 {
     static uint32_t lastAttempt = 0xffff0000; // -65k
-    static bool loggedOnce = false;
-
-    if (clientHdd.connected())  // && clientIkbd.connected())
-    { // already connected? quit
-        if(!loggedOnce) {
-            debug("connectToCEhost - connected!\n");
-            loggedOnce = true;
-        }
-
-        return;
-    }
-    loggedOnce = false;
 
     // if last attempt was less than a moment ago, don't try
     if ((millis() - lastAttempt) < 3000)
@@ -210,7 +198,11 @@ void connectToCEhost(void)
     debug("connectToCEhost - IP: %s, port: %d\n", hostIpString.c_str(), hostPortHdd);
 
     // start connection attempt
-    clientHdd.connect(hostIpString.c_str(), hostPortHdd);
+    clientHdd.stop();                                       // close socket if still open
+    connected = clientHdd.connect(hostIpString.c_str(), hostPortHdd);
+
+    debug("connectToCEhost - connected: %d\n", connected);
+
     // clientHdd.setNoDelay(true);
 
     // clientIkbd.connect(hostIpString.c_str(), hostPortIkbd);
@@ -279,7 +271,7 @@ void connectToHost(void)
 
 bool getIncommingHeader(EthernetClient* client, uint32_t expectedSyncTag, THeader* header)
 {
-    if(!client->connected())    // client not connected, no header received
+    if(!connected)    // client not connected, no header received
     {
         return false;
     }
@@ -433,7 +425,7 @@ bool sendDataToHost(uint8_t whichSock, uint8_t *bfr, uint32_t dataSizeBytes)
         default: return false;
     }
 
-    if(!client->connected())
+    if(!connected)
     {
         return false;
     }
