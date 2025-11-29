@@ -1,12 +1,15 @@
+#include "pico/stdlib.h"
+#include "pico/time.h"
+
 #include <EEPROM.h>
 
 #include "utils.h"
 #include "defs.h"
 
 // hw_timer_t *timer = NULL;
-volatile uint8_t hasTimedOut = false;
-uint8_t timerRunning = false;
-uint32_t timerEndMillis = 0;
+volatile bool hasTimedOut = false;
+volatile uint8_t timerRunning = false;
+alarm_id_t timer_id = 0;    // Will hold the alarm handle
 
 struct TSettings settings;
 
@@ -76,10 +79,11 @@ void store24bits(uint8_t *bfr, uint32_t val)
     bfr[2] = val;
 }
 
-// void ARDUINO_ISR_ATTR onTimer()
-// {
-//     hasTimedOut = 1;
-// }
+int64_t timer_callback(alarm_id_t id, void *user_data) {
+    hasTimedOut = true;
+    timerRunning = false;
+    return 0;   // 0 = do NOT reschedule (one-shot)
+}
 
 void timeoutStart(uint32_t durationMs)
 {
@@ -87,19 +91,15 @@ void timeoutStart(uint32_t durationMs)
 //     debug("timeoutStart %d at %d", durationMs, millis());
 // #endif
 
-    if(timerRunning)                                // if timer running, stop it first
-    {
-        // timerEnd(timer);
+    // If already running, cancel old one
+    if (timerRunning) {
+        timerRunning = false;
+        cancel_alarm(timer_id);
     }
 
-    timerRunning = false;
-    hasTimedOut = false;
-    // timer = timerBegin(1000);                       // Set timer frequency to 1 kHz
-    // timerAttachInterrupt(timer, &onTimer);          // Attach onTimer function to our timer.
-    // timerAlarm(timer, durationMs, false, 0);        // Set alarm to call onTimer function after specified timeout time (value in ms)
+    timer_id = add_alarm_in_ms(durationMs, timer_callback, NULL, false);
 
-    timerEndMillis = millis() + durationMs;         // this is the time when the time out will happen
-
+    hasTimedOut = false; // reset flag
     timerRunning = true;
 }
 
@@ -109,9 +109,13 @@ void timeoutClear(void)
 //  debug("timeoutClear\n");
 // #endif
 
+    if (timerRunning) {
+        timerRunning = false;
+        cancel_alarm(timer_id);
+    }
+
     hasTimedOut = false;
     timerRunning = false;
-    // timerEnd(timer);
 }
 
 void cmdTimeoutChangeLength(uint32_t newPeriod)

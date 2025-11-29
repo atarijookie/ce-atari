@@ -13,7 +13,7 @@ void store24bits(uint8_t *bfr, uint32_t val);
 void storeHeader(uint8_t *bfr, uint16_t atnCode, uint32_t txLen);
 
 extern uint32_t timerEndMillis;
-extern volatile uint8_t hasTimedOut;
+extern volatile bool hasTimedOut;
 void timeoutClear(void);
 void timeoutStart(uint32_t durationMs = CMD_TIMEOUT_SHORT);
 void longTimeout_basedOnSectorCount(uint16_t sectorCount);
