@@ -21,7 +21,7 @@ static const uint16_t cmd_first_program_instructions[] = {
     0x200b, //  0: wait   0 gpio, 11
     0x00c0, //  1: jmp    pin, 0
     0xa442, //  2: nop                           [4]
-    0x4008, //  3: in     pins, 8
+    0x4508, //  3: in     pins, 8                [5]
     0x208b, //  4: wait   1 gpio, 11
     0x8020, //  5: push   block
             //     .wrap

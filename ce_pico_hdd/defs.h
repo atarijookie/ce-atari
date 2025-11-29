@@ -56,7 +56,8 @@
 
 ///////////////////////////
 
-#define DATA_PINS_MASK  0x3fc
+#define DATA_PINS_MASK      ((1 << PIN_D0) | (1 << PIN_D1) | (1 << PIN_D2) | (1 << PIN_D3) | (1 << PIN_D4) | (1 << PIN_D5) | (1 << PIN_D6) | (1 << PIN_D7))
+#define HANDSHAKE_OUT_PINS  ((1 << PIN_DRQ) | (1 << PIN_INT))
 
 #define PIN_TXD_DEBUG   0
 #define PIN_RXD_DEBUG   1

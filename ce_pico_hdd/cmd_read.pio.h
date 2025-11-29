@@ -13,27 +13,24 @@
 // -------- //
 
 #define cmd_read_wrap_target 0
-#define cmd_read_wrap 8
+#define cmd_read_wrap 5
 #define cmd_read_pio_version 0
 
 static const uint16_t cmd_read_program_instructions[] = {
             //     .wrap_target
-    0x80a0, //  0: pull   block
-    0x6008, //  1: out    pins, 8
-    0xe000, //  2: set    pins, 0
-    0x00c3, //  3: jmp    pin, 3
-    0xe001, //  4: set    pins, 1
-    0x00c7, //  5: jmp    pin, 7
-    0x0005, //  6: jmp    5
-    0xa442, //  7: nop                           [4]
-    0x8020, //  8: push   block
+    0x90a0, //  0: pull   block           side 1
+    0x7008, //  1: out    pins, 8         side 1
+    0x2020, //  2: wait   0 pin, 0        side 0
+    0xb942, //  3: nop                    side 1 [9]
+    0x32a0, //  4: wait   1 pin, 0        side 1 [2]
+    0x9020, //  5: push   block           side 1
             //     .wrap
 };
 
 #if !PICO_NO_HARDWARE
 static const struct pio_program cmd_read_program = {
     .instructions = cmd_read_program_instructions,
-    .length = 9,
+    .length = 6,
     .origin = -1,
     .pio_version = cmd_read_pio_version,
 #if PICO_PIO_VERSION > 0
@@ -44,12 +41,12 @@ static const struct pio_program cmd_read_program = {
 static inline pio_sm_config cmd_read_program_get_default_config(uint offset) {
     pio_sm_config c = pio_get_default_sm_config();
     sm_config_set_wrap(&c, offset + cmd_read_wrap_target, offset + cmd_read_wrap);
+    sm_config_set_sideset(&c, 1, false, false);
     return c;
 }
 
 #include "hardware/clocks.h"
 #include "hardware/gpio.h"
-static pio_sm_config cRead;
 static PIO cmdReadPio;
 static uint cmdReadSm;
 static inline void cmd_read_program_init(PIO pio, uint sm, uint offset)
@@ -61,12 +58,12 @@ static inline void cmd_read_program_init(PIO pio, uint sm, uint offset)
     int pio_dirs[PIO_READ_COUNT] = {     1,      1,      1,      1,      1,      1,      1,      1,      0,      0,       1,       1,       0};
     for (int i = 0; i < PIO_READ_COUNT; i++) {
         pio_gpio_init(pio, pio_pins[i]);
-        pio_sm_set_consecutive_pindirs(pio, sm, pio_pins[0], 1, pio_dirs[i]);
+        pio_sm_set_consecutive_pindirs(pio, sm, pio_pins[i], 1, pio_dirs[i]);
     }
-    cRead = cmd_read_program_get_default_config(offset);
+    pio_sm_config cRead = cmd_read_program_get_default_config(offset);
     sm_config_set_out_pins(&cRead, PIN_D0, 8);          // for OUT
-    sm_config_set_set_pins(&cRead, PIN_INT, 1);         // for SET
-    sm_config_set_jmp_pin(&cRead, PIN_CS);              // for JMP
+    sm_config_set_in_pins(&cRead, PIN_CS);              // for WAIT, IN
+    sm_config_set_sideset_pins(&cRead, PIN_INT);        // for SIDE_SET
     sm_config_set_out_shift(&cRead, true, false, 32);   // Shift to right, autopush disabled
     sm_config_set_fifo_join(&cRead, PIO_FIFO_JOIN_NONE);  // no fifo joining
     float div = (float)clock_get_hz(clk_sys) / 50000000;    // calc divider for 50 MHz, that's 20 ns per instruction
@@ -76,23 +73,25 @@ static inline void cmd_read_program_init(PIO pio, uint sm, uint offset)
 }
 void configCmdReadForPIO(void)
 {
+    pio_sm_set_pins_with_mask(cmdReadPio, cmdReadSm, HANDSHAKE_OUT_PINS, HANDSHAKE_OUT_PINS);   // INT and DRQ to H in PIO SM output
     // DRQ is controlled by gpio, always driving H
-    gpio_set_function(PIN_DRQ, GPIO_FUNC_SIO);
     gpio_put(PIN_DRQ, 1);
+    gpio_set_function(PIN_DRQ, GPIO_FUNC_SIO);
     // INT is controlled by PIO
     pio_gpio_init(cmdReadPio, PIN_INT);
-    sm_config_set_set_pins(&cRead, PIN_INT, 1);        // for SET
-    sm_config_set_jmp_pin(&cRead, PIN_CS);             // for JMP
+    pio_sm_set_sideset_pins(cmdReadPio, cmdReadSm, PIN_INT);    // for SIDE_SET
+    pio_sm_set_in_pins(cmdReadPio, cmdReadSm, PIN_CS);          // for WAIT, IN
 }
 void configCmdReadForDMA(void)
 {
+    pio_sm_set_pins_with_mask(cmdReadPio, cmdReadSm, HANDSHAKE_OUT_PINS, HANDSHAKE_OUT_PINS);   // INT and DRQ to H in PIO SM output
     // INT is controlled by gpio, always driving H
-    gpio_set_function(PIN_INT, GPIO_FUNC_SIO);
     gpio_put(PIN_INT, 1);
+    gpio_set_function(PIN_INT, GPIO_FUNC_SIO);
     // DRQ is controlled by PIO
-    pio_gpio_init(cmdWritePio, PIN_DRQ);
-    sm_config_set_set_pins(&cRead, PIN_DRQ, 1);        // for SET
-    sm_config_set_jmp_pin(&cRead, PIN_ACK);            // for JMP
+    pio_gpio_init(cmdReadPio, PIN_DRQ);
+    pio_sm_set_sideset_pins(cmdReadPio, cmdReadSm, PIN_DRQ);    // for SIDE_SET
+    pio_sm_set_in_pins(cmdReadPio, cmdReadSm, PIN_ACK);         // for WAIT, IN
 }
 
 #endif

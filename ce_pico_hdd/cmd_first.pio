@@ -6,9 +6,8 @@ start:
     wait 0 gpio 11      ; wait for CS pin to become L
     jmp pin start       ; if A1 (jmp_pin) is H, ignore this CS being L
 
-    ; if got here, CS is L, A1 is L
-    nop [4]             ; delay 1+4 cycles (100 ns) before reading data
-    in pins, 8          ; read 8 bits from gpio into isr
+    nop             [4] ; delay 1+4 cycles (100 ns) before reading data
+    in pins, 8      [5] ; read 8 bits from gpio into isr
 
     wait 1 gpio 11      ; wait for CS pin to become H
     push                ; push the contents of the ISR into the RX FIFO, intentionally at the end

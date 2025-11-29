@@ -1,33 +1,21 @@
-.pio_version 0 // only requires PIO version 0
-
+.pio_version 0          // only requires PIO version 0
 .program cmd_write
+.side_set 1             // the number of side-set bits to be used
 
 start:
-        pull                ; load from the TX FIFO into the OSR
-        mov x, osr          ; X = OSR
+        pull                side 1          ; load from the TX FIFO into the OSR
+        mov x, osr          side 1          ; X = OSR
 
-one_more_byte:
-        set pins, 0         ; set INT to L
+wait4L: jmp pin wait4L      side 0          ; set INT / DRQ to L, keep waiting here until CS / ACK is L
+        nop                 side 1  [4]     ; set INT / DRQ to H, total 100 ns delay before reading data
+        in pins, 8          side 1          ; read 8 bits from gpio into ISR
 
-        ; wait for CS to become L, keep looping while it's still H
-wait4L: jmp pin wait4L
+wait4H: jmp pin wr_end      side 1          ; wait here for CS / ACK to become H
+        jmp wait4H          side 1
 
-        set pins, 1 [4]     ; set INT to H
-        in pins, 8          ; read 8 bits from gpio into ISR
+wr_end: push                side 1          ; Push the contents of the ISR into the RX FIFO. Intentionally late in the routine to signal transfer end
 
-        ; wait for CS to become H, keep looping while it's still L
-wait4H: jmp pin write_byte_end
-        jmp wait4H
-
-write_byte_end:
-        ; Push the contents of the ISR into the RX FIFO.
-        ; This push is intentionally late in the routine,
-        ; so seeting it in the FIFO means that this transfer it done.
-        push
-
-        ; if X is not zero, decrement and jump to get one more byte
-        ; x must be loaded to value N-1, if you want to load N bytes
-        jmp x-- one_more_byte
+        jmp x-- wait4L      side 1          ; If X is not zero, decrement and jump to get one more byte. X must be loaded to value N-1, if you want to load N bytes.
 
 
 % c-sdk {
@@ -36,7 +24,6 @@ write_byte_end:
 
 // to read N bytes, you must put N-1 into TX FIFO (one less)
 
-static pio_sm_config cWrite;
 static PIO cmdWritePio;
 static uint cmdWriteSm;
 
@@ -54,11 +41,12 @@ static inline void cmd_write_program_init(PIO pio, uint sm, uint offset)
         pio_sm_set_consecutive_pindirs(pio, sm, pio_pins[i], 1, pio_dirs[i]);
     }
 
-    cWrite = cmd_write_program_get_default_config(offset);
-    sm_config_set_in_pins(&cWrite, PIN_D0);              // for WAIT, IN
-    sm_config_set_set_pins(&cWrite, PIN_INT, 1);         // for SET
-    sm_config_set_jmp_pin(&cWrite, PIN_CS);              // for JMP
-    sm_config_set_in_shift(&cWrite, true, false, 32);    // Shift to right, autopush disabled
+    pio_sm_config cWrite = cmd_write_program_get_default_config(offset);
+    sm_config_set_in_pins(&cWrite, PIN_D0);             // for WAIT, IN
+    sm_config_set_set_pins(&cWrite, PIN_INT, 1);        // for SET
+    sm_config_set_sideset_pins(&cWrite, PIN_INT);       // for SIDE_SET
+    sm_config_set_jmp_pin(&cWrite, PIN_CS);             // for JMP
+    sm_config_set_in_shift(&cWrite, true, false, 32);   // Shift to right, autopush disabled
     sm_config_set_fifo_join(&cWrite, PIO_FIFO_JOIN_NONE);   // no fifo joining, we need both fifos
 
     float div = (float)clock_get_hz(clk_sys) / 50000000;    // calc divider for 50 MHz, that's 20 ns per instruction
@@ -70,6 +58,8 @@ static inline void cmd_write_program_init(PIO pio, uint sm, uint offset)
 
 void configCmdWriteForPIO(void)
 {
+    pio_sm_set_pins_with_mask(cmdWritePio, cmdWriteSm, HANDSHAKE_OUT_PINS, HANDSHAKE_OUT_PINS);   // INT and DRQ to H in PIO SM output
+
     // DRQ is controlled by gpio, always driving H
     gpio_set_function(PIN_DRQ, GPIO_FUNC_SIO);
     gpio_put(PIN_DRQ, 1);
@@ -77,12 +67,14 @@ void configCmdWriteForPIO(void)
     // INT is controlled by PIO
     pio_gpio_init(cmdWritePio, PIN_INT);
 
-    sm_config_set_set_pins(&cWrite, PIN_INT, 1);        // for SET
-    sm_config_set_jmp_pin(&cWrite, PIN_CS);             // for JMP
+    pio_sm_set_sideset_pins(cmdWritePio, cmdWriteSm, PIN_INT);      // for SIDE_SET
+    pio_sm_set_jmp_pin(cmdWritePio, cmdWriteSm, PIN_CS);            // for JMP
 }
 
 void configCmdWriteForDMA(void)
 {
+    pio_sm_set_pins_with_mask(cmdWritePio, cmdWriteSm, HANDSHAKE_OUT_PINS, HANDSHAKE_OUT_PINS);   // INT and DRQ to H in PIO SM output
+
     // INT is controlled by gpio, always driving H
     gpio_set_function(PIN_INT, GPIO_FUNC_SIO);
     gpio_put(PIN_INT, 1);
@@ -90,8 +82,8 @@ void configCmdWriteForDMA(void)
     // DRQ is controlled by PIO
     pio_gpio_init(cmdWritePio, PIN_DRQ);
 
-    sm_config_set_set_pins(&cWrite, PIN_DRQ, 1);        // for SET
-    sm_config_set_jmp_pin(&cWrite, PIN_ACK);            // for JMP
+    pio_sm_set_sideset_pins(cmdWritePio, cmdWriteSm, PIN_DRQ);      // for SIDE_SET
+    pio_sm_set_jmp_pin(cmdWritePio, cmdWriteSm, PIN_ACK);           // for JMP
 }
 
 %}
