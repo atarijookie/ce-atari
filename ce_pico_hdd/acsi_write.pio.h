@@ -9,14 +9,14 @@
 #endif
 
 // --------- //
-// cmd_write //
+// acsi_write //
 // --------- //
 
-#define cmd_write_wrap_target 0
-#define cmd_write_wrap 8
-#define cmd_write_pio_version 0
+#define acsi_write_wrap_target 0
+#define acsi_write_wrap 8
+#define acsi_write_pio_version 0
 
-static const uint16_t cmd_write_program_instructions[] = {
+static const uint16_t acsi_write_program_instructions[] = {
             //     .wrap_target
     0x90a0, //  0: pull   block           side 1
     0xb027, //  1: mov    x, osr          side 1
@@ -31,19 +31,19 @@ static const uint16_t cmd_write_program_instructions[] = {
 };
 
 #if !PICO_NO_HARDWARE
-static const struct pio_program cmd_write_program = {
-    .instructions = cmd_write_program_instructions,
+static const struct pio_program acsi_write_program = {
+    .instructions = acsi_write_program_instructions,
     .length = 9,
     .origin = -1,
-    .pio_version = cmd_write_pio_version,
+    .pio_version = acsi_write_pio_version,
 #if PICO_PIO_VERSION > 0
     .used_gpio_ranges = 0x0
 #endif
 };
 
-static inline pio_sm_config cmd_write_program_get_default_config(uint offset) {
+static inline pio_sm_config acsi_write_program_get_default_config(uint offset) {
     pio_sm_config c = pio_get_default_sm_config();
-    sm_config_set_wrap(&c, offset + cmd_write_wrap_target, offset + cmd_write_wrap);
+    sm_config_set_wrap(&c, offset + acsi_write_wrap_target, offset + acsi_write_wrap);
     sm_config_set_sideset(&c, 1, false, false);
     return c;
 }
@@ -51,12 +51,12 @@ static inline pio_sm_config cmd_write_program_get_default_config(uint offset) {
 #include "hardware/clocks.h"
 #include "hardware/gpio.h"
 // to read N bytes, you must put N-1 into TX FIFO (one less)
-static PIO cmdWritePio;
-static uint cmdWriteSm;
-static inline void cmd_write_program_init(PIO pio, uint sm, uint offset)
+static PIO acsiWritePio;
+static uint acsiWriteSm;
+static inline void acsi_write_program_init(PIO pio, uint sm, uint offset)
 {
-    cmdWritePio = pio;
-    cmdWriteSm = sm;
+    acsiWritePio = pio;
+    acsiWriteSm = sm;
     #define PIO_WRITE_COUNT 13
     int pio_pins[PIO_WRITE_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_CS, PIN_A1, PIN_INT, PIN_DRQ, PIN_ACK};
     int pio_dirs[PIO_WRITE_COUNT] = {     0,      0,      0,      0,      0,      0,      0,      0,      0,      0,       1,       1,       0};
@@ -64,7 +64,7 @@ static inline void cmd_write_program_init(PIO pio, uint sm, uint offset)
         pio_gpio_init(pio, pio_pins[i]);
         pio_sm_set_consecutive_pindirs(pio, sm, pio_pins[i], 1, pio_dirs[i]);
     }
-    pio_sm_config cWrite = cmd_write_program_get_default_config(offset);
+    pio_sm_config cWrite = acsi_write_program_get_default_config(offset);
     sm_config_set_in_pins(&cWrite, PIN_D0);             // for WAIT, IN
     sm_config_set_set_pins(&cWrite, PIN_INT, 1);        // for SET
     sm_config_set_sideset_pins(&cWrite, PIN_INT);       // for SIDE_SET
@@ -76,27 +76,27 @@ static inline void cmd_write_program_init(PIO pio, uint sm, uint offset)
     pio_sm_init(pio, sm, offset, &cWrite);
     // pio_sm_set_enabled(pio, sm, true);
 }
-void configCmdWriteForPIO(void)
+void configAcsiWriteForPIO(void)
 {
-    pio_sm_set_pins_with_mask(cmdWritePio, cmdWriteSm, HANDSHAKE_OUT_PINS, HANDSHAKE_OUT_PINS);   // INT and DRQ to H in PIO SM output
+    pio_sm_set_pins_with_mask(acsiWritePio, acsiWriteSm, HANDSHAKE_OUT_PINS, HANDSHAKE_OUT_PINS);   // INT and DRQ to H in PIO SM output
     // DRQ is controlled by gpio, always driving H
     gpio_set_function(PIN_DRQ, GPIO_FUNC_SIO);
     gpio_put(PIN_DRQ, 1);
     // INT is controlled by PIO
-    pio_gpio_init(cmdWritePio, PIN_INT);
-    pio_sm_set_sideset_pins(cmdWritePio, cmdWriteSm, PIN_INT);      // for SIDE_SET
-    pio_sm_set_jmp_pin(cmdWritePio, cmdWriteSm, PIN_CS);            // for JMP
+    pio_gpio_init(acsiWritePio, PIN_INT);
+    pio_sm_set_sideset_pins(acsiWritePio, acsiWriteSm, PIN_INT);      // for SIDE_SET
+    pio_sm_set_jmp_pin(acsiWritePio, acsiWriteSm, PIN_CS);            // for JMP
 }
-void configCmdWriteForDMA(void)
+void configAcsiWriteForDMA(void)
 {
-    pio_sm_set_pins_with_mask(cmdWritePio, cmdWriteSm, HANDSHAKE_OUT_PINS, HANDSHAKE_OUT_PINS);   // INT and DRQ to H in PIO SM output
+    pio_sm_set_pins_with_mask(acsiWritePio, acsiWriteSm, HANDSHAKE_OUT_PINS, HANDSHAKE_OUT_PINS);   // INT and DRQ to H in PIO SM output
     // INT is controlled by gpio, always driving H
     gpio_set_function(PIN_INT, GPIO_FUNC_SIO);
     gpio_put(PIN_INT, 1);
     // DRQ is controlled by PIO
-    pio_gpio_init(cmdWritePio, PIN_DRQ);
-    pio_sm_set_sideset_pins(cmdWritePio, cmdWriteSm, PIN_DRQ);      // for SIDE_SET
-    pio_sm_set_jmp_pin(cmdWritePio, cmdWriteSm, PIN_ACK);           // for JMP
+    pio_gpio_init(acsiWritePio, PIN_DRQ);
+    pio_sm_set_sideset_pins(acsiWritePio, acsiWriteSm, PIN_DRQ);      // for SIDE_SET
+    pio_sm_set_jmp_pin(acsiWritePio, acsiWriteSm, PIN_ACK);           // for JMP
 }
 
 #endif

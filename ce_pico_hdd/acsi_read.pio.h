@@ -9,14 +9,14 @@
 #endif
 
 // -------- //
-// cmd_read //
+// acsi_read //
 // -------- //
 
-#define cmd_read_wrap_target 0
-#define cmd_read_wrap 5
-#define cmd_read_pio_version 0
+#define acsi_read_wrap_target 0
+#define acsi_read_wrap 5
+#define acsi_read_pio_version 0
 
-static const uint16_t cmd_read_program_instructions[] = {
+static const uint16_t acsi_read_program_instructions[] = {
             //     .wrap_target
     0x90a0, //  0: pull   block           side 1
     0x7008, //  1: out    pins, 8         side 1
@@ -28,31 +28,31 @@ static const uint16_t cmd_read_program_instructions[] = {
 };
 
 #if !PICO_NO_HARDWARE
-static const struct pio_program cmd_read_program = {
-    .instructions = cmd_read_program_instructions,
+static const struct pio_program acsi_read_program = {
+    .instructions = acsi_read_program_instructions,
     .length = 6,
     .origin = -1,
-    .pio_version = cmd_read_pio_version,
+    .pio_version = acsi_read_pio_version,
 #if PICO_PIO_VERSION > 0
     .used_gpio_ranges = 0x0
 #endif
 };
 
-static inline pio_sm_config cmd_read_program_get_default_config(uint offset) {
+static inline pio_sm_config acsi_read_program_get_default_config(uint offset) {
     pio_sm_config c = pio_get_default_sm_config();
-    sm_config_set_wrap(&c, offset + cmd_read_wrap_target, offset + cmd_read_wrap);
+    sm_config_set_wrap(&c, offset + acsi_read_wrap_target, offset + acsi_read_wrap);
     sm_config_set_sideset(&c, 1, false, false);
     return c;
 }
 
 #include "hardware/clocks.h"
 #include "hardware/gpio.h"
-static PIO cmdReadPio;
-static uint cmdReadSm;
-static inline void cmd_read_program_init(PIO pio, uint sm, uint offset)
+static PIO acsiReadPio;
+static uint acsiReadSm;
+static inline void acsi_read_program_init(PIO pio, uint sm, uint offset)
 {
-    cmdReadPio = pio;
-    cmdReadSm = sm;
+    acsiReadPio = pio;
+    acsiReadSm = sm;
     #define PIO_READ_COUNT 13
     int pio_pins[PIO_READ_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_CS, PIN_A1, PIN_INT, PIN_DRQ, PIN_ACK};
     int pio_dirs[PIO_READ_COUNT] = {     1,      1,      1,      1,      1,      1,      1,      1,      0,      0,       1,       1,       0};
@@ -60,7 +60,7 @@ static inline void cmd_read_program_init(PIO pio, uint sm, uint offset)
         pio_gpio_init(pio, pio_pins[i]);
         pio_sm_set_consecutive_pindirs(pio, sm, pio_pins[i], 1, pio_dirs[i]);
     }
-    pio_sm_config cRead = cmd_read_program_get_default_config(offset);
+    pio_sm_config cRead = acsi_read_program_get_default_config(offset);
     sm_config_set_out_pins(&cRead, PIN_D0, 8);          // for OUT
     sm_config_set_in_pins(&cRead, PIN_CS);              // for WAIT, IN
     sm_config_set_sideset_pins(&cRead, PIN_INT);        // for SIDE_SET
@@ -71,27 +71,27 @@ static inline void cmd_read_program_init(PIO pio, uint sm, uint offset)
     pio_sm_init(pio, sm, offset, &cRead);
     // pio_sm_set_enabled(pio, sm, true);
 }
-void configCmdReadForPIO(void)
+void configAcsiReadForPIO(void)
 {
-    pio_sm_set_pins_with_mask(cmdReadPio, cmdReadSm, HANDSHAKE_OUT_PINS, HANDSHAKE_OUT_PINS);   // INT and DRQ to H in PIO SM output
+    pio_sm_set_pins_with_mask(acsiReadPio, acsiReadSm, HANDSHAKE_OUT_PINS, HANDSHAKE_OUT_PINS);   // INT and DRQ to H in PIO SM output
     // DRQ is controlled by gpio, always driving H
     gpio_put(PIN_DRQ, 1);
     gpio_set_function(PIN_DRQ, GPIO_FUNC_SIO);
     // INT is controlled by PIO
-    pio_gpio_init(cmdReadPio, PIN_INT);
-    pio_sm_set_sideset_pins(cmdReadPio, cmdReadSm, PIN_INT);    // for SIDE_SET
-    pio_sm_set_in_pins(cmdReadPio, cmdReadSm, PIN_CS);          // for WAIT, IN
+    pio_gpio_init(acsiReadPio, PIN_INT);
+    pio_sm_set_sideset_pins(acsiReadPio, acsiReadSm, PIN_INT);    // for SIDE_SET
+    pio_sm_set_in_pins(acsiReadPio, acsiReadSm, PIN_CS);          // for WAIT, IN
 }
-void configCmdReadForDMA(void)
+void configAcsiReadForDMA(void)
 {
-    pio_sm_set_pins_with_mask(cmdReadPio, cmdReadSm, HANDSHAKE_OUT_PINS, HANDSHAKE_OUT_PINS);   // INT and DRQ to H in PIO SM output
+    pio_sm_set_pins_with_mask(acsiReadPio, acsiReadSm, HANDSHAKE_OUT_PINS, HANDSHAKE_OUT_PINS);   // INT and DRQ to H in PIO SM output
     // INT is controlled by gpio, always driving H
     gpio_put(PIN_INT, 1);
     gpio_set_function(PIN_INT, GPIO_FUNC_SIO);
     // DRQ is controlled by PIO
-    pio_gpio_init(cmdReadPio, PIN_DRQ);
-    pio_sm_set_sideset_pins(cmdReadPio, cmdReadSm, PIN_DRQ);    // for SIDE_SET
-    pio_sm_set_in_pins(cmdReadPio, cmdReadSm, PIN_ACK);         // for WAIT, IN
+    pio_gpio_init(acsiReadPio, PIN_DRQ);
+    pio_sm_set_sideset_pins(acsiReadPio, acsiReadSm, PIN_DRQ);    // for SIDE_SET
+    pio_sm_set_in_pins(acsiReadPio, acsiReadSm, PIN_ACK);         // for WAIT, IN
 }
 
 #endif

@@ -16,7 +16,7 @@
 
 #define MODE_UNKNOWN    0
 #define MODE_RESET      1
-#define MODE_CMD_FIRST  2
+#define MODE_ACSI_FIRST  2
 #define MODE_CMD_REST   3
 #define MODE_DMA_READ   4
 #define MODE_DMA_WRITE  5

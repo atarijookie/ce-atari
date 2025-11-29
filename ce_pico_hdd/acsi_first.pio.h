@@ -9,14 +9,14 @@
 #endif
 
 // --------- //
-// cmd_first //
+// acsi_first //
 // --------- //
 
-#define cmd_first_wrap_target 0
-#define cmd_first_wrap 5
-#define cmd_first_pio_version 0
+#define acsi_first_wrap_target 0
+#define acsi_first_wrap 5
+#define acsi_first_pio_version 0
 
-static const uint16_t cmd_first_program_instructions[] = {
+static const uint16_t acsi_first_program_instructions[] = {
             //     .wrap_target
     0x200b, //  0: wait   0 gpio, 11
     0x00c0, //  1: jmp    pin, 0
@@ -28,28 +28,28 @@ static const uint16_t cmd_first_program_instructions[] = {
 };
 
 #if !PICO_NO_HARDWARE
-static const struct pio_program cmd_first_program = {
-    .instructions = cmd_first_program_instructions,
+static const struct pio_program acsi_first_program = {
+    .instructions = acsi_first_program_instructions,
     .length = 6,
     .origin = -1,
-    .pio_version = cmd_first_pio_version,
+    .pio_version = acsi_first_pio_version,
 #if PICO_PIO_VERSION > 0
     .used_gpio_ranges = 0x1
 #endif
 };
 
-static inline pio_sm_config cmd_first_program_get_default_config(uint offset) {
+static inline pio_sm_config acsi_first_program_get_default_config(uint offset) {
     pio_sm_config c = pio_get_default_sm_config();
-    sm_config_set_wrap(&c, offset + cmd_first_wrap_target, offset + cmd_first_wrap);
+    sm_config_set_wrap(&c, offset + acsi_first_wrap_target, offset + acsi_first_wrap);
     return c;
 }
 
 #include "hardware/clocks.h"
 #include "hardware/gpio.h"
 #include "defs.h"
-static PIO cmdFirstPio;
-static uint cmdFirstSm;
-void configCmdFirst(void)
+static PIO acsiFirstPio;
+static uint acsiFirstSm;
+void configAcsiFirst(void)
 {
     // INT is controlled by gpio, always driving H
     gpio_set_function(PIN_INT, GPIO_FUNC_SIO);
@@ -58,10 +58,10 @@ void configCmdFirst(void)
     gpio_set_function(PIN_DRQ, GPIO_FUNC_SIO);
     gpio_put(PIN_DRQ, 1);
 }
-static inline void cmd_first_program_init(PIO pio, uint sm, uint offset)
+static inline void acsi_first_program_init(PIO pio, uint sm, uint offset)
 {
-    cmdFirstPio = pio;
-    cmdFirstSm = sm;
+    acsiFirstPio = pio;
+    acsiFirstSm = sm;
     #define PIO_FIRST_COUNT 10
     int pio_pins[PIO_FIRST_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_CS, PIN_A1};
     int pio_dirs[PIO_FIRST_COUNT] = {     0,      0,      0,      0,      0,      0,      0,      0,      0,      0};
@@ -69,7 +69,7 @@ static inline void cmd_first_program_init(PIO pio, uint sm, uint offset)
         pio_gpio_init(pio, pio_pins[i]);
         pio_sm_set_consecutive_pindirs(pio, sm, pio_pins[i], 1, pio_dirs[i]);
     }
-    pio_sm_config c = cmd_first_program_get_default_config(offset);
+    pio_sm_config c = acsi_first_program_get_default_config(offset);
     sm_config_set_in_pins(&c, PIN_D0);              // base index for WAIT, IN
     sm_config_set_jmp_pin(&c, PIN_A1);              // for JMP
     sm_config_set_in_shift(&c, true, false, 32);    // Shift to right, autopush disabled

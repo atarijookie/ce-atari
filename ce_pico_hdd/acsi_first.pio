@@ -1,6 +1,6 @@
 .pio_version 0 // only requires PIO version 0
 
-.program cmd_first
+.program acsi_first
 
 start:
     wait 0 gpio 11      ; wait for CS pin to become L
@@ -18,10 +18,10 @@ start:
 #include "hardware/gpio.h"
 #include "defs.h"
 
-static PIO cmdFirstPio;
-static uint cmdFirstSm;
+static PIO acsiFirstPio;
+static uint acsiFirstSm;
 
-void configCmdFirst(void)
+void configAcsiFirst(void)
 {
     // INT is controlled by gpio, always driving H
     gpio_set_function(PIN_INT, GPIO_FUNC_SIO);
@@ -32,10 +32,10 @@ void configCmdFirst(void)
     gpio_put(PIN_DRQ, 1);
 }
 
-static inline void cmd_first_program_init(PIO pio, uint sm, uint offset)
+static inline void acsi_first_program_init(PIO pio, uint sm, uint offset)
 {
-    cmdFirstPio = pio;
-    cmdFirstSm = sm;
+    acsiFirstPio = pio;
+    acsiFirstSm = sm;
 
     #define PIO_FIRST_COUNT 10
     int pio_pins[PIO_FIRST_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_CS, PIN_A1};
@@ -46,7 +46,7 @@ static inline void cmd_first_program_init(PIO pio, uint sm, uint offset)
         pio_sm_set_consecutive_pindirs(pio, sm, pio_pins[i], 1, pio_dirs[i]);
     }
 
-    pio_sm_config c = cmd_first_program_get_default_config(offset);
+    pio_sm_config c = acsi_first_program_get_default_config(offset);
     sm_config_set_in_pins(&c, PIN_D0);              // base index for WAIT, IN
     sm_config_set_jmp_pin(&c, PIN_A1);              // for JMP
     sm_config_set_in_shift(&c, true, false, 32);    // Shift to right, autopush disabled
