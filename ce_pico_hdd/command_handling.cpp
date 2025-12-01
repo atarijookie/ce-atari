@@ -65,14 +65,14 @@ uint8_t onGetCommandAcsi(void)
     id = (cmd[0] >> 5) & 0x07; // get only device ID
 
 #ifdef LOG_MORE
-    debug("\n\nonGetCommandAcsi - cmd[0]: %02X, id: %d", cmd[0], id);
+    debug("\n\nonGetCommandAcsi - cmd[0]: %02X, id: %d ", cmd[0], id);
 #endif
 
     //----------------------
     if (!idIsEnabled(id)) // if this ID is not enabled, quit
     {
         resetBridge();
-        // debug(" NOT ENABLED\n");
+        debug("not enabled\n");
         return 0;
     }
 
@@ -87,7 +87,7 @@ uint8_t onGetCommandAcsi(void)
         if (brStat != E_OK)     // if something was wrong, quit, failed
         {
 #ifdef LOG_MORE
-            debug(" failed on cmd #%d", i);
+            debug("failed on cmd #%d\n", i);
 #endif
             resetBridge();
             return 0;
@@ -100,8 +100,13 @@ uint8_t onGetCommandAcsi(void)
     }
 
 #ifdef LOG_MORE
-    debug("%02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X\n",
-           cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7], cmd[8], cmd[9], cmd[10], cmd[11]);
+    switch(cmdLen) {
+        case 6:     debug("-> %02X %02X %02X %02X %02X %02X\n", cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5]); break;
+        case 7:     debug("-> %02X %02X %02X %02X %02X %02X %02X\n", cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6]); break;
+        case 11:    debug("-> %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X\n", cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7], cmd[8], cmd[9], cmd[10]); break;
+        case 13:
+        default:    debug("-> %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X\n", cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7], cmd[8], cmd[9], cmd[10], cmd[11], cmd[12]); break;
+    }
 #endif
 
     return 1;
