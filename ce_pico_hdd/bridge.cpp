@@ -16,6 +16,40 @@ static uint smAcsiFirst, smAcsiCmdWrite, smAcsiDataWrite, smAcsiDataRead, smAcsi
 
 int readInProgressCount = 0;
 
+void setDataDirection(uint8_t sendNotRecv, PIO pio)
+{
+    static uint8_t sendNotRecvNow = 0xff; // init with no data direction set yet
+    static PIO pioNow = nullptr;
+
+    if (sendNotRecvNow == sendNotRecv && pioNow == pio) { // direction not changed since last time? quit
+        return;
+    }
+
+    sendNotRecvNow = sendNotRecv; // remember what we're just setting
+    pioNow = pio;
+
+    // if output from mcu, set OUT_OE to L before switching mcu pins directions
+    if (sendNotRecv == DIR_SEND) {
+        BIT_SET(PIN_DATA_DIR);
+    }
+
+    if(sendNotRecv == DIR_SEND) {   // outputs?
+        gpio_set_dir_out_masked(DATA_PINS_MASK);
+    } else {                        // inputs!
+        gpio_set_dir_in_masked(DATA_PINS_MASK);
+    }
+
+    int pio_data_pins[8] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7};
+    for (int i = 0; i < 8; i++) {
+        pio_gpio_init(pio, pio_data_pins[i]);
+    }
+
+    // if input to mcu, set OUT_OE to H after switching mcu pins directions
+    if (sendNotRecv == DIR_RECV) {
+        BIT_CLR(PIN_DATA_DIR);
+    }
+}
+
 void pioConfigAll(void)
 {
     bool success;
@@ -69,20 +103,12 @@ void pioConfig(int newMode, bool force)
     pio_sm_set_pins_with_mask(pioAcsiDataRead, smAcsiDataRead, HANDSHAKE_OUT_PINS, HANDSHAKE_OUT_PINS);     // INT and DRQ to H in PIO SM output
     pio_sm_set_pins_with_mask(pioAcsiStatusRead, smAcsiStatusRead, HANDSHAKE_OUT_PINS, HANDSHAKE_OUT_PINS);       // INT and DRQ to H in PIO SM output
 
-    // data direction RECV for CMD and WRITE, data direction SEND for READ and STATUS
-    uint8_t sendNotRecv = (newMode == MODE_DMA_READ || newMode == MODE_STATUS) ? DIR_SEND : DIR_RECV;
-    setDataDirection(sendNotRecv);
-
-    // if we're in the reset mode, don't enabble any PIO SM
-    if(newMode == MODE_RESET) {
-        return;
-    }
-
     PIO whichPio;
     uint whichSm;
 
     switch(newMode)
     {
+        case MODE_RESET:
         case MODE_ACSI_FIRST:
             configAcsiFirst();
 
@@ -99,6 +125,7 @@ void pioConfig(int newMode, bool force)
 
         case MODE_DMA_READ:
             pio_gpio_init(pioAcsiDataRead, PIN_DRQ);   // DRQ is controlled by PIO
+            pio_sm_set_pindirs_with_mask64(pioAcsiDataRead, smAcsiDataRead, DATA_PINS_MASK, DATA_PINS_MASK);
 
             readInProgressCount = 0;        // no read bytes in progress
 
@@ -115,10 +142,20 @@ void pioConfig(int newMode, bool force)
 
         case MODE_STATUS:
             pio_gpio_init(pioAcsiStatusRead, PIN_INT);   // INT is controlled by PIO
+            pio_sm_set_pindirs_with_mask64(pioAcsiStatusRead, smAcsiStatusRead, DATA_PINS_MASK, DATA_PINS_MASK);
 
             whichPio = pioAcsiStatusRead;
             whichSm = smAcsiStatusRead;
             break;
+    }
+
+    // data direction RECV for CMD and WRITE, data direction SEND for READ and STATUS
+    uint8_t sendNotRecv = (newMode == MODE_DMA_READ || newMode == MODE_STATUS) ? DIR_SEND : DIR_RECV;
+    setDataDirection(sendNotRecv, whichPio);
+
+    // if we're in the reset mode, don't enabble any PIO SM
+    if(newMode == MODE_RESET) {
+        return;
     }
 
     // restart state machine, clear FIFOs, enable state machine
@@ -151,6 +188,7 @@ uint8_t PIO_writeFirst(void)
 // get next CMD byte from ST -- with setting INT to LOW and waiting for CS
 uint8_t PIO_write(void)
 {
+    pioConfig(MODE_CMD_REST);
     pio_sm_put(pioAcsiCmdWrite, smAcsiCmdWrite, 0);      // write N-1 count of bytes to write here
 
     while(1)
@@ -192,7 +230,6 @@ void PIO_read(uint8_t scsiStatusByte)
     }
 
     // resetBridge();               // reset XILINX - put BSY, C/D, I/O in released states - needed for SCSI, doesn't harm anything in ACSI
-    setDataDirection(DIR_RECV);     // data as inputs (write)
 }
 
 void PIO_read_solely(uint8_t val)
@@ -300,29 +337,3 @@ void resetBridge(void)
     brStat = E_OK; // set bridge status to OK
 }
 
-void setDataDirection(uint8_t sendNotRecv)
-{
-    static uint8_t sendNotRecvNow = 0xff; // init with no data direction set yet
-
-    if (sendNotRecvNow == sendNotRecv) { // direction not changed since last time? quit
-        return;
-    }
-
-    sendNotRecvNow = sendNotRecv; // remember what we're just setting
-
-    // if output from mcu, set OUT_OE to L before switching mcu pins directions
-    if (sendNotRecv == DIR_SEND) {
-        BIT_SET(PIN_DATA_DIR);
-    }
-
-    if(sendNotRecv == DIR_SEND) {   // outputs?
-        gpio_set_dir_out_masked(DATA_PINS_MASK);
-    } else {                        // inputs!
-        gpio_set_dir_in_masked(DATA_PINS_MASK);
-    }
-
-    // if input to mcu, set OUT_OE to H after switching mcu pins directions
-    if (sendNotRecv == DIR_RECV) {
-        BIT_CLR(PIN_DATA_DIR);
-    }
-}

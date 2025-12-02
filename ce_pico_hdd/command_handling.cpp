@@ -76,8 +76,6 @@ uint8_t onGetCommandAcsi(void)
         return 0;
     }
 
-    pioConfig(MODE_CMD_REST);
-
     cmdLen = 6; // maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
 
     for (i = 1; i < cmdLen; i++)
@@ -202,9 +200,6 @@ uint8_t onDataRead(uint8_t withStatus)
         }
     }
 
-    // now start the double buffered transfer to ST
-    setDataDirection(DIR_SEND); // data direction for reading
-
     #define BFR_SIZE    4096
     int rSize = 512;
     uint8_t data[BFR_SIZE];
@@ -232,8 +227,6 @@ uint8_t onDataRead(uint8_t withStatus)
             if (brStat == E_TimeOut)
             {
                 debug("onDataRead TO 3\n");
-
-                setDataDirection(DIR_RECV); // data direction for writing, and quit
                 return STATE_GET_COMMAND;   // next state: get next command
             }
         }
@@ -245,7 +238,6 @@ uint8_t onDataRead(uint8_t withStatus)
     if (brStat == E_TimeOut)        // read failed to wait for end?
     {
         debug("onDataRead TO 4\n");
-        setDataDirection(DIR_RECV); // data direction for writing, and quit
         return STATE_GET_COMMAND;   // next state: get next command
     }
 
@@ -272,9 +264,6 @@ uint8_t onDataWrite(void)
     sendDataToHost(SOCK_HDD, header, TX_HEADER_SIZE);
 
     uint8_t data[512];
-
-    // get data from Atari and send it to host by sector sized chunks
-    setDataDirection(DIR_RECV);     // data direction for reading
 
     pioConfig(MODE_DMA_WRITE);
 
