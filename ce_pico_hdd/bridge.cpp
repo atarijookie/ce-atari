@@ -8,7 +8,6 @@
 
 extern uint8_t brStat; // status from bridge
 extern uint8_t isAcsiNotScsi;
-extern uint8_t lastScsiStatusByte;
 extern uint8_t busIdle;
 
 static PIO pioAcsiFirst, pioAcsiCmdWrite, pioAcsiDataWrite, pioAcsiDataRead, pioAcsiStatusRead;
@@ -212,7 +211,6 @@ void PIO_read(uint8_t scsiStatusByte)
 {
     if (brStat != E_TimeOut)
     {                                        // if we didn't have bridge timeout, we can try to send STATUS byte
-        lastScsiStatusByte = scsiStatusByte; // store last SCSI status byte - for debugging purpose
         PIO_read_solely(scsiStatusByte);     // this sends only STATUS byte to host - both in ACSI and SCSI
     }
 

@@ -44,7 +44,10 @@
 #define STATE_DATA_WRITE                        5
 #define STATE_WAIT_FOR_STATUS_ARRIVAL           6
 #define STATE_READ_STATUS                       7
-// #define STATE_SEND_FW_VER                       10
+
+#define STATE_SEND_FW_VER                       10
+#define STATE_SEND_WRITE_MORE_DATA              11
+#define STATE_DATA_READ                         12
 
 ///////////////////////////
 

@@ -6,6 +6,7 @@
 #include "command_handling.h"
 #include "connection.h"
 #include "scsi.h"
+#include "ipc.h"
 
 extern EthernetClient clientHdd;
 extern EthernetClient clientIkbd;
@@ -17,21 +18,15 @@ uint8_t onGetCommandScsi(void);
 void getCmdLengthFromCmdBytesAcsi(void);
 void getCmdLengthFromCmdBytesScsi(uint8_t cmd);
 
-extern uint8_t state;
-extern uint32_t dataCnt;
-extern uint8_t statusByte;
-
 extern uint8_t atnSendACSIcommand[ATN_SENDACSICOMMAND_LEN_TX];
 
 //----------
-extern uint8_t *cmd;   // received command bytes, should point beyond the header in atnSendACSIcommand
-extern uint8_t cmdLen; // length of received command
-extern uint8_t brStat; // status from bridge
-extern uint8_t lastScsiStatusByte;
+uint8_t cmd[16];   // received command bytes, should point beyond the header in atnSendACSIcommand
+uint8_t cmdLen; // length of received command
+uint8_t brStat; // status from bridge
 
 extern uint8_t isAcsiNotScsi;
 extern uint8_t busIdle;
-extern bool dataReceived;
 
 uint8_t onGetCommand(void)
 {
@@ -47,11 +42,19 @@ uint8_t onGetCommand(void)
         return STATE_GET_COMMAND;
     }
 
+    IPCbuffer* bfr = ipcGetFreeBuffer(0, CMD_TIMEOUT_SHORT);
+    if(bfr == NULL) {
+        debug("onGetCommand - no free buffers\n");
+        timeoutClear();
+        return STATE_GET_COMMAND;
+    }
+
+    // store data to buffer, add buffer index to queue
+    ipcSetBufferAndPutToFifo(bfr, 0, STATE_GET_COMMAND, cmdLen, cmd, cmdLen);
+
     //----------------
     // command received, send it to host
     timeoutStart(); // start the timeout timer to give the rest of code full timeout time
-
-    sendHeaderAndDataToHost(SOCK_HDD, atnSendACSIcommand, ATN_SENDACSICOMMAND_LEN_TX - TX_HEADER_SIZE);
 
     return STATE_WAIT_COMMAND_RESPONSE;
 }
@@ -64,15 +67,13 @@ uint8_t onGetCommandAcsi(void)
     cmd[0] = PIO_writeFirst(); // get byte from ST (waiting for the 1st byte)
     id = (cmd[0] >> 5) & 0x07; // get only device ID
 
-#ifdef LOG_MORE
-    debug("\n\nonGetCommandAcsi - cmd[0]: %02X, id: %d ", cmd[0], id);
-#endif
+    // debug("\n\nonGetCommandAcsi - cmd[0]: %02X, id: %d ", cmd[0], id);
 
     //----------------------
     if (!idIsEnabled(id)) // if this ID is not enabled, quit
     {
         resetBridge();
-        debug("not enabled\n");
+        // debug("not enabled\n");
         return 0;
     }
 
@@ -84,9 +85,7 @@ uint8_t onGetCommandAcsi(void)
 
         if (brStat != E_OK)     // if something was wrong, quit, failed
         {
-#ifdef LOG_MORE
-            debug("failed on cmd #%d\n", i);
-#endif
+            debug("%02X %02X %02X %02X %02X %02X - failed on cmd #%d\n", cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], i);
             resetBridge();
             return 0;
         }
@@ -97,15 +96,13 @@ uint8_t onGetCommandAcsi(void)
         }
     }
 
-#ifdef LOG_MORE
-    switch(cmdLen) {
-        case 6:     debug("-> %02X %02X %02X %02X %02X %02X\n", cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5]); break;
-        case 7:     debug("-> %02X %02X %02X %02X %02X %02X %02X\n", cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6]); break;
-        case 11:    debug("-> %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X\n", cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7], cmd[8], cmd[9], cmd[10]); break;
-        case 13:
-        default:    debug("-> %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X\n", cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7], cmd[8], cmd[9], cmd[10], cmd[11], cmd[12]); break;
-    }
-#endif
+    // switch(cmdLen) {
+    //     case 6:     debug("-> %02X %02X %02X %02X %02X %02X\n", cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5]); break;
+    //     case 7:     debug("-> %02X %02X %02X %02X %02X %02X %02X\n", cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6]); break;
+    //     case 11:    debug("-> %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X\n", cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7], cmd[8], cmd[9], cmd[10]); break;
+    //     case 13:
+    //     default:    debug("-> %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X\n", cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7], cmd[8], cmd[9], cmd[10], cmd[11], cmd[12]); break;
+    // }
 
     return 1;
 }
@@ -172,98 +169,47 @@ uint8_t onGetCommandScsi(void)
     return 1;
 }
 
-uint8_t onDataRead(uint8_t withStatus)
+bool onDataRead(uint32_t cnt, uint8_t* bfr)
 {
 #ifdef LOG_MORE
-    debug("onDataRead withStatus: %d, dataCnt: %d\n", withStatus, dataCnt);
+    // debug("onDataRead withStatus: %d, dataCnt: %d\n", withStatus, cnt);
 #endif
-
-    // nothing to send AND should send status? then just quit with status byte
-    if (dataCnt == 0 && withStatus)
-    {
-        PIO_read(statusByte);
-        return STATE_GET_COMMAND;   // next state: get next command
-    }
 
     pioConfig(MODE_DMA_READ);
 
-    uint32_t start = millis();
-    while(!dataReceived)
-    {
-        handleIncommingData();      // receive data and wait for dataReceived flag
+    for(uint32_t i=0; i<cnt; i++) {    // send all the data from buffer to Atari
+        DMA_read(bfr[i]);
 
-        if(hasTimedOut) {
+        if (brStat == E_TimeOut)
+        {
             debug("onDataRead TO 1\n");
-
-            PIO_read(SCSI_ST_CHECK_CONDITION);
-            return STATE_GET_COMMAND;   // next state: get next command
+            return false;
         }
-    }
-
-    #define BFR_SIZE    4096
-    int rSize = 512;
-    uint8_t data[BFR_SIZE];
-
-    while(dataCnt > 0)
-    {
-        uint32_t cntNow = MIN(rSize, dataCnt);
-        int actualCnt = clientHdd.read(data, cntNow);   // try to read desired cntNow to buffer
-
-        if(actualCnt <= 0) {        // nothing read? do delay so other tasks can run
-            // vTaskDelay(1);
-            continue;
-        }
-
-        dataCnt -= actualCnt;       // decrease total size by actual read count
-        cntNow = actualCnt;
-
-        if(rSize < BFR_SIZE) {      // the requested read size not at the buffer size? increase it
-            rSize = MIN(rSize * 2, BFR_SIZE);
-        }
-
-        for(uint16_t i=0; i<cntNow; i++) {    // send all the data from buffer to Atari
-            DMA_read(data[i]);
-
-            if (brStat == E_TimeOut)
-            {
-                debug("onDataRead TO 3\n");
-                return STATE_GET_COMMAND;   // next state: get next command
-            }
-        }
-
     }
 
     DMA_read_waitForEnd();
 
     if (brStat == E_TimeOut)        // read failed to wait for end?
     {
-        debug("onDataRead TO 4\n");
-        return STATE_GET_COMMAND;   // next state: get next command
+        debug("onDataRead TO 2\n");
+        return false;
     }
 
-    // if should send status, then send status and go to STATE_GET_COMMAND
-    if (withStatus)
-    {
-        PIO_read(statusByte);       // send the status to Atari
-        return STATE_GET_COMMAND;   // next state: get next command
-    }
-
-    // if shouldn't send status here, switch to state STATE_READ_STATUS, which will retrieve status from host and send it to ST
-    return STATE_READ_STATUS;       // next state: read status
+    return true;
 }
 
-uint8_t onDataWrite(void)
+bool onDataWrite(uint32_t dataCnt)
 {
-#ifdef LOG_MORE
-    debug("onDataWrite dataCnt: %d\n", dataCnt);
-#endif
+    // debug("onDataWrite dataCnt: %d\n", dataCnt);
 
     // create and send one header at the start
-    uint8_t header[TX_HEADER_SIZE];
-    storeHeader(header, ATN_WRITE_MORE_DATA, dataCnt);
-    sendDataToHost(SOCK_HDD, header, TX_HEADER_SIZE);
-
-    uint8_t data[512];
+    IPCbuffer* bfr = ipcGetFreeBuffer(0, CMD_TIMEOUT_SHORT);
+    if(bfr) {
+        ipcSetBufferAndPutToFifo(bfr, 0, STATE_SEND_WRITE_MORE_DATA, dataCnt, NULL, 0);
+    } else {
+        debug("onDataWrite - ipcGetFreeBuffer failed\n");
+        return false;
+    }
 
     pioConfig(MODE_DMA_WRITE);
 
@@ -275,27 +221,34 @@ uint8_t onDataWrite(void)
 
         dataCnt -= cntNow;
 
+        // get buffer where we can store the written data
+        IPCbuffer* bfr = ipcGetFreeBuffer(0, CMD_TIMEOUT_SHORT);
+        if(!bfr) {
+            debug("onDataWrite - ipcGetFreeBuffer failed\n");
+            return false;
+        }
+        bfr->free = false;
+
         for(int i = 0; i < cntNow; i++)
         {
-            data[i] = DMA_write();          // get data from Atari
+            bfr->data[i] = DMA_write();          // get data from Atari
 
             if (brStat == E_TimeOut)
             {                              // if timeout occured
-
 #ifdef LOG_MORE
     debug("onDataWrite timeout on DMA_write");
 #endif
-                return STATE_GET_COMMAND; // transfer failed, don't send status, just get next command
+                return false; // transfer failed, don't send status, just get next command
             }
         }
 
-        sendDataToHost(SOCK_HDD, data, cntNow);     // send to host
+        ipcSetBufferAndPutToFifo(bfr, 0, STATE_DATA_WRITE, cntNow, NULL, 0);
     }
 
-    return STATE_WAIT_FOR_STATUS_ARRIVAL;  // continue with sending the status
+    return true;  // continue with sending the status
 }
 
-void onReadStatus(void)
+void onReadStatus(uint8_t statusByte)
 {
     PIO_read(statusByte);       // send the status to Atari
 }

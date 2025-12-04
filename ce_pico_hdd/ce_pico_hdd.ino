@@ -8,43 +8,33 @@
 #include "connection.h"
 #include "display.h"
 #include "ikbd.h"
+#include "ipc.h"
 
 uint16_t version[2] = {0xa025, 0x1117}; // this means: hAns, 2025-11-17
 
 uint8_t atnSendFwVersion[ATN_SENDFWVERSION_LEN_TX];
 uint8_t atnSendACSIcommand[ATN_SENDACSICOMMAND_LEN_TX];
 
-uint8_t state;
-uint32_t dataCnt;
-uint8_t statusByte;
-bool dataReceived;
-
-uint8_t *cmd;   // received command bytes, should point beyond the header in atnSendACSIcommand
-uint8_t cmdLen;  // length of received command
-uint8_t brStat;  // status from bridge
-uint8_t lastScsiStatusByte;
-
-uint8_t isAcsiNotScsi = 1;
-uint8_t busIdle;
-
 void handleButton(void);
 
 EthernetClient client;
+
+void core1_main_loop(void);
 
 void setup(void)
 {
     Serial1.begin(115200);   // uart0 for debug strings
 
-    // Serial1.begin(7812, SERIAL_8N1, /* rxd pin */ PIN_KEYB_TX_ORIG, /* txd pin */ PIN_KEYB_TX); // uart1 for IKBD
-    // Serial2.begin(7812, SERIAL_8N1, /* rxd pin */ PIN_KEYB_RX, /* txd pin */ PIN_TXD2);         // uart2 for IKBD
-
     debug("setup() starting\n");
 
     loadSettings();
+    ipcInit();
+
+    multicore_launch_core1(core1_main_loop);
 
     // config pins as inputs
-    #define INPUTS_COUNT 13
-    int inputs[INPUTS_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_CS, PIN_A1, PIN_ACK, PIN_RESET, PIN_SDA};
+    #define INPUTS_COUNT 1
+    int inputs[INPUTS_COUNT] = {PIN_SDA};
 
     for (int i = 0; i < INPUTS_COUNT; i++)
     {
@@ -52,9 +42,9 @@ void setup(void)
     }
 
     // config pins as outputs
-    #define OUTPUTS_COUNT 4
-    int outputs[OUTPUTS_COUNT] = {PIN_DATA_DIR, PIN_INT, PIN_DRQ, PIN_SCL};
-    int levels[OUTPUTS_COUNT]  = {           0,       1,       1,       1};
+    #define OUTPUTS_COUNT 1
+    int outputs[OUTPUTS_COUNT] = {PIN_SCL};
+    int levels[OUTPUTS_COUNT]  = {      0};
 
     for (int i = 0; i < OUTPUTS_COUNT; i++)
     {
@@ -63,13 +53,9 @@ void setup(void)
         gpio_put(outputs[i], levels[i]);
     }
 
-    pioConfigAll();     // configure all PIO state machines
-
-    cmd = atnSendACSIcommand + TX_HEADER_SIZE;      // place command beyond the header
+    // cmd = atnSendACSIcommand + TX_HEADER_SIZE;      // place command beyond the header
 
     setupAtnBuffers(); // fill the ATN buffers with needed headers and terminators
-
-    resetBridge();
 
     debug("setup() done, enabledIDs: %02X\n", settings.enabledIDs);
 
@@ -112,10 +98,8 @@ void setupAtnBuffers(void)
 
 void loop(void)
 {
-    uint32_t lastSendFwTime = millis();
-    uint32_t lastYield = millis();
+    uint8_t header[TX_HEADER_SIZE];
 
-    state = STATE_GET_COMMAND;
     debug("starting main loop\n");
 
     while(1)
@@ -126,89 +110,36 @@ void loop(void)
         // handle any data incoming
         handleIncommingData();
 
-        if(BIT_IS_L(PIN_RESET)) {   // when ACSI RESET is L, enter reset mode - no PIO transfers
-            pioConfig(MODE_RESET);
-        }
-
-        // get the command from ACSI and send it to host
-        // IN  STATE: STATE_GET_COMMAND
-        // OUT STATE: WAIT_COMMAND_RESPONSE when GOOD, STATE_GET_COMMAND when FAIL
-        if (state == STATE_GET_COMMAND)
-        {
-            if(PIO_gotFirstCmdByte())       // if 1st CMD byte was received
+        // something in the queue for core0? get it, handle it
+        IPCbuffer* bfr = ipcGetBufferFromFifo(0);
+        if(bfr) {
+            // debug("c0: c %d\n", bfr->command);
+            switch(bfr->command)
             {
-                state = onGetCommand();
-            }
-            else                // in command waiting state, nothing to do and should send FW version?
-            {
-                uint32_t now = millis();
-
-                if ((now - lastSendFwTime) >= 1000)
-                {
-#ifdef LOG_MORE
-                    // dumpPinStates();        // instead of message about fw, dump pin states
-#endif
-                    lastSendFwTime = now;
+                // report FW version to host
+                case STATE_SEND_FW_VER:
                     sendHeaderAndDataToHost(SOCK_HDD, atnSendFwVersion, ATN_SENDFWVERSION_LEN_TX - TX_HEADER_SIZE);
-                }
+                    break;
+
+                // send ACSI command to host
+                case STATE_GET_COMMAND:
+                    memcpy(atnSendACSIcommand + TX_HEADER_SIZE, bfr->data, bfr->length);
+                    sendHeaderAndDataToHost(SOCK_HDD, atnSendACSIcommand, ATN_SENDACSICOMMAND_LEN_TX - TX_HEADER_SIZE);
+                    break;
+
+                // create and send one header at the start
+                case STATE_SEND_WRITE_MORE_DATA:
+                    storeHeader(header, ATN_WRITE_MORE_DATA, bfr->length);
+                    sendDataToHost(SOCK_HDD, header, TX_HEADER_SIZE);
+                    break;
+
+                // should write this data to host
+                case STATE_DATA_WRITE:
+                    sendDataToHost(SOCK_HDD, bfr->data, bfr->length);
+                    break;
             }
-        }
 
-        // transfer the data - read (to ST)
-        // IN  STATE: STATE_DATA_READ_WITH_STATUS or STATE_DATA_READ_WITHOUT_STATUS
-        // OUT STATE: STATE_READ_STATUS or STATE_GET_COMMAND
-        if (state == STATE_DATA_READ_WITH_STATUS || state == STATE_DATA_READ_WITHOUT_STATUS)
-        {
-            longTimeout_basedOnSectorCount(dataCnt >> 9); // set timeout time based on how many sectors are transfered
-
-            bool withStatus = state == STATE_DATA_READ_WITH_STATUS;
-            state = onDataRead(withStatus);     // read data to Atari
-
-            // if going to get command state, clear timeout, for other states use short timeout
-            (state == STATE_GET_COMMAND) ? timeoutClear() : cmdTimeoutChangeLength(CMD_TIMEOUT_SHORT);
-        }
-
-        // transfer the data - write (from ST)
-        // IN  STATE: STATE_DATA_WRITE
-        // OUT STATE: STATE_READ_STATUS on success, STATE_GET_COMMAND on FAIL
-        if (state == STATE_DATA_WRITE)
-        {
-            longTimeout_basedOnSectorCount(dataCnt >> 9); // set timeout time based on how many sectors are transfered
-
-            state = onDataWrite();
-
-            // if going to get command state, clear timeout, for other states use short timeout
-            (state == STATE_GET_COMMAND) ? timeoutClear() : cmdTimeoutChangeLength(CMD_TIMEOUT_SHORT);
-        }
-
-        // after write, we will wait for STATUS arrival from host
-        // IN  STATE: STATE_WAIT_FOR_STATUS_ARRIVAL
-        // OUT STATE: STATE_READ_STATUS
-        // { no code needed here }
-
-        // this happens after READ - wait for status byte, send it to ST (read)
-        // IN  STATE: STATE_READ_STATUS
-        // OUT STATE: STATE_GET_COMMAND
-        if (state == STATE_READ_STATUS)
-        {
-            timeoutStart(); // start the timeout timer to give the rest of code full timeout time
-
-            onReadStatus();
-
-            state = STATE_GET_COMMAND;  // get the next command
-            timeoutClear();             // clear timeout, no need for it
-        }
-
-        // if the data from host doesn't come within timeout, quit
-        if (hasTimedOut)
-        {
-            timeoutClear();
-
-#ifdef LOG_MORE
-            debug("State : %d, cmd: %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X, timeout at: %d\n",
-                state, cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7], cmd[8], cmd[9], cmd[10], cmd[11], millis());
-#endif
-            state = STATE_GET_COMMAND;
+            bfr->free = true;
         }
 
         //---------------------------

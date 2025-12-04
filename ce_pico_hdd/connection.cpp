@@ -4,6 +4,7 @@
 #include "connection.h"
 #include "utils.h"
 #include "display.h"
+#include "ipc.h"
 
 #define SERVER_UDP_PORT 7200 // port number where CE listens for client requests
 #define CLIENT_UDP_PORT 7201 // port where this client should listen for CE responses
@@ -21,12 +22,12 @@ uint16_t hostPortHdd;
 uint16_t hostPortFdd;
 uint16_t hostPortIkbd;
 
-extern uint8_t state;
-extern uint32_t dataCnt;
-extern uint8_t statusByte;
-extern bool dataReceived;
-
 bool connected;
+
+struct {
+    bool sendStatusAfterRead;
+    uint8_t statusByte;
+} c0;
 
 THeader hddHeader;      // keep the header global to preserve syncTag between calls
 
@@ -353,8 +354,14 @@ void handleAcsiConfig(uint32_t len)
 
 void handleSendStatus(void)
 {
-    statusByte = clientHdd.read();      // read the status byte
-    state = STATE_READ_STATUS;          // transition to READ STATUS state
+    uint8_t status = clientHdd.read();
+
+    IPCbuffer* bfr = ipcGetFreeBuffer(1, CMD_TIMEOUT_SHORT);
+    if(bfr) {
+        ipcSetBufferAndPutToFifo(bfr, 1, STATE_READ_STATUS, 1, &status, 1);
+    } else {
+        debug("handleSendStatus - ipcGetFreeBuffer failed\n");
+    }
 }
 
 void handleReadStart(bool withStatus)
@@ -363,10 +370,8 @@ void handleReadStart(bool withStatus)
     memset(data, 0, 4);
     clientHdd.read(data, 4);
 
-    dataCnt = get24bits(data);
-    statusByte = data[3];
-
-    state = withStatus ? STATE_DATA_READ_WITH_STATUS : STATE_DATA_READ_WITHOUT_STATUS;
+    c0.sendStatusAfterRead = withStatus;
+    c0.statusByte = data[3];
 }
 
 void handleWriteStart(void)
@@ -375,23 +380,71 @@ void handleWriteStart(void)
     memset(data, 0, 4);
     clientHdd.read(data, 4);
 
-    dataCnt = get24bits(data);
-    statusByte = data[3];
-
-    state = STATE_DATA_WRITE;
+    IPCbuffer* bfr = ipcGetFreeBuffer(1, CMD_TIMEOUT_SHORT);
+    if(bfr) {
+        ipcSetBufferAndPutToFifo(bfr, 1, STATE_DATA_WRITE, get24bits(data), &data[3], 1);
+    } else {
+        debug("handleWriteStart - ipcGetFreeBuffer failed\n");
+    }
 }
 
 void handleReadDataReceived(void)
 {
-    dataCnt = hddHeader.len;
-    dataReceived = true;
+    uint32_t dataCnt = hddHeader.len;
+    uint32_t start = millis();
+
+    while(dataCnt > 0)
+    {
+        uint32_t now = millis();
+        if(now - start > 5000) {
+            debug("handleReadDataReceived - timeout!");
+            break;
+        }
+
+        IPCbuffer* bfr = ipcGetFreeBuffer(1, CMD_TIMEOUT_SHORT);
+        if(!bfr) {
+            debug("handleReadDataReceived - ipcGetFreeBuffer failed\n");
+            continue;
+        }
+
+        uint32_t cntNow = MIN(512, dataCnt);
+        int actualCnt = 0;
+
+        while(true)
+        {
+            now = millis();
+            if(now - start > 5000) {
+                debug("handleReadDataReceived - timeout!");
+                break;
+            }
+
+            actualCnt = clientHdd.read(bfr->data, cntNow);   // try to read desired cntNow to buffer
+
+            if(actualCnt > 0) {     // got something?
+                break;
+            }
+        }
+
+        ipcSetBufferAndPutToFifo(bfr, 1, STATE_DATA_READ, actualCnt, NULL, 0);
+        dataCnt -= actualCnt;                   // update total data needed to be read
+    }
+
+    // if we should end reading by sending status byte
+    if(c0.sendStatusAfterRead)
+    {
+        IPCbuffer* bfr = ipcGetFreeBuffer(1, CMD_TIMEOUT_SHORT);
+        if(bfr) {
+            ipcSetBufferAndPutToFifo(bfr, 1, STATE_READ_STATUS, 1, &c0.statusByte, 1);
+        } else {
+            debug("handleReadDataReceived status - ipcGetFreeBuffer failed\n");
+        }
+    }
 }
 
 void handleIncommingData(void)
 {
     if(getIncommingHeader(&clientHdd, SYNC_TAG_HDD, &hddHeader))   // if got valid hdd header
     {
-        dataReceived = false;
         hddHeader.syncTag = 0;      // clear sync tag
 
         switch(hddHeader.cmdCode) {
