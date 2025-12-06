@@ -1,6 +1,9 @@
 #include <Ethernet.h>
 #include <EEPROM.h>
 
+#include "pico/multicore.h"
+#include "pico/sync.h"
+
 #include "defs.h"
 #include "bridge.h"
 #include "utils.h"
@@ -18,6 +21,7 @@ uint8_t atnSendACSIcommand[ATN_SENDACSICOMMAND_LEN_TX];
 void handleButton(void);
 
 EthernetClient client;
+mutex_t debugMutex;
 
 void core1_main_loop(void);
 
@@ -25,6 +29,7 @@ void setup(void)
 {
     Serial1.begin(115200);   // uart0 for debug strings
 
+    mutex_init(&debugMutex);
     debug("setup() starting\n");
 
     loadSettings();
@@ -32,28 +37,7 @@ void setup(void)
 
     multicore_launch_core1(core1_main_loop);
 
-    // config pins as inputs
-    #define INPUTS_COUNT 1
-    int inputs[INPUTS_COUNT] = {PIN_SDA};
-
-    for (int i = 0; i < INPUTS_COUNT; i++)
-    {
-        pinMode(inputs[i], INPUT);
-    }
-
-    // config pins as outputs
-    #define OUTPUTS_COUNT 1
-    int outputs[OUTPUTS_COUNT] = {PIN_SCL};
-    int levels[OUTPUTS_COUNT]  = {      0};
-
-    for (int i = 0; i < OUTPUTS_COUNT; i++)
-    {
-        gpio_set_function(outputs[i], GPIO_FUNC_SIO);
-        gpio_set_dir(outputs[i], GPIO_OUT);
-        gpio_put(outputs[i], levels[i]);
-    }
-
-    // cmd = atnSendACSIcommand + TX_HEADER_SIZE;      // place command beyond the header
+    displayInit();
 
     setupAtnBuffers(); // fill the ATN buffers with needed headers and terminators
 
@@ -81,8 +65,6 @@ void setup(void)
                                                   atnSendFwVersion[TX_HEADER_SIZE + 9], atnSendFwVersion[TX_HEADER_SIZE + 10], atnSendFwVersion[TX_HEADER_SIZE + 11]);
 
     // createIkbdTask();   // this task sends ikdb data to host and back
-
-    // displayInit();
 }
 
 void setupAtnBuffers(void)

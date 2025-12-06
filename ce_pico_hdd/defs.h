@@ -87,6 +87,8 @@
 #define PIN_SDA         14      // input/output
 #define PIN_SCL         15      // output
 
+#define PIN_LED_EVB     25
+
 #define BIT_IS_H(PIN)   (gpio_get(PIN) != 0)
 #define BIT_IS_L(PIN)   (gpio_get(PIN) == 0)
 #define BIT_LEVEL(PIN)  ( (gpio_get(PIN) == 0) ? 0 : 1)

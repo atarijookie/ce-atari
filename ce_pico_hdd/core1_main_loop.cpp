@@ -20,8 +20,8 @@ void core1_setup(void)
     flash_safe_execute_core_init();     // call this for flash_safe_execute() to work
 
     // config pins as inputs
-    #define INPUTS_COUNT 13
-    int inputs[INPUTS_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_CS, PIN_A1, PIN_ACK, PIN_RESET, PIN_SDA};
+    #define INPUTS_COUNT 12
+    int inputs[INPUTS_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_CS, PIN_A1, PIN_ACK, PIN_RESET};
 
     for (int i = 0; i < INPUTS_COUNT; i++)
     {
@@ -29,9 +29,9 @@ void core1_setup(void)
     }
 
     // config pins as outputs
-    #define OUTPUTS_COUNT 4
-    int outputs[OUTPUTS_COUNT] = {PIN_DATA_DIR, PIN_INT, PIN_DRQ, PIN_SCL};
-    int levels[OUTPUTS_COUNT]  = {           0,       1,       1,       1};
+    #define OUTPUTS_COUNT 3
+    int outputs[OUTPUTS_COUNT] = {PIN_DATA_DIR, PIN_INT, PIN_DRQ};
+    int levels[OUTPUTS_COUNT]  = {           0,       1,       1};
 
     for (int i = 0; i < OUTPUTS_COUNT; i++)
     {
@@ -53,7 +53,7 @@ void core1_main_loop(void)
 
     uint8_t state;
     state = STATE_GET_COMMAND;
-    debug("starting cor1_main loop\n");
+    debug("starting core1_main loop\n");
 
     while(1)
     {

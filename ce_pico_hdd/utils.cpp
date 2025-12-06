@@ -1,15 +1,18 @@
 #include "pico/stdlib.h"
 #include "pico/time.h"
+#include "pico/multicore.h"
+#include "pico/sync.h"
 
 #include <EEPROM.h>
 
 #include "utils.h"
 #include "defs.h"
 
-// hw_timer_t *timer = NULL;
 volatile bool hasTimedOut = false;
 volatile uint8_t timerRunning = false;
 alarm_id_t timer_id = 0;    // Will hold the alarm handle
+
+extern mutex_t debugMutex;
 
 struct TSettings settings;
 
@@ -179,6 +182,8 @@ void loadSettings(void)
 
 void debug(const char *fmt, ...)
 {
+    mutex_enter_blocking(&debugMutex);
+
     char buf[256];
     va_list args;
     va_start(args, fmt);
@@ -193,4 +198,6 @@ void debug(const char *fmt, ...)
             uart_putc_raw(uart0, buf[i]);
         }
     }
+
+    mutex_exit(&debugMutex);
 }
