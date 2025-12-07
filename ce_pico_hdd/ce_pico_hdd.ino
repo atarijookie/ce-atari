@@ -21,15 +21,12 @@ uint8_t atnSendACSIcommand[ATN_SENDACSICOMMAND_LEN_TX];
 void handleButton(void);
 
 EthernetClient client;
-mutex_t debugMutex;
 
 void core1_main_loop(void);
 
 void setup(void)
 {
-    Serial1.begin(115200);   // uart0 for debug strings
-
-    mutex_init(&debugMutex);
+    debugInit();
     debug("setup() starting\n");
 
     loadSettings();

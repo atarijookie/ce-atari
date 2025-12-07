@@ -19,10 +19,10 @@ Adafruit_GFX* gfx;
 
 bool displayPresent = false;
 
-bool isDisplayConnected(uint8_t address)
+bool isI2CdeviceConnected(uint8_t address)
 {
     uint8_t rxdata;
-    int ret = i2c_read_timeout_us(DISPLAY_I2C_IFACE, address, &rxdata, 1, false, 100000);
+    int ret = i2c_write_timeout_us(DISPLAY_I2C_IFACE, address, &rxdata, 1, false, 100000);
 
     return (ret >= 0);  // -1 on error, zero or positive values mean success
 }
@@ -31,14 +31,9 @@ void displayInit(void)
 {
     debug("displayInit\n");
 
-    // I2C Initialisation. Using it at 400Khz.
-    i2c_init(i2c1, 400000);
-    gpio_set_function(PIN_SDA, GPIO_FUNC_I2C);
-    gpio_set_function(PIN_SCL, GPIO_FUNC_I2C);
-    gpio_pull_up(PIN_SDA);
-    gpio_pull_up(PIN_SCL);
+    i2c1init();
 
-    displayPresent = isDisplayConnected(DISPLAY_I2C_ADDRESS);
+    displayPresent = isI2CdeviceConnected(DISPLAY_I2C_ADDRESS);
 
     if(!displayPresent) {
         debug("displayInit - i2c display not connected\n");

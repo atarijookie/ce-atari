@@ -7,14 +7,18 @@
 
 #include "utils.h"
 #include "defs.h"
+#include "display.h"
 
 volatile bool hasTimedOut = false;
 volatile uint8_t timerRunning = false;
 alarm_id_t timer_id = 0;    // Will hold the alarm handle
 
-extern mutex_t debugMutex;
+mutex_t debugMutex;
 
 struct TSettings settings;
+
+#define FT200X_ADDRESS  0x22      // use FT_PROG tool to get actual i2c address - the FT PROG shows it in hexadecimal!
+bool ft200xPresent = false;
 
 uint16_t getWord(uint8_t *bfr)
 {
@@ -180,24 +184,58 @@ void loadSettings(void)
     }
 }
 
+void i2c1init(void)
+{
+    i2c_init(i2c1, 400000);
+    gpio_set_function(PIN_SDA, GPIO_FUNC_I2C);
+    gpio_set_function(PIN_SCL, GPIO_FUNC_I2C);
+    gpio_pull_up(PIN_SDA);
+    gpio_pull_up(PIN_SCL);
+}
+
+void debugInit(void)
+{
+    mutex_init(&debugMutex);
+
+    // uart0 for debug strings
+    // Serial1.begin(115200);
+
+    // ft200x for debug strings
+    i2c1init();
+    ft200xPresent = isI2CdeviceConnected(FT200X_ADDRESS);
+}
+
 void debug(const char *fmt, ...)
 {
+    if(!ft200xPresent) {
+        return;
+    }
+
     mutex_enter_blocking(&debugMutex);
 
-    char buf[256];
+    char buf[1024];
     va_list args;
     va_start(args, fmt);
     int len = vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
 
+    // replace \n with \n\r
+    int j=0;
+    char buf2[2048];
     for(int i=0; i<len; i++) {
+        buf2[j++] = buf[i];
+
         if(buf[i] == '\n') {
-            uart_putc_raw(uart0, '\n');
-            uart_putc_raw(uart0, '\r');
-        } else {
-            uart_putc_raw(uart0, buf[i]);
+            buf2[j++] = '\r';
         }
     }
+    buf2[j] = 0;
+
+    // use uart0 for debug strings
+    // uart_puts(uart0, buf2);
+
+    // use ft200x for debug strings
+    i2c_write_timeout_us(DISPLAY_I2C_IFACE, FT200X_ADDRESS, (const uint8_t*) buf2, j, false, 100000);
 
     mutex_exit(&debugMutex);
 }

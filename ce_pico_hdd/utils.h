@@ -33,6 +33,8 @@ extern TSettings settings;
 void loadSettings(void);
 void saveSettings(void);
 
+void i2c1init(void);
+void debugInit(void);
 void debug(const char *fmt, ...);
 
 #endif
