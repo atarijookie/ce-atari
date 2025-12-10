@@ -13,7 +13,7 @@
 // --------- //
 
 #define scsi_read_wrap_target 0
-#define scsi_read_wrap 5
+#define scsi_read_wrap 4
 #define scsi_read_pio_version 0
 
 static const uint16_t scsi_read_program_instructions[] = {
@@ -21,16 +21,15 @@ static const uint16_t scsi_read_program_instructions[] = {
     0x90a0, //  0: pull   block           side 1
     0x7009, //  1: out    pins, 9         side 1
     0x2020, //  2: wait   0 pin, 0        side 0
-    0xb442, //  3: nop                    side 1 [4]
-    0x31a0, //  4: wait   1 pin, 0        side 1 [1]
-    0x9020, //  5: push   block           side 1
+    0xa842, //  3: nop                    side 0 [8]
+    0x9020, //  4: push   block           side 1
             //     .wrap
 };
 
 #if !PICO_NO_HARDWARE
 static const struct pio_program scsi_read_program = {
     .instructions = scsi_read_program_instructions,
-    .length = 6,
+    .length = 5,
     .origin = -1,
     .pio_version = scsi_read_pio_version,
 #if PICO_PIO_VERSION > 0
@@ -51,7 +50,7 @@ static inline void scsi_read_program_init(PIO pio, uint sm, uint offset, uint in
 {
     #define PIO_READ_COUNT 11
     int pio_pins[PIO_READ_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_SEL_IO_DP_SDA, PIN_RST_CD_REQ_SCL, PIN_ACK};
-    int pio_dirs[PIO_READ_COUNT] = {     1,      1,      1,      1,      1,      1,      1,      1,      1,                  1,       0};
+    int pio_dirs[PIO_READ_COUNT] = {     1,      1,      1,      1,      1,      1,      1,      1,                 1,                  1,       0};
     for (int i = 0; i < PIO_READ_COUNT; i++) {
         pio_gpio_init(pio, pio_pins[i]);
         pio_sm_set_consecutive_pindirs(pio, sm, pio_pins[i], 1, pio_dirs[i]);

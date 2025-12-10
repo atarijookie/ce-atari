@@ -13,7 +13,7 @@
 // ---------- //
 
 #define scsi_write_wrap_target 0
-#define scsi_write_wrap 8
+#define scsi_write_wrap 6
 #define scsi_write_pio_version 0
 
 static const uint16_t scsi_write_program_instructions[] = {
@@ -21,19 +21,17 @@ static const uint16_t scsi_write_program_instructions[] = {
     0x90a0, //  0: pull   block           side 1
     0xb027, //  1: mov    x, osr          side 1
     0x00c2, //  2: jmp    pin, 2          side 0
-    0xb242, //  3: nop                    side 1 [2]
-    0x5008, //  4: in     pins, 8         side 1
-    0x10c7, //  5: jmp    pin, 7          side 1
-    0x1005, //  6: jmp    5               side 1
-    0x9020, //  7: push   block           side 1
-    0x1042, //  8: jmp    x--, 2          side 1
+    0xa242, //  3: nop                    side 0 [2]
+    0x4508, //  4: in     pins, 8         side 0 [5]
+    0x9020, //  5: push   block           side 1
+    0x1042, //  6: jmp    x--, 2          side 1
             //     .wrap
 };
 
 #if !PICO_NO_HARDWARE
 static const struct pio_program scsi_write_program = {
     .instructions = scsi_write_program_instructions,
-    .length = 9,
+    .length = 7,
     .origin = -1,
     .pio_version = scsi_write_pio_version,
 #if PICO_PIO_VERSION > 0
@@ -53,9 +51,9 @@ static inline pio_sm_config scsi_write_program_get_default_config(uint offset) {
 // to read N bytes, you must put N-1 into TX FIFO (one less)
 static inline void scsi_write_program_init(PIO pio, uint sm, uint offset, uint jumpPin, uint sideSetPin)
 {
-    #define PIO_WRITE_COUNT 9
-    int pio_pins[PIO_WRITE_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_RST_CD_REQ_SCL};
-    int pio_dirs[PIO_WRITE_COUNT] = {     0,      0,      0,      0,      0,      0,      0,      0,                  1};
+    #define PIO_WRITE_COUNT 10
+    int pio_pins[PIO_WRITE_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_RST_CD_REQ_SCL, PIN_ACK};
+    int pio_dirs[PIO_WRITE_COUNT] = {     0,      0,      0,      0,      0,      0,      0,      0,                  1,       0};
     for (int i = 0; i < PIO_WRITE_COUNT; i++) {
         pio_gpio_init(pio, pio_pins[i]);
         pio_sm_set_consecutive_pindirs(pio, sm, pio_pins[i], 1, pio_dirs[i]);

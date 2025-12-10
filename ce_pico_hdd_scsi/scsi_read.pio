@@ -7,10 +7,9 @@ start:
         out pins, 9     side 1          ; write 9 bits from OSR to gpio
 
         wait 0 pin 0    side 0          ; side set REQ to L, then wait for ACK pin to become L
-        nop             side 1  [4]     ; side set REQ to H, delay 100 ns to skip signal transitions / glitches
-        wait 1 pin 0    side 1  [1]     ; then wait for ACK pin to become H, with additional delay to keep data longer present on SCSI bus
+        nop             side 0  [8]     ; keep REQ in L, delay 200 ns to make this reasonably slow
 
-        push            side 1          ; Push the contents of the ISR into the RX FIFO. We don't care about the value, it's just a flag that the transfer has finished
+        push            side 1          ; put REQ back to H, push the contents of the ISR into the RX FIFO. We don't care about the value, it's just a flag that the transfer has finished
 
 
 % c-sdk {
