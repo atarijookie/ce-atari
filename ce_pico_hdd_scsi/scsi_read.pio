@@ -1,0 +1,44 @@
+.pio_version 0      // only requires PIO version 0
+.program scsi_read
+.side_set 1         // the number of side-set bits to be used
+
+start:
+        pull            side 1          ; load from the TX FIFO into the OSR
+        out pins, 9     side 1          ; write 9 bits from OSR to gpio
+
+        wait 0 pin 0    side 0          ; side set REQ to L, then wait for ACK pin to become L
+        nop             side 1  [4]     ; side set REQ to H, delay 100 ns to skip signal transitions / glitches
+        wait 1 pin 0    side 1  [1]     ; then wait for ACK pin to become H, with additional delay to keep data longer present on SCSI bus
+
+        push            side 1          ; Push the contents of the ISR into the RX FIFO. We don't care about the value, it's just a flag that the transfer has finished
+
+
+% c-sdk {
+#include "hardware/clocks.h"
+#include "hardware/gpio.h"
+
+static inline void scsi_read_program_init(PIO pio, uint sm, uint offset, uint inPin, uint sideSetPin)
+{
+    #define PIO_READ_COUNT 11
+    int pio_pins[PIO_READ_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_SEL_IO_DP_SDA, PIN_RST_CD_REQ_SCL, PIN_ACK};
+    int pio_dirs[PIO_READ_COUNT] = {     1,      1,      1,      1,      1,      1,      1,      1,      1,       1,       0};
+
+    for (int i = 0; i < PIO_READ_COUNT; i++) {
+        pio_gpio_init(pio, pio_pins[i]);
+        pio_sm_set_consecutive_pindirs(pio, sm, pio_pins[i], 1, pio_dirs[i]);
+    }
+
+    pio_sm_config cRead = scsi_read_program_get_default_config(offset);
+    sm_config_set_out_pins(&cRead, PIN_D0, 9);          // for OUT
+    sm_config_set_in_pins(&cRead, inPin);               // for WAIT, IN
+    sm_config_set_sideset_pins(&cRead, sideSetPin);     // for SIDE_SET
+    sm_config_set_out_shift(&cRead, true, false, 32);   // Shift to right, autopush disabled
+    sm_config_set_fifo_join(&cRead, PIO_FIFO_JOIN_NONE);  // no fifo joining
+
+    float div = (float)clock_get_hz(clk_sys) / 50000000;    // calc divider for 50 MHz, that's 20 ns per instruction
+    sm_config_set_clkdiv(&cRead, div);
+
+    pio_sm_init(pio, sm, offset, &cRead);
+}
+
+%}

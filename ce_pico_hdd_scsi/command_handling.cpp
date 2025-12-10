@@ -1,0 +1,267 @@
+#include <Ethernet.h>
+
+#include "defs.h"
+#include "bridge.h"
+#include "utils.h"
+#include "command_handling.h"
+#include "connection.h"
+#include "scsi.h"
+#include "ipc.h"
+
+extern EthernetClient clientHdd;
+extern EthernetClient clientIkbd;
+
+void onButtonPress(void);
+
+uint8_t onGetCommandAcsi(void);
+uint8_t onGetCommandScsi(void);
+void getCmdLengthFromCmdBytesAcsi(void);
+void getCmdLengthFromCmdBytesScsi(uint8_t cmd);
+
+extern uint8_t atnSendACSIcommand[ATN_SENDACSICOMMAND_LEN_TX];
+
+//----------
+uint8_t cmd[16];   // received command bytes, should point beyond the header in atnSendACSIcommand
+uint8_t cmdLen; // length of received command
+uint8_t brStat; // status from bridge
+
+extern uint8_t busIdle;
+
+uint8_t onGetCommand(void)
+{
+    // retrieve the comman
+    uint8_t good = onGetCommandScsi();
+
+    if (!good)  // if failed to get the cmd, quit
+    {
+        timeoutClear();
+        return STATE_GET_COMMAND;
+    }
+
+    IPCbuffer* bfr = ipcGetFreeBuffer(0, CMD_TIMEOUT_SHORT);
+    if(bfr == NULL) {
+        debug("onGetCommand - no free buffers\n");
+        timeoutClear();
+        return STATE_GET_COMMAND;
+    }
+
+    // store data to buffer, add buffer index to queue
+    ipcSetBufferAndPutToFifo(bfr, 0, STATE_GET_COMMAND, cmdLen, cmd, cmdLen);
+
+    //----------------
+    // command received, send it to host
+    timeoutStart(); // start the timeout timer to give the rest of code full timeout time
+
+    return STATE_WAIT_COMMAND_RESPONSE;
+}
+
+uint8_t onGetCommandScsi(void)
+{
+    uint8_t id;
+    uint8_t sel;
+    int i;
+
+    //----------------------
+    sel = PIO_writeFirst(); // get SELection byte
+    id = 0xff;              // mark that ID hasn't been found yet
+
+    for (i = 0; i < 8; i++)
+    {
+        if ((sel & (1 << i)) != 0)
+        { // if bit is one, this ID is selected
+            if (idIsEnabled(id))
+            {           // if that ID is enabled
+                id = i; // store this ID and quit loop
+                break;
+            }
+        }
+    }
+
+    if (id == 0xff || !idIsEnabled(id))     // id not found or id not enabled? quit
+    {
+        return 0;
+    }
+
+    cmdLen = 6; // maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
+
+    for (i = 0; i < cmdLen; i++)
+    {                         // receive the next command bytes
+        cmd[i] = PIO_write(); // drop down IRQ, get byte
+
+        if (brStat != E_OK)
+        { // if something was wrong, quit, failed
+            resetBridge();
+            return 0;
+        }
+
+        if (i == 0)
+        {                                         // if we got also the 2nd byte
+            getCmdLengthFromCmdBytesScsi(cmd[0]); // we set up the length of command, etc.
+        }
+    }
+
+    // now fix the command if the length is more than 6 bytes
+    if (cmdLen > 6)
+    {
+        for (i = 13; i > 0; i--)
+        { // move the cmd one byte further (to make cmd[0] unused)
+            cmd[i] = cmd[i - 1];
+        }
+        cmd[0] = 0x1f; // store ICD command marker
+
+        cmdLen++; // now the command is one byte longer
+    }
+
+    // for all commands add fake ACSI ID on top of the 0th byte
+    cmd[0] = cmd[0] | (id << 5); // add ID on the top 3 bits
+    return 1;
+}
+
+bool onDataRead(uint32_t cnt, uint8_t* bfr)
+{
+#ifdef LOG_MORE
+    // debug("onDataRead withStatus: %d, dataCnt: %d\n", withStatus, cnt);
+#endif
+
+    pioConfig(MODE_DMA_READ);
+
+    for(uint32_t i=0; i<cnt; i++) {    // send all the data from buffer to Atari
+        DMA_read(bfr[i]);
+
+        if (brStat == E_TimeOut)
+        {
+            debug("onDataRead TO 1\n");
+            return false;
+        }
+    }
+
+    DMA_read_waitForEnd();
+
+    if (brStat == E_TimeOut)        // read failed to wait for end?
+    {
+        debug("onDataRead TO 2\n");
+        return false;
+    }
+
+    return true;
+}
+
+bool onDataWrite(uint32_t dataCnt)
+{
+    // debug("onDataWrite dataCnt: %d\n", dataCnt);
+
+    // create and send one header at the start
+    IPCbuffer* bfr = ipcGetFreeBuffer(0, CMD_TIMEOUT_SHORT);
+    if(bfr) {
+        ipcSetBufferAndPutToFifo(bfr, 0, STATE_SEND_WRITE_MORE_DATA, dataCnt, NULL, 0);
+    } else {
+        debug("onDataWrite - ipcGetFreeBuffer failed\n");
+        return false;
+    }
+
+    pioConfig(MODE_DMA_WRITE);
+
+    DMA_write_startWithCount(dataCnt);      // let PIO program know the count of bytes we want to transfer
+
+    while (dataCnt > 0)             // something to write?
+    {
+        uint32_t cntNow = MIN(dataCnt, 512);
+
+        dataCnt -= cntNow;
+
+        // get buffer where we can store the written data
+        IPCbuffer* bfr = ipcGetFreeBuffer(0, CMD_TIMEOUT_SHORT);
+        if(!bfr) {
+            debug("onDataWrite - ipcGetFreeBuffer failed\n");
+            return false;
+        }
+        bfr->free = false;
+
+        for(int i = 0; i < cntNow; i++)
+        {
+            bfr->data[i] = DMA_write();          // get data from Atari
+
+            if (brStat == E_TimeOut)
+            {                              // if timeout occured
+#ifdef LOG_MORE
+    debug("onDataWrite timeout on DMA_write");
+#endif
+                return false; // transfer failed, don't send status, just get next command
+            }
+        }
+
+        ipcSetBufferAndPutToFifo(bfr, 0, STATE_DATA_WRITE, cntNow, NULL, 0);
+    }
+
+    return true;  // continue with sending the status
+}
+
+void onReadStatus(uint8_t statusByte)
+{
+    PIO_read(statusByte);       // send the status to Atari
+}
+
+void getCmdLengthFromCmdBytesAcsi(void)
+{
+    // now it's time to set up the receiver buffer and length
+    if ((cmd[0] & 0x1f) == 0x1f)
+    {                                 // if the command is '0x1f'
+        switch ((cmd[1] & 0xe0) >> 5) // get the length of the command
+        {
+        case 0:
+            cmdLen = 7;
+            break;
+        case 1:
+            cmdLen = 11;
+            break;
+        case 2:
+            cmdLen = 11;
+            break;
+        case 5:
+            cmdLen = 13;
+            break;
+        default:
+            cmdLen = 7;
+            break;
+        }
+    }
+    else
+    {               // if it isn't a ICD command
+        cmdLen = 6; // then length is 6 bytes
+    }
+}
+
+void getCmdLengthFromCmdBytesScsi(uint8_t cmd)
+{
+    switch ((cmd & 0xe0) >> 5) // get the length of the command
+    {
+    case 0:
+        cmdLen = 6;
+        break;
+    case 1:
+        cmdLen = 10;
+        break;
+    case 2:
+        cmdLen = 10;
+        break;
+    case 4:
+        cmdLen = 16;
+        break;
+    case 5:
+        cmdLen = 12;
+        break;
+    default:
+        cmdLen = 6;
+        break;
+    }
+}
+
+uint8_t idIsEnabled(uint8_t id)
+{
+    if (id > 7)
+    {
+        return false;
+    }
+
+    return (settings.enabledIDs & (1 << id));
+}

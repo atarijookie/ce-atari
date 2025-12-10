@@ -1,0 +1,501 @@
+#include <Ethernet.h>
+
+#include "defs.h"
+#include "connection.h"
+#include "utils.h"
+#include "display.h"
+#include "ipc.h"
+
+#define SERVER_UDP_PORT 7200 // port number where CE listens for client requests
+#define CLIENT_UDP_PORT 7201 // port where this client should listen for CE responses
+
+EthernetUDP udp;
+bool udpInitialized;
+
+EthernetClient clientHdd;
+EthernetClient clientFdd;
+EthernetClient clientIkbd;
+
+uint8_t hostIp[4];
+String hostIpString;
+uint16_t hostPortHdd;
+uint16_t hostPortFdd;
+uint16_t hostPortIkbd;
+
+bool connected;
+
+struct {
+    bool sendStatusAfterRead;
+    uint8_t statusByte;
+} c0;
+
+THeader hddHeader;      // keep the header global to preserve syncTag between calls
+
+void showRunningStateOnDisplay(void)
+{
+    char msg1[128];
+    sprintf(msg1, "host: %s", hostIpString.c_str());
+
+    char msg2[128];
+    memset(msg2, 0, 128);
+
+    String msg3 = "devs: ";
+    for(int i=0; i<8; i++) {
+        if(settings.enabledIDs & (1 << i)) {     // if ID bit enabled, add to string
+            msg3 += i;
+            msg3 += " ";
+        }
+    }
+
+    if(settings.ikbdEnabled) {       // if ikbd is enabled
+        msg3 += "IKBD";
+    }
+
+    displayMessage(msg1, msg2, msg3.c_str());
+}
+
+// Send broadcast to find any CE server on the network.
+void ceDiscoverySend(void)
+{
+    static uint32_t lastAttempt = 0xffff0000; // -65k
+    static bool whichBroadcastAddr = false;
+
+    // already got hostIp and port? don't do discovery
+    if (hostIp[0] != 0 && hostPortHdd != 0)
+    {
+        return;
+    }
+
+    // if last attempt was less than a moment ago, don't try
+    if ((millis() - lastAttempt) < 1000)
+    {
+        return;
+    }
+
+    lastAttempt = millis();
+
+    displayMessage("eth connected", "CE host discovery");
+
+    // send upd broadcast
+    uint8_t updPacket[5];
+    strcpy((char *)updPacket, "CELC");
+
+    whichBroadcastAddr = !whichBroadcastAddr;   // toggle this flag
+
+    if(whichBroadcastAddr)      // send to subnet broadcast addr?
+    {
+        // get local ip and mask, create broadcast ip
+        IPAddress ip = Ethernet.localIP();
+        uint32_t ip32 = (((uint32_t)ip[0]) << 24) | (((uint32_t)ip[1]) << 16) | (((uint32_t)ip[2]) << 8) | (((uint32_t)ip[3]));
+
+        IPAddress mask = Ethernet.subnetMask();
+        uint32_t mask32 = (((uint32_t)mask[0]) << 24) | (((uint32_t)mask[1]) << 16) | (((uint32_t)mask[2]) << 8) | (((uint32_t)mask[3]));
+        uint32_t mask32inv = ~mask32;
+
+        uint32_t ip32broadcast = ip32 | mask32inv; // create broadcast addr by setting all subnet bits to 1
+
+        IPAddress addrBroadcast((uint8_t) (ip32broadcast >> 24), (uint8_t) (ip32broadcast >> 16), (uint8_t) (ip32broadcast >> 8), (uint8_t) ip32broadcast);    // from uint32_t to object
+
+        debug("ceDiscoverySend to %s\n", addrBroadcast.toString().c_str());
+
+        // broadcast to subnet devices (e.g. 192.168.1.255)
+        udp.beginPacket(addrBroadcast.toString().c_str(), SERVER_UDP_PORT);
+        udp.write(updPacket, 4);
+        udp.endPacket();
+    }
+    else        // send to generic broadcast addr
+    {
+        debug("ceDiscoverySend to 255.255.255.255\n");
+
+        // broadcast to all possible devices (255.255.255.255)
+        udp.beginPacket("255.255.255.255", SERVER_UDP_PORT);
+        udp.write(updPacket, 4);
+        udp.endPacket();
+    }
+}
+
+// Receive response from server if there is any and store it if it's valid.
+// Serves also for dropping any additional udp packets.
+void ceDiscoveryReceive(void)
+{
+    static uint32_t lastAttempt = 0xffff0000; // -65k
+
+    // if last attempt was less than a moment ago, don't try
+    if ((millis() - lastAttempt) < 100)
+    {
+        return;
+    }
+
+    lastAttempt = millis();
+
+    // check if any udp packet was received, handle it
+    while (true)
+    {
+        int packetSize = udp.parsePacket();
+
+        // no packet received? can stop trying to read it
+        if (packetSize == 0)
+        {
+            break;
+        }
+
+        /*
+            received packet structure:
+            0..3    'CELR' string
+            4..5    port for hdd
+            6..7    port for fdd
+            8..9    port for ikbd
+        */
+        uint8_t buffer[10];
+        memset(buffer, 0, 10);
+        udp.read(buffer, 10);
+
+        // start of the data isn't CELR? skip the rest
+        if (strncmp((const char *)buffer, "CELR", 4) != 0)
+        {
+            continue;
+        }
+
+        // store server's ip address
+        IPAddress remoteIp = udp.remoteIP();
+        for (int i = 0; i < 4; i++)
+        {
+            hostIp[i] = remoteIp[i];
+        }
+
+        IPAddress addr(hostIp[0], hostIp[1], hostIp[2], hostIp[3]); // octets to IPAddress
+        hostIpString = addr.toString();                             // copy the ip address as string
+
+        // store ports and stop receiving
+        hostPortHdd = getWord(buffer + 4);
+        hostPortFdd = getWord(buffer + 6);
+        hostPortIkbd = getWord(buffer + 8);
+
+        debug("ceDiscoveryReceive - got host ip: %s, ports: %d, %d, %d\n", hostIpString.c_str(), hostPortHdd, hostPortFdd, hostPortIkbd);
+    }
+}
+
+void connectToCEhost(void)
+{
+    static uint32_t lastAttempt = 0xffff0000; // -65k
+
+    // if last attempt was less than a moment ago, don't try
+    if ((millis() - lastAttempt) < 3000)
+    {
+        return;
+    }
+
+    // we're connecting now
+    lastAttempt = millis();
+
+    // no host IP? not connecting
+    if (hostIpString.length() == 0)
+    {
+        return;
+    }
+
+    displayMessage("eth connected", "connecting to host:", hostIpString.c_str());
+
+    debug("connectToCEhost - IP: %s, port: %d\n", hostIpString.c_str(), hostPortHdd);
+
+    // start connection attempt
+    clientHdd.stop();                                       // close socket if still open
+    connected = clientHdd.connect(hostIpString.c_str(), hostPortHdd);
+
+    debug("connectToCEhost - connected: %d\n", connected);
+
+    // clientHdd.setNoDelay(true);
+
+    // clientIkbd.connect(hostIpString.c_str(), hostPortIkbd);
+}
+
+// if UDP not initialized, do that now
+void udpSocketOpen(void)
+{
+    if (!udpInitialized)
+    {
+        udp.begin(CLIENT_UDP_PORT);
+        udpInitialized = true;
+    }
+}
+
+// if UDP is initialized, deinitialize
+void udpSocketClose(void)
+{
+    if(udpInitialized)
+    {
+        udp.stop();
+        udpInitialized = false;
+    }
+}
+
+void connectToHost(void)
+{
+    static bool prevConnected = false;
+    connected = clientHdd.connected();
+
+    // on connected state changed
+    if(prevConnected != connected)
+    {
+        prevConnected = connected;
+
+        if(connected) {     // now in connected state, display state on display
+            showRunningStateOnDisplay();
+        }
+    }
+
+    // socket connected? just quit
+    if(connected)
+    {
+        udpSocketClose();
+        return;
+    }
+
+    // do discovery if needed
+    if(hostIp[0] == 0 || hostPortHdd == 0)
+    {
+        udpSocketOpen();
+
+        ceDiscoverySend();
+        ceDiscoveryReceive();
+    }
+
+    // if got ip and port, then before connecting, close udp socket
+    if(hostIp[0] != 0 && hostPortHdd != 0)
+    {
+        udpSocketClose();
+    }
+
+    // connect to CE server
+    connectToCEhost();
+}
+
+bool getIncommingHeader(EthernetClient* client, uint32_t expectedSyncTag, THeader* header)
+{
+    if(!connected)    // client not connected, no header received
+    {
+        return false;
+    }
+
+    while(true)
+    {
+        // Determine how many bytes are needed to be received, if we want to get 10 bytes of header.
+        // If we already got some bytes in the syncTag, we need less than 10 bytes.
+        int needed = 10;
+        if((header->syncTag & 0xffffff) == (expectedSyncTag >> 8))      // got c050d1 (3 bytes) already? need only 7 more
+        {
+            needed = 7;
+        }
+        else if((header->syncTag & 0xffff) == (expectedSyncTag >> 16))  // got c050 (2 bytes) already? need only 8 more
+        {
+            needed = 8;
+        }
+        else if((header->syncTag & 0xff) == (expectedSyncTag >> 24))    // got c0 (1 bytes) already? need only 9 more
+        {
+            needed = 9;
+        }
+        else                // in other cases, expect to have all 10 bytes available before trying to read header
+        {
+            needed = 10;
+        }
+
+        // not enough data for full header, no header received
+        int available = client->available();
+        if(available < needed)
+        {
+            return false;
+        }
+
+        uint32_t data = ((uint8_t) client->read()); // read byte
+        header->syncTag = header->syncTag << 8;     // shift previous sync tag one byte up
+        header->syncTag |= data;                    // add lowest byte to syncTag
+
+        if(header->syncTag == expectedSyncTag)      // found expected syncTag
+        {
+            uint8_t rest[6];
+            client->read(rest, 6);               // read rest of header
+            header->cmdCode = getWord(rest);
+            header->len = getDword(rest + 2);
+
+            return true;                        // got complete header
+        }
+    }
+
+    return false;       // no valid header
+}
+
+void handleAcsiConfig(uint32_t len)
+{
+    uint8_t data[32];
+    memset(data, 0, 32);
+    uint32_t readLen = MIN(32, len);        // limit read length to buffer length
+
+    clientHdd.read(data, len);              // read data
+
+    for(int i=0; i<readLen; i++)            // go through all the received data
+    {
+        if(data[i] == CMD_ACSI_CONFIG) {
+            uint8_t newAcsiIds = data[i + 1];
+            i++;    // move 1 more byte forward, as we've read it
+
+            // check if new config different from previous, then write settings
+            if(settings.enabledIDs != newAcsiIds) {
+                settings.enabledIDs = newAcsiIds;
+
+                debug("handleAcsiConfig - storing new ids: %02X\n", newAcsiIds);
+
+                saveSettings();
+
+                showRunningStateOnDisplay();
+            }
+        }
+    }
+}
+
+void handleSendStatus(void)
+{
+    uint8_t status = clientHdd.read();
+
+    IPCbuffer* bfr = ipcGetFreeBuffer(1, CMD_TIMEOUT_SHORT);
+    if(bfr) {
+        ipcSetBufferAndPutToFifo(bfr, 1, STATE_READ_STATUS, 1, &status, 1);
+    } else {
+        debug("handleSendStatus - ipcGetFreeBuffer failed\n");
+    }
+}
+
+void handleReadStart(bool withStatus)
+{
+    uint8_t data[4];
+    memset(data, 0, 4);
+    clientHdd.read(data, 4);
+
+    c0.sendStatusAfterRead = withStatus;
+    c0.statusByte = data[3];
+}
+
+void handleWriteStart(void)
+{
+    uint8_t data[4];
+    memset(data, 0, 4);
+    clientHdd.read(data, 4);
+
+    IPCbuffer* bfr = ipcGetFreeBuffer(1, CMD_TIMEOUT_SHORT);
+    if(bfr) {
+        ipcSetBufferAndPutToFifo(bfr, 1, STATE_DATA_WRITE, get24bits(data), &data[3], 1);
+    } else {
+        debug("handleWriteStart - ipcGetFreeBuffer failed\n");
+    }
+}
+
+void handleReadDataReceived(void)
+{
+    uint32_t dataCnt = hddHeader.len;
+    uint32_t start = millis();
+
+    while(dataCnt > 0)
+    {
+        uint32_t now = millis();
+        if(now - start > 5000) {
+            debug("handleReadDataReceived - timeout!");
+            break;
+        }
+
+        IPCbuffer* bfr = ipcGetFreeBuffer(1, CMD_TIMEOUT_SHORT);
+        if(!bfr) {
+            debug("handleReadDataReceived - ipcGetFreeBuffer failed\n");
+            continue;
+        }
+
+        uint32_t cntNow = MIN(512, dataCnt);
+        int actualCnt = 0;
+
+        while(true)
+        {
+            now = millis();
+            if(now - start > 5000) {
+                debug("handleReadDataReceived - timeout!");
+                break;
+            }
+
+            actualCnt = clientHdd.read(bfr->data, cntNow);   // try to read desired cntNow to buffer
+
+            if(actualCnt > 0) {     // got something?
+                break;
+            }
+        }
+
+        ipcSetBufferAndPutToFifo(bfr, 1, STATE_DATA_READ, actualCnt, NULL, 0);
+        dataCnt -= actualCnt;                   // update total data needed to be read
+    }
+
+    // if we should end reading by sending status byte
+    if(c0.sendStatusAfterRead)
+    {
+        IPCbuffer* bfr = ipcGetFreeBuffer(1, CMD_TIMEOUT_SHORT);
+        if(bfr) {
+            ipcSetBufferAndPutToFifo(bfr, 1, STATE_READ_STATUS, 1, &c0.statusByte, 1);
+        } else {
+            debug("handleReadDataReceived status - ipcGetFreeBuffer failed\n");
+        }
+    }
+}
+
+void handleIncommingData(void)
+{
+    if(getIncommingHeader(&clientHdd, SYNC_TAG_HDD, &hddHeader))   // if got valid hdd header
+    {
+        hddHeader.syncTag = 0;      // clear sync tag
+
+        switch(hddHeader.cmdCode) {
+            case CMD_ACSI_CONFIG: handleAcsiConfig(hddHeader.len); break;
+            case CMD_DATA_READ_WITH_STATUS: handleReadStart(true); break;
+            case CMD_DATA_READ_WITHOUT_STATUS: handleReadStart(false); break;
+            case CMD_DATA_MARKER: handleReadDataReceived(); break;
+            case CMD_DATA_WRITE: handleWriteStart(); break;
+            case CMD_SEND_STATUS: handleSendStatus(); break;
+            default: debug("unknown cmdCode %d\n", hddHeader.cmdCode); break;
+        }
+    }
+}
+
+/*
+    Send data as is to host using the desired socket.
+    This just selects the right socket and sends the count of data specified in dataSizeBytes.
+    @param whichSock SOCK_HDD or SOCK_FDD
+    @param bfr Pointer to start of the data buffer
+    @param dataSizeBytes Size of the data you want to send.
+*/
+bool sendDataToHost(uint8_t whichSock, uint8_t *bfr, uint32_t dataSizeBytes)
+{
+    EthernetClient* client = NULL;
+
+    switch(whichSock)
+    {
+        case SOCK_HDD: client = &clientHdd; break;
+        case SOCK_FDD: client = &clientFdd; break;
+        case SOCK_IKBD: client = &clientIkbd; break;
+        default: return false;
+    }
+
+    if(!connected)
+    {
+        return false;
+    }
+
+    uint32_t writtenCount = client->write(bfr, dataSizeBytes);
+    return (writtenCount == dataSizeBytes);
+}
+
+/*
+    Send header and data to host using the desired socket.
+    This is just extension to sendDataToHost, because it also stores the data size in the header and sends the header, too.
+    @param whichSock SOCK_HDD or SOCK_FDD
+    @param bfr Pointer to start of the data buffer
+    @param dataSizeBytes Size of the data portion after the header (header is TX_HEADER_SIZE bytes big) in bytes
+*/
+bool sendHeaderAndDataToHost(uint8_t whichSock, uint8_t *bfr, uint32_t dataSizeBytes)
+{
+    storeDword(bfr + 6, dataSizeBytes);     // store the tx length on index 6..9
+    return sendDataToHost(whichSock, bfr, TX_HEADER_SIZE + dataSizeBytes);
+}
