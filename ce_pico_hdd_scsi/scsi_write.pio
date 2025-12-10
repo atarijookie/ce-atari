@@ -26,9 +26,9 @@ wr_end: push                side 1          ; Push the contents of the ISR into 
 
 static inline void scsi_write_program_init(PIO pio, uint sm, uint offset, uint jumpPin, uint sideSetPin)
 {
-    #define PIO_WRITE_COUNT 9
-    int pio_pins[PIO_WRITE_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_RST_CD_REQ_SCL};
-    int pio_dirs[PIO_WRITE_COUNT] = {     0,      0,      0,      0,      0,      0,      0,      0,                  1};
+    #define PIO_WRITE_COUNT 10
+    int pio_pins[PIO_WRITE_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_RST_CD_REQ_SCL, PIN_ACK};
+    int pio_dirs[PIO_WRITE_COUNT] = {     0,      0,      0,      0,      0,      0,      0,      0,                  1,       0};
 
     for (int i = 0; i < PIO_WRITE_COUNT; i++) {
         pio_gpio_init(pio, pio_pins[i]);

@@ -59,7 +59,7 @@
 
 ///////////////////////////
 
-#define DATA_PINS_MASK      ((1 << PIN_D0) | (1 << PIN_D1) | (1 << PIN_D2) | (1 << PIN_D3) | (1 << PIN_D4) | (1 << PIN_D5) | (1 << PIN_D6) | (1 << PIN_D7))
+#define DATA_PINS_MASK      ((1 << PIN_D0) | (1 << PIN_D1) | (1 << PIN_D2) | (1 << PIN_D3) | (1 << PIN_D4) | (1 << PIN_D5) | (1 << PIN_D6) | (1 << PIN_D7) | (1 << PIN_SEL_IO_DP_SDA))
 
 #define PIN_D0              0
 #define PIN_D1              1
@@ -80,7 +80,7 @@
 #define PIN_BSY             27
 #define PIN_DATA_DIR        28      // out
 
-#define PIN_LED_EVB     25
+#define PIN_LED_EVB         25
 
 #define BIT_IS_H(PIN)   (gpio_get(PIN) != 0)
 #define BIT_IS_L(PIN)   (gpio_get(PIN) == 0)

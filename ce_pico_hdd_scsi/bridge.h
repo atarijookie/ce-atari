@@ -29,11 +29,11 @@ void pioConfig(int newMode, bool force=false);
 
 void resetBridge(void);
 
-uint8_t PIO_gotFirstCmdByte(void); // check if we got the 1st command byte
-uint8_t PIO_writeFirst(void);      // get 1st CMD byte from ST  -- without setting INT
+uint8_t isSelectionHappening(void); // check if we got the 1st command byte
+uint8_t getSelectionByte(void);      // get 1st CMD byte from ST  -- without setting INT
 uint8_t PIO_write(void);           // get next CMD byte from ST -- with setting INT to LOW and waiting for CS
 
-void PIO_read(uint8_t scsiStatusByte); // send status byte to ST
+void statusAndMsgRead(uint8_t scsiStatusByte); // send status byte to ST
 
 void DMA_write_startWithCount(uint32_t transfersCount);     // set how many bytes we will transfer, before calling DMA_write()
 uint8_t DMA_write(void);    // get byte from ST using DMA
@@ -41,8 +41,7 @@ uint8_t DMA_write(void);    // get byte from ST using DMA
 void DMA_read(uint8_t val);         // send byte to ST using DMA
 void DMA_read_waitForEnd(void);
 
-void MSG_read(uint8_t val);
-void PIO_read_solely(uint8_t val);
+void PIO_read(uint8_t val);
 
 // internal functions
 void dumpPinStates(void);

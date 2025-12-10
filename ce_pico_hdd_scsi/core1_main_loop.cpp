@@ -65,7 +65,7 @@ void core1_main_loop(void)
         // OUT STATE: WAIT_COMMAND_RESPONSE when GOOD, STATE_GET_COMMAND when FAIL
         if (state == STATE_GET_COMMAND)
         {
-            if(PIO_gotFirstCmdByte())       // if 1st CMD byte was received
+            if(isSelectionHappening())       // if 1st CMD byte was received
             {
                 state = onGetCommand();
             }

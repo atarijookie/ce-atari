@@ -11,11 +11,7 @@
 extern EthernetClient clientHdd;
 extern EthernetClient clientIkbd;
 
-void onButtonPress(void);
-
-uint8_t onGetCommandAcsi(void);
 uint8_t onGetCommandScsi(void);
-void getCmdLengthFromCmdBytesAcsi(void);
 void getCmdLengthFromCmdBytesScsi(uint8_t cmd);
 
 extern uint8_t atnSendACSIcommand[ATN_SENDACSICOMMAND_LEN_TX];
@@ -57,17 +53,14 @@ uint8_t onGetCommand(void)
 
 uint8_t onGetCommandScsi(void)
 {
-    uint8_t id;
-    uint8_t sel;
     int i;
 
-    //----------------------
-    sel = PIO_writeFirst(); // get SELection byte
-    id = 0xff;              // mark that ID hasn't been found yet
+    uint8_t sel = getSelectionByte(); // get SELection byte
+    uint8_t id = 0xff;              // mark that ID hasn't been found yet
 
     for (i = 0; i < 8; i++)
     {
-        if ((sel & (1 << i)) != 0)
+        if ((sel & (1 << i)) != 0)      // this bit is set?
         { // if bit is one, this ID is selected
             if (idIsEnabled(id))
             {           // if that ID is enabled
@@ -198,37 +191,7 @@ bool onDataWrite(uint32_t dataCnt)
 
 void onReadStatus(uint8_t statusByte)
 {
-    PIO_read(statusByte);       // send the status to Atari
-}
-
-void getCmdLengthFromCmdBytesAcsi(void)
-{
-    // now it's time to set up the receiver buffer and length
-    if ((cmd[0] & 0x1f) == 0x1f)
-    {                                 // if the command is '0x1f'
-        switch ((cmd[1] & 0xe0) >> 5) // get the length of the command
-        {
-        case 0:
-            cmdLen = 7;
-            break;
-        case 1:
-            cmdLen = 11;
-            break;
-        case 2:
-            cmdLen = 11;
-            break;
-        case 5:
-            cmdLen = 13;
-            break;
-        default:
-            cmdLen = 7;
-            break;
-        }
-    }
-    else
-    {               // if it isn't a ICD command
-        cmdLen = 6; // then length is 6 bytes
-    }
+    statusAndMsgRead(statusByte);       // send the status to Atari
 }
 
 void getCmdLengthFromCmdBytesScsi(uint8_t cmd)

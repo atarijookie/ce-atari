@@ -5,9 +5,7 @@
 
 uint8_t idIsEnabled(uint8_t id);
 
-uint8_t onGetCommandAcsi(void);
 uint8_t onGetCommandScsi(void);
-void getCmdLengthFromCmdBytesAcsi(void);
 void getCmdLengthFromCmdBytesScsi(uint8_t cmd);
 
 uint8_t onGetCommand(void);
