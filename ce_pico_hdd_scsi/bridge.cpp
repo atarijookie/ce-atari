@@ -13,6 +13,67 @@ static uint smScsiWrite, smScsiRead;
 
 int readInProgressCount = 0;
 
+uint16_t byteWithParity[256];
+
+// prefill the table with bytes inverted, extended with parity
+void prefillBytesWithParityTable(void)
+{
+    for(int i=0; i<256; i++) {
+        uint16_t valPar = i;
+        uint8_t parity = __builtin_parity(i);
+
+        if(!parity) {           // if odd parity, then set parity bit
+            valPar |= 0x100;
+        }
+
+        byteWithParity[i] = (~valPar) & 0x1ff;
+    }
+}
+
+int getAtnReset(void)
+{
+    // get pin directions
+    int dirAtn = gpio_get_dir(PIN_ATN_MSG);
+    int dirRst = gpio_get_dir(PIN_RST_CD_REQ_SCL);
+
+    // get the current output level of PIN_IN_OE
+    int lvlInOe = gpio_get_out_level(PIN_IN_OE);
+
+    // get gpio function, set to SIO
+    gpio_function_t funcRst = gpio_get_function(PIN_RST_CD_REQ_SCL);
+    gpio_set_function(PIN_RST_CD_REQ_SCL, GPIO_FUNC_SIO);
+
+    // set as inputs
+    gpio_set_dir(PIN_ATN_MSG, 0);
+    gpio_set_dir(PIN_RST_CD_REQ_SCL, 0);
+
+    // enable input chip
+    gpio_put(PIN_IN_OE, 1);
+
+    // read pins, set bits in result
+    int res = 0;
+
+    if(BIT_IS_L(PIN_ATN_MSG)) {
+        res |= BIT_ATN;
+    }
+
+    if(BIT_IS_L(PIN_RST_CD_REQ_SCL)) {
+        res |= BIT_RESET;
+    }
+
+    // restore gpio function
+    gpio_set_function(PIN_RST_CD_REQ_SCL, funcRst);
+
+    // restore directions
+    gpio_set_dir(PIN_ATN_MSG, dirAtn);
+    gpio_set_dir(PIN_RST_CD_REQ_SCL, dirRst);
+
+    // restore previous output level of PIN_IN_OE
+    gpio_put(PIN_IN_OE, lvlInOe);
+
+    return res;
+}
+
 void setScsiPhase(int newPhase, bool force)
 {
     static int currentPhase = MODE_UNKNOWN;
@@ -21,6 +82,11 @@ void setScsiPhase(int newPhase, bool force)
         return;
     }
     currentPhase = newPhase;
+
+    // I/O, C/D, MSG must be controlled by SIO for setting the phase
+    gpio_set_function(PIN_SEL_IO_DP_SDA, GPIO_FUNC_SIO);
+    gpio_set_function(PIN_RST_CD_REQ_SCL, GPIO_FUNC_SIO);
+    gpio_set_function(PIN_ATN_MSG, GPIO_FUNC_SIO);
 
     uint32_t bits = 0;
     switch(newPhase)
@@ -38,17 +104,17 @@ void setScsiPhase(int newPhase, bool force)
     gpio_set_dir_out_masked((1 << PIN_SEL_IO_DP_SDA) | (1 << PIN_RST_CD_REQ_SCL) | (1 << PIN_ATN_MSG));     // I/O, C/D, MSG as outputs
     gpio_put_masked((1 << PIN_SEL_IO_DP_SDA) | (1 << PIN_RST_CD_REQ_SCL) | (1 << PIN_ATN_MSG), bits);       // set the bits L or H
     gpio_put(PIN_OUT_LE1, 1);       // store I/O, C/D, MSG from D to Q
-    // TODO: add few ns pause
+    busy_wait_at_least_cycles(10);
     gpio_put(PIN_OUT_LE1, 0);       // latch enable, that means hold the signals
 
     bool driveControls = (newPhase != MODE_RESET) && (newPhase != MODE_SCSI_SELECTION);
-    gpio_put(PIN_OUT_OE, driveControls ? 0 : 1);    // when we're not in selection or reset phase, drive the output control pins (device is responsing, BSY is L) 
+    gpio_put(PIN_OUT_OE, driveControls ? 0 : 1);    // when we're not in selection or reset phase, drive the output control pins (device is responsing, BSY is L)
     gpio_put(PIN_IN_OE, driveControls ? 1 : 0);     // when we're in selection or reset phase, set IN_OE to L, so we can read the SEL, RST, BSY signals
 
     gpio_set_dir_out_masked((1 << PIN_SEL_IO_DP_SDA) | (1 << PIN_RST_CD_REQ_SCL));  // DP and REQ as outputs
     gpio_put_masked((1 << PIN_SEL_IO_DP_SDA) | (1 << PIN_RST_CD_REQ_SCL), (1 << PIN_SEL_IO_DP_SDA) | (1 << PIN_RST_CD_REQ_SCL));    // DP and REQ to H
     gpio_put(PIN_OUT_LE2, 1);       // store DP and REQ from D to Q
-    // TODO: add few ns pause
+    busy_wait_at_least_cycles(10);
     gpio_put(PIN_OUT_LE2, 0);       // latch enable, that means hold the signals
 
     if(newPhase == MODE_RESET || newPhase == MODE_SCSI_SELECTION) {     // RESET / SELECTION?
@@ -59,7 +125,7 @@ void setScsiPhase(int newPhase, bool force)
     }
 }
 
-void setDataDirection(uint8_t sendNotRecv, PIO pio)
+void setDataDirection(uint8_t sendNotRecv, PIO pio, uint sm)
 {
     static uint8_t sendNotRecvNow = 0xff; // init with no data direction set yet
     static PIO pioNow = nullptr;
@@ -82,8 +148,13 @@ void setDataDirection(uint8_t sendNotRecv, PIO pio)
         gpio_set_dir_in_masked(DATA_PINS_MASK);
     }
 
-    int pio_data_pins[8] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7};
-    for (int i = 0; i < 8; i++) {
+    if(pio != NULL) {
+        int dirs = (sendNotRecv == DIR_SEND) ? DATA_PINS_MASK : 0;
+        pio_sm_set_pindirs_with_mask64(pio, sm, dirs, DATA_PINS_MASK);
+    }
+
+    int pio_data_pins[10] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_SEL_IO_DP_SDA, PIN_RST_CD_REQ_SCL};
+    for (int i = 0; i < 10; i++) {
         if(pio != NULL) {           // got pio, pin handled by PIO
             pio_gpio_init(pio, pio_data_pins[i]);
         } else {                    // no pio, pin handled by SIO
@@ -109,14 +180,17 @@ void pioConfigAll(void)
     success = pio_claim_free_sm_and_add_program_for_gpio_range(&scsi_read_program, &pioScsiRead, &smScsiRead, &offset, PIN_D0, 26, true);
     if(!success) { debug("Failed to claim PIO SM 2\n"); while(1); }
     scsi_write_program_init(pioScsiRead, smScsiRead, offset, PIN_ACK, PIN_RST_CD_REQ_SCL);
+
+    prefillBytesWithParityTable();
 }
 
-void pioConfig(int newMode, bool force)
+int pioConfig(int newMode, bool force)
 {
     static int currentMode = MODE_UNKNOWN;
+    int oldMode = currentMode;
 
     if(!force && newMode == currentMode) {    // no mode change? just quit
-        return;
+        return oldMode;
     }
     currentMode = newMode;
 
@@ -131,19 +205,20 @@ void pioConfig(int newMode, bool force)
 
     switch(newMode)
     {
-        // inactive modes
+        // pasive modes (just watching bus)
         case MODE_RESET:
         case MODE_SCSI_SELECTION:
+            // SEL, RST, ATN, BSY are controlled by SIO and are inputs
+            gpio_set_function(PIN_SEL_IO_DP_SDA, GPIO_FUNC_SIO);
+            gpio_set_function(PIN_RST_CD_REQ_SCL, GPIO_FUNC_SIO);
+            gpio_set_function(PIN_ATN_MSG, GPIO_FUNC_SIO);
+            gpio_set_function(PIN_BSY, GPIO_FUNC_SIO);
             break;
 
         // write modes
         case MODE_CMD:
         case MODE_DMA_WRITE:
         case MODE_MSG_OUT:
-            pio_sm_set_pindirs_with_mask64(pioScsiWrite, smScsiWrite, 0, DATA_PINS_MASK);                 // data pins are inputs
-
-            pio_gpio_init(pioScsiWrite, PIN_RST_CD_REQ_SCL);    // DRQ is controlled by PIO
-
             whichPio = pioScsiWrite;
             whichSm = smScsiWrite;
             break;
@@ -152,11 +227,6 @@ void pioConfig(int newMode, bool force)
         case MODE_DMA_READ:
         case MODE_STATUS:
         case MODE_MSG_IN:
-            pio_sm_set_pindirs_with_mask64(pioScsiRead, smScsiRead, DATA_PINS_MASK, DATA_PINS_MASK);    // data pins are outputs
-
-            pio_gpio_init(pioScsiRead, PIN_SEL_IO_DP_SDA);      // DP is controlled by PIO
-            pio_gpio_init(pioScsiRead, PIN_RST_CD_REQ_SCL);     // DRQ is controlled by PIO
-
             readInProgressCount = 0;        // no read bytes in progress
 
             whichPio = pioScsiRead;
@@ -166,17 +236,19 @@ void pioConfig(int newMode, bool force)
 
     // data direction RECV for CMD and WRITE, data direction SEND for READ and STATUS
     uint8_t sendNotRecv = (newMode == MODE_DMA_READ || newMode == MODE_STATUS || newMode == MODE_MSG_IN) ? DIR_SEND : DIR_RECV;
-    setDataDirection(sendNotRecv, whichPio);
+    setDataDirection(sendNotRecv, whichPio, whichSm);
 
     // if we're in the reset mode, don't enable any PIO SM
     if(newMode == MODE_RESET || newMode == MODE_SCSI_SELECTION) {
-        return;
+        return oldMode;
     }
 
     // restart state machine, clear FIFOs, enable state machine
     pio_sm_restart(whichPio, whichSm);
     pio_sm_clear_fifos(whichPio, whichSm);
     pio_sm_set_enabled(whichPio, whichSm, true);
+
+    return oldMode;
 }
 
 uint8_t isSelectionHappening(void)
@@ -204,7 +276,6 @@ uint8_t getSelectionByte(void)
 // get next CMD byte from ST -- with setting INT to LOW and waiting for CS
 uint8_t PIO_write(void)
 {
-    pioConfig(MODE_CMD);
     pio_sm_put(pioScsiWrite, smScsiWrite, 0);      // write N-1 count of bytes to write here
 
     while(1)
@@ -252,13 +323,7 @@ void statusAndMsgRead(uint8_t scsiStatusByte)
 
 void PIO_read(uint8_t val)
 {
-    uint16_t valPar = (~val) & 0xff;
-    uint8_t parity = __builtin_parity(val);
-
-    if(parity) {        // if odd parity, then set parity bit
-        valPar = 0x100 | valPar;
-    }
-
+    uint16_t valPar = byteWithParity[val];
     pio_sm_put(pioScsiRead, smScsiRead, valPar);     // write status byte to TX FIFO, the transfer will start
 
     // wait for data to be transfered
@@ -303,12 +368,7 @@ void DMA_read_waitForEnd(void)
 
 void DMA_read(uint8_t val)
 {
-    uint16_t valPar = (~val) & 0xff;
-    uint8_t parity = __builtin_parity(val);
-
-    if(parity) {        // if odd parity, then set parity bit
-        valPar = 0x100 | valPar;
-    }
+    uint16_t valPar = byteWithParity[val];
 
     // wait for TX fifo not full, so we can put the current value in
     while(1) {

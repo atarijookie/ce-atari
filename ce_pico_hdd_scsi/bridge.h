@@ -24,10 +24,14 @@
 #define MODE_STATUS             7
 #define MODE_MSG_IN             8
 
+#define BIT_ATN     1
+#define BIT_RESET   2
+
 void pioConfigAll(void);
-void pioConfig(int newMode, bool force=false);
+int pioConfig(int newMode, bool force=false);
 
 void resetBridge(void);
+int getAtnReset(void);
 
 uint8_t isSelectionHappening(void); // check if we got the 1st command byte
 uint8_t getSelectionByte(void);      // get 1st CMD byte from ST  -- without setting INT

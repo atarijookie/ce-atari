@@ -51,6 +51,25 @@ uint8_t onGetCommand(void)
     return STATE_WAIT_COMMAND_RESPONSE;
 }
 
+void doMsgOutIfAtnSet(void)
+{
+    while(1)
+    {
+        int atnReset = getAtnReset();
+
+        if((atnReset & BIT_ATN) != BIT_ATN) {   // ATN not set? quit
+            return;
+        }
+
+        // temporarily set MSG_OUT mode
+        int originalMode = pioConfig(MODE_MSG_OUT);
+        PIO_write();            // do 1 PIO write, ignore retrieved MSG byte
+
+        // restore original mode
+        pioConfig(originalMode);
+    }
+}
+
 uint8_t onGetCommandScsi(void)
 {
     int i;
@@ -75,7 +94,11 @@ uint8_t onGetCommandScsi(void)
         return 0;
     }
 
+    doMsgOutIfAtnSet();     // do MSG_OUT if ATN set before cmd transfer
+
     cmdLen = 6; // maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
+
+    pioConfig(MODE_CMD);
 
     for (i = 0; i < cmdLen; i++)
     {                         // receive the next command bytes
@@ -107,6 +130,9 @@ uint8_t onGetCommandScsi(void)
 
     // for all commands add fake ACSI ID on top of the 0th byte
     cmd[0] = cmd[0] | (id << 5); // add ID on the top 3 bits
+
+    doMsgOutIfAtnSet();     // do MSG_OUT if ATN set after cmd transfer
+
     return 1;
 }
 
