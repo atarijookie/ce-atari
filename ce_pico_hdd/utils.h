@@ -37,4 +37,8 @@ void i2c1init(void);
 void debugInit(void);
 void debug(const char *fmt, ...);
 
+#ifdef LOG_LED
+void debugFromQueue(void);
+#endif
+
 #endif

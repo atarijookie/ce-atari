@@ -109,6 +109,8 @@ void pioConfig(int newMode, bool force)
     {
         case MODE_RESET:
         case MODE_ACSI_FIRST:
+            LED_OFF;
+
             configAcsiFirst();
 
             whichPio = pioAcsiFirst;
@@ -116,6 +118,7 @@ void pioConfig(int newMode, bool force)
             break;
 
         case MODE_CMD_REST:
+            LED_ON;
             pio_gpio_init(pioAcsiCmdWrite, PIN_INT);   // INT is controlled by PIO
 
             whichPio = pioAcsiCmdWrite;

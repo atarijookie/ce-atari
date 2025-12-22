@@ -15,9 +15,15 @@ extern uint8_t cmd[16];  // received command bytes
 uint8_t isAcsiNotScsi = 1;
 uint8_t busIdle;
 
+volatile bool core1running = false;
+
 void core1_setup(void)
 {
+    debug("CORE 1 setup\n");
+
     flash_safe_execute_core_init();     // call this for flash_safe_execute() to work
+
+    // debug("CORE 1 config GPIO\n");
 
     // config pins as inputs
     #define INPUTS_COUNT 12
@@ -40,7 +46,11 @@ void core1_setup(void)
         gpio_put(outputs[i], levels[i]);
     }
 
+    // debug("CORE 1 config PIO\n");
+
     pioConfigAll();     // configure all PIO state machines
+
+    // debug("CORE 1 resetBridge\n");
 
     resetBridge();
 }
@@ -53,11 +63,14 @@ void core1_main_loop(void)
 
     uint8_t state;
     state = STATE_GET_COMMAND;
-    debug("starting core1_main loop\n");
+    debug("CORE 1 main\n");
+
+    core1running = true;
 
     while(1)
     {
         if(BIT_IS_L(PIN_RESET)) {   // when ACSI RESET is L, enter reset mode - no PIO transfers
+            state == STATE_GET_COMMAND;
             pioConfig(MODE_RESET);
         }
 

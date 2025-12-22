@@ -22,23 +22,39 @@ void handleButton(void);
 
 EthernetClient client;
 
+extern volatile bool core1running;
 void core1_main_loop(void);
 
 void setup(void)
 {
+    gpio_set_function(PIN_LED_EVB, GPIO_FUNC_SIO);
+    gpio_set_dir(PIN_LED_EVB, GPIO_OUT);
+    LED_ON;             // turn LED on during setup
+
     debugInit();
-    debug("setup() starting\n");
+    debug("CORE 0 setup\n");
 
     loadSettings();
     ipcInit();
 
     multicore_launch_core1(core1_main_loop);
 
+    while(!core1running) {
+        #ifdef LOG_LED
+        debugFromQueue();
+        #endif
+
+        delay(1000);
+        debug("CORE 0 waiting for CORE 1\n");
+    }
+
+    // ikbdInit();
+
     displayInit();
 
     setupAtnBuffers(); // fill the ATN buffers with needed headers and terminators
 
-    debug("setup() done, enabledIDs: %02X\n", settings.enabledIDs);
+    debug("enabledIDs: %02X\n", settings.enabledIDs);
 
     Ethernet.init(17);              // WIZnet W6100-EVB-Pico
     Ethernet.begin(settings.mac);   // set mac, get IP via hdcp
@@ -79,10 +95,15 @@ void loop(void)
 {
     uint8_t header[TX_HEADER_SIZE];
 
-    debug("starting main loop\n");
+    LED_OFF;             // turn LED off when reached main loop
+    debug("CORE 0 main\n");
 
     while(1)
     {
+        #ifdef LOG_LED
+        debugFromQueue();
+        #endif
+
         // discover CE server, connect to CE server
         connectToHost();
 
@@ -97,6 +118,7 @@ void loop(void)
             {
                 // report FW version to host
                 case STATE_SEND_FW_VER:
+                    LED_TOGGLE;
                     sendHeaderAndDataToHost(SOCK_HDD, atnSendFwVersion, ATN_SENDFWVERSION_LEN_TX - TX_HEADER_SIZE);
                     break;
 
@@ -120,6 +142,8 @@ void loop(void)
 
             bfr->free = true;
         }
+
+        // ikbdProcessing();
 
         //---------------------------
         // check the button state and press duration

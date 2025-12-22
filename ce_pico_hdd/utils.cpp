@@ -9,6 +9,15 @@
 #include "defs.h"
 #include "display.h"
 
+#ifdef LOG_LED
+#include "uart_tx.pio.h"
+
+PIO pioUartTx;
+uint smUartTx;
+
+queue_t fifoDebug;
+#endif
+
 volatile bool hasTimedOut = false;
 volatile uint8_t timerRunning = false;
 alarm_id_t timer_id = 0;    // Will hold the alarm handle
@@ -201,15 +210,41 @@ void debugInit(void)
     // Serial1.begin(115200);
 
     // ft200x for debug strings
+#ifdef LOG_FT200
     i2c1init();
     ft200xPresent = isI2CdeviceConnected(FT200X_ADDRESS);
+#endif
+
+#ifdef LOG_LED
+    uint offset;
+
+    bool success = pio_claim_free_sm_and_add_program_for_gpio_range(&uart_tx_program, &pioUartTx, &smUartTx, &offset, PIN_LED_EVB, 1, true);
+    if(!success) { debug("Failed to claim PIO SM for UART\n"); while(1); }
+
+    uart_tx_program_init(pioUartTx, smUartTx, offset, PIN_LED_EVB, 115200);
+
+    queue_init(&fifoDebug, 1, 1024);
+#endif
 }
+
+#ifdef LOG_LED
+void debugFromQueue(void)
+{
+    while(!queue_is_empty(&fifoDebug)) {
+        char c;
+        queue_try_remove(&fifoDebug, &c);
+        uart_tx_program_putc(pioUartTx, smUartTx, c);
+    }
+}
+#endif
 
 void debug(const char *fmt, ...)
 {
+#ifdef LOG_FT200
     if(!ft200xPresent) {
         return;
     }
+#endif
 
     mutex_enter_blocking(&debugMutex);
 
@@ -234,8 +269,26 @@ void debug(const char *fmt, ...)
     // use uart0 for debug strings
     // uart_puts(uart0, buf2);
 
+    #ifdef LOG_FT200
     // use ft200x for debug strings
     i2c_write_timeout_us(DISPLAY_I2C_IFACE, FT200X_ADDRESS, (const uint8_t*) buf2, j, false, 100000);
+    #endif
+
+    #ifdef LOG_LED
+    if(get_core_num() == 1)         // core 1 - just add to fifo
+    {
+        int i = 0;
+
+        while(buf2[i] != 0) {
+            queue_try_add(&fifoDebug, &buf2[i]);
+            i++;
+        }
+    }
+    else                            // core 0 - actually send to uart
+    {
+        uart_tx_program_puts(pioUartTx, smUartTx, buf2);
+    }
+    #endif
 
     mutex_exit(&debugMutex);
 }

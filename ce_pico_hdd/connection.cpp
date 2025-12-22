@@ -23,6 +23,7 @@ uint16_t hostPortFdd;
 uint16_t hostPortIkbd;
 
 bool connected;
+bool ikbdConnected;
 
 struct {
     bool sendStatusAfterRead;
@@ -206,7 +207,7 @@ void connectToCEhost(void)
 
     // clientHdd.setNoDelay(true);
 
-    // clientIkbd.connect(hostIpString.c_str(), hostPortIkbd);
+    // ikbdConnected = clientIkbd.connect(hostIpString.c_str(), hostPortIkbd);
 }
 
 // if UDP not initialized, do that now
