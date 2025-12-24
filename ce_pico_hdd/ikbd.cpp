@@ -81,7 +81,7 @@ void ikbdConnectDisconnect(void)
         // ikbd is enabled, ikdb chip is sending data (chip present), eth is connected, but our ikbd socket is NOT connected, connect now
         if(connected && !ikbdConnected)
         {
-            debug("I connect");
+            debug("I con\n");
             ikbdConnected = clientIkbd.connect(hostIpString.c_str(), hostPortIkbd);
             // clientIkbd.setNoDelay(true);
         }
@@ -91,7 +91,7 @@ void ikbdConnectDisconnect(void)
         // ikbd not sending data (chip not present) or ikbd not enabled, but the ikbd socket is connected, then disconnect
         if(ikbdConnected)
         {
-            debug("I disconnect");
+            debug("I dis\n");
             ikbdConnected = false;
             clientIkbd.stop();
         }
@@ -146,7 +146,7 @@ void ikbdInit(void)
 
     uint offset;
     bool success = pio_claim_free_sm_and_add_program_for_gpio_range(&uart_rx_program, &pioUart, &smUart, &offset, PIN_KEYB_RX, 1, true);
-    if(!success) { debug("Failed to claim PIO SM for UART\n"); while(1); }
+    if(!success) { debug("HALT! Failed to claim PIO SM for UART\n"); while(1); }
     uart_rx_program_init(pioUart, smUart, offset, PIN_KEYB_RX, IKBD_BAUD_RATE);
 
     // Find a free irq
@@ -154,7 +154,8 @@ void ikbdInit(void)
     if (irq_get_exclusive_handler(pioIrqUart)) {
         pioIrqUart++;
         if (irq_get_exclusive_handler(pioIrqUart)) {
-            debug("All IRQs are in use\n");
+            debug("HALT! All IRQs are in use\n");
+            while(1);
         }
     }
 

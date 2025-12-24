@@ -32,23 +32,33 @@ void setup(void)
     LED_ON;             // turn LED on during setup
 
     debugInit();
-    debug("CORE 0 setup\n");
+    debug("\n\n------------\nCORE 0 setup\n");
 
     loadSettings();
     ipcInit();
 
     multicore_launch_core1(core1_main_loop);
 
-    while(!core1running) {
+    int loops = 0;
+    while(true) {
         #ifdef LOG_LED
         debugFromQueue();
         #endif
 
-        delay(1000);
-        debug("CORE 0 waiting for CORE 1\n");
+        delay(100);
+        loops++;
+
+        if(loops >= 10) {
+            loops = 0;
+            debug("CORE 0 waiting for CORE 1\n");
+        }
+
+        if(core1running) {
+            break;
+        }
     }
 
-    // ikbdInit();
+    ikbdInit();
 
     displayInit();
 
@@ -76,8 +86,6 @@ void setup(void)
 
     debug("mac: %02X:%02X:%02X:%02X:%02X:%02X\n", atnSendFwVersion[TX_HEADER_SIZE + 6], atnSendFwVersion[TX_HEADER_SIZE + 7], atnSendFwVersion[TX_HEADER_SIZE + 8],
                                                   atnSendFwVersion[TX_HEADER_SIZE + 9], atnSendFwVersion[TX_HEADER_SIZE + 10], atnSendFwVersion[TX_HEADER_SIZE + 11]);
-
-    // createIkbdTask();   // this task sends ikdb data to host and back
 }
 
 void setupAtnBuffers(void)
@@ -143,7 +151,7 @@ void loop(void)
             bfr->free = true;
         }
 
-        // ikbdProcessing();
+        ikbdProcessing();
 
         //---------------------------
         // check the button state and press duration

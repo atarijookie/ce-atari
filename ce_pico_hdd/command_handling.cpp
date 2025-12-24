@@ -25,15 +25,9 @@ uint8_t cmd[16];   // received command bytes, should point beyond the header in 
 uint8_t cmdLen; // length of received command
 uint8_t brStat; // status from bridge
 
-extern uint8_t isAcsiNotScsi;
-extern uint8_t busIdle;
-
 uint8_t onGetCommand(void)
 {
-    //---------
-    // retrieve the command. There are some slight differences between ACSI and SCSI part,
-    // but the resulting commands should be the same (to make the rest of app work without further changes).
-    // uint8_t good = isAcsiNotScsi ? onGetCommandAcsi() : onGetCommandScsi();
+    // retrieve the command
     uint8_t good = onGetCommandAcsi();
 
     if (!good)  // if failed to get the cmd, quit

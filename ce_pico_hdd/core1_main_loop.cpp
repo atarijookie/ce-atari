@@ -12,9 +12,6 @@
 
 extern uint8_t cmd[16];  // received command bytes
 
-uint8_t isAcsiNotScsi = 1;
-uint8_t busIdle;
-
 volatile bool core1running = false;
 
 void core1_setup(void)

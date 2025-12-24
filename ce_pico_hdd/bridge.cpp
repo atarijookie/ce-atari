@@ -7,8 +7,6 @@
 #include "acsi_read.pio.h"
 
 extern uint8_t brStat; // status from bridge
-extern uint8_t isAcsiNotScsi;
-extern uint8_t busIdle;
 
 static PIO pioAcsiFirst, pioAcsiCmdWrite, pioAcsiDataWrite, pioAcsiDataRead, pioAcsiStatusRead;
 static uint smAcsiFirst, smAcsiCmdWrite, smAcsiDataWrite, smAcsiDataRead, smAcsiStatusRead;
@@ -212,32 +210,9 @@ uint8_t PIO_write(void)
 // send status byte to host, and on SCSI also to MSG IN byte
 void PIO_read(uint8_t scsiStatusByte)
 {
-    if (brStat != E_TimeOut)
-    {                                        // if we didn't have bridge timeout, we can try to send STATUS byte
-        PIO_read_solely(scsiStatusByte);     // this sends only STATUS byte to host - both in ACSI and SCSI
-    }
-
-    // if (!isAcsiNotScsi)
-    // { // if it's SCSI, send also MSG IN to host
-    //     if (brStat != E_TimeOut)
-    //     { // if we didn't have bridge timeout, we can try to send MSG IN
-    //         MSG_read(0);
-    //     }
-    // }
-
-    if (brStat != E_OK)
-    { // if some timeout occured, then failed
-
-    }
-
-    // resetBridge();               // reset XILINX - put BSY, C/D, I/O in released states - needed for SCSI, doesn't harm anything in ACSI
-}
-
-void PIO_read_solely(uint8_t val)
-{
     pioConfig(MODE_STATUS);
 
-    pio_sm_put(pioAcsiStatusRead, smAcsiStatusRead, val);     // write status byte to TX FIFO, the transfer will start
+    pio_sm_put(pioAcsiStatusRead, smAcsiStatusRead, scsiStatusByte);     // write status byte to TX FIFO, the transfer will start
 
     // wait for data to be transfered
     while(1)
@@ -255,11 +230,6 @@ void PIO_read_solely(uint8_t val)
     }
 
     brStat = E_OK;
-}
-
-// send MESSAGE IN byte to ST
-void MSG_read(uint8_t val)
-{
 }
 
 void DMA_read_waitForEnd(void)

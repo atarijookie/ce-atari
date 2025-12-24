@@ -4,12 +4,8 @@
 #include "defs.h"
 
 // bridge functions return value
-#define E_TimeOut 0
-#define E_OK 1
-#define E_OK_A1 2
-#define E_CARDCHANGE 3
-#define E_RESET 4
-#define E_FAIL_CMD_AGAIN 5
+#define E_TimeOut   0
+#define E_OK        1
 
 #define DIR_RECV 0
 #define DIR_SEND 1
@@ -38,11 +34,5 @@ uint8_t DMA_write(void);    // get byte from ST using DMA
 
 void DMA_read(uint8_t val);         // send byte to ST using DMA
 void DMA_read_waitForEnd(void);
-
-void MSG_read(uint8_t val);
-void PIO_read_solely(uint8_t val);
-
-// internal functions
-void dumpPinStates(void);
 
 #endif
