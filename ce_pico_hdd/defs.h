@@ -6,6 +6,7 @@
 #define LOG_MORE    1
 #define LOG_LED     1
 // #define LOG_FT200   1
+// #define LOG_UART    1
 
 #ifndef MIN
     #define MIN(X,Y)    ((X < Y) ? X : Y)

@@ -206,11 +206,13 @@ void debugInit(void)
 {
     mutex_init(&debugMutex);
 
+#ifdef LOG_UART
     // uart0 for debug strings
-    // Serial1.begin(115200);
+    Serial1.begin(115200);
+#endif
 
-    // ft200x for debug strings
 #ifdef LOG_FT200
+    // ft200x for debug strings
     i2c1init();
     ft200xPresent = isI2CdeviceConnected(FT200X_ADDRESS);
 #endif
@@ -266,15 +268,17 @@ void debug(const char *fmt, ...)
     }
     buf2[j] = 0;
 
+#ifdef LOG_UART
     // use uart0 for debug strings
-    // uart_puts(uart0, buf2);
+    uart_puts(uart0, buf2);
+#endif
 
-    #ifdef LOG_FT200
+#ifdef LOG_FT200
     // use ft200x for debug strings
     i2c_write_timeout_us(DISPLAY_I2C_IFACE, FT200X_ADDRESS, (const uint8_t*) buf2, j, false, 100000);
-    #endif
+#endif
 
-    #ifdef LOG_LED
+#ifdef LOG_LED
     if(get_core_num() == 1)         // core 1 - just add to fifo
     {
         int i = 0;
@@ -288,7 +292,7 @@ void debug(const char *fmt, ...)
     {
         uart_tx_program_puts(pioUartTx, smUartTx, buf2);
     }
-    #endif
+#endif
 
     mutex_exit(&debugMutex);
 }
