@@ -25,21 +25,10 @@ EthernetClient client;
 extern volatile bool core1running;
 void core1_main_loop(void);
 
-void setup(void)
+void waitForCore1Running(void)
 {
-    gpio_set_function(PIN_LED_EVB, GPIO_FUNC_SIO);
-    gpio_set_dir(PIN_LED_EVB, GPIO_OUT);
-    LED_ON;             // turn LED on during setup
-
-    debugInit();
-    debug("\n\n------------\nCORE 0 setup\n");
-
-    loadSettings();
-    ipcInit();
-
-    multicore_launch_core1(core1_main_loop);
-
     int loops = 0;
+
     while(true) {
         #ifdef LOG_LED
         debugFromQueue();
@@ -57,6 +46,25 @@ void setup(void)
             break;
         }
     }
+}
+
+void setup(void)
+{
+    gpio_set_function(PIN_LED_EVB, GPIO_FUNC_SIO);
+    gpio_set_dir(PIN_LED_EVB, GPIO_OUT);
+    LED_ON;             // turn LED on during setup
+
+    debugInit();
+    debug("\n\n------------\nCORE 0 setup\n");
+
+    loadSettings();
+    ipcInit();
+
+    multicore_reset_core1();
+    multicore_fifo_drain();
+    sleep_ms(10);
+    multicore_launch_core1(core1_main_loop);
+    waitForCore1Running();
 
     ikbdInit();
 

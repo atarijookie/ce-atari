@@ -10,7 +10,6 @@
 #include "command_handling.h"
 #include "connection.h"
 #include "display.h"
-#include "ikbd.h"
 #include "ipc.h"
 
 uint16_t version[2] = {0xa025, 0x1117}; // this means: hAns, 2025-11-17
@@ -20,23 +19,55 @@ uint8_t atnSendACSIcommand[ATN_SENDACSICOMMAND_LEN_TX];
 
 EthernetClient client;
 
+extern volatile bool core1running;
 void core1_main_loop(void);
+
+void waitForCore1Running(void)
+{
+    int loops = 0;
+
+    while(true) {
+        #ifdef LOG_LED
+        debugFromQueue();
+        #endif
+
+        delay(100);
+        loops++;
+
+        if(loops >= 10) {
+            loops = 0;
+            debug("CORE 0 waiting for CORE 1\n");
+        }
+
+        if(core1running) {
+            break;
+        }
+    }
+}
 
 void setup(void)
 {
+    gpio_set_function(PIN_LED_EVB, GPIO_FUNC_SIO);
+    gpio_set_dir(PIN_LED_EVB, GPIO_OUT);
+    LED_ON;             // turn LED on during setup
+
     debugInit();
-    debug("setup() starting\n");
+    debug("\n\n------------\nCORE 0 setup\n");
 
     loadSettings();
     ipcInit();
 
+    multicore_reset_core1();
+    multicore_fifo_drain();
+    sleep_ms(10);
     multicore_launch_core1(core1_main_loop);
+    waitForCore1Running();
 
     displayInit();
 
     setupAtnBuffers(); // fill the ATN buffers with needed headers and terminators
 
-    debug("setup() done, enabledIDs: %02X\n", settings.enabledIDs);
+    debug("enabledIDs: %02X\n", settings.enabledIDs);
 
     Ethernet.init(17);              // WIZnet W6100-EVB-Pico
     Ethernet.begin(settings.mac);   // set mac, get IP via hdcp
@@ -77,10 +108,15 @@ void loop(void)
 {
     uint8_t header[TX_HEADER_SIZE];
 
-    debug("starting main loop\n");
+    LED_OFF;             // turn LED off when reached main loop
+    debug("CORE 0 main\n");
 
     while(1)
     {
+#ifdef LOG_LED
+        debugFromQueue();
+#endif
+
         // discover CE server, connect to CE server
         connectToHost();
 
@@ -95,6 +131,7 @@ void loop(void)
             {
                 // report FW version to host
                 case STATE_SEND_FW_VER:
+                    LED_TOGGLE;
                     sendHeaderAndDataToHost(SOCK_HDD, atnSendFwVersion, ATN_SENDFWVERSION_LEN_TX - TX_HEADER_SIZE);
                     break;
 

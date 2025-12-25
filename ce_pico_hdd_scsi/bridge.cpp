@@ -92,13 +92,13 @@ void setScsiPhase(int newPhase, bool force)
     switch(newPhase)
     {
         case MODE_RESET:
-        case MODE_SCSI_SELECTION:   bits = (1 << PIN_SEL_IO_DP_SDA) | (1 << PIN_RST_CD_REQ_SCL) | (1 << PIN_ATN_MSG); break;
-        case MODE_CMD:              bits = (1 << PIN_SEL_IO_DP_SDA) |                             (1 << PIN_ATN_MSG); break;
-        case MODE_MSG_OUT:          bits = (1 << PIN_SEL_IO_DP_SDA)                                                 ; break;
-        case MODE_DMA_READ:         bits =                            (1 << PIN_RST_CD_REQ_SCL) | (1 << PIN_ATN_MSG); break;
-        case MODE_DMA_WRITE:        bits = (1 << PIN_SEL_IO_DP_SDA) | (1 << PIN_RST_CD_REQ_SCL) | (1 << PIN_ATN_MSG); break;
-        case MODE_STATUS:           bits =                                                        (1 << PIN_ATN_MSG); break;
-        case MODE_MSG_IN:           bits =                                                                         0; break;
+        case MODE_SCSI_SELECTION:   bits = (1 << PIN_SEL_IO_DP_SDA) | (1 << PIN_RST_CD_REQ_SCL) | (1 << PIN_ATN_MSG); LED_OFF;  break;
+        case MODE_CMD:              bits = (1 << PIN_SEL_IO_DP_SDA) |                             (1 << PIN_ATN_MSG); LED_ON;   break;
+        case MODE_MSG_OUT:          bits = (1 << PIN_SEL_IO_DP_SDA)                                                 ; LED_ON;   break;
+        case MODE_DMA_READ:         bits =                            (1 << PIN_RST_CD_REQ_SCL) | (1 << PIN_ATN_MSG);           break;
+        case MODE_DMA_WRITE:        bits = (1 << PIN_SEL_IO_DP_SDA) | (1 << PIN_RST_CD_REQ_SCL) | (1 << PIN_ATN_MSG);           break;
+        case MODE_STATUS:           bits =                                                        (1 << PIN_ATN_MSG);           break;
+        case MODE_MSG_IN:           bits =                                                                         0;           break;
     }
 
     gpio_set_dir_out_masked((1 << PIN_SEL_IO_DP_SDA) | (1 << PIN_RST_CD_REQ_SCL) | (1 << PIN_ATN_MSG));     // I/O, C/D, MSG as outputs

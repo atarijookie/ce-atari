@@ -4,6 +4,9 @@
 #include <arduino.h>
 
 #define LOG_MORE    1
+#define LOG_LED     1
+// #define LOG_FT200   1
+// #define LOG_UART    1
 
 #ifndef MIN
     #define MIN(X,Y)    ((X < Y) ? X : Y)
@@ -88,5 +91,15 @@
 
 #define BIT_SET(PIN)    gpio_put(PIN, true)
 #define BIT_CLR(PIN)    gpio_put(PIN, false)
+
+#ifdef LOG_LED
+    #define LED_OFF         {}
+    #define LED_ON          {}
+    #define LED_TOGGLE      { debug(".\n"); }
+#else
+    #define LED_OFF         gpio_put(PIN_LED_EVB, 0)
+    #define LED_ON          gpio_put(PIN_LED_EVB, 1)
+    #define LED_TOGGLE      { gpio_put(PIN_LED_EVB, (gpio_get_out_level(PIN_LED_EVB) == 0) ? 1 : 0); }
+#endif
 
 #endif /* DEFS_H_ */

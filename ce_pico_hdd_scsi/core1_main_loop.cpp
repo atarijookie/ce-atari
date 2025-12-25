@@ -7,16 +7,18 @@
 #include "command_handling.h"
 #include "connection.h"
 #include "display.h"
-#include "ikbd.h"
 #include "ipc.h"
 
 extern uint8_t cmd[16];  // received command bytes
-
 uint8_t busIdle;
+
+volatile bool core1running = false;
 
 void core1_setup(void)
 {
     flash_safe_execute_core_init();     // call this for flash_safe_execute() to work
+
+    debug("CORE 1 setup\n");
 
     // config pins as inputs
     #define INPUTS_COUNT 11
@@ -52,7 +54,9 @@ void core1_main_loop(void)
 
     uint8_t state;
     state = STATE_GET_COMMAND;
-    debug("starting core1_main loop\n");
+
+    debug("CORE 1 main\n");
+    core1running = true;
 
     while(1)
     {
