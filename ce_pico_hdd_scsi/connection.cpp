@@ -22,7 +22,7 @@ uint16_t hostPortHdd;
 uint16_t hostPortFdd;
 uint16_t hostPortIkbd;
 
-bool connected;
+volatile bool connected = false;
 
 struct {
     bool sendStatusAfterRead;

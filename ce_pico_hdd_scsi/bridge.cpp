@@ -83,6 +83,10 @@ void setScsiPhase(int newPhase, bool force)
     }
     currentPhase = newPhase;
 
+    bool driveControls = (newPhase != MODE_RESET) && (newPhase != MODE_SCSI_SELECTION);
+    gpio_put(PIN_OUT_OE, driveControls ? 0 : 1);    // when we're not in selection or reset phase, drive the output control pins (device is responsing, BSY is L)
+    gpio_put(PIN_IN_OE, driveControls ? 1 : 0);     // when we're in selection or reset phase, set IN_OE to L, so we can read the SEL, RST, BSY signals
+
     // I/O, C/D, MSG must be controlled by SIO for setting the phase
     gpio_set_function(PIN_SEL_IO_DP_SDA, GPIO_FUNC_SIO);
     gpio_set_function(PIN_RST_CD_REQ_SCL, GPIO_FUNC_SIO);
@@ -91,7 +95,7 @@ void setScsiPhase(int newPhase, bool force)
     uint32_t bits = 0;
     switch(newPhase)
     {
-        case MODE_RESET:
+        // case MODE_RESET:     // same as SELECTION
         case MODE_SCSI_SELECTION:   bits = (1 << PIN_SEL_IO_DP_SDA) | (1 << PIN_RST_CD_REQ_SCL) | (1 << PIN_ATN_MSG); LED_OFF;  break;
         case MODE_CMD:              bits = (1 << PIN_SEL_IO_DP_SDA) |                             (1 << PIN_ATN_MSG); LED_ON;   break;
         case MODE_MSG_OUT:          bits = (1 << PIN_SEL_IO_DP_SDA)                                                 ; LED_ON;   break;
@@ -106,10 +110,6 @@ void setScsiPhase(int newPhase, bool force)
     gpio_put(PIN_OUT_LE1, 1);       // store I/O, C/D, MSG from D to Q
     busy_wait_at_least_cycles(10);
     gpio_put(PIN_OUT_LE1, 0);       // latch enable, that means hold the signals
-
-    bool driveControls = (newPhase != MODE_RESET) && (newPhase != MODE_SCSI_SELECTION);
-    gpio_put(PIN_OUT_OE, driveControls ? 0 : 1);    // when we're not in selection or reset phase, drive the output control pins (device is responsing, BSY is L)
-    gpio_put(PIN_IN_OE, driveControls ? 1 : 0);     // when we're in selection or reset phase, set IN_OE to L, so we can read the SEL, RST, BSY signals
 
     gpio_set_dir_out_masked((1 << PIN_SEL_IO_DP_SDA) | (1 << PIN_RST_CD_REQ_SCL));  // DP and REQ as outputs
     gpio_put_masked((1 << PIN_SEL_IO_DP_SDA) | (1 << PIN_RST_CD_REQ_SCL), (1 << PIN_SEL_IO_DP_SDA) | (1 << PIN_RST_CD_REQ_SCL));    // DP and REQ to H
@@ -143,14 +143,15 @@ void setDataDirection(uint8_t sendNotRecv, PIO pio, uint sm)
     }
 
     if(sendNotRecv == DIR_SEND) {   // outputs?
-        gpio_set_dir_out_masked(DATA_PINS_MASK);
+        gpio_set_dir_out_masked(DATA_PINS_MASK | PIN_RST_CD_REQ_SCL);
     } else {                        // inputs!
         gpio_set_dir_in_masked(DATA_PINS_MASK);
+        gpio_set_dir_out_masked(PIN_RST_CD_REQ_SCL);
     }
 
     if(pio != NULL) {
-        int dirs = (sendNotRecv == DIR_SEND) ? DATA_PINS_MASK : 0;
-        pio_sm_set_pindirs_with_mask64(pio, sm, dirs, DATA_PINS_MASK);
+        int dirs = (sendNotRecv == DIR_SEND) ? (DATA_PINS_MASK | PIN_RST_CD_REQ_SCL) : PIN_RST_CD_REQ_SCL;
+        pio_sm_set_pindirs_with_mask64(pio, sm, dirs, DATA_PINS_MASK | PIN_RST_CD_REQ_SCL);
     }
 
     int pio_data_pins[10] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_SEL_IO_DP_SDA, PIN_RST_CD_REQ_SCL};
@@ -206,7 +207,7 @@ int pioConfig(int newMode, bool force)
     switch(newMode)
     {
         // pasive modes (just watching bus)
-        case MODE_RESET:
+        // case MODE_RESET:         // same as SELECTION
         case MODE_SCSI_SELECTION:
             // SEL, RST, ATN, BSY are controlled by SIO and are inputs
             gpio_set_function(PIN_SEL_IO_DP_SDA, GPIO_FUNC_SIO);
@@ -242,6 +243,9 @@ int pioConfig(int newMode, bool force)
     if(newMode == MODE_RESET || newMode == MODE_SCSI_SELECTION) {
         return oldMode;
     }
+
+    // for other modes we need to put LE2 to H, so that the DP + REQ + ACK signals are transparently passed out of device without latch
+    gpio_put(PIN_OUT_LE2, 1);
 
     // restart state machine, clear FIFOs, enable state machine
     pio_sm_restart(whichPio, whichSm);

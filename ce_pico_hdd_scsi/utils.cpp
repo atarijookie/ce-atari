@@ -298,3 +298,52 @@ void debug(const char *fmt, ...)
 
     mutex_exit(&debugMutex);
 }
+
+static const char *gpio_func_name(uint func) {
+    switch (func) {
+        case GPIO_FUNC_XIP:   return "XIP";
+        case GPIO_FUNC_SPI:   return "SPI";
+        case GPIO_FUNC_UART:  return "UART";
+        case GPIO_FUNC_I2C:   return "I2C";
+        case GPIO_FUNC_PWM:   return "PWM";
+        case GPIO_FUNC_SIO:   return "SIO";
+        case GPIO_FUNC_PIO0:  return "PIO0";
+        case GPIO_FUNC_PIO1:  return "PIO1";
+        case GPIO_FUNC_GPCK:  return "GPCK";
+        default:              return "UNKNOWN";
+    }
+}
+
+void dump_gpio(uint gpio)
+{
+    if (gpio >= 31) {
+        debug("GPIO %u is invalid on RP2040\n", gpio);
+        return;
+    }
+
+    // CTRL register (function select, overrides)
+    uint32_t ctrl = io_bank0_hw->io[gpio].ctrl;
+
+    uint func = (ctrl >> IO_BANK0_GPIO0_CTRL_FUNCSEL_LSB) &
+                IO_BANK0_GPIO0_CTRL_FUNCSEL_BITS;
+
+    // PAD register (pullups, drive strength, etc.)
+    uint32_t pad = pads_bank0_hw->io[gpio];
+
+    // SIO state
+    bool sio_out_en = sio_hw->gpio_oe & (1u << gpio);
+    bool sio_out    = sio_hw->gpio_out & (1u << gpio);
+    bool sio_in     = sio_hw->gpio_in & (1u << gpio);
+
+    debug("GPIO %u\n", gpio);
+    debug("  Function       : %s (%u)\n", gpio_func_name(func), func);
+
+    if (func == GPIO_FUNC_SIO) {
+        debug("  SIO direction  : %s\n", sio_out_en ? "OUTPUT" : "INPUT");
+        debug("  SIO output val : %u\n", sio_out ? 1 : 0);
+        debug("  SIO input val  : %u\n", sio_in ? 1 : 0);
+    } else {
+        debug("  SIO            : not active (controlled by peripheral)\n");
+        debug("  Input level    : %u\n", sio_in ? 1 : 0);
+    }
+}

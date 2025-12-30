@@ -13,6 +13,7 @@ extern uint8_t cmd[16];  // received command bytes
 uint8_t busIdle;
 
 volatile bool core1running = false;
+extern volatile bool connected;
 
 void core1_setup(void)
 {
@@ -60,7 +61,7 @@ void core1_main_loop(void)
 
     while(1)
     {
-        if(BIT_IS_L(PIN_RST_CD_REQ_SCL)) {   // when ACSI RESET is L, enter reset mode - no PIO transfers
+        if((getAtnReset() & BIT_RESET) == BIT_RESET) {   // when SCSI RESET is L, enter reset mode - no PIO transfers
             pioConfig(MODE_RESET);
         }
 
@@ -71,13 +72,14 @@ void core1_main_loop(void)
         {
             if(isSelectionHappening())       // if 1st CMD byte was received
             {
+                debug("SEL\n");
                 state = onGetCommand();
             }
             else
             {
                 uint32_t now = millis();
 
-                if ((now - lastSendFwTime) >= 1000)
+                if ((now - lastSendFwTime) >= 1000 && connected)
                 {
                     lastSendFwTime = now;
 

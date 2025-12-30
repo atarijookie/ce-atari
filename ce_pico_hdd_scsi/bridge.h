@@ -15,14 +15,14 @@
 #define DIR_SEND 1
 
 #define MODE_UNKNOWN            0
-#define MODE_RESET              1
-#define MODE_SCSI_SELECTION     2
-#define MODE_CMD                3
-#define MODE_MSG_OUT            4
-#define MODE_DMA_READ           5
-#define MODE_DMA_WRITE          6
-#define MODE_STATUS             7
-#define MODE_MSG_IN             8
+#define MODE_RESET              1       // same as SELECTION
+#define MODE_SCSI_SELECTION     1       // same as RESET
+#define MODE_CMD                2
+#define MODE_MSG_OUT            3
+#define MODE_DMA_READ           4
+#define MODE_DMA_WRITE          5
+#define MODE_STATUS             6
+#define MODE_MSG_IN             7
 
 #define BIT_ATN     1
 #define BIT_RESET   2

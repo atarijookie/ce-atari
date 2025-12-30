@@ -41,4 +41,6 @@ void debug(const char *fmt, ...);
 void debugFromQueue(void);
 #endif
 
+void dump_gpio(uint gpio);
+
 #endif

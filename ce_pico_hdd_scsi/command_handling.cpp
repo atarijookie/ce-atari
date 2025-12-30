@@ -81,7 +81,7 @@ uint8_t onGetCommandScsi(void)
     {
         if ((sel & (1 << i)) != 0)      // this bit is set?
         { // if bit is one, this ID is selected
-            if (idIsEnabled(id))
+            if (idIsEnabled(i))
             {           // if that ID is enabled
                 id = i; // store this ID and quit loop
                 break;
@@ -91,14 +91,19 @@ uint8_t onGetCommandScsi(void)
 
     if (id == 0xff || !idIsEnabled(id))     // id not found or id not enabled? quit
     {
+        debug("FAIL id: %d\n", id);
+        while(BIT_IS_L(PIN_SEL_IO_DP_SDA) && !hasTimedOut);     // while still selection ongoing and no timeout, wait
         return 0;
     }
 
-    doMsgOutIfAtnSet();     // do MSG_OUT if ATN set before cmd transfer
+    // TODO: possibly re-enable
+    // doMsgOutIfAtnSet();     // do MSG_OUT if ATN set before cmd transfer
 
     cmdLen = 6; // maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
 
     pioConfig(MODE_CMD);
+
+    dump_gpio(PIN_RST_CD_REQ_SCL);  // TODO: remove
 
     for (i = 0; i < cmdLen; i++)
     {                         // receive the next command bytes
@@ -106,6 +111,7 @@ uint8_t onGetCommandScsi(void)
 
         if (brStat != E_OK)
         { // if something was wrong, quit, failed
+            debug("FAIL cmd i: %d\n", i);
             resetBridge();
             return 0;
         }
