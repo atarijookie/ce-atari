@@ -22,12 +22,13 @@ void core1_setup(void)
     debug("CORE 1 setup\n");
 
     // config pins as inputs
-    #define INPUTS_COUNT 11
-    int inputs[INPUTS_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_SEL_IO_DP_SDA, PIN_RST_CD_REQ_SCL, PIN_ACK};
+    #define INPUTS_COUNT 12
+    int inputs[INPUTS_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_SEL_IO_DP_SDA, PIN_RST_CD_REQ_SCL, PIN_ACK, PIN_BSY};
 
     for (int i = 0; i < INPUTS_COUNT; i++)
     {
         pinMode(inputs[i], INPUT);
+        gpio_set_drive_strength(inputs[i], GPIO_DRIVE_STRENGTH_12MA);
     }
 
     // config pins as outputs
@@ -40,6 +41,7 @@ void core1_setup(void)
         gpio_set_function(outputs[i], GPIO_FUNC_SIO);
         gpio_set_dir(outputs[i], GPIO_OUT);
         gpio_put(outputs[i], levels[i]);
+        gpio_set_drive_strength(inputs[i], GPIO_DRIVE_STRENGTH_12MA);
     }
 
     pioConfigAll();     // configure all PIO state machines
@@ -87,6 +89,9 @@ void core1_main_loop(void)
                     if(bfr) {
                         ipcSetBufferAndPutToFifo(bfr, 0, STATE_SEND_FW_VER, 0, NULL, 0);
                     }
+
+                    // TODO: remove
+                    // onGetCommandScsi();
                 }
             }
         }

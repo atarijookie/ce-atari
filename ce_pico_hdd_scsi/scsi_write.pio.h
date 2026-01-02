@@ -13,29 +13,30 @@
 // ---------- //
 
 #define scsi_write_wrap_target 0
-#define scsi_write_wrap 6
+#define scsi_write_wrap 7
 #define scsi_write_pio_version 0
 
 static const uint16_t scsi_write_program_instructions[] = {
             //     .wrap_target
     0x90a0, //  0: pull   block           side 1
     0xb027, //  1: mov    x, osr          side 1
-    0x00c2, //  2: jmp    pin, 2          side 0
+    0x200a, //  2: wait   0 gpio, 10      side 0
     0xa242, //  3: nop                    side 0 [2]
     0x4508, //  4: in     pins, 8         side 0 [5]
-    0x9020, //  5: push   block           side 1
-    0x1042, //  6: jmp    x--, 2          side 1
+    0x308a, //  5: wait   1 gpio, 10      side 1
+    0x9020, //  6: push   block           side 1
+    0x1042, //  7: jmp    x--, 2          side 1
             //     .wrap
 };
 
 #if !PICO_NO_HARDWARE
 static const struct pio_program scsi_write_program = {
     .instructions = scsi_write_program_instructions,
-    .length = 7,
+    .length = 8,
     .origin = -1,
     .pio_version = scsi_write_pio_version,
 #if PICO_PIO_VERSION > 0
-    .used_gpio_ranges = 0x0
+    .used_gpio_ranges = 0x1
 #endif
 };
 

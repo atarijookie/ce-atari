@@ -77,6 +77,8 @@ uint8_t onGetCommandScsi(void)
     uint8_t sel = getSelectionByte(); // get SELection byte
     uint8_t id = 0xff;              // mark that ID hasn't been found yet
 
+    debug("sel: %02x\n", sel);
+
     for (i = 0; i < 8; i++)
     {
         if ((sel & (1 << i)) != 0)      // this bit is set?
@@ -103,7 +105,9 @@ uint8_t onGetCommandScsi(void)
 
     pioConfig(MODE_CMD);
 
-    dump_gpio(PIN_RST_CD_REQ_SCL);  // TODO: remove
+    // dump_gpio(PIN_RST_CD_REQ_SCL);  // TODO: remove
+    // dump_gpio(PIN_OUT_OE);  // TODO: remove
+    // dump_gpio(PIN_OUT_LE2);  // TODO: remove
 
     for (i = 0; i < cmdLen; i++)
     {                         // receive the next command bytes
@@ -122,6 +126,8 @@ uint8_t onGetCommandScsi(void)
         }
     }
 
+    debug("cmd: %02x %02x %02x %02x %02x %02x\n", cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5]);
+
     // now fix the command if the length is more than 6 bytes
     if (cmdLen > 6)
     {
@@ -137,15 +143,18 @@ uint8_t onGetCommandScsi(void)
     // for all commands add fake ACSI ID on top of the 0th byte
     cmd[0] = cmd[0] | (id << 5); // add ID on the top 3 bits
 
-    doMsgOutIfAtnSet();     // do MSG_OUT if ATN set after cmd transfer
+    // doMsgOutIfAtnSet();     // do MSG_OUT if ATN set after cmd transfer
 
     return 1;
 }
 
+extern int readInProgressCount;
+
 bool onDataRead(uint32_t cnt, uint8_t* bfr)
 {
 #ifdef LOG_MORE
-    // debug("onDataRead withStatus: %d, dataCnt: %d\n", withStatus, cnt);
+    debug("onDataRead dataCnt: %d\n", cnt);
+    debug("onDataRead START readInProgressCount: %d\n", readInProgressCount);
 #endif
 
     pioConfig(MODE_DMA_READ);

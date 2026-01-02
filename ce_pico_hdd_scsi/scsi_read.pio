@@ -3,13 +3,15 @@
 .side_set 1         // the number of side-set bits to be used
 
 start:
-        pull            side 1          ; load from the TX FIFO into the OSR
-        out pins, 9     side 1          ; write 9 bits from OSR to gpio
+        pull                side 1          ; load from the TX FIFO into the OSR
+        out pins, 9         side 1          ; write 9 bits from OSR to gpio
+        out null, 23        side 1          ; drain remaning bits - is this needed?
 
-        wait 0 pin 0    side 0          ; side set REQ to L, then wait for ACK pin to become L
-        nop             side 0  [8]     ; keep REQ in L, delay 200 ns to make this reasonably slow
+        wait 0 gpio 10      side 0          ; set REQ to L, wait until ACK is L
+        nop                 side 0  [8]     ; keep REQ in L, delay 200 ns to make this reasonably slow
+        wait 1 gpio 10      side 1          ; set REQ to H, wait until ACK is H
 
-        push            side 1          ; put REQ back to H, push the contents of the ISR into the RX FIFO. We don't care about the value, it's just a flag that the transfer has finished
+        push                side 1          ; put REQ back to H, push the contents of the ISR into the RX FIFO. We don't care about the value, it's just a flag that the transfer has finished
 
 
 % c-sdk {

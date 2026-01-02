@@ -29,9 +29,14 @@ bool isI2CdeviceConnected(uint8_t address)
 
 void displayInit(void)
 {
+    // TODO: remove later
+    displayPresent = false;
+    return;
+
     debug("displayInit\n");
 
-    i2c1init();
+    // TODO: re-enable, but causes issues on REQ signal on 0th cmd byte!
+    // i2c1init();
 
     displayPresent = isI2CdeviceConnected(DISPLAY_I2C_ADDRESS);
 

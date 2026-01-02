@@ -6,12 +6,12 @@ start:
         pull                side 1          ; load from the TX FIFO into the OSR
         mov x, osr          side 1          ; X = OSR
 
-wait4L: jmp pin wait4L      side 0          ; set REQ to L, keep waiting here until ACK is L
+wait4L: wait 0 gpio 10      side 0          ; set REQ to L, wait until ACK is L
         nop                 side 0  [2]     ; delay reading data by 60 ns
         in pins, 8          side 0  [5]     ; read 8 bits from gpio into ISR, with additional delay total up to 200 ns of REQ being L
+        wait 1 gpio 10      side 1          ; REQ to H, wait until ACK is H
 
-wr_end: push                side 1          ; put REQ back to H, push the contents of the ISR into the RX FIFO. Intentionally late in the routine to signal transfer end
-
+        push                side 1          ; put REQ back to H, push the contents of the ISR into the RX FIFO. Intentionally late in the routine to signal transfer end
         jmp x-- wait4L      side 1          ; If X is not zero, decrement and jump to get one more byte. X must be loaded to value N-1, if you want to load N bytes.
 
 
