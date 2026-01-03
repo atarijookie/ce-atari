@@ -74,7 +74,6 @@ void core1_main_loop(void)
         {
             if(isSelectionHappening())       // if 1st CMD byte was received
             {
-                debug("SEL\n");
                 state = onGetCommand();
             }
             else

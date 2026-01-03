@@ -5,7 +5,6 @@
 start:
         pull                side 1          ; load from the TX FIFO into the OSR
         out pins, 9         side 1          ; write 9 bits from OSR to gpio
-        out null, 23        side 1          ; drain remaning bits - is this needed?
 
         wait 0 gpio 10      side 0          ; set REQ to L, wait until ACK is L
         nop                 side 0  [8]     ; keep REQ in L, delay 200 ns to make this reasonably slow
@@ -18,7 +17,7 @@ start:
 #include "hardware/clocks.h"
 #include "hardware/gpio.h"
 
-static inline void scsi_read_program_init(PIO pio, uint sm, uint offset, uint inPin, uint sideSetPin)
+static inline void scsi_read_program_init(PIO pio, uint sm, uint offset)
 {
     #define PIO_READ_COUNT 11
     int pio_pins[PIO_READ_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_SEL_IO_DP_SDA, PIN_RST_CD_REQ_SCL, PIN_ACK};
@@ -30,9 +29,8 @@ static inline void scsi_read_program_init(PIO pio, uint sm, uint offset, uint in
     }
 
     pio_sm_config cRead = scsi_read_program_get_default_config(offset);
-    sm_config_set_out_pins(&cRead, PIN_D0, 9);          // for OUT
-    sm_config_set_in_pins(&cRead, inPin);               // for WAIT, IN
-    sm_config_set_sideset_pins(&cRead, sideSetPin);     // for SIDE_SET
+    sm_config_set_out_pins(&cRead, PIN_D0, 9);              // for OUT
+    sm_config_set_sideset_pins(&cRead, PIN_RST_CD_REQ_SCL); // for SIDE_SET
     sm_config_set_out_shift(&cRead, true, false, 32);   // Shift to right, autopush disabled
     sm_config_set_fifo_join(&cRead, PIO_FIFO_JOIN_NONE);  // no fifo joining
 

@@ -77,8 +77,6 @@ uint8_t onGetCommandScsi(void)
     uint8_t sel = getSelectionByte(); // get SELection byte
     uint8_t id = 0xff;              // mark that ID hasn't been found yet
 
-    debug("sel: %02x\n", sel);
-
     for (i = 0; i < 8; i++)
     {
         if ((sel & (1 << i)) != 0)      // this bit is set?
@@ -93,7 +91,6 @@ uint8_t onGetCommandScsi(void)
 
     if (id == 0xff || !idIsEnabled(id))     // id not found or id not enabled? quit
     {
-        debug("FAIL id: %d\n", id);
         while(BIT_IS_L(PIN_SEL_IO_DP_SDA) && !hasTimedOut);     // while still selection ongoing and no timeout, wait
         return 0;
     }
@@ -126,8 +123,6 @@ uint8_t onGetCommandScsi(void)
         }
     }
 
-    debug("cmd: %02x %02x %02x %02x %02x %02x\n", cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5]);
-
     // now fix the command if the length is more than 6 bytes
     if (cmdLen > 6)
     {
@@ -153,8 +148,8 @@ extern int readInProgressCount;
 bool onDataRead(uint32_t cnt, uint8_t* bfr)
 {
 #ifdef LOG_MORE
-    debug("onDataRead dataCnt: %d\n", cnt);
-    debug("onDataRead START readInProgressCount: %d\n", readInProgressCount);
+    // debug("onDataRead dataCnt: %d\n", cnt);
+    // debug("onDataRead START readInProgressCount: %d\n", readInProgressCount);
 #endif
 
     pioConfig(MODE_DMA_READ);

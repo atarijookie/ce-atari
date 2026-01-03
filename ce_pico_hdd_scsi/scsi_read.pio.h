@@ -13,25 +13,24 @@
 // --------- //
 
 #define scsi_read_wrap_target 0
-#define scsi_read_wrap 6
+#define scsi_read_wrap 5
 #define scsi_read_pio_version 0
 
 static const uint16_t scsi_read_program_instructions[] = {
             //     .wrap_target
     0x90a0, //  0: pull   block           side 1
     0x7009, //  1: out    pins, 9         side 1
-    0x7077, //  2: out    null, 23        side 1
-    0x200a, //  3: wait   0 gpio, 10      side 0
-    0xa842, //  4: nop                    side 0 [8]
-    0x308a, //  5: wait   1 gpio, 10      side 1
-    0x9020, //  6: push   block           side 1
+    0x200a, //  2: wait   0 gpio, 10      side 0
+    0xa842, //  3: nop                    side 0 [8]
+    0x308a, //  4: wait   1 gpio, 10      side 1
+    0x9020, //  5: push   block           side 1
             //     .wrap
 };
 
 #if !PICO_NO_HARDWARE
 static const struct pio_program scsi_read_program = {
     .instructions = scsi_read_program_instructions,
-    .length = 7,
+    .length = 6,
     .origin = -1,
     .pio_version = scsi_read_pio_version,
 #if PICO_PIO_VERSION > 0
@@ -48,7 +47,7 @@ static inline pio_sm_config scsi_read_program_get_default_config(uint offset) {
 
 #include "hardware/clocks.h"
 #include "hardware/gpio.h"
-static inline void scsi_read_program_init(PIO pio, uint sm, uint offset, uint inPin, uint sideSetPin)
+static inline void scsi_read_program_init(PIO pio, uint sm, uint offset)
 {
     #define PIO_READ_COUNT 11
     int pio_pins[PIO_READ_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_SEL_IO_DP_SDA, PIN_RST_CD_REQ_SCL, PIN_ACK};
@@ -58,9 +57,8 @@ static inline void scsi_read_program_init(PIO pio, uint sm, uint offset, uint in
         pio_sm_set_consecutive_pindirs(pio, sm, pio_pins[i], 1, pio_dirs[i]);
     }
     pio_sm_config cRead = scsi_read_program_get_default_config(offset);
-    sm_config_set_out_pins(&cRead, PIN_D0, 9);          // for OUT
-    sm_config_set_in_pins(&cRead, inPin);               // for WAIT, IN
-    sm_config_set_sideset_pins(&cRead, sideSetPin);     // for SIDE_SET
+    sm_config_set_out_pins(&cRead, PIN_D0, 9);              // for OUT
+    sm_config_set_sideset_pins(&cRead, PIN_RST_CD_REQ_SCL); // for SIDE_SET
     sm_config_set_out_shift(&cRead, true, false, 32);   // Shift to right, autopush disabled
     sm_config_set_fifo_join(&cRead, PIO_FIFO_JOIN_NONE);  // no fifo joining
     float div = (float)clock_get_hz(clk_sys) / 50000000;    // calc divider for 50 MHz, that's 20 ns per instruction

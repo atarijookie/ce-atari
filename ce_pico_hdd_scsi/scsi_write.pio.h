@@ -50,7 +50,7 @@ static inline pio_sm_config scsi_write_program_get_default_config(uint offset) {
 #include "hardware/clocks.h"
 #include "hardware/gpio.h"
 // to read N bytes, you must put N-1 into TX FIFO (one less)
-static inline void scsi_write_program_init(PIO pio, uint sm, uint offset, uint jumpPin, uint sideSetPin)
+static inline void scsi_write_program_init(PIO pio, uint sm, uint offset)
 {
     #define PIO_WRITE_COUNT 10
     int pio_pins[PIO_WRITE_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_RST_CD_REQ_SCL, PIN_ACK};
@@ -60,9 +60,8 @@ static inline void scsi_write_program_init(PIO pio, uint sm, uint offset, uint j
         pio_sm_set_consecutive_pindirs(pio, sm, pio_pins[i], 1, pio_dirs[i]);
     }
     pio_sm_config cWrite = scsi_write_program_get_default_config(offset);
-    sm_config_set_in_pins(&cWrite, PIN_D0);             // for WAIT, IN
-    sm_config_set_sideset_pins(&cWrite, sideSetPin);    // for SIDE_SET
-    sm_config_set_jmp_pin(&cWrite, jumpPin);            // for JMP
+    sm_config_set_in_pins(&cWrite, PIN_D0);                     // for WAIT, IN
+    sm_config_set_sideset_pins(&cWrite, PIN_RST_CD_REQ_SCL);    // for SIDE_SET
     sm_config_set_in_shift(&cWrite, true, false, 32);   // Shift to right, autopush disabled
     sm_config_set_fifo_join(&cWrite, PIO_FIFO_JOIN_NONE);   // no fifo joining, we need both fifos
     float div = (float)clock_get_hz(clk_sys) / 50000000;    // calc divider for 50 MHz, that's 20 ns per instruction

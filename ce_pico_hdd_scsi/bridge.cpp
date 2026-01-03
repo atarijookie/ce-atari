@@ -202,13 +202,13 @@ void pioConfigAll(void)
     bool success;
     uint offset;
 
-    success = pio_claim_free_sm_and_add_program_for_gpio_range(&scsi_write_program, &pioScsiWrite, &smScsiWrite, &offset, PIN_D0, 26, true);
+    success = pio_claim_free_sm_and_add_program_for_gpio_range(&scsi_write_program, &pioScsiWrite, &smScsiWrite, &offset, PIN_D0, 11, true);
     if(!success) { debug("Failed to claim PIO SM 1\n"); while(1); }
-    scsi_write_program_init(pioScsiWrite, smScsiWrite, offset, PIN_ACK, PIN_RST_CD_REQ_SCL);
+    scsi_write_program_init(pioScsiWrite, smScsiWrite, offset);
 
-    success = pio_claim_free_sm_and_add_program_for_gpio_range(&scsi_read_program, &pioScsiRead, &smScsiRead, &offset, PIN_D0, 26, true);
+    success = pio_claim_free_sm_and_add_program_for_gpio_range(&scsi_read_program, &pioScsiRead, &smScsiRead, &offset, PIN_D0, 11, true);
     if(!success) { debug("Failed to claim PIO SM 2\n"); while(1); }
-    scsi_write_program_init(pioScsiRead, smScsiRead, offset, PIN_ACK, PIN_RST_CD_REQ_SCL);
+    scsi_read_program_init(pioScsiRead, smScsiRead, offset);
 
     prefillBytesWithParityTable();
 }
@@ -331,6 +331,10 @@ void statusAndMsgRead(uint8_t scsiStatusByte)
     {
         pioConfig(MODE_STATUS);
         PIO_read(scsiStatusByte);
+
+        if(brStat == E_TimeOut) {
+            debug("TO on STATUS\n");
+        }
     }
 
     // if we didn't have bridge timeout, we can try to send MSG IN
@@ -338,11 +342,10 @@ void statusAndMsgRead(uint8_t scsiStatusByte)
     {
         pioConfig(MODE_MSG_IN);
         PIO_read(0);
-    }
 
-    if (brStat != E_OK)
-    { // if some timeout occured, then failed
-
+        if(brStat == E_TimeOut) {
+            debug("TO on MSG_IN\n");
+        }
     }
 
     resetBridge();               // put BSY, C/D, I/O in released states
@@ -350,8 +353,8 @@ void statusAndMsgRead(uint8_t scsiStatusByte)
 
 void PIO_read(uint8_t val)
 {
-    uint16_t valPar = byteWithParity[val];
-    pio_sm_put(pioScsiRead, smScsiRead, valPar);     // write status byte to TX FIFO, the transfer will start
+    uint32_t valPar = byteWithParity[val];
+    pio_sm_put_blocking(pioScsiRead, smScsiRead, valPar);     // write status byte to TX FIFO, the transfer will start
 
     // wait for data to be transfered
     while(1)
@@ -387,7 +390,7 @@ void DMA_read_waitForEnd(void)
         }
 
         if(hasTimedOut) {       // on timeout
-            debug("DMA_read_waitForEnd T/O readInProgressCount: %d\n", readInProgressCount);
+            debug("DMA_read_waitForEnd T/O - %d\n", readInProgressCount);
             brStat = E_TimeOut; // set the bridge status
             return;
         }
@@ -396,7 +399,7 @@ void DMA_read_waitForEnd(void)
 
 void DMA_read(uint8_t val)
 {
-    uint16_t valPar = byteWithParity[val];
+    uint32_t valPar = byteWithParity[val];
 
     // wait for TX fifo not full, so we can put the current value in
     while(1) {
@@ -409,13 +412,13 @@ void DMA_read(uint8_t val)
         // READ TX FIFO not full, we can push to fifo
         if(!pio_sm_is_tx_fifo_full(pioScsiRead, smScsiRead)) {
            // put current byte in TX FIFO, increment readInProgressCount
-           pio_sm_put(pioScsiRead, smScsiRead, valPar);
+           pio_sm_put_blocking(pioScsiRead, smScsiRead, valPar);
            readInProgressCount++;
            return;
         }
 
         if(hasTimedOut) {       // on timeout
-            debug("DMA_read T/O readInProgressCount: %d\n", readInProgressCount);
+            debug("DMA_read T/O - %d\n", readInProgressCount);
             brStat = E_TimeOut; // set the bridge status
             return;
         }
