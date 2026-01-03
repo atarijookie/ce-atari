@@ -63,9 +63,10 @@ void core1_main_loop(void)
 
     while(1)
     {
-        if((getAtnReset() & BIT_RESET) == BIT_RESET) {   // when SCSI RESET is L, enter reset mode - no PIO transfers
-            pioConfig(MODE_RESET);
-        }
+        // TODO: re-enable, seems to mess up sending status after data
+        // if((getAtnReset() & BIT_RESET) == BIT_RESET) {   // when SCSI RESET is L, enter reset mode - no PIO transfers
+        //     pioConfig(MODE_RESET);
+        // }
 
         // get the command from ACSI and send it to host
         // IN  STATE: STATE_GET_COMMAND

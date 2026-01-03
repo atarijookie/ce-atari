@@ -74,6 +74,7 @@ int getAtnReset(void)
     return res;
 }
 
+// for reset / selection phases
 void setScsiPhaseForSelection(void)
 {
     // don't drive control signals
@@ -91,10 +92,11 @@ void setScsiPhaseForSelection(void)
     gpio_put(PIN_IN_OE, 0);
 }
 
+// for most of the phases (except reset / selection)
 void setScsiPhaseForTransfer(int newPhase)
 {
-    // for most of the phases (except reset / selection)
     gpio_put(PIN_IN_OE, 1);     // disable input chip
+    gpio_put(PIN_OUT_LE2, 0);   // put LE2 to L, so changing shared phase / handshake pins doesn't put out false req out
 
     // I/O, C/D, MSG controlled by SIO to set these phase controls
     gpio_set_function(PIN_SEL_IO_DP_SDA, GPIO_FUNC_SIO);
@@ -155,16 +157,6 @@ void setScsiPhase(int newPhase, bool force)
 
 void setDataDirection(uint8_t sendNotRecv, PIO pio, uint sm)
 {
-    static uint8_t sendNotRecvNow = 0xff; // init with no data direction set yet
-    static PIO pioNow = nullptr;
-
-    if (sendNotRecvNow == sendNotRecv && pioNow == pio) { // direction not changed since last time? quit
-        return;
-    }
-
-    sendNotRecvNow = sendNotRecv; // remember what we're just setting
-    pioNow = pio;
-
     // if output from mcu, set OUT_OE to L before switching mcu pins directions
     if (sendNotRecv == DIR_SEND) {
         BIT_SET(PIN_DATA_DIR);
