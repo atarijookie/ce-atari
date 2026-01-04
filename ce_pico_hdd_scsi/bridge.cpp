@@ -287,9 +287,24 @@ uint8_t getSelectionByte(void)
     uint8_t val;
 
     timeoutStart();             // start the timeout timer
-
     brStat = E_OK;              // init bridge status to E_OK
-    return ((uint8_t) ~(gpio_get_all()));
+
+    while(BIT_IS_L(PIN_SEL_IO_DP_SDA) && !hasTimedOut)          // while SEL pin is asserted and it's not timeout yet
+    {
+        uint8_t selectedIds = ((uint8_t) ~(gpio_get_all()));    // get all data bits
+
+        for (int i = 0; i < 8; i++)
+        {
+            int bit = (1 << i);
+
+            if ((selectedIds & bit) && (settings.enabledIDs & bit))    // if the bit #i set and is this ID enabled?
+            {
+                return i;   // return this ID
+            }
+        }
+    }
+
+    return 0xff;            // this device was not selected
 }
 
 // get next CMD byte from ST -- with setting INT to LOW and waiting for CS

@@ -72,33 +72,15 @@ void doMsgOutIfAtnSet(void)
 
 uint8_t onGetCommandScsi(void)
 {
-    int i;
+    uint8_t id = getSelectionByte(); // check if one of the IDs of this device is selected
 
-    uint8_t sel = getSelectionByte(); // get SELection byte
-    uint8_t id = 0xff;              // mark that ID hasn't been found yet
-
-    for (i = 0; i < 8; i++)
+    if (id == 0xff)     // this device was not selected?
     {
-        if ((sel & (1 << i)) != 0)      // this bit is set?
-        { // if bit is one, this ID is selected
-            if (idIsEnabled(i))
-            {           // if that ID is enabled
-                id = i; // store this ID and quit loop
-                break;
-            }
-        }
-    }
-
-    if (id == 0xff || !idIsEnabled(id))     // id not found or id not enabled? quit
-    {
-        while(BIT_IS_L(PIN_SEL_IO_DP_SDA) && !hasTimedOut);     // while still selection ongoing and no timeout, wait
         return 0;
     }
 
     // TODO: possibly re-enable
     // doMsgOutIfAtnSet();     // do MSG_OUT if ATN set before cmd transfer
-
-    cmdLen = 6; // maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
 
     pioConfig(MODE_CMD);
 
@@ -106,7 +88,9 @@ uint8_t onGetCommandScsi(void)
     // dump_gpio(PIN_OUT_OE);  // TODO: remove
     // dump_gpio(PIN_OUT_LE2);  // TODO: remove
 
-    for (i = 0; i < cmdLen; i++)
+    cmdLen = 6; // maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
+
+    for (int i = 0; i < cmdLen; i++)
     {                         // receive the next command bytes
         cmd[i] = PIO_write(); // drop down IRQ, get byte
 
@@ -126,7 +110,7 @@ uint8_t onGetCommandScsi(void)
     // now fix the command if the length is more than 6 bytes
     if (cmdLen > 6)
     {
-        for (i = 13; i > 0; i--)
+        for (int i = 13; i > 0; i--)
         { // move the cmd one byte further (to make cmd[0] unused)
             cmd[i] = cmd[i - 1];
         }
@@ -255,12 +239,3 @@ void getCmdLengthFromCmdBytesScsi(uint8_t cmd)
     }
 }
 
-uint8_t idIsEnabled(uint8_t id)
-{
-    if (id > 7)
-    {
-        return false;
-    }
-
-    return (settings.enabledIDs & (1 << id));
-}
