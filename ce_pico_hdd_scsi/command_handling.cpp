@@ -55,7 +55,7 @@ void doMsgOutIfAtnSet(void)
 {
     while(1)
     {
-        int atnReset = getAtnReset();
+        int atnReset = isAtnAsserted();
 
         if((atnReset & BIT_ATN) != BIT_ATN) {   // ATN not set? quit
             return;
@@ -79,14 +79,9 @@ uint8_t onGetCommandScsi(void)
         return 0;
     }
 
-    // TODO: possibly re-enable
-    // doMsgOutIfAtnSet();     // do MSG_OUT if ATN set before cmd transfer
+    doMsgOutIfAtnSet();     // do MSG_OUT if ATN set before cmd transfer
 
     pioConfig(MODE_CMD);
-
-    // dump_gpio(PIN_RST_CD_REQ_SCL);  // TODO: remove
-    // dump_gpio(PIN_OUT_OE);  // TODO: remove
-    // dump_gpio(PIN_OUT_LE2);  // TODO: remove
 
     cmdLen = 6; // maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
 
@@ -122,7 +117,7 @@ uint8_t onGetCommandScsi(void)
     // for all commands add fake ACSI ID on top of the 0th byte
     cmd[0] = cmd[0] | (id << 5); // add ID on the top 3 bits
 
-    // doMsgOutIfAtnSet();     // do MSG_OUT if ATN set after cmd transfer
+    doMsgOutIfAtnSet();     // do MSG_OUT if ATN set after cmd transfer
 
     return 1;
 }

@@ -10,8 +10,6 @@ start:
         nop                 side 0  [8]     ; keep REQ in L, delay 200 ns to make this reasonably slow
         wait 1 gpio 10      side 1          ; set REQ to H, wait until ACK is H
 
-        push                side 1          ; put REQ back to H, push the contents of the ISR into the RX FIFO. We don't care about the value, it's just a flag that the transfer has finished
-
 
 % c-sdk {
 #include "hardware/clocks.h"

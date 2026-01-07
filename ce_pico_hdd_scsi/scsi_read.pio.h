@@ -13,7 +13,7 @@
 // --------- //
 
 #define scsi_read_wrap_target 0
-#define scsi_read_wrap 5
+#define scsi_read_wrap 4
 #define scsi_read_pio_version 0
 
 static const uint16_t scsi_read_program_instructions[] = {
@@ -23,14 +23,13 @@ static const uint16_t scsi_read_program_instructions[] = {
     0x200a, //  2: wait   0 gpio, 10      side 0
     0xa842, //  3: nop                    side 0 [8]
     0x308a, //  4: wait   1 gpio, 10      side 1
-    0x9020, //  5: push   block           side 1
             //     .wrap
 };
 
 #if !PICO_NO_HARDWARE
 static const struct pio_program scsi_read_program = {
     .instructions = scsi_read_program_instructions,
-    .length = 6,
+    .length = 5,
     .origin = -1,
     .pio_version = scsi_read_pio_version,
 #if PICO_PIO_VERSION > 0

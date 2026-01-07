@@ -80,10 +80,15 @@
 #define PIN_OUT_LE1         13      // out
 #define PIN_OUT_LE2         14      // out
 #define PIN_ATN_MSG         26
-#define PIN_BSY             27
 #define PIN_DATA_DIR        28      // out
 
+#define PIN_KEYB_RX         15
+#define PIN_KEYB_TX         22
+#define PIN_KEYB_TX_ORIG    27
+
 #define PIN_LED_EVB         25
+
+#define HANDSHAKE_PINS_MASK     ((1 << PIN_RST_CD_REQ_SCL) | (1 << PIN_ACK))
 
 #define BIT_IS_H(PIN)   (gpio_get(PIN) != 0)
 #define BIT_IS_L(PIN)   (gpio_get(PIN) == 0)

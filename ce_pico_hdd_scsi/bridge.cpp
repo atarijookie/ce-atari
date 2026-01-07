@@ -11,8 +11,6 @@ extern uint8_t busIdle;
 static PIO pioScsiWrite, pioScsiRead;
 static uint smScsiWrite, smScsiRead;
 
-int readInProgressCount = 0;
-
 uint16_t byteWithParity[256];
 
 // prefill the table with bytes inverted, extended with parity
@@ -30,46 +28,22 @@ void prefillBytesWithParityTable(void)
     }
 }
 
-int getAtnReset(void)
+bool isAtnAsserted(void)
 {
-    // get pin directions
-    int dirAtn = gpio_get_dir(PIN_ATN_MSG);
-    int dirRst = gpio_get_dir(PIN_RST_CD_REQ_SCL);
+    int lvlOutLe2 = gpio_get_out_level(PIN_OUT_LE2);    // get the current output level of PIN_OUT_LE2
+    gpio_put(PIN_OUT_LE2, 0);                           // put LE2 to L, so changing shared phase / handshake pins doesn't put out false req out
 
-    // get the current output level of PIN_IN_OE
-    int lvlInOe = gpio_get_out_level(PIN_IN_OE);
+    int dirAtn = gpio_get_dir(PIN_ATN_MSG);             // get pin direction
+    gpio_set_dir(PIN_ATN_MSG, GPIO_IN);                 // set as input (so it won't drive the pin to some last level, but read actual ATN instead)
 
-    // get gpio function, set to SIO
-    gpio_function_t funcRst = gpio_get_function(PIN_RST_CD_REQ_SCL);
-    gpio_set_function(PIN_RST_CD_REQ_SCL, GPIO_FUNC_SIO);
+    int lvlInOe = gpio_get_out_level(PIN_IN_OE);        // get the current output level of PIN_IN_OE
+    gpio_put(PIN_IN_OE, 0);                             // enable input chip
 
-    // set as inputs
-    gpio_set_dir(PIN_ATN_MSG, 0);
-    gpio_set_dir(PIN_RST_CD_REQ_SCL, 0);
+    bool res = BIT_IS_L(PIN_ATN_MSG);                   // see if ATN is L
 
-    // enable input chip
-    gpio_put(PIN_IN_OE, 1);
-
-    // read pins, set bits in result
-    int res = 0;
-
-    if(BIT_IS_L(PIN_ATN_MSG)) {
-        res |= BIT_ATN;
-    }
-
-    if(BIT_IS_L(PIN_RST_CD_REQ_SCL)) {
-        res |= BIT_RESET;
-    }
-
-    // restore gpio function
-    gpio_set_function(PIN_RST_CD_REQ_SCL, funcRst);
-
-    // restore directions
-    gpio_set_dir(PIN_ATN_MSG, dirAtn);
-    gpio_set_dir(PIN_RST_CD_REQ_SCL, dirRst);
-
-    // restore previous output level of PIN_IN_OE
-    gpio_put(PIN_IN_OE, lvlInOe);
+    gpio_put(PIN_IN_OE, lvlInOe);                       // restore previous output level of PIN_IN_OE
+    gpio_set_dir(PIN_ATN_MSG, dirAtn);                  // restore directions
+    gpio_put(PIN_OUT_LE2, lvlOutLe2);                   // restore previous output level of PIN_OUT_LE2
 
     return res;
 }
@@ -243,7 +217,7 @@ int pioConfig(int newMode, bool force)
         case MODE_DMA_READ:
         case MODE_STATUS:
         case MODE_MSG_IN:
-            readInProgressCount = 0;        // no read bytes in progress
+            // readInProgressCount = 0;        // no read bytes in progress
 
             whichPio = pioScsiRead;
             whichSm = smScsiRead;
@@ -371,10 +345,13 @@ void PIO_read(uint8_t val)
             return;
         }
 
-        // on rx fifo has data, this means that transfer has finished with success
-        if(!pio_sm_is_rx_fifo_empty(pioScsiRead, smScsiRead)) {
-            uint32_t tmp = pio_sm_get(pioScsiRead, smScsiRead);
-            break;
+        // nothing in TX fifo? pins idle? we're done
+        if(pio_sm_is_tx_fifo_empty(pioScsiRead, smScsiRead)) {
+            uint32_t allPins = gpio_get_all();
+
+            if((allPins & HANDSHAKE_PINS_MASK) == HANDSHAKE_PINS_MASK) {    // both handshake pins are H?
+                break;
+            }
         }
     }
 
@@ -385,19 +362,17 @@ void DMA_read_waitForEnd(void)
 {
     // wait while read is still in progress (from FIFO to Atari)
     while(1) {
-        if(readInProgressCount <= 0) {  // nothing in progress? this the normal end
-            readInProgressCount = 0;
-            return;
-        }
+        // nothing in TX fifo and handshake pins are idle? we're done
+        if(pio_sm_is_tx_fifo_empty(pioScsiRead, smScsiRead)) {
+            uint32_t allPins = gpio_get_all();
 
-        // RX FIFO not empty? read it, decrement readInProgressCount
-        if(!pio_sm_is_rx_fifo_empty(pioScsiRead, smScsiRead)) {
-            uint32_t tmp = pio_sm_get(pioScsiRead, smScsiRead);
-            readInProgressCount--;
+            if((allPins & HANDSHAKE_PINS_MASK) == HANDSHAKE_PINS_MASK) {    // both handshake pins are H?
+                return;
+            }
         }
 
         if(hasTimedOut) {       // on timeout
-            debug("DMA_read_waitForEnd T/O - %d\n", readInProgressCount);
+            debug("DMA_read_waitForEnd T/O\n");
             brStat = E_TimeOut; // set the bridge status
             return;
         }
@@ -410,22 +385,14 @@ void DMA_read(uint8_t val)
 
     // wait for TX fifo not full, so we can put the current value in
     while(1) {
-        // RX FIFO not empty? read it, decrement readInProgressCount
-        if(!pio_sm_is_rx_fifo_empty(pioScsiRead, smScsiRead)) {
-            uint32_t tmp = pio_sm_get(pioScsiRead, smScsiRead);
-            readInProgressCount--;
-        }
-
         // READ TX FIFO not full, we can push to fifo
         if(!pio_sm_is_tx_fifo_full(pioScsiRead, smScsiRead)) {
-           // put current byte in TX FIFO, increment readInProgressCount
-           pio_sm_put_blocking(pioScsiRead, smScsiRead, valPar);
-           readInProgressCount++;
+           pio_sm_put(pioScsiRead, smScsiRead, valPar);
            return;
         }
 
         if(hasTimedOut) {       // on timeout
-            debug("DMA_read T/O - %d\n", readInProgressCount);
+            debug("DMA_read T/O\n");
             brStat = E_TimeOut; // set the bridge status
             return;
         }

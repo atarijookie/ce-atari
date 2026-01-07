@@ -22,8 +22,8 @@ void core1_setup(void)
     debug("CORE 1 setup\n");
 
     // config pins as inputs
-    #define INPUTS_COUNT 12
-    int inputs[INPUTS_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_SEL_IO_DP_SDA, PIN_RST_CD_REQ_SCL, PIN_ACK, PIN_BSY};
+    #define INPUTS_COUNT 11
+    int inputs[INPUTS_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_SEL_IO_DP_SDA, PIN_RST_CD_REQ_SCL, PIN_ACK};
 
     for (int i = 0; i < INPUTS_COUNT; i++)
     {
@@ -63,11 +63,6 @@ void core1_main_loop(void)
 
     while(1)
     {
-        // TODO: re-enable, seems to mess up sending status after data
-        // if((getAtnReset() & BIT_RESET) == BIT_RESET) {   // when SCSI RESET is L, enter reset mode - no PIO transfers
-        //     pioConfig(MODE_RESET);
-        // }
-
         // get the command from ACSI and send it to host
         // IN  STATE: STATE_GET_COMMAND
         // OUT STATE: WAIT_COMMAND_RESPONSE when GOOD, STATE_GET_COMMAND when FAIL
