@@ -18,8 +18,6 @@ uint16_t version[2] = {0xa025, 0x1117}; // this means: hAns, 2025-11-17
 uint8_t atnSendFwVersion[ATN_SENDFWVERSION_LEN_TX];
 uint8_t atnSendACSIcommand[ATN_SENDACSICOMMAND_LEN_TX];
 
-void handleButton(void);
-
 EthernetClient client;
 
 extern volatile bool core1running;
@@ -160,98 +158,5 @@ void loop(void)
         }
 
         ikbdProcessing();
-
-        //---------------------------
-        // check the button state and press duration
-        handleButton();
     }
-}
-
-#define BTN_PRESS_SHORT     500
-#define BTN_PRESS_SAVE      2000
-
-// This gets called on button pressed (current button state LOW) or released (current button state HIGH)
-void onButtonStateChanged(int buttonState, uint32_t now, uint32_t& buttonPressTime)
-{
-    // button state change to low, so button just pressed - store time, nothing more to do
-    if(buttonState == LOW)
-    {
-        buttonPressTime = now;
-        return;
-    }
-
-    //-------
-    // button state change to high, so button released
-    uint32_t pressDuration = now - buttonPressTime;
-
-    if(pressDuration < BTN_PRESS_SHORT)     // on short press, ikbd enable / disable
-    {
-        settings.ikbdEnabled = !settings.ikbdEnabled;
-    }
-
-    // on longer press, save ikbd enabled flag
-    if(pressDuration >= BTN_PRESS_SAVE)
-    {
-        saveSettings();
-    }
-
-    showRunningStateOnDisplay();
-}
-
-// Gets called during the button is pressed down, used to show stuff on display for long press.
-void duringButtonPressed(uint32_t now, uint32_t& buttonPressTime)
-{
-    uint32_t pressDuration = now - buttonPressTime;
-
-    // press too short? nothing to show on display
-    if(pressDuration < BTN_PRESS_SAVE)
-    {
-        return;
-    }
-
-    // longer press? ask about saving ikbd settings
-    if(pressDuration >= BTN_PRESS_SAVE)
-    {
-        displayMessage(NULL, "Store IKDB enabled?", NULL);
-    }
-
-    // longest press? ask about running captive portal
-    // if(pressDuration >= BTN_PRESS_CAPTIVE)
-    // {
-    //     displayMessage(NULL, "Run captive portal?", NULL);
-    // }
-}
-
-// Check the button pressed / released state, check if button has been just pressed, released,
-// or is being held down. Show stuff on display, handle button actions.
-void handleButton(void)
-{
-    static uint32_t lastCheck = millis();
-    static int lastButtonState = HIGH;
-    static uint32_t buttonPressTime = 0;
-
-    uint32_t now = millis();
-
-    if(now - lastCheck < 100)      // check for button change only every now and then
-    {
-        return;
-    }
-    lastCheck = now;
-
-    // int buttonState = digitalRead(PIN_BOOT_BTN);    // read button
-
-    // bool buttonStateChanged = (lastButtonState != buttonState);
-    // lastButtonState = buttonState;
-
-    // if(buttonStateChanged)      // button state changed? (e.g. pressed, released)
-    // {
-    //     onButtonStateChanged(buttonState, now, buttonPressTime);
-    // }
-    // else        // button state not changed (stayed released, stayed pressed)
-    // {
-    //     if(buttonState == LOW)
-    //     {
-    //         duringButtonPressed(now, buttonPressTime);
-    //     }
-    // }
 }
