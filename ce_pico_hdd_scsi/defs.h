@@ -5,7 +5,6 @@
 
 #define LOG_MORE    1
 #define LOG_LED     1
-// #define LOG_FT200   1
 // #define LOG_UART    1
 
 #ifndef MIN
@@ -62,7 +61,7 @@
 
 ///////////////////////////
 
-#define DATA_PINS_MASK      ((1 << PIN_D0) | (1 << PIN_D1) | (1 << PIN_D2) | (1 << PIN_D3) | (1 << PIN_D4) | (1 << PIN_D5) | (1 << PIN_D6) | (1 << PIN_D7) | (1 << PIN_SEL_IO_DP_SDA))
+#define DATA_PINS_MASK      ((1 << PIN_D0) | (1 << PIN_D1) | (1 << PIN_D2) | (1 << PIN_D3) | (1 << PIN_D4) | (1 << PIN_D5) | (1 << PIN_D6) | (1 << PIN_D7) | (1 << PIN_SEL_IO_DP_DS))
 
 #define PIN_D0              0
 #define PIN_D1              1
@@ -72,8 +71,8 @@
 #define PIN_D5              5
 #define PIN_D6              6
 #define PIN_D7              7
-#define PIN_SEL_IO_DP_SDA   8
-#define PIN_RST_CD_REQ_SCL  9
+#define PIN_SEL_IO_DP_DS    8
+#define PIN_RST_CD_REQ_CP   9
 #define PIN_ACK             10      // in
 #define PIN_IN_OE           11      // out
 #define PIN_OUT_OE          12      // out
@@ -88,7 +87,7 @@
 
 #define PIN_LED_EVB         25
 
-#define HANDSHAKE_PINS_MASK     ((1 << PIN_RST_CD_REQ_SCL) | (1 << PIN_ACK))
+#define HANDSHAKE_PINS_MASK     ((1 << PIN_RST_CD_REQ_CP) | (1 << PIN_ACK))
 
 #define BIT_IS_H(PIN)   (gpio_get(PIN) != 0)
 #define BIT_IS_L(PIN)   (gpio_get(PIN) == 0)

@@ -1,13 +1,16 @@
 #ifndef __DISPLAY_H__
 #define __DISPLAY_H__
 
-#include "hardware/i2c.h"
+#define DISP_SNAKE_0    150
+#define DISP_SNAKE_1    151
+#define DISP_SNAKE_2    152
+#define DISP_SNAKE_3    153
+#define DISP_SNAKE_4    154
+#define DISP_SNAKE_5    155
+#define DISP_SNAKE_6    156
+#define DISP_SNAKE_7    157
 
-#define DISPLAY_I2C_ADDRESS     0x3C
-#define DISPLAY_I2C_IFACE       i2c1
-
-bool isI2CdeviceConnected(uint8_t address);
 void displayInit(void);
-void displayMessage(const char* msg1 = NULL, const char* msg2 = NULL, const char* msg3 = NULL);
+void display(uint8_t what);
 
 #endif

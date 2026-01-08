@@ -52,13 +52,17 @@ void ethernetInit(void)
     Ethernet.init(17);              // WIZnet W6100-EVB-Pico
     Ethernet.begin(settings.mac);   // set mac, get IP via hdcp
 
+    display(3);
+
     if(Ethernet.hardwareStatus() == EthernetNoHardware) {
         debug("No ethernet. HALT!\n");
+        display('E');
         while(1);
     }
 
     while(Ethernet.linkStatus() == LinkOFF) {
         debug("cable not connected\n");
+        display('C');
         delay(1000);
     }
 
@@ -84,9 +88,12 @@ void setup(void)
     debug("enabledIDs: %02X\n", settings.enabledIDs);
 
     displayInit();      // display init
+    display(0);
 
     setupAtnBuffers(); // fill the ATN buffers with needed headers and terminators
     ipcInit();
+
+    display(1);
 
     // start core 1
     multicore_reset_core1();
@@ -94,6 +101,8 @@ void setup(void)
     sleep_ms(10);
     multicore_launch_core1(core1_main_loop);
     waitForCore1Running();
+
+    display(2);
 
     ethernetInit();     // ethernet init
 }

@@ -55,11 +55,11 @@ void setScsiPhaseForSelection(void)
     gpio_put(PIN_OUT_OE, 1);
 
     // SEL, RST, ATN as inputs
-    gpio_set_dir_in_masked((1 << PIN_SEL_IO_DP_SDA) | (1 << PIN_RST_CD_REQ_SCL) | (1 << PIN_ATN_MSG));
+    gpio_set_dir_in_masked((1 << PIN_SEL_IO_DP_DS) | (1 << PIN_RST_CD_REQ_CP) | (1 << PIN_ATN_MSG));
 
     // SEL, RST, ATN controlled by SIO
-    gpio_set_function(PIN_SEL_IO_DP_SDA, GPIO_FUNC_SIO);
-    gpio_set_function(PIN_RST_CD_REQ_SCL, GPIO_FUNC_SIO);
+    gpio_set_function(PIN_SEL_IO_DP_DS, GPIO_FUNC_SIO);
+    gpio_set_function(PIN_RST_CD_REQ_CP, GPIO_FUNC_SIO);
     gpio_set_function(PIN_ATN_MSG, GPIO_FUNC_SIO);
 
     // now we can enable input chip
@@ -73,15 +73,15 @@ void setScsiPhaseForTransfer(int newPhase)
     gpio_put(PIN_OUT_LE2, 0);   // put LE2 to L, so changing shared phase / handshake pins doesn't put out false req out
 
     // I/O, C/D, MSG controlled by SIO to set these phase controls
-    gpio_set_function(PIN_SEL_IO_DP_SDA, GPIO_FUNC_SIO);
-    gpio_set_function(PIN_RST_CD_REQ_SCL, GPIO_FUNC_SIO);
+    gpio_set_function(PIN_SEL_IO_DP_DS, GPIO_FUNC_SIO);
+    gpio_set_function(PIN_RST_CD_REQ_CP, GPIO_FUNC_SIO);
     gpio_set_function(PIN_ATN_MSG, GPIO_FUNC_SIO);
 
     // I/O, C/D, MSG as outputs
-    gpio_set_dir_out_masked((1 << PIN_SEL_IO_DP_SDA) | (1 << PIN_RST_CD_REQ_SCL) | (1 << PIN_ATN_MSG));
+    gpio_set_dir_out_masked((1 << PIN_SEL_IO_DP_DS) | (1 << PIN_RST_CD_REQ_CP) | (1 << PIN_ATN_MSG));
 
     // put DP and REQ to H, capture them in L using latch (by LE2 going to L afterwards)
-    gpio_put_masked((1 << PIN_SEL_IO_DP_SDA) | (1 << PIN_RST_CD_REQ_SCL), (1 << PIN_SEL_IO_DP_SDA) | (1 << PIN_RST_CD_REQ_SCL));    // DP and REQ to H
+    gpio_put_masked((1 << PIN_SEL_IO_DP_DS) | (1 << PIN_RST_CD_REQ_CP), (1 << PIN_SEL_IO_DP_DS) | (1 << PIN_RST_CD_REQ_CP));    // DP and REQ to H
     gpio_put(PIN_OUT_LE2, 1);       // store DP and REQ from D to Q
     busy_wait_at_least_cycles(10);
     gpio_put(PIN_OUT_LE2, 0);       // latch enable, that means hold the signals
@@ -90,22 +90,22 @@ void setScsiPhaseForTransfer(int newPhase)
     switch(newPhase)
     {
         // case MODE_RESET:     // same as SELECTION
-        case MODE_SCSI_SELECTION:   bits = (1 << PIN_SEL_IO_DP_SDA) | (1 << PIN_RST_CD_REQ_SCL) | (1 << PIN_ATN_MSG); LED_OFF;  break;
-        case MODE_CMD:              bits = (1 << PIN_SEL_IO_DP_SDA) |                             (1 << PIN_ATN_MSG); LED_ON;   break;
-        case MODE_MSG_OUT:          bits = (1 << PIN_SEL_IO_DP_SDA)                                                 ; LED_ON;   break;
-        case MODE_DMA_READ:         bits =                            (1 << PIN_RST_CD_REQ_SCL) | (1 << PIN_ATN_MSG);           break;
-        case MODE_DMA_WRITE:        bits = (1 << PIN_SEL_IO_DP_SDA) | (1 << PIN_RST_CD_REQ_SCL) | (1 << PIN_ATN_MSG);           break;
+        case MODE_SCSI_SELECTION:   bits = (1 << PIN_SEL_IO_DP_DS) | (1 << PIN_RST_CD_REQ_CP) | (1 << PIN_ATN_MSG); LED_OFF;  break;
+        case MODE_CMD:              bits = (1 << PIN_SEL_IO_DP_DS) |                             (1 << PIN_ATN_MSG); LED_ON;   break;
+        case MODE_MSG_OUT:          bits = (1 << PIN_SEL_IO_DP_DS)                                                 ; LED_ON;   break;
+        case MODE_DMA_READ:         bits =                            (1 << PIN_RST_CD_REQ_CP) | (1 << PIN_ATN_MSG);           break;
+        case MODE_DMA_WRITE:        bits = (1 << PIN_SEL_IO_DP_DS) | (1 << PIN_RST_CD_REQ_CP) | (1 << PIN_ATN_MSG);           break;
         case MODE_STATUS:           bits =                                                        (1 << PIN_ATN_MSG);           break;
         case MODE_MSG_IN:           bits =                                                                         0;           break;
     }
 
-    gpio_put_masked((1 << PIN_SEL_IO_DP_SDA) | (1 << PIN_RST_CD_REQ_SCL) | (1 << PIN_ATN_MSG), bits);       // set the bits L or H
+    gpio_put_masked((1 << PIN_SEL_IO_DP_DS) | (1 << PIN_RST_CD_REQ_CP) | (1 << PIN_ATN_MSG), bits);       // set the bits L or H
     gpio_put(PIN_OUT_LE1, 1);       // store I/O, C/D, MSG from D to Q
     busy_wait_at_least_cycles(10);
     gpio_put(PIN_OUT_LE1, 0);       // latch enable, that means hold the signals
 
     // put DP and REQ to H after using them for phase setting, but no need to latch them (no LE2 cycle)
-    gpio_put_masked((1 << PIN_SEL_IO_DP_SDA) | (1 << PIN_RST_CD_REQ_SCL), (1 << PIN_SEL_IO_DP_SDA) | (1 << PIN_RST_CD_REQ_SCL));    // DP and REQ to H
+    gpio_put_masked((1 << PIN_SEL_IO_DP_DS) | (1 << PIN_RST_CD_REQ_CP), (1 << PIN_SEL_IO_DP_DS) | (1 << PIN_RST_CD_REQ_CP));    // DP and REQ to H
 
     gpio_put(PIN_OUT_OE, 0);        // enable output chip
 }
@@ -143,12 +143,12 @@ void setDataDirection(uint8_t sendNotRecv, PIO pio, uint sm)
     }
 
     if(pio != NULL) {
-        int dirs = (sendNotRecv == DIR_SEND) ? (DATA_PINS_MASK | (1 << PIN_RST_CD_REQ_SCL)) : (1 << PIN_RST_CD_REQ_SCL);
-        pio_sm_set_pins_with_mask(pio, sm, (1 << PIN_RST_CD_REQ_SCL), (1 << PIN_RST_CD_REQ_SCL));
-        pio_sm_set_pindirs_with_mask(pio, sm, dirs, DATA_PINS_MASK | (1 << PIN_RST_CD_REQ_SCL));
+        int dirs = (sendNotRecv == DIR_SEND) ? (DATA_PINS_MASK | (1 << PIN_RST_CD_REQ_CP)) : (1 << PIN_RST_CD_REQ_CP);
+        pio_sm_set_pins_with_mask(pio, sm, (1 << PIN_RST_CD_REQ_CP), (1 << PIN_RST_CD_REQ_CP));
+        pio_sm_set_pindirs_with_mask(pio, sm, dirs, DATA_PINS_MASK | (1 << PIN_RST_CD_REQ_CP));
     }
 
-    int pio_data_pins[10] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_SEL_IO_DP_SDA, PIN_RST_CD_REQ_SCL};
+    int pio_data_pins[10] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_SEL_IO_DP_DS, PIN_RST_CD_REQ_CP};
     for (int i = 0; i < 10; i++) {
         if(pio != NULL) {           // got pio, pin handled by PIO
             pio_gpio_init(pio, pio_data_pins[i]);
@@ -248,11 +248,11 @@ uint8_t isSelectionHappening(void)
 {
     pioConfig(MODE_SCSI_SELECTION);
 
-    if(BIT_IS_L(PIN_RST_CD_REQ_SCL)) {      // no new cmd bytes when RESET is L
+    if(BIT_IS_L(PIN_RST_CD_REQ_CP)) {      // no new cmd bytes when RESET is L
         return false;
     }
 
-    return BIT_IS_L(PIN_SEL_IO_DP_SDA);     // the SELECTION is happening, when SEL is L
+    return BIT_IS_L(PIN_SEL_IO_DP_DS);     // the SELECTION is happening, when SEL is L
 }
 
 // get selection byte
@@ -263,7 +263,7 @@ uint8_t getSelectionByte(void)
     timeoutStart();             // start the timeout timer
     brStat = E_OK;              // init bridge status to E_OK
 
-    while(BIT_IS_L(PIN_SEL_IO_DP_SDA) && !hasTimedOut)          // while SEL pin is asserted and it's not timeout yet
+    while(BIT_IS_L(PIN_SEL_IO_DP_DS) && !hasTimedOut)          // while SEL pin is asserted and it's not timeout yet
     {
         uint8_t selectedIds = ((uint8_t) ~(gpio_get_all()));    // get all data bits
 

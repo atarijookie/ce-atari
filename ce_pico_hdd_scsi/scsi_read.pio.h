@@ -49,7 +49,7 @@ static inline pio_sm_config scsi_read_program_get_default_config(uint offset) {
 static inline void scsi_read_program_init(PIO pio, uint sm, uint offset)
 {
     #define PIO_READ_COUNT 11
-    int pio_pins[PIO_READ_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_SEL_IO_DP_SDA, PIN_RST_CD_REQ_SCL, PIN_ACK};
+    int pio_pins[PIO_READ_COUNT] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7, PIN_SEL_IO_DP_DS, PIN_RST_CD_REQ_CP, PIN_ACK};
     int pio_dirs[PIO_READ_COUNT] = {     1,      1,      1,      1,      1,      1,      1,      1,                 1,                  1,       0};
     for (int i = 0; i < PIO_READ_COUNT; i++) {
         pio_gpio_init(pio, pio_pins[i]);
@@ -57,7 +57,7 @@ static inline void scsi_read_program_init(PIO pio, uint sm, uint offset)
     }
     pio_sm_config cRead = scsi_read_program_get_default_config(offset);
     sm_config_set_out_pins(&cRead, PIN_D0, 9);              // for OUT
-    sm_config_set_sideset_pins(&cRead, PIN_RST_CD_REQ_SCL); // for SIDE_SET
+    sm_config_set_sideset_pins(&cRead, PIN_RST_CD_REQ_CP); // for SIDE_SET
     sm_config_set_out_shift(&cRead, true, false, 32);   // Shift to right, autopush disabled
     sm_config_set_fifo_join(&cRead, PIO_FIFO_JOIN_NONE);  // no fifo joining
     float div = (float)clock_get_hz(clk_sys) / 50000000;    // calc divider for 50 MHz, that's 20 ns per instruction

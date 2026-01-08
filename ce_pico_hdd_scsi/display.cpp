@@ -1,73 +1,76 @@
 
 #include <cstdint>
-#include <Wire.h>
 
 #include "defs.h"
 #include "display.h"
 #include "utils.h"
 
-#include "hardware/i2c.h"
-#include "ssd1306.h"
-#include "adafruit_gfx.h"
-#include "lcdfont.h"
-
-SSD1306* display;
-Adafruit_GFX* gfx;
-
-#define SCREEN_WIDTH 128    // OLED display width, in pixels
-#define SCREEN_HEIGHT 32    // OLED display height, in pixels
-
-bool displayPresent = false;
-
-bool isI2CdeviceConnected(uint8_t address)
-{
-    uint8_t rxdata;
-    int ret = i2c_write_timeout_us(DISPLAY_I2C_IFACE, address, &rxdata, 1, false, 100000);
-
-    return (ret >= 0);  // -1 on error, zero or positive values mean success
-}
-
 void displayInit(void)
 {
-    // TODO: remove later
-    displayPresent = false;
-    return;
-
     debug("displayInit\n");
 
-    // TODO: re-enable, but causes issues on REQ signal on 0th cmd byte!
-    // i2c1init();
+    gpio_set_function(PIN_SEL_IO_DP_DS, GPIO_FUNC_SIO);
+    gpio_set_function(PIN_RST_CD_REQ_CP, GPIO_FUNC_SIO);
 
-    displayPresent = isI2CdeviceConnected(DISPLAY_I2C_ADDRESS);
+    gpio_set_dir_out_masked((1 << PIN_SEL_IO_DP_DS) | (1 << PIN_RST_CD_REQ_CP));
 
-    if(!displayPresent) {
-        debug("displayInit - i2c display not connected\n");
-        return;
-    }
-    debug("displayInit - i2c display found\n");
-
-    display = new SSD1306();
-
-    bool res = display->begin(SSD1306_SWITCHCAPVCC);    // low level OLED library
-    display->clearDisplay();
-    display->display();
-
-    gfx = new Adafruit_GFX(SSD1306_LCDWIDTH, SSD1306_LCDHEIGHT, display);    // font displaying library
-
-    displayMessage("CE starting");
+    BIT_CLR(PIN_SEL_IO_DP_DS);
+    BIT_CLR(PIN_RST_CD_REQ_CP);
 }
 
-void displayMessage(const char* msg1, const char* msg2, const char* msg3)
+// these codes are for segments order GFEDCBA
+const uint8_t segmentsNumbers[10] = {0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F};
+const uint8_t segmentsLetters[26] = {0x77, 0x7C, 0x39, 0x5E, 0x79, 0x71, 0x3D, 0x76, 0x06, 0x1E, 0x00, 0x38, 0x00, 0x54, 0x3F, 0x73, 0x00, 0x50, 0x6D, 0x00, 0x3E, 0x00, 0x00, 0x00, 0x00, 0x00};
+const uint8_t segmentsSnake[8] = {0x01, 0x02, 0x40, 0x10, 0x08, 0x04, 0x40, 0x20};
+
+// use this to transform standard .GFEDCBA (76543210) order to our ABC.DEGF (01273465) order
+const uint8_t segmentOrder[8] = {0, 1, 2, 7, 3, 4, 6, 5};
+
+extern volatile uint8_t core1state;
+
+void display(uint8_t what)
 {
-    if(!displayPresent) {
+    if(core1state != STATE_GET_COMMAND) {   // don't display anything unless the core1 is in the GET_COMMAND state (idle, between commands) - the display pins are shared with SCSI handshake
         return;
     }
 
-    display->clearDisplay();
+    // change from SIO inputs to SIO outputs, so we can control the pins
+    gpio_set_dir_out_masked((1 << PIN_SEL_IO_DP_DS) | (1 << PIN_RST_CD_REQ_CP));
 
-    if(msg1) gfx->drawString(0,   CHAR_H, msg1);
-    if(msg2) gfx->drawString(0, 2*CHAR_H, msg2);
-    if(msg3) gfx->drawString(0, 3*CHAR_H, msg3);
+    uint8_t val = 0;
 
-    display->display();
+    if(what >= '0' && what <= '9') {    // for numbers
+        val = segmentsNumbers[what - '0'];
+    }
+
+    if(what >= 'A' && what <= 'Z') {    // for capital letters
+        val = segmentsLetters[what - 'A'];
+    }
+
+    if(what >= 'a' && what <= 'z') {    // for small letters
+        val = segmentsLetters[what - 'a'];
+    }
+
+    if(what >= DISP_SNAKE_0 && what <= DISP_SNAKE_7) {  // for progress snake
+        val = segmentsSnake[what - DISP_SNAKE_0];
+    }
+
+    for(int i = 7; i >= 0; i--) {
+        int bitNo = segmentOrder[i];    // .GFEDCBA to ABC.DEGF order
+
+        if(val & (bitNo << 7)) {        // segment on? pin off
+            BIT_CLR(PIN_SEL_IO_DP_DS);
+        } else {                        // segment off? pin on
+            BIT_SET(PIN_SEL_IO_DP_DS);
+        }
+
+        BIT_CLR(PIN_RST_CD_REQ_CP);    // CP to L
+        busy_wait_at_least_cycles(10);
+        BIT_SET(PIN_RST_CD_REQ_CP);    // CP to H
+        busy_wait_at_least_cycles(10);
+        BIT_SET(PIN_RST_CD_REQ_CP);    // CP to L
+    }
+
+    // in GET_COMMAND mode (selection) the display pins are used as SIO inputs
+    gpio_set_dir_in_masked((1 << PIN_SEL_IO_DP_DS) | (1 << PIN_RST_CD_REQ_CP));
 }

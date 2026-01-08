@@ -17,11 +17,6 @@ mutex_t debugMutex;
 
 struct TSettings settings;
 
-#ifdef LOG_FT200
-#define FT200X_ADDRESS  0x22      // use FT_PROG tool to get actual i2c address - the FT PROG shows it in hexadecimal!
-bool ft200xPresent = false;
-#endif
-
 #ifdef LOG_LED
 #include "uart_tx.pio.h"
 
@@ -195,15 +190,6 @@ void loadSettings(void)
     }
 }
 
-void i2c1init(void)
-{
-    i2c_init(i2c1, 400000);
-    gpio_set_function(PIN_SEL_IO_DP_SDA, GPIO_FUNC_I2C);
-    gpio_set_function(PIN_RST_CD_REQ_SCL, GPIO_FUNC_I2C);
-    gpio_pull_up(PIN_SEL_IO_DP_SDA);
-    gpio_pull_up(PIN_RST_CD_REQ_SCL);
-}
-
 void debugInit(void)
 {
     mutex_init(&debugMutex);
@@ -211,12 +197,6 @@ void debugInit(void)
 #ifdef LOG_UART
     // uart0 for debug strings
     Serial1.begin(115200);
-#endif
-
-#ifdef LOG_FT200
-    // ft200x for debug strings
-    i2c1init();
-    ft200xPresent = isI2CdeviceConnected(FT200X_ADDRESS);
 #endif
 
 #ifdef LOG_LED
@@ -244,12 +224,6 @@ void debugFromQueue(void)
 
 void debug(const char *fmt, ...)
 {
-#ifdef LOG_FT200
-    if(!ft200xPresent) {
-        return;
-    }
-#endif
-
     mutex_enter_blocking(&debugMutex);
 
     char buf[1024];
@@ -273,11 +247,6 @@ void debug(const char *fmt, ...)
 #ifdef LOG_UART
     // use uart0 for debug strings
     uart_puts(uart0, buf2);
-#endif
-
-#ifdef LOG_FT200
-    // use ft200x for debug strings
-    i2c_write_timeout_us(DISPLAY_I2C_IFACE, FT200X_ADDRESS, (const uint8_t*) buf2, j, false, 100000);
 #endif
 
 #ifdef LOG_LED
