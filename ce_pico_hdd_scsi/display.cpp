@@ -9,11 +9,13 @@ void displayInit(void)
 {
     debug("displayInit\n");
 
+    gpio_set_function(PIN_IN_OE, GPIO_FUNC_SIO);
     gpio_set_function(PIN_SEL_IO_DP_DS, GPIO_FUNC_SIO);
     gpio_set_function(PIN_RST_CD_REQ_CP, GPIO_FUNC_SIO);
 
-    gpio_set_dir_out_masked((1 << PIN_SEL_IO_DP_DS) | (1 << PIN_RST_CD_REQ_CP));
+    gpio_set_dir_out_masked((1 << PIN_SEL_IO_DP_DS) | (1 << PIN_RST_CD_REQ_CP) | (1 << PIN_IN_OE));
 
+    BIT_SET(PIN_IN_OE);         // disable input chip, so it won't interfere with DS and CP pins
     BIT_CLR(PIN_SEL_IO_DP_DS);
     BIT_CLR(PIN_RST_CD_REQ_CP);
 }
@@ -34,12 +36,19 @@ void display(uint8_t what)
         return;
     }
 
+    int lvlInOe = gpio_get_out_level(PIN_IN_OE);    // get the current output level of PIN_IN_OE
+    BIT_SET(PIN_IN_OE);                             // disable input chip, so it won't interfere with DS and CP pins
+
     // change from SIO inputs to SIO outputs, so we can control the pins
     gpio_set_dir_out_masked((1 << PIN_SEL_IO_DP_DS) | (1 << PIN_RST_CD_REQ_CP));
 
     uint8_t val = 0;
 
-    if(what >= '0' && what <= '9') {    // for numbers
+    if(what >= 0 && what <= 9) {        // for numbers
+        val = segmentsNumbers[what];
+    }
+
+    if(what >= '0' && what <= '9') {    // for ASCII numbers
         val = segmentsNumbers[what - '0'];
     }
 
@@ -58,7 +67,7 @@ void display(uint8_t what)
     for(int i = 7; i >= 0; i--) {
         int bitNo = segmentOrder[i];    // .GFEDCBA to ABC.DEGF order
 
-        if(val & (bitNo << 7)) {        // segment on? pin off
+        if(val & (1 << bitNo)) {        // segment on? pin off
             BIT_CLR(PIN_SEL_IO_DP_DS);
         } else {                        // segment off? pin on
             BIT_SET(PIN_SEL_IO_DP_DS);
@@ -70,6 +79,8 @@ void display(uint8_t what)
         busy_wait_at_least_cycles(10);
         BIT_SET(PIN_RST_CD_REQ_CP);    // CP to L
     }
+
+    gpio_put(PIN_IN_OE, lvlInOe);       // restore previous output level of PIN_IN_OE
 
     // in GET_COMMAND mode (selection) the display pins are used as SIO inputs
     gpio_set_dir_in_masked((1 << PIN_SEL_IO_DP_DS) | (1 << PIN_RST_CD_REQ_CP));
