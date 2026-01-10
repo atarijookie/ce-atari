@@ -7,8 +7,6 @@
 #define SOCK_FDD    1
 #define SOCK_IKBD   2
 
-void showRunningStateOnDisplay(void);
-
 void connectToHost(void);
 void handleIncommingData(void);
 

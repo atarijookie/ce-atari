@@ -20,8 +20,8 @@ struct TSettings settings;
 #ifdef LOG_LED
 #include "uart_tx.pio.h"
 
-PIO pioUartTx;
-uint smUartTx;
+PIO pioUartDebugTx;
+uint smUartDebugTx;
 
 queue_t fifoDebug;
 #endif
@@ -202,10 +202,10 @@ void debugInit(void)
 #ifdef LOG_LED
     uint offset;
 
-    bool success = pio_claim_free_sm_and_add_program_for_gpio_range(&uart_tx_program, &pioUartTx, &smUartTx, &offset, PIN_LED_EVB, 1, true);
+    bool success = pio_claim_free_sm_and_add_program_for_gpio_range(&uart_tx_program, &pioUartDebugTx, &smUartDebugTx, &offset, PIN_LED_EVB, 1, true);
     if(!success) { debug("Failed to claim PIO SM for UART\n"); while(1); }
 
-    uart_tx_program_init(pioUartTx, smUartTx, offset, PIN_LED_EVB, 115200);
+    uart_tx_program_init(pioUartDebugTx, smUartDebugTx, offset, PIN_LED_EVB, 115200);
 
     queue_init(&fifoDebug, 1, 1024);
 #endif
@@ -217,7 +217,7 @@ void debugFromQueue(void)
     while(!queue_is_empty(&fifoDebug)) {
         char c;
         queue_try_remove(&fifoDebug, &c);
-        uart_tx_program_putc(pioUartTx, smUartTx, c);
+        uart_tx_program_putc(pioUartDebugTx, smUartDebugTx, c);
     }
 }
 #endif
@@ -261,7 +261,7 @@ void debug(const char *fmt, ...)
     }
     else                            // core 0 - actually send to uart
     {
-        uart_tx_program_puts(pioUartTx, smUartTx, buf2);
+        uart_tx_program_puts(pioUartDebugTx, smUartDebugTx, buf2);
     }
 #endif
 

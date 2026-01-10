@@ -46,42 +46,24 @@ void waitForCore1Running(void)
     }
 }
 
-void setup(void)
+void ethernetInit(void)
 {
-    gpio_set_function(PIN_LED_EVB, GPIO_FUNC_SIO);
-    gpio_set_dir(PIN_LED_EVB, GPIO_OUT);
-    LED_ON;             // turn LED on during setup
-
-    debugInit();
-    debug("\n\n------------\nCORE 0 setup\n");
-
-    loadSettings();
-    ipcInit();
-
-    multicore_reset_core1();
-    multicore_fifo_drain();
-    sleep_ms(10);
-    multicore_launch_core1(core1_main_loop);
-    waitForCore1Running();
-
-    ikbdInit();
-
-    displayInit();
-
-    setupAtnBuffers(); // fill the ATN buffers with needed headers and terminators
-
-    debug("enabledIDs: %02X\n", settings.enabledIDs);
+    debug("ethernetInit start\n");
 
     Ethernet.init(17);              // WIZnet W6100-EVB-Pico
     Ethernet.begin(settings.mac);   // set mac, get IP via hdcp
 
+    display(4);
+
     if(Ethernet.hardwareStatus() == EthernetNoHardware) {
         debug("No ethernet. HALT!\n");
+        display('E');
         while(1);
     }
 
     while(Ethernet.linkStatus() == LinkOFF) {
         debug("cable not connected\n");
+        display('C');
         delay(1000);
     }
 
@@ -92,6 +74,42 @@ void setup(void)
 
     debug("mac: %02X:%02X:%02X:%02X:%02X:%02X\n", atnSendFwVersion[TX_HEADER_SIZE + 6], atnSendFwVersion[TX_HEADER_SIZE + 7], atnSendFwVersion[TX_HEADER_SIZE + 8],
                                                   atnSendFwVersion[TX_HEADER_SIZE + 9], atnSendFwVersion[TX_HEADER_SIZE + 10], atnSendFwVersion[TX_HEADER_SIZE + 11]);
+}
+
+void setup(void)
+{
+    gpio_set_function(PIN_LED_EVB, GPIO_FUNC_SIO);
+    gpio_set_dir(PIN_LED_EVB, GPIO_OUT);
+    LED_ON;             // turn LED on during setup
+
+    debugInit();
+    debug("\n\n------------\nCORE 0 setup\n");
+
+    loadSettings();
+    debug("enabledIDs: %02X\n", settings.enabledIDs);
+
+    displayInit();
+    display(0);
+
+    setupAtnBuffers(); // fill the ATN buffers with needed headers and terminators
+    ipcInit();
+
+    display(1);
+
+    // start core 1
+    multicore_reset_core1();
+    multicore_fifo_drain();
+    sleep_ms(10);
+    multicore_launch_core1(core1_main_loop);
+    waitForCore1Running();
+
+    display(2);
+
+    ikbdInit();
+
+    display(3);
+
+    ethernetInit();     // ethernet init
 }
 
 void setupAtnBuffers(void)

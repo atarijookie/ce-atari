@@ -32,29 +32,6 @@ struct {
 
 THeader hddHeader;      // keep the header global to preserve syncTag between calls
 
-void showRunningStateOnDisplay(void)
-{
-    char msg1[128];
-    sprintf(msg1, "host: %s", hostIpString.c_str());
-
-    char msg2[128];
-    memset(msg2, 0, 128);
-
-    String msg3 = "devs: ";
-    for(int i=0; i<8; i++) {
-        if(settings.enabledIDs & (1 << i)) {     // if ID bit enabled, add to string
-            msg3 += i;
-            msg3 += " ";
-        }
-    }
-
-    if(settings.ikbdEnabled) {       // if ikbd is enabled
-        msg3 += "IKBD";
-    }
-
-    displayMessage(msg1, msg2, msg3.c_str());
-}
-
 // Send broadcast to find any CE server on the network.
 void ceDiscoverySend(void)
 {
@@ -75,7 +52,7 @@ void ceDiscoverySend(void)
 
     lastAttempt = millis();
 
-    displayMessage("eth connected", "CE host discovery");
+    display(5);
 
     // send upd broadcast
     uint8_t updPacket[5];
@@ -195,7 +172,7 @@ void connectToCEhost(void)
         return;
     }
 
-    displayMessage("eth connected", "connecting to host:", hostIpString.c_str());
+    display(6);
 
     debug("connectToCEhost - IP: %s, port: %d\n", hostIpString.c_str(), hostPortHdd);
 
@@ -241,7 +218,7 @@ void connectToHost(void)
         prevConnected = connected;
 
         if(connected) {     // now in connected state, display state on display
-            showRunningStateOnDisplay();
+
         }
     }
 
@@ -346,8 +323,6 @@ void handleAcsiConfig(uint32_t len)
                 debug("handleAcsiConfig - storing new ids: %02X\n", newAcsiIds);
 
                 saveSettings();
-
-                showRunningStateOnDisplay();
             }
         }
     }

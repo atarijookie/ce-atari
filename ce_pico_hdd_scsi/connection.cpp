@@ -23,6 +23,7 @@ uint16_t hostPortFdd;
 uint16_t hostPortIkbd;
 
 volatile bool connected = false;
+volatile bool ikbdConnected = false;
 
 struct {
     bool sendStatusAfterRead;
@@ -51,7 +52,7 @@ void ceDiscoverySend(void)
 
     lastAttempt = millis();
 
-    display(4);
+    display(5);
 
     // send upd broadcast
     uint8_t updPacket[5];
@@ -171,7 +172,7 @@ void connectToCEhost(void)
         return;
     }
 
-    display(5);
+    display(6);
 
     debug("connectToCEhost - IP: %s, port: %d\n", hostIpString.c_str(), hostPortHdd);
 

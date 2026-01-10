@@ -10,7 +10,6 @@
 #include "ipc.h"
 
 extern uint8_t cmd[16];  // received command bytes
-uint8_t busIdle;
 
 volatile bool core1running = false;
 extern volatile bool connected;

@@ -11,6 +11,7 @@
 #include "connection.h"
 #include "display.h"
 #include "ipc.h"
+#include "ikbd.h"
 
 uint16_t version[2] = {0xa025, 0x1117}; // this means: hAns, 2025-11-17
 
@@ -52,7 +53,7 @@ void ethernetInit(void)
     Ethernet.init(17);              // WIZnet W6100-EVB-Pico
     Ethernet.begin(settings.mac);   // set mac, get IP via hdcp
 
-    display(3);
+    display(4);
 
     if(Ethernet.hardwareStatus() == EthernetNoHardware) {
         debug("No ethernet. HALT!\n");
@@ -103,6 +104,10 @@ void setup(void)
     waitForCore1Running();
 
     display(2);
+
+    ikbdInit();
+
+    display(3);
 
     ethernetInit();     // ethernet init
 }
@@ -169,5 +174,7 @@ void loop(void)
 
             bfr->free = true;
         }
+
+        ikbdProcessing();
     }
 }

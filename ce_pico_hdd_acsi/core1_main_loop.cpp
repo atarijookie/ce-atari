@@ -13,6 +13,9 @@
 extern uint8_t cmd[16];  // received command bytes
 
 volatile bool core1running = false;
+extern volatile bool connected;
+
+volatile uint8_t core1state = STATE_GET_COMMAND;
 
 void core1_setup(void)
 {
@@ -43,11 +46,7 @@ void core1_setup(void)
         gpio_put(outputs[i], levels[i]);
     }
 
-    // debug("CORE 1 config PIO\n");
-
     pioConfigAll();     // configure all PIO state machines
-
-    // debug("CORE 1 resetBridge\n");
 
     resetBridge();
 }
@@ -58,27 +57,25 @@ void core1_main_loop(void)
 
     uint32_t lastSendFwTime = millis();
 
-    uint8_t state;
-    state = STATE_GET_COMMAND;
     debug("CORE 1 main\n");
-
     core1running = true;
+    uint8_t snakePhase = DISP_SNAKE_0;
 
     while(1)
     {
         if(BIT_IS_L(PIN_RESET)) {   // when ACSI RESET is L, enter reset mode - no PIO transfers
-            state == STATE_GET_COMMAND;
+            core1state = STATE_GET_COMMAND;
             pioConfig(MODE_RESET);
         }
 
         // get the command from ACSI and send it to host
         // IN  STATE: STATE_GET_COMMAND
         // OUT STATE: WAIT_COMMAND_RESPONSE when GOOD, STATE_GET_COMMAND when FAIL
-        if (state == STATE_GET_COMMAND)
+        if (core1state == STATE_GET_COMMAND)
         {
             if(PIO_gotFirstCmdByte())       // if 1st CMD byte was received
             {
-                state = onGetCommand();
+                core1state = onGetCommand();
             }
             else
             {
@@ -86,11 +83,22 @@ void core1_main_loop(void)
 
                 if ((now - lastSendFwTime) >= 1000)
                 {
-                    lastSendFwTime = now;
+                    // display another part of snake phase
+                    display(snakePhase);
+                    snakePhase++;
+                    if(snakePhase > DISP_SNAKE_7) {
+                        snakePhase = DISP_SNAKE_0;
+                    }
 
-                    IPCbuffer* bfr = ipcGetFreeBuffer(0, CMD_TIMEOUT_SHORT);
-                    if(bfr) {
-                        ipcSetBufferAndPutToFifo(bfr, 0, STATE_SEND_FW_VER, 0, NULL, 0);
+                    // if connected, keep sending SEND_FW_VER commands
+                    if(connected)
+                    {
+                        lastSendFwTime = now;
+
+                        IPCbuffer* bfr = ipcGetFreeBuffer(0, CMD_TIMEOUT_SHORT);
+                        if(bfr) {
+                            ipcSetBufferAndPutToFifo(bfr, 0, STATE_SEND_FW_VER, 0, NULL, 0);
+                        }
                     }
                 }
             }
@@ -110,7 +118,7 @@ void core1_main_loop(void)
                     bool res = onDataRead(bfr->length, bfr->data);
 
                     if(!res) {  // if failed, go to back to command receiving
-                        state = STATE_GET_COMMAND;
+                        core1state = STATE_GET_COMMAND;
                         timeoutClear();
                     }
                     break;
@@ -125,7 +133,7 @@ void core1_main_loop(void)
                     bool res = onDataWrite(dataCnt);
 
                     if(!res) {  // if failed, go to back to command receiving
-                        state = STATE_GET_COMMAND;
+                        core1state = STATE_GET_COMMAND;
                         timeoutClear();
                     }
                     break;
@@ -137,7 +145,7 @@ void core1_main_loop(void)
                     timeoutStart();             // start the timeout timer to give the rest of code full timeout time
                     uint8_t statusByte = bfr->data[0];
                     onReadStatus(statusByte);
-                    state = STATE_GET_COMMAND;  // get the next command
+                    core1state = STATE_GET_COMMAND;  // get the next command
                     timeoutClear();             // clear timeout, no need for it
                     break;
                 }
@@ -153,9 +161,9 @@ void core1_main_loop(void)
 
 #ifdef LOG_MORE
             debug("State : %d, cmd: %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X, timeout at: %d\n",
-                state, cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7], cmd[8], cmd[9], cmd[10], cmd[11], millis());
+                core1state, cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7], cmd[8], cmd[9], cmd[10], cmd[11], millis());
 #endif
-            state = STATE_GET_COMMAND;
+            core1state = STATE_GET_COMMAND;
         }
     }
 }

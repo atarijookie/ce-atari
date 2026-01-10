@@ -5,7 +5,6 @@
 
 #define LOG_MORE    1
 #define LOG_LED     1
-// #define LOG_FT200   1
 // #define LOG_UART    1
 
 #ifndef MIN
@@ -87,8 +86,8 @@
 
 #define PIN_KEYB_RX     28
 
-#define PIN_SDA         14      // input/output
-#define PIN_SCL         15      // output
+#define PIN_DS          14      // output
+#define PIN_CP          15      // output
 
 #define PIN_LED_EVB     25
 

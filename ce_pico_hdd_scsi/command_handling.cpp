@@ -21,8 +21,6 @@ uint8_t cmd[16];   // received command bytes, should point beyond the header in 
 uint8_t cmdLen; // length of received command
 uint8_t brStat; // status from bridge
 
-extern uint8_t busIdle;
-
 uint8_t onGetCommand(void)
 {
     // retrieve the comman

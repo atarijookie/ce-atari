@@ -6,7 +6,6 @@
 #include "scsi_read.pio.h"
 
 extern uint8_t brStat; // status from bridge
-extern uint8_t busIdle;
 
 static PIO pioScsiWrite, pioScsiRead;
 static uint smScsiWrite, smScsiRead;
