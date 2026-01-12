@@ -9,9 +9,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include "../global.h"
-#include "../debug.h"
-#include "../utils.h"
+#include "../misc/global.h"
+#include "../misc/debug.h"
+#include "../misc/utils.h"
 #include "../libdospath/libdospath.h"
 #include "extension.h"
 #include "extensionhandler.h"
@@ -27,12 +27,12 @@ void handleExtOpen(Extension* ext, uint8_t funcCount, uint8_t* data, uint32_t da
 
     uint8_t dataCanFitFunctions = dataCount / sizeof(ReceivedSignature);    // how many signatures can fit in the received data
     uint8_t funcStoreCount = MIN(funcCount, dataCanFitFunctions);
-    Debug::out(LOG_DEBUG, "handleExtOpen: supplied %d bytes can fit %d functions, funcCount argument says it holds %d functions, so will use lowest - %d", 
+    logHdd(LOG_DEBUG, "handleExtOpen: supplied %d bytes can fit %d functions, funcCount argument says it holds %d functions, so will use lowest - %d",
                            dataCount, dataCanFitFunctions, funcCount, funcStoreCount);
 
     funcStoreCount = MIN(funcStoreCount, MAX_EXPORTED_FUNCTIONS);
 
-    Debug::out(LOG_DEBUG, "handleExtOpen: MIN(funcStoreCount: %d, MAX_EXPORTED_FUNCTIONS: %d) = %d", 
+    logHdd(LOG_DEBUG, "handleExtOpen: MIN(funcStoreCount: %d, MAX_EXPORTED_FUNCTIONS: %d) = %d",
                            funcStoreCount, MAX_EXPORTED_FUNCTIONS, funcStoreCount);
 
     ext->functionTable.storeReceivedSignatures(data, funcStoreCount);       // signatures start at byte 1, store them
@@ -41,17 +41,17 @@ void handleExtOpen(Extension* ext, uint8_t funcCount, uint8_t* data, uint32_t da
     strcpy(ext->outSocketPath, pSockPath);      // store the path to extension's socket
     ext->state = EXT_STATE_RUNNING;             // mark extension as running
 
-    Debug::out(LOG_DEBUG, "handleExtOpen: sock path: %s, state: %d", pSockPath, ext->state);
+    logHdd(LOG_DEBUG, "handleExtOpen: sock path: %s, state: %d", pSockPath, ext->state);
 }
 
 void *extensionThreadCode(void *ptr)
 {
-    Debug::out(LOG_INFO, "Extension Socket thread starting...");
+    logHdd(LOG_INFO, "Extension Socket thread starting...");
 
     int sock = createRecvSocket("EXT_SOCK_PATH");
 
     if(sock < 0) {                      // without socket this thread has no use
-        Debug::out(LOG_ERROR, "Extension Socket thread - failed to open EXT_SOCK_PATH, terminating thread!");
+        logHdd(LOG_ERROR, "Extension Socket thread - failed to open EXT_SOCK_PATH, terminating thread!");
         return 0;
     }
 
@@ -82,7 +82,7 @@ void *extensionThreadCode(void *ptr)
             continue;
         }
 
-        Debug::out(LOG_DEBUG, "extensionThreadCode: received size: %d", (int) recvCnt);
+        logHdd(LOG_DEBUG, "extensionThreadCode: received size: %d", (int) recvCnt);
 
         ResponseFromExtension* resp = (ResponseFromExtension*) &bfr[0];     // the binary response starts here
 
@@ -90,7 +90,7 @@ void *extensionThreadCode(void *ptr)
         uint8_t* data = &resp->data;                                // data starts at index 38
 
         if(resp->extensionId >= MAX_EXTENSIONS_OPEN) {              // bad extension id?
-            Debug::out(LOG_WARNING, "extensionThreadCode - extension index %d out of bounds", resp->extensionId);
+            logHdd(LOG_WARNING, "extensionThreadCode - extension index %d out of bounds", resp->extensionId);
             continue;
         }
 
@@ -100,39 +100,39 @@ void *extensionThreadCode(void *ptr)
         int functionIndex = ext->functionTable.getFunctionIndexByName(resp->functionName);
 
         if(functionIndex == -1) {                   // function index not found?
-            Debug::out(LOG_WARNING, "extensionThreadCode - function index not found for function name: '%s'", resp->functionName);
+            logHdd(LOG_WARNING, "extensionThreadCode - function index not found for function name: '%s'", resp->functionName);
             continue;
         }
 
-        Debug::out(LOG_DEBUG, "extensionThreadCode - will handle extensionId: %d, functionName: '%s'", resp->extensionId, resp->functionName);
+        logHdd(LOG_DEBUG, "extensionThreadCode - will handle extensionId: %d, functionName: '%s'", resp->extensionId, resp->functionName);
 
         if(functionIndex == FAKE_INDEX_OPEN) {      // on open
-            Debug::out(LOG_DEBUG, "extensionThreadCode - handling OPEN response");
+            logHdd(LOG_DEBUG, "extensionThreadCode - handling OPEN response");
             EXT_MUTEX_LOCK;
             handleExtOpen(ext, resp->statusByte, data, dataCount);  // the statusByte field actually holds count of exported functions
             EXT_MUTEX_UNLOCK;
-            Debug::out(LOG_DEBUG, "extensionThreadCode - handling OPEN response done");
+            logHdd(LOG_DEBUG, "extensionThreadCode - handling OPEN response done");
             continue;
         }
 
         if(functionIndex == FAKE_INDEX_CLOSE) {     // on close
-            Debug::out(LOG_DEBUG, "extensionThreadCode - handling CLOSE response");
+            logHdd(LOG_DEBUG, "extensionThreadCode - handling CLOSE response");
 
             if(strcmp(ext->name, (char*) data) != 0) {      // current name vs received name mismatch? don't close
-                Debug::out(LOG_WARNING, "extensionThreadCode - extension at index %d reported CLOSE, but received name '%s' doesn't match current name '%s', so ignoring", 
+                logHdd(LOG_WARNING, "extensionThreadCode - extension at index %d reported CLOSE, but received name '%s' doesn't match current name '%s', so ignoring",
                                          resp->extensionId, data, ext->name);
                 continue;
             }
 
-            Debug::out(LOG_INFO, "extensionThreadCode - extension '%s' at index %d reported CLOSE, clearing internals", ext->name, resp->extensionId);
+            logHdd(LOG_INFO, "extensionThreadCode - extension '%s' at index %d reported CLOSE, clearing internals", ext->name, resp->extensionId);
             EXT_MUTEX_LOCK;
             ext->clear();
             EXT_MUTEX_UNLOCK;
-            Debug::out(LOG_DEBUG, "extensionThreadCode - handling CLOSE response done");
+            logHdd(LOG_DEBUG, "extensionThreadCode - handling CLOSE response done");
             continue;
         }
 
-        Debug::out(LOG_DEBUG, "extensionThreadCode - handling other response");
+        logHdd(LOG_DEBUG, "extensionThreadCode - handling other response");
 
         // it's not one of our special functions, so it's one of the functions from function table - let's handle it now
         EXT_MUTEX_LOCK;
@@ -148,10 +148,10 @@ void *extensionThreadCode(void *ptr)
         EXT_MUTEX_UNLOCK;        // unlock mutex protecting extensions array
 
         ExtensionHandler::setSignal();          // notify possibly waiting command (see where ExtensionHandler::waitForSignal is called)
-        Debug::out(LOG_DEBUG, "extensionThreadCode - handling of response done");
+        logHdd(LOG_DEBUG, "extensionThreadCode - handling of response done");
     }
 
-    Debug::out(LOG_INFO, "extensionThreadCode - terminated.");
+    logHdd(LOG_INFO, "extensionThreadCode - terminated.");
     close(sock);
     return 0;
 }

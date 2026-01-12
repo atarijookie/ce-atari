@@ -1,8 +1,8 @@
 #include <string.h>
 #include <stdint.h>
 #include "extension.h"
-#include "../utils.h"
-#include "../debug.h"
+#include "../misc/utils.h"
+#include "../misc/debug.h"
 
 void Extension::clear(void)
 {
@@ -67,6 +67,6 @@ void Extension::installPath(char* extName, std::string& outPath)
 
 void Extension::dumpToLog(void)
 {
-    Debug::out(LOG_DEBUG, "Extension::dumpToLog - name: '%s', url: '%s', state: %d, lastAccessTime: %d, outSocketPath: '%s'",
+    logHdd(LOG_DEBUG, "Extension::dumpToLog - name: '%s', url: '%s', state: %d, lastAccessTime: %d, outSocketPath: '%s'",
                name, url, state, lastAccessTime, outSocketPath);
 }

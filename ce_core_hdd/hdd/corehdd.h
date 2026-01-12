@@ -1,0 +1,120 @@
+#ifndef COREHDD_H
+#define COREHDD_H
+
+#include "../misc/global.h"
+#include "../misc/settings.h"
+#include "../misc/settingsreloadproxy.h"
+#include "../misc/isettingsuser.h"
+#include "../misc/version.h"
+#include "../misc/utils.h"
+
+class ConfigService;
+class ScreencastService;
+class AcsiDataTrans;
+class RetryModule;
+class ExtensionHandler;
+
+class CoreHdd: public ISettingsUser
+{
+public:
+    CoreHdd();
+    virtual ~CoreHdd();
+
+    void resetHansAndFranz(void);
+    void run(void);
+
+    void sendHalfWord(void);
+    virtual void reloadSettings(int type);                                  // from ISettingsUser
+
+    void setFloppyImageLed(int ledNo);
+
+private:
+    bool shouldRun;
+    bool running;
+
+    AcsiDataTrans       *dataTrans;
+    ExtensionHandler    *extensionHandler;
+
+    //-----------------------------------
+    // settings and config stuff
+    SettingsReloadProxy     settingsReloadProxy;
+
+    void loadSettings(void);
+
+    //-----------------------------------
+    // hard disk stuff
+    bool            setEnabledIDbits;
+    AcsiIDinfo      acsiIdInfo;
+    RetryModule     *retryMod;
+
+    bool handleHdd(uint8_t* inBuff);
+    void handleAcsiCommand(uint8_t *bufIn);
+
+    //-----------------------------------
+    // handle FW version
+    void handleFwVersion_hans(void);
+    void handleFwVersion_franz(void);
+
+    void saveHwConfig(void);
+    uint8_t getIdBits(void);
+
+    //----------------------------------
+    // other
+    void sharedObjects_create(void);
+    void sharedObjects_destroy(void);
+
+    void fillDisplayLines(void);
+    void displayStatusToConsole(uint32_t now);
+
+    void handleOtherStuff(void);
+};
+
+class LoadTracker {
+public:
+    struct {
+        uint32_t start;
+        uint32_t total;
+    } cycle;
+
+    struct {
+        void markStart(void) {                          // call on start of block where the work is done (exclude idle sleep())
+            start  = Utils::getCurrentMs();
+        }
+
+        void markEnd(void) {                            // call on end of block where the work is done (exclude idle sleep())
+            total += Utils::getCurrentMs() - start;
+        }
+
+        uint32_t start;
+        uint32_t total;
+    } busy;
+
+    int     loadPercents;                               // contains 0 .. 100, meaning percentage of load
+    bool    suspicious;                                 // if the last load percentage was high or cycle time was long, this will be true
+
+    LoadTracker(void) {
+        clear();
+    }
+
+    void calculate(void) {  // call this on the end of 1 second interval to calculate load
+        cycle.total     = Utils::getCurrentMs() - cycle.start;
+        loadPercents    = (busy.total * 100) / cycle.total;
+
+        suspicious      = false;
+
+        if(cycle.total > 1100 || loadPercents > 90) {
+            suspicious  = true;
+        }
+    }
+
+    void clear(void) {      // call this on the start of new 1 second interval to clear everything
+        loadPercents = 0;
+        suspicious  = false;
+
+        cycle.total = 0;
+        cycle.start = Utils::getCurrentMs();
+        busy.total  = 0;
+    }
+};
+
+#endif // COREHDD_H

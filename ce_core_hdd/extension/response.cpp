@@ -1,6 +1,6 @@
 #include <string.h>
 #include <stdint.h>
-#include "../utils.h"
+#include "../misc/utils.h"
 #include "response.h"
 
 void Response::clear(void)
@@ -21,7 +21,7 @@ void Response::store(uint8_t statusByte, uint8_t* data, uint32_t dataLen)
 {
     state = RESP_STATE_RECEIVED;                // now received
     this->statusByte = statusByte;              // store status byte
-    
+
     uint32_t storeDataLen = MIN(EXT_BUFFER_SIZE, dataLen);      // make sure to avoid buffer overflow
     memcpy(this->data, data, storeDataLen);     // copy in data
     this->dataLen = dataLen;                    // store data length

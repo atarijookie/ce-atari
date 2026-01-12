@@ -4,8 +4,8 @@
 #include <string>
 #include <stdint.h>
 
-#include "../acsidatatrans.h"
-#include "../settings.h"
+#include "../hdd/acsidatatrans.h"
+#include "../misc/settings.h"
 #include "extension.h"
 
 class ExtensionHandler

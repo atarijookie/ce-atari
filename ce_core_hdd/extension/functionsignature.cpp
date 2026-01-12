@@ -1,8 +1,8 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "../debug.h"
-#include "../utils.h"
+#include "../misc/debug.h"
+#include "../misc/utils.h"
 #include "functionsignature.h"
 #include "extensiondefs.h"
 
@@ -55,7 +55,7 @@ uint16_t FunctionSignature::calcHash(char* name)
 
 void FunctionSignature::dumpReceivedSignature(ReceivedSignature* sign)
 {
-    Debug::out(LOG_DEBUG, "ReceivedSignature - name: '%s', funcType: %d, argumentsCount: %d, argumentTypes: %d %d %d %d %d %d %d %d %d %d, returnValueType: %d",
+    logHdd(LOG_DEBUG, "ReceivedSignature - name: '%s', funcType: %d, argumentsCount: %d, argumentTypes: %d %d %d %d %d %d %d %d %d %d, returnValueType: %d",
         sign->name, sign->funcType, sign->argumentsCount, sign->argumentTypes[0], sign->argumentTypes[1], sign->argumentTypes[2], sign->argumentTypes[3],
         sign->argumentTypes[4], sign->argumentTypes[5], sign->argumentTypes[6], sign->argumentTypes[7], sign->argumentTypes[8], sign->argumentTypes[9],
         sign->returnValueType);
@@ -63,7 +63,7 @@ void FunctionSignature::dumpReceivedSignature(ReceivedSignature* sign)
 
 void FunctionSignature::dump(void)
 {
-    Debug::out(LOG_DEBUG, "stored signature - used: %d, name: '%s', nameHash: %04x, funcType: %d, argumentsCount: %d, argumentTypes: %d %d %d %d %d %d %d %d %d %d, returnValueType: %d",
+    logHdd(LOG_DEBUG, "stored signature - used: %d, name: '%s', nameHash: %04x, funcType: %d, argumentsCount: %d, argumentTypes: %d %d %d %d %d %d %d %d %d %d, returnValueType: %d",
         used, name, nameHash, funcType, argumentsCount, argumentTypes[0], argumentTypes[1], argumentTypes[2], argumentTypes[3],
         argumentTypes[4], argumentTypes[5], argumentTypes[6], argumentTypes[7], argumentTypes[8], argumentTypes[9],
         returnValueType);
@@ -110,7 +110,7 @@ uint8_t FunctionSignature::getAcsiCmdForFuncType(void)
     const static uint8_t funcTypeToJustCmd[4] = {0, CMD_CALL_RAW_READ, CMD_CALL_RAW_WRITE, CMD_CALL_LONG_WRITE_ARGS};
 
     if(funcType >= sizeof(funcTypeToJustCmd)) { // index would be too big?
-        Debug::out(LOG_WARNING, "FunctionSignature::getAcsiCmdForFuncType - funcType %d is out of bounds!", funcType);
+        logHdd(LOG_WARNING, "FunctionSignature::getAcsiCmdForFuncType - funcType %d is out of bounds!", funcType);
         return 0;
     }
 

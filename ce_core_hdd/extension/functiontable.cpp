@@ -2,7 +2,7 @@
 #include <string.h>
 #include "functiontable.h"
 #include "extensiondefs.h"
-#include "../debug.h"
+#include "../misc/debug.h"
 
 void FunctionTable::clear(void)
 {
@@ -66,7 +66,7 @@ void FunctionTable::storeReceivedSignatures(uint8_t* buffer, uint8_t funcCount)
             }
 
             if(signatures[i].nameHash == signatures[j].nameHash) {
-                Debug::out(LOG_WARNING, "FunctionSignature::storeReceivedSignatures - function '%s' and function '%s' have the same hash! You will not be able to call both!", 
+                logHdd(LOG_WARNING, "FunctionSignature::storeReceivedSignatures - function '%s' and function '%s' have the same hash! You will not be able to call both!",
                            signatures[i].name, signatures[j].name);
                 foundCollision = true;
             }
@@ -74,6 +74,6 @@ void FunctionTable::storeReceivedSignatures(uint8_t* buffer, uint8_t funcCount)
     }
 
     if(!foundCollision) {       // no collision found
-        Debug::out(LOG_DEBUG, "FunctionSignature::storeReceivedSignatures - no hash collision detected, good.");
+        logHdd(LOG_DEBUG, "FunctionSignature::storeReceivedSignatures - no hash collision detected, good.");
     }
 }
