@@ -4,13 +4,15 @@
 #include <stdint.h>
 #include <cstdio>
 
+#define DISCOVERY_LOG_FILENAME  "discovery.log"
 #define CORE_HDD_LOG_FILENAME   "core_hdd.log"
 #define CORE_FDD_LOG_FILENAME   "core_fdd.log"
 #define CORE_IKBD_LOG_FILENAME  "core_ikbd.log"
 
-#define LOGFILE_HDD     0
-#define LOGFILE_FDD     1
-#define LOGFILE_IKBD    2
+#define LOGFILE_DISCOVERY   0
+#define LOGFILE_HDD         1
+#define LOGFILE_FDD         2
+#define LOGFILE_IKBD        3
 
 #define LOG_OFF         0
 #define LOG_INFO        1       // info         - info which can be displayed when running at user's place
@@ -21,9 +23,10 @@
 typedef struct {
     uint8_t    isInHandleAcsiCommand;
     uint32_t   prevAcsiCmdTime;
-    uint32_t   thisAcsiCmdTime;   
+    uint32_t   thisAcsiCmdTime;
 } DebugVars;
 
+void logDiscovery(int logLevel, const char *format, ...);
 void logHdd(int logLevel, const char *format, ...);
 void logFdd(int logLevel, const char *format, ...);
 void logIkbd(int logLevel, const char *format, ...);

@@ -21,7 +21,7 @@ uint8_t  g_outToConsole;
 
 DebugVars dbgVars;
 
-std::string coreLogFileName[3];
+std::string coreLogFileName[4];
 
 const char* Debug::getCoreLogFileName(bool forceCreate, int whichLog)
 {
@@ -32,6 +32,7 @@ const char* Debug::getCoreLogFileName(bool forceCreate, int whichLog)
     std::string logDir = Utils::dotEnvValue("LOG_DIR", LOG_DIR_DEFAULT, false);
 
     switch(whichLog) {
+        case LOGFILE_DISCOVERY: coreLogFileName[whichLog] = logDir + std::string("/" DISCOVERY_LOG_FILENAME); break;
         case LOGFILE_HDD: coreLogFileName[whichLog] = logDir + std::string("/" CORE_HDD_LOG_FILENAME); break;
         case LOGFILE_FDD: coreLogFileName[whichLog] = logDir + std::string("/" CORE_FDD_LOG_FILENAME); break;
         case LOGFILE_IKBD: coreLogFileName[whichLog] = logDir + std::string("/" CORE_IKBD_LOG_FILENAME); break;
@@ -62,6 +63,18 @@ void Debug::printfLogLevelString(void)
     printf("\nLog level: ");
     printf("%s", logLevelString(logLevel));
     printf("\n\n");
+}
+
+void logDiscovery(int aLogLevel, const char *format, ...)
+{
+    if(aLogLevel > logLevel) {         // if this log is higher than allowed, don't do this
+        return;
+    }
+
+    va_list args;
+    va_start(args, format);
+    Debug::outV(LOGFILE_DISCOVERY, aLogLevel, format, args);
+    va_end(args);
 }
 
 void logHdd(int aLogLevel, const char *format, ...)

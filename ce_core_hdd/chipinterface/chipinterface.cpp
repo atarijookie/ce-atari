@@ -78,7 +78,7 @@ void ChipInterface::createListeningSocket(void)
 
     addressListen.sin_family = AF_INET;
     addressListen.sin_addr.s_addr = INADDR_ANY;
-    addressListen.sin_port = htons( SERVER_TCP_PORT_HDD_FIRST );
+    addressListen.sin_port = htons( SERVER_TCP_PORT_HDD );
 
     // bind to address
     if (bind(fdListen, (struct sockaddr *) &addressListen, sizeof(addressListen)) < 0) {
@@ -92,7 +92,7 @@ void ChipInterface::createListeningSocket(void)
         return;
     }
 
-    Debug::out(whichLog, LOG_INFO, "netServer - listening on tcp port: %d", SERVER_TCP_PORT_HDD_FIRST);
+    Debug::out(whichLog, LOG_INFO, "netServer - listening on tcp port: %d", SERVER_TCP_PORT_HDD);
 }
 
 void ChipInterface::acceptSocketIfNeededAndPossible(void)

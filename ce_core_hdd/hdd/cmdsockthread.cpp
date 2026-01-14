@@ -44,7 +44,7 @@ int createRecvSocket(const char* dotEnvKey)
     fchmod(sock, S_IRUSR | S_IWUSR);        // restrict permissions before bind
 
     std::string sockPathEnv = Utils::dotEnvValue(dotEnvKey);
-    std::string sockPath = sockPathEnv + std::to_string(SERVER_TCP_PORT_HDD_FIRST);
+    std::string sockPath = sockPathEnv + std::to_string(SERVER_TCP_PORT_HDD);
 
     logHdd(LOG_DEBUG, "createRecvSocket - %s = %s", dotEnvKey, sockPath.c_str());
 

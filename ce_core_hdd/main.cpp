@@ -24,6 +24,7 @@ volatile sig_atomic_t sigintReceived = 0;
 void sigint_handler(int sig);
 
 void handlePthreadCreate(const char* threadName, pthread_t* pThreadInfo, void* threadCode);
+void pthread_kill_join(const char* threadName, pthread_t& threadInfo);
 void parseCmdLineArguments(int argc, char *argv[]);
 void printfPossibleCmdLineArgs(void);
 
@@ -31,6 +32,9 @@ InterProcessEvents  events;
 ExternalServices    externalServices;
 bool justShowHelp = false;
 int logLevel = LOG_ERROR;
+
+void discoveryMain(void);
+pthread_t discoveryThreadInfo;
 
 bool otherInstanceIsRunning(void);
 int  runCoreHdd(void);
@@ -47,8 +51,10 @@ int main(int argc, char *argv[])
     parseCmdLineArguments(argc, argv);                          // then parse cmd line arguments and set global variables
     Debug::printfLogLevelString();
 
-    Utils::loadDotEnv();                                        // load dotEnv before setting default log file
-    Debug::getCoreLogFileName(true, LOGFILE_HDD);    // call this with force=true to re-create the log file name
+    Utils::loadDotEnv();                                       // load dotEnv before setting default log file
+    for(int i=LOGFILE_DISCOVERY; i<=LOGFILE_IKBD; i++) {
+        Debug::getCoreLogFileName(true, i);    // call this with force=true to re-create the log file name
+    }
     Debug::logLevelFromDotEnv();        // set log level from .env value of LOG_LEVEL
 
     ldp_setParam(1, (uint64_t) logLevel);                         // libDOSpath - set log level to file
@@ -87,7 +93,13 @@ int main(int argc, char *argv[])
         printf("Cannot register SIGHUP handler!\n");
     }
 
-    return runCoreHdd();
+    handlePthreadCreate("discovery service", &discoveryThreadInfo, (void*) discoveryMain);
+
+    int ret = runCoreHdd();
+
+    pthread_kill_join("discovery service", discoveryThreadInfo);
+
+    return ret;
 }
 
 void pthread_kill_join(const char* threadName, pthread_t& threadInfo)
@@ -101,7 +113,7 @@ void pthread_kill_join(const char* threadName, pthread_t& threadInfo)
 std::string pidFileName(void)
 {
     std::string pidDir = Utils::dotEnvValue("PID_DIR", PID_DIR_DEFAULT);
-    std::string pidFilePath = pidDir + std::string("/ce_hdd_") + std::to_string(SERVER_TCP_PORT_HDD_FIRST) + std::string(".pid");
+    std::string pidFilePath = pidDir + std::string("/ce_hdd_") + std::to_string(SERVER_TCP_PORT_HDD) + std::string(".pid");
     return pidFilePath;
 }
 
@@ -114,8 +126,8 @@ int runCoreHdd(void)
 
     char appVersion[16];
     Version::getAppVersion(appVersion);
-    logHdd(LOG_INFO, "CosmosEx HDD core starting at port %d, version: %s", SERVER_TCP_PORT_HDD_FIRST, appVersion);
-    printf("\nCosmosEx HDD core starting at port %d, version: %s\n", SERVER_TCP_PORT_HDD_FIRST, appVersion);
+    logHdd(LOG_INFO, "CosmosEx HDD core starting at port %d, version: %s", SERVER_TCP_PORT_HDD, appVersion);
+    printf("\nCosmosEx HDD core starting at port %d, version: %s\n", SERVER_TCP_PORT_HDD, appVersion);
 
     Utils::setTimezoneVariable_inThisContext();
 
