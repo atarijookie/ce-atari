@@ -7,18 +7,24 @@
 #include "../misc/utils.h"
 #include "../misc/debug.h"
 #include "bufferedreader.h"
-#include "chipinterfacenetwork.h"
+#include "chipinterface.h"
 
 BufferedReader::BufferedReader()
 {
     fd = -1;
     gotBytes = 0;
     dataSizeBytes = 0;
+    whichSyncTag = SYNC_TAG_HDD;
 }
 
 BufferedReader::~BufferedReader()
 {
 
+}
+
+void BufferedReader::setSyncTag(uint32_t whichSyncTagCode)
+{
+    whichSyncTag = whichSyncTagCode;
 }
 
 void BufferedReader::setFd(int inFd)
@@ -144,7 +150,7 @@ int BufferedReader::readHeaderFromBuffer(uint8_t atnCodeWant)
     }
 
     uint32_t syncDword = Utils::getDword(&buffer[0]);
-    if(syncDword != SYNC_TAG_HDD) {                       // sync bytes wrong?
+    if(syncDword != whichSyncTag) {                       // sync bytes wrong?
         logHdd(LOG_DEBUG, "readHeaderFromBuffer() - bad syncDword: %08x", syncDword);
         return NET_ATN_NONE_ID;
     }

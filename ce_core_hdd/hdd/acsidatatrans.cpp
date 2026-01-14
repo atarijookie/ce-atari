@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <time.h>
 
+#include "../chipinterface/chipinterface.h"
 #include "../misc/debug.h"
 #include "../misc/utils.h"
 #include "acsidatatrans.h"
@@ -35,9 +36,10 @@ AcsiDataTrans::~AcsiDataTrans()
     delete []recvBuffer;
 }
 
-void AcsiDataTrans::setCommunicationObject(ChipInterface *comIn)
+void AcsiDataTrans::setCommunicationObject(ChipInterface* cin, int* fdClientIn)
 {
-    com = comIn;
+    com = cin;
+    fdClient = fdClientIn;
 }
 
 void AcsiDataTrans::setRetryObject(RetryModule *retryModule)
@@ -215,13 +217,13 @@ bool AcsiDataTrans::sendData_start(uint32_t totalDataCount, uint8_t scsiStatus, 
         return false;
     }
 
-    return com->hdd_sendData_start(totalDataCount, scsiStatus, withStatus);
+    return com->hdd_sendData_start(*fdClient, totalDataCount, scsiStatus, withStatus);
 }
 
 bool AcsiDataTrans::sendData_transferBlock(uint8_t *pData, uint32_t dataCount, bool withHeader)
 {
     sentDataCount += dataCount;
-    bool res = com->hdd_sendData_transferBlock(pData, dataCount, withHeader);
+    bool res = com->hdd_sendData_transferBlock(*fdClient, pData, dataCount, withHeader);
 
     if(!res) {                                                  // failed? fail
         clear();                                                // clear all the variables
@@ -239,12 +241,12 @@ bool AcsiDataTrans::recvData_start(uint32_t totalDataCount)
 
     dataDirection = DATA_DIRECTION_WRITE;                           // let the higher function know that we've done data write -- 130 048 Bytes
 
-    return com->hdd_recvData_start(recvBuffer, totalDataCount);
+    return com->hdd_recvData_start(*fdClient, recvBuffer, totalDataCount);
 }
 
 bool AcsiDataTrans::recvData_transferBlock(uint8_t *pData, uint32_t dataCount, bool withHeader)
 {
-    bool res = com->hdd_recvData_transferBlock(pData, dataCount, withHeader);
+    bool res = com->hdd_recvData_transferBlock(*fdClient, pData, dataCount, withHeader);
 
     if(!res) {              // failed?
         clear(false);       // clear all the variables
@@ -255,7 +257,7 @@ bool AcsiDataTrans::recvData_transferBlock(uint8_t *pData, uint32_t dataCount, b
 
 bool AcsiDataTrans::sendStatusToHans(uint8_t statusByte)
 {
-    bool res = com->hdd_sendStatusToHans(statusByte);
+    bool res = com->hdd_sendStatusToHans(*fdClient, statusByte);
 
     if(!res) {
         clear();            // clear all the variables

@@ -17,8 +17,7 @@
 #include "misc/debug.h"
 #include "misc/version.h"
 #include "hdd/cmdsockthread.h"
-#include "extension/extensionrecvthread.h"
-#include "chipinterface/chipinterfacenetwork.h"
+#include "chipinterface/chipinterface.h"
 #include "../libdospath/libdospath.h"
 
 volatile sig_atomic_t sigintReceived = 0;
@@ -28,27 +27,21 @@ void handlePthreadCreate(const char* threadName, pthread_t* pThreadInfo, void* t
 void parseCmdLineArguments(int argc, char *argv[]);
 void printfPossibleCmdLineArgs(void);
 
-void loadLastHwConfig(void);
-void initializeFlags(void);
-
-THwConfig           hwConfig;                           // info about the current HW setup
-TFlags              flags;                              // global flags from command line
 InterProcessEvents  events;
-SharedObjects       shared;
-ChipInterface*      chipInterface;
 ExternalServices    externalServices;
+bool justShowHelp = false;
+int logLevel = LOG_ERROR;
 
 bool otherInstanceIsRunning(void);
-int  runCore(void);
+int  runCoreHdd(void);
 
 int main(int argc, char *argv[])
 {
-    pthread_mutex_init(&shared.mtxHdd,   NULL);
-    pthread_mutex_init(&shared.mtxImages, NULL);
-
     printf("\033[H\033[2J\n");
 
-    initializeFlags();                                          // initialize flags
+    justShowHelp = false;
+    Debug::setLogLevel(LOG_ERROR);      // init current log level to LOG_ERROR
+
     logHdd(LOG_INFO, "\n\n"); logHdd(LOG_INFO, "---------------------------------------------------");
 
     parseCmdLineArguments(argc, argv);                          // then parse cmd line arguments and set global variables
@@ -58,18 +51,18 @@ int main(int argc, char *argv[])
     Debug::getCoreLogFileName(true, LOGFILE_HDD);    // call this with force=true to re-create the log file name
     Debug::logLevelFromDotEnv();        // set log level from .env value of LOG_LEVEL
 
-    ldp_setParam(1, (uint64_t) flags.logLevel);                         // libDOSpath - set log level to file
+    ldp_setParam(1, (uint64_t) logLevel);                         // libDOSpath - set log level to file
     std::string logDir = Utils::dotEnvValue("LOG_DIR", LOG_DIR_DEFAULT);  // path to logs dir
     Utils::mergeHostPaths(logDir, "libdospath.log");                    // full path = logs dir + filename
     ldp_setParam(2, (uint64_t) logDir.c_str());                         // libDOSpath - set log file path
-    logHdd(LOG_ERROR, "setting libdospath log file to: %s and log level to: %d", logDir.c_str(), flags.logLevel);
+    logHdd(LOG_ERROR, "setting libdospath log file to: %s and log level to: %d", logDir.c_str(), logLevel);
 
     Utils::screenShotVblEnabled(false);                         // screenshot vbl not enabled by default
     preloadGlobalsFromDotEnv();
 
     //------------------------------------
     // if should only show help and quit
-    if(flags.justShowHelp) {
+    if(justShowHelp) {
         printfPossibleCmdLineArgs();
         return 0;
     }
@@ -82,9 +75,7 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    logHdd(LOG_INFO, "logLevel: %d", flags.logLevel);
-
-    loadLastHwConfig();                                     // load last found HW IF, HW version, SCSI machine
+    logHdd(LOG_INFO, "logLevel: %d", logLevel);
 
     //------------------------------------
     // register signal handlers
@@ -96,7 +87,7 @@ int main(int argc, char *argv[])
         printf("Cannot register SIGHUP handler!\n");
     }
 
-    return runCore();
+    return runCoreHdd();
 }
 
 void pthread_kill_join(const char* threadName, pthread_t& threadInfo)
@@ -110,29 +101,21 @@ void pthread_kill_join(const char* threadName, pthread_t& threadInfo)
 std::string pidFileName(void)
 {
     std::string pidDir = Utils::dotEnvValue("PID_DIR", PID_DIR_DEFAULT);
-    std::string pidFilePath = pidDir + std::string("/ce_hdd_") + std::to_string(flags.portClient) + std::string(".pid");
+    std::string pidFilePath = pidDir + std::string("/ce_hdd_") + std::to_string(SERVER_TCP_PORT_HDD_FIRST) + std::string(".pid");
     return pidFilePath;
 }
 
-int runCore(void)
+int runCoreHdd(void)
 {
     CoreHdd *core;
     pthread_t cmdSockThreadInfo;
-    pthread_t extensionThreadInfo;
 
-    logHdd(LOG_INFO, "runCore as network server");
-    hwConfig.version = 3;
-    chipInterface = new ChipInterfaceNetwork();     // create network chip interface
-    chipInterface->ciOpen();                        // try to open it
-
-    //------------------------------------
-    // normal app run follows
     Debug::printfLogLevelString();
 
     char appVersion[16];
     Version::getAppVersion(appVersion);
-    logHdd(LOG_INFO, "CosmosEx HDD core starting at port %d, version: %s", flags.portClient, appVersion);
-    printf("\nCosmosEx HDD core starting at port %d, version: %s\n", flags.portClient, appVersion);
+    logHdd(LOG_INFO, "CosmosEx HDD core starting at port %d, version: %s", SERVER_TCP_PORT_HDD_FIRST, appVersion);
+    printf("\nCosmosEx HDD core starting at port %d, version: %s\n", SERVER_TCP_PORT_HDD_FIRST, appVersion);
 
     Utils::setTimezoneVariable_inThisContext();
 
@@ -140,26 +123,14 @@ int runCore(void)
     core = new CoreHdd();
 
     handlePthreadCreate("command socket", &cmdSockThreadInfo, (void*) cmdSockThreadCode);
-    handlePthreadCreate("extension", &extensionThreadInfo, (void*) extensionThreadCode);
 
     printf("Entering main loop...\n");
-
     core->run();                // run the main thread
-
     printf("\n\nExit from main loop\n");
 
     delete core;
 
     pthread_kill_join("command socket", cmdSockThreadInfo);
-    pthread_kill_join("extension", extensionThreadInfo);
-
-    //---------------------------------------------------
-    // Closing of GPIO should be done after stopping IKBD thread and DISPLAY thread
-    // as they also use some GPIO pins and we want them to be able to use them until the end.
-    chipInterface->ciClose();                           // close gpio
-    delete chipInterface;
-    chipInterface = NULL;
-    //---------------------------------------------------
 
     // remove PID file on termination
     std::string pidFilePath = pidFileName();
@@ -168,22 +139,6 @@ int runCore(void)
     logHdd(LOG_INFO, "CosmosEx terminated.");
     printf("Terminated\n");
     return 0;
-}
-
-void loadLastHwConfig(void)
-{
-    Settings s;
-
-    hwConfig.changed        = false;
-    memset(hwConfig.hwSerial, 0, 13);
-}
-
-void initializeFlags(void)
-{
-    flags.justShowHelp = false;
-    Debug::setLogLevel(LOG_ERROR);      // init current log level to LOG_ERROR
-    flags.portServerReport = 7200;
-    flags.portClient = 7300;
 }
 
 void parseCmdLineArguments(int argc, char *argv[])
@@ -213,27 +168,9 @@ void parseCmdLineArguments(int argc, char *argv[])
             continue;
         }
 
-        if(argv[i][0] == 'p') {
-            isKnownTag = true;                                      // this is a known tag
-            int res = sscanf(argv[i] + 1, "%d", &flags.portClient);
-            if(res != 1) {
-                printf(">>> BAD CLIENT PORT VALUE: '%s' <<<\n", argv[i] + 1);
-                logHdd(LOG_ERROR, ">>> BAD CLIENT PORT VALUE: '%s' <<<\n", argv[i] + 1);
-            }
-        }
-
-        if(argv[i][0] == 'r') {
-            isKnownTag = true;                                      // this is a known tag
-            int res = sscanf(argv[i] + 1, "%d", &flags.portServerReport);
-            if(res != 1) {
-                printf(">>> BAD REPORT PORT VALUE: '%s' <<<\n", argv[i] + 1);
-                logHdd(LOG_ERROR, ">>> BAD REPORT PORT VALUE: '%s' <<<\n", argv[i] + 1);
-            }
-        }
-
         if(strcmp(argv[i], "help") == 0 || strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "/?") == 0 || strcmp(argv[i], "?") == 0) {
-            isKnownTag          = true;                             // this is a known tag
-            flags.justShowHelp  = true;
+            isKnownTag = true;                             // this is a known tag
+            justShowHelp  = true;
             continue;
         }
 
@@ -247,8 +184,6 @@ void printfPossibleCmdLineArgs(void)
 {
     printf("\nPossible command line args:\n");
     printf("llx      - set log level to x (default is 1, max is 4)\n");
-    printf("pXXXX    - set listening port to XXXX\n");
-    printf("rXXXX    - set port for status reporting to XXXX\n");
 }
 
 void handlePthreadCreate(const char* threadName, pthread_t* pThreadInfo, void* threadCode)

@@ -20,14 +20,11 @@
 #include "../../misc/debug.h"
 #include "../../misc/utils.h"
 #include "../../misc/settings.h"
-#include "../../misc/settingsreloadproxy.h"
 #include "../acsidatatrans.h"
 #include "translateddisk.h"
 #include "translatedhelper.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"
-
-extern TFlags flags;
 
 void TranslatedDisk::onDsetdrv(uint8_t *cmd)
 {
@@ -266,7 +263,7 @@ void TranslatedDisk::onFsfirst(uint8_t *cmd)
 
     logHdd(LOG_DEBUG, "TranslatedDisk::onFsfirst(%08x) - atari search string: %s, find attribs: 0x%02x", dta, atariSearchString.c_str(), findAttribs);
 
-    if(LOG_DEBUG <= flags.logLevel) {                   // only when debug is enabled
+    if(LOG_DEBUG <= logLevel) {                   // only when debug is enabled
         std::string atts;
         atariFindAttribsToString(findAttribs, atts);
         logHdd(LOG_DEBUG, "find attribs: 0x%02x -> %s", findAttribs, atts.c_str());
@@ -1414,7 +1411,7 @@ void TranslatedDisk::onDrvMap(uint8_t *cmd)
 {
     uint16_t drives = getDrivesBitmap();
 
-    if(flags.logLevel >= LOG_DEBUG) {
+    if(logLevel >= LOG_DEBUG) {
         char tmp2[3];
         memset(tmp2, 0, 3);
 
@@ -1649,43 +1646,7 @@ void TranslatedDisk::onSetACSIids(uint8_t *cmd)
         return;
     }
 
-    int newId   = dataBuffer[0];                            // get new ID...
-    int devType = dataBuffer[1];                            // get desired dev type
+    // function deprecated - no setting of IDs from Atari side
 
-    logHdd(LOG_DEBUG, "TranslatedDisk::onSetACSIids - setting devType %d to ID %d", devType, newId);
-
-    AcsiIDinfo  acsiIdInfo;
-    Settings    s;
-    s.loadAcsiIDs(&acsiIdInfo);                             // read the list of device types from settings
-
-    char key[32];
-
-    if(devType == DEVTYPE_TRANSLATED || devType == DEVTYPE_SD) {        // if the device type is one of these, then disable them on their current ID, because we can have only one of them
-        int currentId = findCurrentIDforDevType(devType, &acsiIdInfo);  // try to find it
-
-        if(currentId == newId) {                            // ID not changed? quit
-            dataTrans->setStatus(E_OK);
-            logHdd(LOG_DEBUG, "TranslatedDisk::onSetACSIids - ID not changed, not saving it (it's OK)");
-            return;
-        }
-
-        if(currentId != -1) {                               // if it currently exists, disable it
-            sprintf(key, "ACSI_DEVTYPE_%d", currentId);     // create settings KEY, e.g. ACSI_DEVTYPE_0
-            s.setInt(key, DEVTYPE_OFF);
-
-            logHdd(LOG_DEBUG, "TranslatedDisk::onSetACSIids - the devType %d was already on ID %d, disabling it there", devType, currentId);
-        }
-    }
-
-    sprintf (key, "ACSI_DEVTYPE_%d", newId);                // create settings KEY, e.g. ACSI_DEVTYPE_0
-    s.setInt(key, devType);                                 // save new devType for that ID
-
-    logHdd(LOG_DEBUG, "TranslatedDisk::onSetACSIids - new ID %d was set to devType %d", newId, devType);
     dataTrans->setStatus(E_OK);
-
-    if(reloadProxy) {                                       // if got settings reload proxy, invoke reload
-        reloadProxy->reloadSettings(SETTINGSUSER_ACSI);
-    }
-
-    Utils::forceSync();                                     // tell system to flush the filesystem caches
 }

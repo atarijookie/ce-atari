@@ -17,9 +17,7 @@
 #include "../hdd/native/scsi.h"
 
 uint32_t prevLogOut;
-
-extern TFlags   flags;
-       uint8_t  g_outToConsole;
+uint8_t  g_outToConsole;
 
 DebugVars dbgVars;
 
@@ -62,61 +60,73 @@ const char* Debug::logLevelString(int ll)
 void Debug::printfLogLevelString(void)
 {
     printf("\nLog level: ");
-    printf("%s", logLevelString(flags.logLevel));
+    printf("%s", logLevelString(logLevel));
     printf("\n\n");
 }
 
-void logHdd(int logLevel, const char *format, ...)
+void logHdd(int aLogLevel, const char *format, ...)
 {
-    if(logLevel > flags.logLevel) {         // if this log is higher than allowed, don't do this
+    if(aLogLevel > logLevel) {         // if this log is higher than allowed, don't do this
         return;
     }
 
     va_list args;
     va_start(args, format);
-    Debug::outV(LOGFILE_HDD, logLevel, format, args);
+    Debug::outV(LOGFILE_HDD, aLogLevel, format, args);
     va_end(args);
 }
 
-void logFdd(int logLevel, const char *format, ...)
+void logFdd(int aLogLevel, const char *format, ...)
 {
-    if(logLevel > flags.logLevel) {         // if this log is higher than allowed, don't do this
+    if(aLogLevel > logLevel) {         // if this log is higher than allowed, don't do this
         return;
     }
 
     va_list args;
     va_start(args, format);
-    Debug::outV(LOGFILE_FDD, logLevel, format, args);
+    Debug::outV(LOGFILE_FDD, aLogLevel, format, args);
     va_end(args);
 }
 
-void logIkbd(int logLevel, const char *format, ...)
+void logIkbd(int aLogLevel, const char *format, ...)
 {
-    if(logLevel > flags.logLevel) {         // if this log is higher than allowed, don't do this
+    if(aLogLevel > logLevel) {         // if this log is higher than allowed, don't do this
         return;
     }
 
     va_list args;
     va_start(args, format);
-    Debug::outV(LOGFILE_IKBD, logLevel, format, args);
+    Debug::outV(LOGFILE_IKBD, aLogLevel, format, args);
     va_end(args);
 }
 
-void logHdd(int whichLog, int logLevel, const char *format, ...)
+void logHdd(int whichLog, int aLogLevel, const char *format, ...)
 {
-    if(logLevel > flags.logLevel) {         // if this log is higher than allowed, don't do this
+    if(aLogLevel > logLevel) {         // if this log is higher than allowed, don't do this
         return;
     }
 
     va_list args;
     va_start(args, format);
-    Debug::outV(whichLog, logLevel, format, args);
+    Debug::outV(whichLog, aLogLevel, format, args);
     va_end(args);
 }
 
-void Debug::outV(int whichLog, int logLevel, const char *format, va_list args)
+void Debug::out(int whichLog, int aLogLevel, const char *format, ...)
 {
-    if(logLevel > flags.logLevel) {         // if this log is higher than allowed, don't do this
+    if(aLogLevel > logLevel) {         // if this log is higher than allowed, don't do this
+        return;
+    }
+
+    va_list args;
+    va_start(args, format);
+    outV(whichLog, aLogLevel, format, args);
+    va_end(args);
+}
+
+void Debug::outV(int whichLog, int aLogLevel, const char *format, va_list args)
+{
+    if(aLogLevel > logLevel) {         // if this log is higher than allowed, don't do this
         return;
     }
 
@@ -139,7 +149,7 @@ void Debug::outV(int whichLog, int logLevel, const char *format, va_list args)
     uint32_t diff = now - prevLogOut;
     prevLogOut = now;
 
-    const char* ll = logLevelString(logLevel);
+    const char* ll = logLevelString(aLogLevel);
 
     char humanTime[128];
     struct timeval tv;
@@ -149,7 +159,7 @@ void Debug::outV(int whichLog, int logLevel, const char *format, va_list args)
     struct tm tm = *localtime(&tv.tv_sec);
     sprintf(humanTime, "%02d:%02d:%02d.%06ld", tm.tm_hour, tm.tm_min, tm.tm_sec, tv.tv_usec);
 
-    if(logLevel == LOG_ERROR && dbgVars.isInHandleAcsiCommand) {    // it's an error, and we're debugging ACSI stuff
+    if(aLogLevel == LOG_ERROR && dbgVars.isInHandleAcsiCommand) {    // it's an error, and we're debugging ACSI stuff
         fprintf(f, "%s %4d %s\n", humanTime, diff, ll); // diff in ms, date/time in human readable format
         fprintf(f, "     LOG_ERROR occurred\n");
         fprintf(f, "     Time since beginning of ACSI command handling: %d\n", now - dbgVars.thisAcsiCmdTime);
@@ -165,7 +175,7 @@ void Debug::outV(int whichLog, int logLevel, const char *format, va_list args)
 
 void Debug::outBfr(int whichLog, uint8_t *bfr, int count)
 {
-    if(flags.logLevel < LOG_DEBUG) {            // if we're not in debug log level, don't do this
+    if(logLevel < LOG_DEBUG) {            // if we're not in debug log level, don't do this
         return;
     }
 
@@ -223,11 +233,11 @@ void Debug::setLogLevel(int newLogLevel)
         newLogLevel = LOG_DEBUG;
     }
 
-    logHdd(LOG_INFO, "Switching LOG LEVEL from %d to %d", flags.logLevel, newLogLevel);
-    logFdd(LOG_INFO, "Switching LOG LEVEL from %d to %d", flags.logLevel, newLogLevel);
-    logIkbd(LOG_INFO, "Switching LOG LEVEL from %d to %d", flags.logLevel, newLogLevel);
-    flags.logLevel = newLogLevel;                               // new value to struct
-    ldp_setParam(1, (uint64_t) flags.logLevel);                 // libDOSpath - set new log level to file
+    logHdd(LOG_INFO, "Switching LOG LEVEL from %d to %d", logLevel, newLogLevel);
+    logFdd(LOG_INFO, "Switching LOG LEVEL from %d to %d", logLevel, newLogLevel);
+    logIkbd(LOG_INFO, "Switching LOG LEVEL from %d to %d", logLevel, newLogLevel);
+    logLevel = newLogLevel;                               // new value to struct
+    ldp_setParam(1, (uint64_t) logLevel);                 // libDOSpath - set new log level to file
 }
 
 void Debug::logRotateIfNeeded(const char *logFilePath)

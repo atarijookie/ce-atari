@@ -13,6 +13,8 @@ public:
     TranslatedBootMedia();
     virtual ~TranslatedBootMedia();
 
+    void setHddIface(int hddIface);
+
     virtual bool iopen(const char *path, bool createIfNotExists);
     virtual void iclose(void);
 

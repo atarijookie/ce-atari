@@ -19,7 +19,6 @@
 #include "gemdos_errno.h"
 #include "desktopcreator.h"
 
-extern THwConfig hwConfig;
 extern InterProcessEvents events;
 
 // if PEXEC_FULL_PATH, then RAW IMAGE will contain full path -> \FULL\PATH\TO\MY.PRG will be created

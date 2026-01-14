@@ -16,13 +16,15 @@
 
 #include "retrymodule.h"
 
+class ChipInterface;
+
 class AcsiDataTrans
 {
 public:
     AcsiDataTrans();
     virtual ~AcsiDataTrans();
 
-    virtual void setCommunicationObject(ChipInterface *comIn);
+    virtual void setCommunicationObject(ChipInterface* cin, int* fdClient);
     virtual void setRetryObject(RetryModule *retryModule);
 
     //----------------
@@ -78,7 +80,9 @@ protected:
     bool    statusWasSet;
     int     dataDirection;
 
-    ChipInterface *com;
+    ChipInterface* com;
+    int* fdClient;
+
     RetryModule *retryMod;
 
     uint8_t    *recvBuffer;

@@ -10,11 +10,10 @@
 #include "debug.h"
 #include "utils.h"
 
-extern TFlags       flags;
-extern THwConfig    hwConfig;
-
 Settings::Settings(void)
 {
+    setPrefix(NULL, 0);
+
     std::string settingsDir = Utils::dotEnvValue("SETTINGS_DIR", "./settings"); // path to settings dir
     int res = mkdir(settingsDir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);      // mod: 0x775
 
@@ -26,6 +25,16 @@ Settings::Settings(void)
         if(errno != EEXIST) {       // and it's not because it already exists...
             logHdd(LOG_ERROR, "Settings: failed to create settings directory %s - %s", settingsDir.c_str(), strerror(errno));
         }
+    }
+}
+
+void Settings::setPrefix(uint8_t* bytes, int len)
+{
+    if(bytes != NULL && len > 0) {      // got pointer and length, store prefix as string
+        binToHex(bytes, len, prefix);
+        strcat(prefix, "_");
+    } else {        // no pointer or length, clear prefix
+        memset(prefix, 0, 32);
     }
 }
 
@@ -228,12 +237,6 @@ void Settings::binToHex(uint8_t *inBfr, int len, char *outBfr)
     }
 }
 //-------------------------
-void Settings::generateLicenseKeyName(uint8_t* hwSerial, char *keyName)
-{
-    strcpy(keyName, "HW_LICENSE_");                             // start with "HW_LICENSE_"
-    Settings::binToHex(hwSerial, 13, keyName + 11);    // take hwSerial and convert it from binary to hex string and append it to key name
-}
-//-------------------------
 void Settings::setBinaryString(const char *key, uint8_t *inBfr, int len)
 {
     char tmp[512];
@@ -339,7 +342,9 @@ void Settings::saveFloppyConfig(FloppyConfig *fc)
 FILE *Settings::sOpen(const char *key, bool readNotWrite)
 {
     std::string settingsDir = Utils::dotEnvValue("SETTINGS_DIR", "./settings"); // path to settings dir
-    std::string path = Utils::mergeHostPaths3(settingsDir, key);
+
+    std::string keyWithPrefix = prefix[0] ? (std::string(prefix) + std::string(key)) : std::string(key);
+    std::string path = Utils::mergeHostPaths2(settingsDir, keyWithPrefix);
 
     FILE *file;
 

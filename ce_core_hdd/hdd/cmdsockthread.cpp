@@ -26,10 +26,6 @@
 
 using json = nlohmann::json;
 
-extern THwConfig        hwConfig;
-extern TFlags           flags;
-extern SharedObjects    shared;
-
 void handleGenericAction(std::string& action, json& data);
 void handleSceencastAction(std::string& action, json& data);
 void handleDisksAction(std::string& action, json& data);
@@ -48,7 +44,7 @@ int createRecvSocket(const char* dotEnvKey)
     fchmod(sock, S_IRUSR | S_IWUSR);        // restrict permissions before bind
 
     std::string sockPathEnv = Utils::dotEnvValue(dotEnvKey);
-    std::string sockPath = sockPathEnv + std::to_string(flags.portClient);
+    std::string sockPath = sockPathEnv + std::to_string(SERVER_TCP_PORT_HDD_FIRST);
 
     logHdd(LOG_DEBUG, "createRecvSocket - %s = %s", dotEnvKey, sockPath.c_str());
 
@@ -360,15 +356,9 @@ void handleSceencastAction(std::string& action, json& data)
 void handleDisksAction(std::string& action, json& data)
 {
     if(action == "reload_trans") {              // reload translated disks
-        pthread_mutex_lock(&shared.mtxHdd);
-        TranslatedDisk* translated = TranslatedDisk::getInstance();
-        translated->loadSettings();
-        translated->findAttachedDisks();
-        pthread_mutex_unlock(&shared.mtxHdd);
+        events.hddReloadTranslated = true;
     } else if(action == "reload_raw") {         // reload raw disks
-        pthread_mutex_lock(&shared.mtxHdd);
-        shared.scsi->findAttachedDisks();
-        pthread_mutex_unlock(&shared.mtxHdd);
+        events.hddReloadRaw = true;
     } else {
         logHdd(LOG_WARNING, "handleDisksAction: unknown action '%s', ignoring message!", action.c_str());
     }

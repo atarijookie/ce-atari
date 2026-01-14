@@ -3,70 +3,25 @@
 
 #include "../misc/global.h"
 #include "../misc/settings.h"
-#include "../misc/settingsreloadproxy.h"
-#include "../misc/isettingsuser.h"
 #include "../misc/version.h"
 #include "../misc/utils.h"
 
-class ConfigService;
-class ScreencastService;
-class AcsiDataTrans;
-class RetryModule;
-class ExtensionHandler;
+#define MAX_CLIENTS     8
+class HddClient;
 
-class CoreHdd: public ISettingsUser
+class CoreHdd
 {
 public:
     CoreHdd();
     virtual ~CoreHdd();
 
-    void resetHansAndFranz(void);
     void run(void);
 
-    void sendHalfWord(void);
-    virtual void reloadSettings(int type);                                  // from ISettingsUser
-
-    void setFloppyImageLed(int ledNo);
-
 private:
-    bool shouldRun;
-    bool running;
+    HddClient* hddClients[MAX_CLIENTS];
 
-    AcsiDataTrans       *dataTrans;
-    ExtensionHandler    *extensionHandler;
-
-    //-----------------------------------
-    // settings and config stuff
-    SettingsReloadProxy     settingsReloadProxy;
-
-    void loadSettings(void);
-
-    //-----------------------------------
-    // hard disk stuff
-    bool            setEnabledIDbits;
-    AcsiIDinfo      acsiIdInfo;
-    RetryModule     *retryMod;
-
-    bool handleHdd(uint8_t* inBuff);
-    void handleAcsiCommand(uint8_t *bufIn);
-
-    //-----------------------------------
-    // handle FW version
-    void handleFwVersion_hans(void);
-    void handleFwVersion_franz(void);
-
-    void saveHwConfig(void);
-    uint8_t getIdBits(void);
-
-    //----------------------------------
-    // other
-    void sharedObjects_create(void);
-    void sharedObjects_destroy(void);
-
-    void fillDisplayLines(void);
+    void handleEvents(void);
     void displayStatusToConsole(uint32_t now);
-
-    void handleOtherStuff(void);
 };
 
 class LoadTracker {

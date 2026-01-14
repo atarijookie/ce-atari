@@ -14,7 +14,6 @@
 #include "../../misc/debug.h"
 #include "../../misc/settings.h"
 #include "../../misc/utils.h"
-#include "../../misc/settingsreloadproxy.h"
 #include "../acsidatatrans.h"
 #include "../acsicommand/screencastacsicommand.h"
 #include "../acsicommand/dateacsicommand.h"
@@ -25,45 +24,12 @@
 #include "desktopcreator.h"
 #include "../../../libdospath/libdospath.h"
 
-extern THwConfig hwConfig;
 extern InterProcessEvents events;
-extern SharedObjects shared;
 
-TranslatedDisk * TranslatedDisk::instance = NULL;
-
-void TranslatedDisk::mutexLock(void)
-{
-    pthread_mutex_lock(&shared.mtxHdd);
-}
-
-void TranslatedDisk::mutexUnlock(void)
-{
-    pthread_mutex_unlock(&shared.mtxHdd);
-}
-
-TranslatedDisk * TranslatedDisk::getInstance(void)
-{
-    return instance;
-}
-
-TranslatedDisk * TranslatedDisk::createInstance(AcsiDataTrans *dt)
-{
-    instance = new TranslatedDisk(dt);
-    return instance;
-}
-
-void TranslatedDisk::deleteInstance(void)
-{
-    delete instance;
-    instance = NULL;
-    ldp_cleanup();          // clean up the LibDosPath internals
-}
-
-TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt)
+TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt, THwConfig* hwConfig)
 {
     dataTrans = dt;
-
-    reloadProxy = NULL;
+    this->hwConfig = hwConfig;
 
     dataBuffer  = new uint8_t[ACSI_BUFFER_SIZE];
     dataBuffer2 = new uint8_t[ACSI_BUFFER_SIZE];
@@ -117,11 +83,6 @@ void TranslatedDisk::loadSettings(void)
     Settings s;
     configDriveLetter = s.getChar("DRIVELETTER_CONFDRIVE", 'C');
     configDriveIndex = configDriveLetter - 65;
-}
-
-void TranslatedDisk::setSettingsReloadProxy(SettingsReloadProxy *rp)
-{
-    reloadProxy = rp;
 }
 
 void TranslatedDisk::findAttachedDisks(void)
@@ -376,22 +337,14 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
     // depending on TOS major version determine the machine, on which this SCSI device is used, and limit the available SCSI IDs depending on that
     uint8_t tosVersionMajor = tosVersion >> 8;
 
-    int oldHwScsiMachine = hwConfig.scsiMachine;                // store the old value
-
     if(tosVersionMajor == 3) {                                  // TOS 3 == TT
-        hwConfig.scsiMachine = SCSI_MACHINE_TT;
+        hwConfig->scsiMachine = SCSI_MACHINE_TT;
     } else if(tosVersionMajor == 4) {                           // TOS 4 == Falcon
-        hwConfig.scsiMachine = SCSI_MACHINE_FALCON;
+        hwConfig->scsiMachine = SCSI_MACHINE_FALCON;
     } else {                                                    // other TOSes - probably not SCSI
-        hwConfig.scsiMachine = SCSI_MACHINE_UNKNOWN;
+        hwConfig->scsiMachine = SCSI_MACHINE_UNKNOWN;
     }
 
-    if(oldHwScsiMachine != hwConfig.scsiMachine) {              // SCSI machine changed? resend SCSI IDs to Hans
-        if(reloadProxy) {                                       // if got settings reload proxy, invoke reload
-            logHdd(LOG_DEBUG, "TranslatedDisk::onInitialize() - SCSI machine changed, will resend new SCSI IDs");
-            reloadProxy->reloadSettings(SETTINGSUSER_SCSI_IDS);
-        }
-    }
     //------------------------------------
 
     uint16_t translatedDrives = getDrivesBitmap();          // get bitmap of all translated drives we got

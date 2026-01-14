@@ -4,7 +4,6 @@
 #include <string>
 
 #include "../../misc/settings.h"
-#include "../../misc/isettingsuser.h"
 #include "../acsidatatrans.h"
 #include "imedia.h"
 #include "nomedia.h"

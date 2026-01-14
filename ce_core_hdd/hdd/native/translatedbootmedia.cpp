@@ -6,8 +6,6 @@
 #include "../../misc/global.h"
 #include "translatedbootmedia.h"
 
-extern THwConfig hwConfig;
-
 TranslatedBootMedia::TranslatedBootMedia()
 {
     BCapacity       = TRANSLATEDBOOTMEDIA_SIZE;
@@ -30,6 +28,12 @@ TranslatedBootMedia::~TranslatedBootMedia()
 {
     iclose();
     delete []imageBuffer;
+}
+
+void TranslatedBootMedia::setHddIface(int hddIface)
+{
+    hwHddIfaceCurrent = hddIface;
+    loadDataIntoBuffer();               // reload data from disk to virtual config drive image
 }
 
 bool TranslatedBootMedia::loadDataIntoBuffer(void)
@@ -57,7 +61,6 @@ bool TranslatedBootMedia::loadDataIntoBuffer(void)
 
     fclose(f);
 
-    hwHddIfaceCurrent = hwConfig.hddIface;     // store for which HDD IF it was prepared
     //-------------
     // load Level 2 bootsector
     f = fopen(PATH_CE_DD_BS_L2.c_str(), "rb");
@@ -191,7 +194,7 @@ void TranslatedBootMedia::updateBootsectorConfigWithACSIid(uint8_t acsiId)
     }
 
     uint8_t id;
-    if(hwConfig.hddIface == HDD_IF_ACSI) {     // for ACSI - it's the ID (0 .. 7)
+    if(hwHddIfaceCurrent == HDD_IF_ACSI) {     // for ACSI - it's the ID (0 .. 7)
         id = acsiId;
 
         logHdd(LOG_DEBUG, "TranslatedBootMedia::updateBootsectorConfigWithACSIid() - hddIface is ACSI, bootsector ID set to: %d", (int) id);
@@ -264,12 +267,6 @@ bool TranslatedBootMedia::readSectors(int64_t sectorNo, uint32_t count, uint8_t 
 
     if(sectorNo >= SCapacity) {                 // if trying to read sector beyond the last sector, fail
         return false;
-    }
-
-    if(sectorNo == 0) {                         // if loading boot sector
-        if(hwHddIfaceCurrent != hwConfig.hddIface) {   // if HDD IF changed (e.g. it was first loaded when Franz didn't respond yet, and then Franz responded that it's SCSI)
-            loadDataIntoBuffer();               // reload data from disk to virtual config drive image
-        }
     }
 
     memset(bfr, 0, count * 512);                // clear the buffer

@@ -10,7 +10,6 @@
 #include <string>
 
 #include "../../../libdospath/libdospath.h"
-#include "../../misc/isettingsuser.h"
 #include "../../misc/settings.h"
 #include "findstorage.h"
 
@@ -19,7 +18,6 @@ class ScreencastService;
 class DateAcsiCommand;
 class ScreencastAcsiCommand;
 class AcsiDataTrans;
-class SettingsReloadProxy;
 
 // this version number should be increased whenever command, data or status part of translated disk has changed - to enable CE_DD vs. Main App pairing.
 // The CE_DD should check this version number and it this doesn't match expectations, it should refuse to work.
@@ -103,25 +101,14 @@ class ZipDirEntry {
 
 class TranslatedDisk
 {
-private:
-    static TranslatedDisk * instance;
-    TranslatedDisk(AcsiDataTrans *dt);
-    virtual ~TranslatedDisk();
-
 public:
-    static TranslatedDisk * createInstance(AcsiDataTrans *dt);
-    static TranslatedDisk * getInstance(void);
-    static void deleteInstance(void);
+    TranslatedDisk(AcsiDataTrans *dt, THwConfig* hwConfig);
+    virtual ~TranslatedDisk();
 
     void loadSettings(void);
     void findAttachedDisks(void);
 
-    void mutexLock(void);
-    void mutexUnlock(void);
-
     void processCommand(uint8_t *cmd);
-
-    void setSettingsReloadProxy(SettingsReloadProxy *rp);
 
     bool hostPathExists(std::string &hostPath, bool alsoCheckCaseInsensitive = false);
     bool hostPathExists_caseInsensitive(std::string hostPath, std::string &justPath, std::string &originalFileName, std::string &foundFileName);
@@ -144,7 +131,7 @@ public:
 
 private:
     AcsiDataTrans       *dataTrans;
-    SettingsReloadProxy *reloadProxy;
+    THwConfig* hwConfig;
 
     uint8_t            *dataBuffer;
     uint8_t            *dataBuffer2;

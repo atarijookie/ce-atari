@@ -13,12 +13,7 @@
 #include "../hdd/translated/translateddisk.h"
 #include "../hdd/native/scsi.h"
 
-extern THwConfig    hwConfig;
-extern TFlags       flags;
-
 extern DebugVars    dbgVars;
-
-extern SharedObjects shared;
 
 volatile TStatuses statuses;
 
@@ -52,7 +47,7 @@ void StatusReport::createReport(std::string &report, int reportFormat)
     uint8_t ipaddrs[10];
     Utils::getIpAdds(ipaddrs);
 
-    dumpPair(report, "HDD interface type",      (hwConfig.hddIface == HDD_IF_ACSI) ? "ACSI" : "SCSI", reportFormat);
+    // dumpPair(report, "HDD interface type",      (hwConfig.hddIface == HDD_IF_ACSI) ? "ACSI" : "SCSI", reportFormat);
     dumpPair(report, "eth0  up and running",    netIfStatus(ipaddrs),   reportFormat);
     dumpPair(report, "wlan0 up and running",    netIfStatus(ipaddrs+5), reportFormat);
 
@@ -68,68 +63,68 @@ void StatusReport::createReport(std::string &report, int reportFormat)
     // USB drives
     startSection(report, "USB drives", reportFormat);
 
-    TranslatedDisk * translated = TranslatedDisk::getInstance();
+    // TranslatedDisk * translated = TranslatedDisk::getInstance();
 
-    for(int i=2; i<MAX_DRIVES; i++) {
-        if(translated->driveIsEnabled(i)) {
-            std::string driveName = std::string("Drive X");
-            driveName[6] = 'A' + i;
+    // for(int i=2; i<MAX_DRIVES; i++) {
+    //     if(translated->driveIsEnabled(i)) {
+    //         std::string driveName = std::string("Drive X");
+    //         driveName[6] = 'A' + i;
 
-            std::string reportString;
-            translated->driveGetReport(i, reportString);
+    //         std::string reportString;
+    //         translated->driveGetReport(i, reportString);
 
-            dumpPair(report, driveName.c_str(), reportString.c_str(), reportFormat, false, TEXT_COL1_WIDTH, 60);
-        }
-    }
+    //         dumpPair(report, driveName.c_str(), reportString.c_str(), reportFormat, false, TEXT_COL1_WIDTH, 60);
+    //     }
+    // }
 
     endSection  (report, reportFormat);
 
-    //------------------
-    // ACSI SCSI ID status / media
-    startSection(report, "ACSI/SCSI ID status / media", reportFormat);
-    for(int i=0; i < 8; i++) {
-        char tmp[10];
-        std::string desc;
-        snprintf(tmp, sizeof(tmp), "ID %d", i);
-        TDevInfo *devInfo = shared.scsi->getDevInfo(i);
+    // //------------------
+    // // ACSI SCSI ID status / media
+    // startSection(report, "ACSI/SCSI ID status / media", reportFormat);
+    // for(int i=0; i < 8; i++) {
+    //     char tmp[10];
+    //     std::string desc;
+    //     snprintf(tmp, sizeof(tmp), "ID %d", i);
+    //     // TDevInfo *devInfo = shared.scsi->getDevInfo(i);
 
-        if(devInfo) {
-            switch(devInfo->hostSourceType) {
-            case SOURCETYPE_NONE:                   desc = "none";  break;
-            case SOURCETYPE_IMAGE:                  desc = "HDD Image"; break;
-            case SOURCETYPE_IMAGE_TRANSLATEDBOOT:   desc = "Translated boot Image"; break;
-            case SOURCETYPE_DEVICE:                 desc = "Device"; break;
-            case SOURCETYPE_SD_CARD:                desc = "SD Card"; break;
-            default:                                desc = "unknown";
-            }
+    //     if(devInfo) {
+    //         switch(devInfo->hostSourceType) {
+    //         case SOURCETYPE_NONE:                   desc = "none";  break;
+    //         case SOURCETYPE_IMAGE:                  desc = "HDD Image"; break;
+    //         case SOURCETYPE_IMAGE_TRANSLATEDBOOT:   desc = "Translated boot Image"; break;
+    //         case SOURCETYPE_DEVICE:                 desc = "Device"; break;
+    //         case SOURCETYPE_SD_CARD:                desc = "SD Card"; break;
+    //         default:                                desc = "unknown";
+    //         }
 
-            desc += " : ";
+    //         desc += " : ";
 
-            switch(devInfo->accessType) {
-            case SCSI_ACCESSTYPE_FULL:      desc += " (RW)"; break;
-            case SCSI_ACCESSTYPE_READ_ONLY: desc += " (READ-ONLY)"; break;
-            case SCSI_ACCESSTYPE_NO_DATA:   desc += " (NO DATA)"; break;
-            default:                        desc += " (unknown)";
-            }
-        } else {
-            desc = "no media attached";
-        }
+    //         switch(devInfo->accessType) {
+    //         case SCSI_ACCESSTYPE_FULL:      desc += " (RW)"; break;
+    //         case SCSI_ACCESSTYPE_READ_ONLY: desc += " (READ-ONLY)"; break;
+    //         case SCSI_ACCESSTYPE_NO_DATA:   desc += " (NO DATA)"; break;
+    //         default:                        desc += " (unknown)";
+    //         }
+    //     } else {
+    //         desc = "no media attached";
+    //     }
 
-        dumpPair(report, tmp, desc.c_str(), reportFormat);
-    }
-    endSection  (report, reportFormat);
+    //     dumpPair(report, tmp, desc.c_str(), reportFormat);
+    // }
+    // endSection  (report, reportFormat);
 
     //------------------
     // chips and interfaces
     startSection   (report, "chips and interfaces live status",        reportFormat);
     putStatusHeader(report, reportFormat);
 
-    const char* chipName = (hwConfig.version < 3) ? "Hans  chip" : "Horst chip";
-    dumpStatus     (report, chipName,              statuses.hans,      reportFormat);
+    // const char* chipName = (hwConfig.version < 3) ? "Hans  chip" : "Horst chip";
+    // dumpStatus     (report, chipName,              statuses.hans,      reportFormat);
 
-    if(hwConfig.version < 3) {  // v1 and v2 contain Franz, v3 it's only horst
-        dumpStatus (report, "Franz chip",          statuses.franz,     reportFormat);
-    }
+    // if(hwConfig.version < 3) {  // v1 and v2 contain Franz, v3 it's only horst
+    //     dumpStatus (report, "Franz chip",          statuses.franz,     reportFormat);
+    // }
 
     dumpStatus     (report, "Hard Drive IF",       statuses.hdd,       reportFormat);
     // TODO: rework

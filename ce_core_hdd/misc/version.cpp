@@ -6,8 +6,6 @@
 #include "version.h"
 #include "debug.h"
 
-extern TFlags flags;        // global flags from command line
-
 Version::Version()
 {
     clear();

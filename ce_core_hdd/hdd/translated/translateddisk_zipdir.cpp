@@ -15,7 +15,6 @@
 #include "../../misc/debug.h"
 #include "../../misc/settings.h"
 #include "../../misc/utils.h"
-#include "../../misc/settingsreloadproxy.h"
 #include "../acsidatatrans.h"
 #include "../acsicommand/screencastacsicommand.h"
 #include "../acsicommand/dateacsicommand.h"

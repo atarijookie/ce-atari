@@ -2,7 +2,6 @@
 #define _BUFFEREDREADER_H_
 
 #include <stdint.h>
-#include "chipinterface.h"
 
 #define NET_ATN_NONE_ID         0
 #define NET_ATN_HANS_ID         1
@@ -18,6 +17,9 @@ class BufferedReader
 public:
     BufferedReader();
     ~BufferedReader();
+
+    // set which sync tag this reader will look for - SYNC_TAG_HDD / SYNC_TAG_FDD
+    void setSyncTag(uint32_t whichSyncTagCode);
 
     // set file descriptor for reading
     void setFd(int inFd);
@@ -42,6 +44,7 @@ public:
 
 private:
     int fd;
+    uint32_t whichSyncTag;
 
     uint8_t buffer[HEADER_BUFFER_SIZE];
     int     gotBytes;

@@ -5,6 +5,16 @@
 #include <stdint.h>
 #include <pthread.h>
 
+#define FD_EMPTY    -1
+
+#define SERVER_UDP_PORT             7200        // port where the CE discovery for reports from cores and for requests from devices
+#define CLIENT_UDP_PORT             7201        // this is where the CE device will wait for discovery response
+
+#define SERVER_TCP_PORT_HDD_FIRST   7300        // first port used by HDD core (next at +1, +2, ...)
+
+#define SERVER_TCP_PORT_FDD         7400        // port used by FDD core
+#define SERVER_TCP_PORT_IKBD        7401        // port used by IKBD core
+
 // commands sent from host to device
 #define CMD_CURRENT_SECTOR          0x50                                // followed by sector #
 #define CMD_GET_FW_VERSION          0x60
@@ -70,39 +80,26 @@ typedef struct {
     int  version;               // returned from Hans: HW version (1 for HW from 2014, 2 for HW from 2015, 3 for HW from 2020)
     int  hddIface;              // returned from Hans: HDD interface type (ACSI or SCSI (added in 2015))
     int  scsiMachine;           // when HwHddIface is HDD_IF_SCSI, this specifies what machine (TT or Falcon) is using this device
-    bool fwMismatch;            // when HW and FW types don't match (e.g. SCSI HW + ACSI FW, or ACSI HW + SCSI FW)
 
     uint8_t hwSerial[13];          // contains HW serial number, if HW version is 3 and device is running for few seconds
 
     bool changed;               // true if the value has changes recently
 } THwConfig;
 
-typedef struct {
-    bool justShowHelp;          // show possible command line arguments and quit
-    int  logLevel;              // init current log level to LOG_ERROR
-    int  portServerReport;
-    int  portClient;
-} TFlags;
+extern int logLevel;
 
 typedef struct {
     // volatile uint8_t insertSpecialFloppyImageId;
 
     volatile bool screenShotVblEnabled;
     volatile bool doScreenShot;
+    volatile bool hddReloadRaw;
+    volatile bool hddReloadTranslated;
 } InterProcessEvents;
 
 extern InterProcessEvents events;
 
-class Scsi;
 class ImageStorage;
-
-typedef struct {
-    Scsi            *scsi;
-    pthread_mutex_t  mtxHdd;
-    pthread_mutex_t  mtxImages;
-} SharedObjects;
-
-extern SharedObjects shared;
 
 typedef struct {
     int linuxTermFd;

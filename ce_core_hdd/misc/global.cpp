@@ -13,8 +13,6 @@ std::string PATH_CE_DD_BS_L2;
 std::string PATH_CE_DD_PRG_PATH_AND_FILENAME;
 std::string CONFIG_DRIVE_PATH;
 
-extern TFlags flags;
-
 void preloadGlobalsFromDotEnv(void)
 {
     corePath = Utils::dotEnvValue("BIN_DIR");     // path to where the core service is stored

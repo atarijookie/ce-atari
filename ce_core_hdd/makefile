@@ -39,11 +39,10 @@ AT = $(AT_$(V))
 
 SUBDIR1 = chipinterface
 SUBDIR2 = misc
-SUBDIR3 = extension
-SUBDIR4 = hdd
-SUBDIR5	= hdd/native
-SUBDIR6	= hdd/translated
-SUBDIR7	= hdd/acsicommand
+SUBDIR3 = hdd
+SUBDIR4	= hdd/native
+SUBDIR5	= hdd/translated
+SUBDIR6	= hdd/acsicommand
 
 SRCS  = $(wildcard *.cpp)
 SRCS += $(wildcard $(SUBDIR1)/*.cpp)
@@ -52,7 +51,6 @@ SRCS += $(wildcard $(SUBDIR3)/*.cpp)
 SRCS += $(wildcard $(SUBDIR4)/*.cpp)
 SRCS += $(wildcard $(SUBDIR5)/*.cpp)
 SRCS += $(wildcard $(SUBDIR6)/*.cpp)
-SRCS += $(wildcard $(SUBDIR7)/*.cpp)
 
 HDRS  = $(wildcard *.h)
 HDRS += $(wildcard $(SUBDIR1)/*.h)
@@ -61,7 +59,6 @@ HDRS += $(wildcard $(SUBDIR3)/*.h)
 HDRS += $(wildcard $(SUBDIR4)/*.h)
 HDRS += $(wildcard $(SUBDIR5)/*.h)
 HDRS += $(wildcard $(SUBDIR6)/*.h)
-HDRS += $(wildcard $(SUBDIR7)/*.h)
 HDRS += ../libdospath/libdospath.h
 
 OBJS = $(addprefix $(OBJDIR)/, $(patsubst %.cpp,%.o,$(SRCS:.c=.o)))
