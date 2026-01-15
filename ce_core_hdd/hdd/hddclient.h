@@ -14,8 +14,6 @@ class ChipInterface;
 class TranslatedDisk;
 class Scsi;
 
-#define MAX_CLIENTS     8
-
 class HddClient
 {
 public:

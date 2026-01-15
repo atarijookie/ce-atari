@@ -19,6 +19,7 @@
 #include "misc/cmdsockthread.h"
 #include "chipinterface/chipinterface.h"
 #include "../libdospath/libdospath.h"
+#include "discovery/discovery.h"
 
 volatile sig_atomic_t sigintReceived = 0;
 void sigint_handler(int sig);

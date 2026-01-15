@@ -20,6 +20,7 @@
 #include "../misc/debug.h"
 #include "../misc/global.h"
 #include "../misc/version.h"
+#include "../discovery/discovery.h"
 
 #define SERVER_STATUS_NOT_RUNNING   0       // when this server slot is not used yet and server is not running
 #define SERVER_STATUS_FREE          1       // server is running but no client is connected there
@@ -166,23 +167,6 @@ int ChipInterface::setAllClientFds(fd_set* readfds)
 
     return maxFd;
 }
-
-// void ChipInterface::handleAllReadyClients(fd_set* readfds, FloppyThread* core)
-// {
-//     for(int i=0; i<MAX_CLIENTS; i++) {
-//         if(clients[i].fdClient == FD_EMPTY) {           // no client here? skip it
-//             continue;
-//         }
-
-//         if(FD_ISSET(clients[i].fdClient, readfds)) {    // this fd read for read?
-//             bool hadData = core->handleOneClient(i, clients[i].fdClient, clients[i].floppySlotIndex);
-
-//             if(hadData) {       // something was read, mark client as active
-//                 clients[i].lastMs = Utils::getCurrentMs();
-//             }
-//         }
-//     }
-// }
 
 bool ChipInterface::actionNeeded(int clientIndex, uint8_t *inBuf)
 {

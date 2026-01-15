@@ -5,8 +5,8 @@
 #include "../misc/settings.h"
 #include "../misc/version.h"
 #include "../misc/utils.h"
+#include "../chipinterface/chipinterface.h"
 
-#define MAX_CLIENTS     8
 class HddClient;
 
 class CoreHdd

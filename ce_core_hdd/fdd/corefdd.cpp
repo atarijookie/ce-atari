@@ -12,6 +12,7 @@
 #include "../misc/debug.h"
 #include "../misc/utils.h"
 #include "../chipinterface/chipinterface.h"
+#include "../discovery/discovery.h"
 
 #include "corefdd.h"
 #include "imagesilo.h"

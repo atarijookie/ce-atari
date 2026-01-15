@@ -19,6 +19,7 @@
 #include "../misc/global.h"
 #include "../misc/statusreport.h"
 #include "../misc/json.h"
+#include "../discovery/discovery.h"
 
 using json = nlohmann::json;
 
@@ -66,7 +67,7 @@ int createRecvSocket(const char* dotEnvKey)
 void *cmdSockThreadCode(void *ptr)
 {
     logHdd(LOG_INFO, "Command Socket thread starting...");
-    int sock = createRecvSocket("CORE_HDD_SOCK_PATH");
+    int sock = createRecvSocket("CMD_SOCK_PATH");
 
     if(sock < 0) {              // without socket this thread has no use
         return 0;

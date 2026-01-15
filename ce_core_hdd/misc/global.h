@@ -7,14 +7,6 @@
 
 #define FD_EMPTY    -1
 
-#define SERVER_UDP_PORT             7200        // port where the CE discovery for reports from cores and for requests from devices
-#define CLIENT_UDP_PORT             7201        // this is where the CE device will wait for discovery response
-
-#define SERVER_TCP_PORT_HDD   7300        // first port used by HDD core (next at +1, +2, ...)
-
-#define SERVER_TCP_PORT_FDD         7400        // port used by FDD core
-#define SERVER_TCP_PORT_IKBD        7401        // port used by IKBD core
-
 // commands sent from host to device
 #define CMD_CURRENT_SECTOR          0x50                                // followed by sector #
 #define CMD_GET_FW_VERSION          0x60
@@ -24,7 +16,6 @@
 #define MFM_4US     1
 #define MFM_6US     2
 #define MFM_8US     3
-
 
 #define VERSION_STRING          "CosmosEx v4.00 (by Jookie)"
 #define VERSION_STRING_SHORT    "4.00"
