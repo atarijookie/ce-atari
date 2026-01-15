@@ -110,4 +110,7 @@ private:
     static void getDefaultValueFromVarName(std::string& varName, std::string& defValue, const std::string& delim);
 };
 
+void handlePthreadCreate(const char* threadName, pthread_t* pThreadInfo, void* threadCode);
+void pthread_kill_join(const char* threadName, pthread_t& threadInfo);
+
 #endif

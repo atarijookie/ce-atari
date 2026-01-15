@@ -703,7 +703,7 @@ bool Utils::unZIPfloppyImageAndReturnFirstImage(const char *inZipFilePath, std::
     }
 
     // construct path to unZIPed image
-    outImageFilePath = "/tmp/zipedfloppy/";
+    outImageFilePath = "/tmp/zipedfdd/";
     outImageFilePath.append(de->d_name);
 
     logHdd(LOG_DEBUG, "Utils::unZIPfloppyImageAndReturnFirstImage -- this ZIP file: %s contains this floppy image file: %s", inZipFilePath, outImageFilePath.c_str());
@@ -1157,4 +1157,23 @@ void Utils::closeFdIfOpen(int& fd)
         close(fd);    // close it
         fd = -1;      // set it to invalid value
     }
+}
+
+void handlePthreadCreate(const char* threadName, pthread_t* pThreadInfo, void* threadCode)
+{
+    int res = pthread_create(pThreadInfo, NULL, (void* (*)(void*)) threadCode, NULL);
+
+    if(res != 0) {
+        logHdd(LOG_ERROR, "Failed to create %s thread, %s won't work...", threadName, threadName);
+    } else {
+        logHdd(LOG_DEBUG, "%s thread created", threadName);
+        pthread_setname_np(*pThreadInfo, threadName);
+    }
+}
+
+void pthread_kill_join(const char* threadName, pthread_t& threadInfo)
+{
+    printf("Stoping %s thread\n", threadName);
+    pthread_kill(threadInfo, SIGINT);           // stop the select()
+    pthread_join(threadInfo, NULL);             // wait until thread finishes
 }

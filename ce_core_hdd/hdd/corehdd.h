@@ -13,7 +13,7 @@ class CoreHdd
 {
 public:
     CoreHdd();
-    virtual ~CoreHdd();
+    ~CoreHdd();
 
     void run(void);
 

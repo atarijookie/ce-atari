@@ -16,15 +16,13 @@
 #include "hdd/corehdd.h"
 #include "misc/debug.h"
 #include "misc/version.h"
-#include "hdd/cmdsockthread.h"
+#include "misc/cmdsockthread.h"
 #include "chipinterface/chipinterface.h"
 #include "../libdospath/libdospath.h"
 
 volatile sig_atomic_t sigintReceived = 0;
 void sigint_handler(int sig);
 
-void handlePthreadCreate(const char* threadName, pthread_t* pThreadInfo, void* threadCode);
-void pthread_kill_join(const char* threadName, pthread_t& threadInfo);
 void parseCmdLineArguments(int argc, char *argv[]);
 void printfPossibleCmdLineArgs(void);
 
@@ -36,8 +34,13 @@ int logLevel = LOG_ERROR;
 void discoveryMain(void);
 pthread_t discoveryThreadInfo;
 
+int fddThreadCode(void);
+pthread_t fddThreadInfo;
+
+pthread_t cmdSockThreadInfo;
+
 bool otherInstanceIsRunning(void);
-int  runCoreHdd(void);
+int runCoreHdd(void);
 
 int main(int argc, char *argv[])
 {
@@ -94,19 +97,16 @@ int main(int argc, char *argv[])
     }
 
     handlePthreadCreate("discovery service", &discoveryThreadInfo, (void*) discoveryMain);
+    handlePthreadCreate("command socket", &cmdSockThreadInfo, (void*) cmdSockThreadCode);
+    handlePthreadCreate("floppy core", &fddThreadInfo, (void*) fddThreadCode);
 
     int ret = runCoreHdd();
 
+    pthread_kill_join("floppy core", fddThreadInfo);
+    pthread_kill_join("command socket", cmdSockThreadInfo);
     pthread_kill_join("discovery service", discoveryThreadInfo);
 
     return ret;
-}
-
-void pthread_kill_join(const char* threadName, pthread_t& threadInfo)
-{
-    printf("Stoping %s thread\n", threadName);
-    pthread_kill(threadInfo, SIGINT);           // stop the select()
-    pthread_join(threadInfo, NULL);             // wait until thread finishes
 }
 
 // return path and filename to pid file for this core's instance, include port to distinguish between instances
@@ -119,8 +119,7 @@ std::string pidFileName(void)
 
 int runCoreHdd(void)
 {
-    CoreHdd *core;
-    pthread_t cmdSockThreadInfo;
+    CoreHdd *coreHdd;
 
     Debug::printfLogLevelString();
 
@@ -132,17 +131,13 @@ int runCoreHdd(void)
     Utils::setTimezoneVariable_inThisContext();
 
     //-------------
-    core = new CoreHdd();
-
-    handlePthreadCreate("command socket", &cmdSockThreadInfo, (void*) cmdSockThreadCode);
+    coreHdd = new CoreHdd();
 
     printf("Entering main loop...\n");
-    core->run();                // run the main thread
+    coreHdd->run();                // run the main thread
     printf("\n\nExit from main loop\n");
 
-    delete core;
-
-    pthread_kill_join("command socket", cmdSockThreadInfo);
+    delete coreHdd;
 
     // remove PID file on termination
     std::string pidFilePath = pidFileName();
@@ -196,18 +191,6 @@ void printfPossibleCmdLineArgs(void)
 {
     printf("\nPossible command line args:\n");
     printf("llx      - set log level to x (default is 1, max is 4)\n");
-}
-
-void handlePthreadCreate(const char* threadName, pthread_t* pThreadInfo, void* threadCode)
-{
-    int res = pthread_create(pThreadInfo, NULL, (void* (*)(void*)) threadCode, NULL);
-
-    if(res != 0) {
-        logHdd(LOG_ERROR, "Failed to create %s thread, %s won't work...", threadName, threadName);
-    } else {
-        logHdd(LOG_DEBUG, "%s thread created", threadName);
-        pthread_setname_np(*pThreadInfo, threadName);
-    }
 }
 
 void sigint_handler(int sig)

@@ -88,13 +88,39 @@ typedef struct {
 
 extern int logLevel;
 
-typedef struct {
-    // volatile uint8_t insertSpecialFloppyImageId;
+// commands sent from host to device
+// #define CMD_WRITE_PROTECT_OFF    0x10
+// #define CMD_WRITE_PROTECT_ON     0x20
+// #define CMD_DISK_CHANGE_OFF      0x30
+// #define CMD_DISK_CHANGE_ON       0x40
+#define CMD_CURRENT_SECTOR          0x50        // followed by sector #
+#define CMD_GET_FW_VERSION          0x60
+// #define CMD_SET_DRIVE_ID_0       0x70
+// #define CMD_SET_DRIVE_ID_1       0x80
+#define CMD_CURRENT_TRACK           0x90        // followed by track #
+// #define CMD_DRIVE_ENABLED        0xa0
+// #define CMD_DRIVE_DISABLED       0xb0
+#define CMD_DATA_PART_OF_SECTOR     0xC0
 
+#define CMD_TRACK_STREAM_END        0xF0    // this is the mark in the track stream that we shouldn't go any further in the stream
+
+#define ENCODED_SECTOR_MAX_SIZE     1200    // the mfm encoded sector - header + gaps + markers + data - should not exceed this size. Using fixed size to simplify sector write to memory in device.
+
+#define FDD_ACTION_NONE     0
+#define FDD_ACTION_INSERT   1
+#define FDD_ACTION_EJECT    2
+
+typedef struct {
     volatile bool screenShotVblEnabled;
     volatile bool doScreenShot;
+
     volatile bool hddReloadRaw;
     volatile bool hddReloadTranslated;
+
+    volatile int fddAction;
+    int fddIndex;
+    std::string fddFlename;
+    std::string fdddHostPath;
 } InterProcessEvents;
 
 extern InterProcessEvents events;

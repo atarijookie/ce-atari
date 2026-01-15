@@ -19,16 +19,13 @@
 #include "../misc/global.h"
 #include "../misc/statusreport.h"
 #include "../misc/json.h"
-#include "corehdd.h"
-#include "native/scsi.h"
-#include "native/scsi_defs.h"
-#include "translated/translateddisk.h"
 
 using json = nlohmann::json;
 
 void handleGenericAction(std::string& action, json& data);
 void handleSceencastAction(std::string& action, json& data);
 void handleDisksAction(std::string& action, json& data);
+void handleFloppyAction(std::string& action, json& data);
 void closeFifo(bool keybNotMouse);
 
 int createRecvSocket(const char* dotEnvKey)
@@ -126,6 +123,8 @@ void *cmdSockThreadCode(void *ptr)
                 handleDisksAction(action, data);
             } else if(module == "screencast") {
                 handleSceencastAction(action, data);
+            } else if(module == "floppy") {         // for floppy module?
+                handleFloppyAction(action, data);
             } else {                                // for uknown module?
                 logHdd(LOG_WARNING, "cmdSockThreadCode: uknown module '%s', ignoring message!", module.c_str());
             }
@@ -361,5 +360,39 @@ void handleDisksAction(std::string& action, json& data)
         events.hddReloadRaw = true;
     } else {
         logHdd(LOG_WARNING, "handleDisksAction: unknown action '%s', ignoring message!", action.c_str());
+    }
+}
+
+void handleFloppyAction(std::string& action, json& data)
+{
+    int slot = -1;
+
+    if(data.contains("slot")) {                 // if can get slot, get slot number
+        slot = data["slot"].get<int>();
+    }
+
+    if(action == "insert") {                    // for 'insert' action
+        if(data.contains("image")) {            // image is present in message
+            std::string empty;
+            std::string pathAndFile = data["image"].get<std::string>();     // get image full path
+
+            std::string path, file;
+            Utils::splitFilenameFromPath(pathAndFile, path, file);          // get just filename from full path
+
+            // store details into events, action as the last one
+            events.fddIndex = slot;
+            events.fddFlename = file;
+            events.fdddHostPath = pathAndFile;
+            events.fddAction = FDD_ACTION_NONE;
+        } else {
+            logFdd(LOG_WARNING, "handleFloppyAction: missing 'image' in message, ignoring message!");
+        }
+    } else if(action == "eject") {              // for 'eject' action
+        events.fddIndex = slot;
+        events.fddAction = FDD_ACTION_EJECT;
+    } else if(action == "activate") {           // for 'activate' action
+
+    } else {
+        logFdd(LOG_WARNING, "handleFloppyAction: unknown action '%s', ignoring message!", action.c_str());
     }
 }

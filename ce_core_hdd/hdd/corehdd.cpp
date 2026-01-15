@@ -27,18 +27,6 @@
 
 extern DebugVars    dbgVars;
 
-struct TLastFwInfoTime {
-    uint32_t hans;
-    uint32_t franz;
-    uint32_t nextDisplay;
-
-    uint32_t hansResetTime;
-    uint32_t franzResetTime;
-
-    int     progress;
-};
-
-TLastFwInfoTime lastFwInfoTime;
 LoadTracker load;
 
 CoreHdd::CoreHdd()
@@ -60,13 +48,13 @@ void CoreHdd::run(void)
     memset(inBuff, 0, INBUF_SIZE);
 
     // create network chip interface
-    ChipInterface* chipInterface = new ChipInterface(LOGFILE_HDD, NET_ATN_HANS_ID, SYNC_TAG_HDD);
-    chipInterface->ciOpen();
+    ChipInterface* ciHdd = new ChipInterface(LOGFILE_HDD, NET_ATN_HANS_ID, SYNC_TAG_HDD);
+    ciHdd->ciOpen();
 
     // create hdd clients, 1 hdd client per each tcp client
     for(int i=0; i<MAX_CLIENTS; i++) {
-        ClientInfo* ci = chipInterface->clientGetByIndex(i);
-        hddClients[i] = new HddClient(chipInterface, ci->fdClient);
+        ClientInfo* ci = ciHdd->clientGetByIndex(i);
+        hddClients[i] = new HddClient(ciHdd, ci->fdClient);
     }
 
     //------------------------------
@@ -81,18 +69,18 @@ void CoreHdd::run(void)
             Utils::sleepMs(1);      // intentional sleep to not utilize cpu to max when looping too much before client disconnect
         }
 
-        chipInterface->clientsDisconnectInactive();
+        ciHdd->clientsDisconnectInactive();
 
         max_fd = -1;
         FD_ZERO(&readfds);
 
         // get listening socket from chip interface, add it to readfds
-        int fdListen = chipInterface->getFdListen();
+        int fdListen = ciHdd->getFdListen();
         FD_SET(fdListen, &readfds);
         max_fd = MAX(max_fd, fdListen);
 
         // get all connected client fds, add them to readfds
-        max_fd = MAX(max_fd, chipInterface->setAllClientFds(&readfds));     // all valid client fds will be set to readfds, and highest fd into max_fd
+        max_fd = MAX(max_fd, ciHdd->setAllClientFds(&readfds));     // all valid client fds will be set to readfds, and highest fd into max_fd
 
         // add timeout to select(), so we can check for connection status, settings reload, etc.
         timeval timeout;
@@ -111,27 +99,27 @@ void CoreHdd::run(void)
 
         // if listening socket is set, handle it
         if(FD_ISSET(fdListen, &readfds)) {
-            chipInterface->acceptSocketIfNeededAndPossible();
+            ciHdd->acceptSocketIfNeededAndPossible();
         }
 
         someClientActive = false;
 
         // check which fds are ready to be handled and handle them
         for(int i=0; i<MAX_CLIENTS; i++) {
-            ClientInfo* ci = chipInterface->clientGetByIndex(i);
+            ClientInfo* ci = ciHdd->clientGetByIndex(i);
 
             if(ci->fdClient == FD_EMPTY) {           // no client here? skip it
                 continue;
             }
 
             if(FD_ISSET(ci->fdClient, &readfds)) {    // this fd read for read?
-                bool needsAction = chipInterface->actionNeeded(i, inBuff);
+                bool needsAction = ciHdd->actionNeeded(i, inBuff);
 
                 if(needsAction) {   // client #i needs action?
                     someClientActive = true;
                     hddClients[i]->handleHdd(inBuff);
 
-                    chipInterface->dropRestOfData(i, inBuff, INBUF_SIZE);
+                    ciHdd->dropRestOfData(i, inBuff, INBUF_SIZE);
                     ci->lastMs = Utils::getCurrentMs();     // mark client as active
                 }
             }
@@ -144,16 +132,17 @@ void CoreHdd::run(void)
     }
 
     // destroy chip interface
-    chipInterface->ciClose();
-    delete chipInterface;
+    ciHdd->ciClose();
+    delete ciHdd;
 }
 
 void CoreHdd::displayStatusToConsole(uint32_t now)
 {
-    char progChars[4] = {'|', '/', '-', '\\'};
+    static int progress = 0;
 
-    printf("\033[2K  [ %c ]  CE HDD core is running\033[A\n", progChars[lastFwInfoTime.progress]);
-    lastFwInfoTime.progress = (lastFwInfoTime.progress + 1) % 4;
+    char progChars[4] = {'|', '/', '-', '\\'};
+    printf("\033[2K  [ %c ]  CE core is running\033[A\n", progChars[progress]);
+    progress = (progress + 1) % 4;
 }
 
 void CoreHdd::handleEvents(void)
