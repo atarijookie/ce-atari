@@ -81,6 +81,9 @@ public:
     int setAllClientFds(fd_set* readfds);
     void acceptSocketIfNeededAndPossible(void);
 
+    // ikbd related
+    void ikbdUartWriteToAll(uint8_t* bfr, int len);
+
 private:
     int whichLog;
     int whichAtn;

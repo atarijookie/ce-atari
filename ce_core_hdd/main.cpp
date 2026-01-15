@@ -20,6 +20,7 @@
 #include "chipinterface/chipinterface.h"
 #include "../libdospath/libdospath.h"
 #include "discovery/discovery.h"
+#include "ikbd/ikbd.h"
 
 volatile sig_atomic_t sigintReceived = 0;
 void sigint_handler(int sig);
@@ -39,9 +40,12 @@ int fddThreadCode(void);
 pthread_t fddThreadInfo;
 
 pthread_t cmdSockThreadInfo;
+pthread_t ikbdThreadInfo;
 
 bool otherInstanceIsRunning(void);
 int runCoreHdd(void);
+
+bool noCapture = false;
 
 int main(int argc, char *argv[])
 {
@@ -100,9 +104,11 @@ int main(int argc, char *argv[])
     handlePthreadCreate("discovery service", &discoveryThreadInfo, (void*) discoveryMain);
     handlePthreadCreate("command socket", &cmdSockThreadInfo, (void*) cmdSockThreadCode);
     handlePthreadCreate("floppy core", &fddThreadInfo, (void*) fddThreadCode);
+    handlePthreadCreate("ikbd core", &ikbdThreadInfo, (void*) ikbdThreadCode);
 
     int ret = runCoreHdd();
 
+    pthread_kill_join("ikbd core", ikbdThreadInfo);
     pthread_kill_join("floppy core", fddThreadInfo);
     pthread_kill_join("command socket", cmdSockThreadInfo);
     pthread_kill_join("discovery service", discoveryThreadInfo);
@@ -174,6 +180,12 @@ void parseCmdLineArguments(int argc, char *argv[])
             }
 
             continue;
+        }
+
+        // don't capture USB mouse and keyboard
+        if(strcmp(argv[i], "nocap") == 0) {
+            isKnownTag = true;
+            noCapture = true;
         }
 
         if(strcmp(argv[i], "help") == 0 || strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "/?") == 0 || strcmp(argv[i], "?") == 0) {

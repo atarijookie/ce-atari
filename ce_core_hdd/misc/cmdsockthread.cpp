@@ -27,6 +27,7 @@ void handleGenericAction(std::string& action, json& data);
 void handleSceencastAction(std::string& action, json& data);
 void handleDisksAction(std::string& action, json& data);
 void handleFloppyAction(std::string& action, json& data);
+void handleIkbdAction(std::string& action, json& data);
 void closeFifo(bool keybNotMouse);
 
 int createRecvSocket(const char* dotEnvKey)

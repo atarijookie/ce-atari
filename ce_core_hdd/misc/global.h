@@ -112,6 +112,8 @@ typedef struct {
     int fddIndex;
     std::string fddFlename;
     std::string fdddHostPath;
+
+    volatile bool loadIkbdConfig;
 } InterProcessEvents;
 
 extern InterProcessEvents events;

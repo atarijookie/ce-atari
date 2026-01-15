@@ -793,3 +793,14 @@ int ChipInterface::readRestOfData(int clientIndex, uint8_t* buffer, uint32_t buf
     int readSize = MIN(clients[clientIndex].bufReader.dataSizeRest(), bufferSize);
     return recvFromClient(clientIndex, buffer, readSize);
 }
+
+void ChipInterface::ikbdUartWriteToAll(uint8_t* bfr, int len)
+{
+    for(int i=0; i<MAX_CLIENTS; i++) {
+        if(clients[i].fdClient == FD_EMPTY) {      // client not connected here? skip it
+            continue;
+        }
+
+        write(clients[i].fdClient, bfr, len);    // send it
+    }
+}

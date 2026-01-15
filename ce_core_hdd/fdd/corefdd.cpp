@@ -152,6 +152,10 @@ void CoreFdd::run(void)
         }
     }
 
+    ciFdd->ciClose();
+    delete ciFdd;
+    ciFdd = NULL;
+
     delete imageSilo;
     imageSilo = NULL;
 }
