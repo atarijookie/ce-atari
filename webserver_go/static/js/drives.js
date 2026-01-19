@@ -10,19 +10,34 @@ function bindHandlersGEMDrives() {
 
 // get ACSI IDs and paths from backend and update UI
 function getDrivesConfig() {
+    // Get MAC address from URL parameters
+    function getURLParameter(name) {
+        name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+        var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+        var results = regex.exec(location.search);
+        return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+    }
+    
+    var mac = getURLParameter('mac');
+    if (!mac) {
+        console.log("Error: No MAC address in URL");
+        return;
+    }
+    
+    // Fetch from the translated endpoint: /hdd/{mac}/translated
     $.ajax({
-        url: '/config/get_drives',
+        url: '/hdd/' + encodeURIComponent(mac) + '/translated',
         type: 'GET',
         dataType: 'json',
         success: function (data) {
             paths = data.paths;
             driveTypes = data.drive_types;
 
-            console.log("config/get_drives - data: " + data + ", paths: " + paths + ", driveTypes: " + driveTypes);
+            console.log("hdd/" + mac + "/translated - data: " + JSON.stringify(data) + ", paths: " + paths + ", driveTypes: " + driveTypes);
             updateIdsFromData();
         },
         error: function (xhr) {
-            console.log("Error: " + xhr.statusText);
+            console.log("Error fetching device config: " + xhr.statusText);
         },
     })
 }

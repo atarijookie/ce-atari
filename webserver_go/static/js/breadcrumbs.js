@@ -46,16 +46,16 @@ function renderBreadcrumbs() {
         return;
     }
     
-    var breadcrumbHtml = '<ul class="nav nav-pills" style="margin-bottom: 20px;">';
+    var breadcrumbHtml = '<ul class="nav nav-pills" style="margin-bottom: 20px; display: flex; align-items: center; list-style: none; padding: 0;">';
     for (var i = 0; i < breadcrumbs.length; i++) {
         var crumb = breadcrumbs[i];
         if (i === breadcrumbs.length - 1) {
             // Last item - active, no link
-            breadcrumbHtml += '<li class="active"><span>' + escapeHtml(crumb.text) + '</span></li>';
+            breadcrumbHtml += '<li class="active" style="display: inline-block; margin-right: 5px; margin-bottom: 5px;"><span style="display: inline-block; padding: 6.5px 10.4px; border-radius: 5px;">' + escapeHtml(crumb.text) + '</span></li>';
         } else {
             // Not last item - link with separator
-            breadcrumbHtml += '<li><a href="' + escapeHtml(crumb.url) + '">' + escapeHtml(crumb.text) + '</a></li>';
-            breadcrumbHtml += '<li style="color: #999; padding: 0 5px;">→</li>';
+            breadcrumbHtml += '<li style="display: inline-block; margin-right: 5px; margin-bottom: 5px;"><a href="' + escapeHtml(crumb.url) + '" style="display: inline-block; padding: 6.5px 10.4px; border-radius: 5px; text-decoration: none;">' + escapeHtml(crumb.text) + '</a></li>';
+            breadcrumbHtml += '<li style="display: inline-block; color: #999; padding: 6.5px 5px; margin-right: 5px; margin-bottom: 5px; vertical-align: middle;">→</li>';
         }
     }
     breadcrumbHtml += '</ul>';
