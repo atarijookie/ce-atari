@@ -37,28 +37,37 @@ AT_0 := @
 AT_1 :=
 AT = $(AT_$(V))
 
-SUBDIR2	= native
-SUBDIR3	= translated
-SUBDIR8	= acsicommand
-SUBDIR18 = chipinterface_network
-SUBDIR19 = misc
-SUBDIR20 = extension
+SUBDIR1 = chipinterface
+SUBDIR2 = misc
+SUBDIR3 = discovery
+SUBDIR4 = hdd
+SUBDIR5	= hdd/native
+SUBDIR6	= hdd/translated
+SUBDIR7	= hdd/acsicommand
+SUBDIR8 = fdd
+SUBDIR9 = ikbd
 
-SRCS  = $(wildcard *.cpp) 
-SRCS += $(wildcard $(SUBDIR2)/*.cpp) 
+SRCS  = $(wildcard *.cpp)
+SRCS += $(wildcard $(SUBDIR1)/*.cpp)
+SRCS += $(wildcard $(SUBDIR2)/*.cpp)
 SRCS += $(wildcard $(SUBDIR3)/*.cpp)
+SRCS += $(wildcard $(SUBDIR4)/*.cpp)
+SRCS += $(wildcard $(SUBDIR5)/*.cpp)
+SRCS += $(wildcard $(SUBDIR6)/*.cpp)
+SRCS += $(wildcard $(SUBDIR7)/*.cpp)
 SRCS += $(wildcard $(SUBDIR8)/*.cpp)
-SRCS += $(wildcard $(SUBDIR18)/*.cpp)
-SRCS += $(wildcard $(SUBDIR19)/*.cpp)
-SRCS += $(wildcard $(SUBDIR20)/*.cpp)
+SRCS += $(wildcard $(SUBDIR9)/*.cpp)
 
 HDRS  = $(wildcard *.h)
+HDRS += $(wildcard $(SUBDIR1)/*.h)
 HDRS += $(wildcard $(SUBDIR2)/*.h)
 HDRS += $(wildcard $(SUBDIR3)/*.h)
+HDRS += $(wildcard $(SUBDIR4)/*.h)
+HDRS += $(wildcard $(SUBDIR5)/*.h)
+HDRS += $(wildcard $(SUBDIR6)/*.h)
+HDRS += $(wildcard $(SUBDIR7)/*.h)
 HDRS += $(wildcard $(SUBDIR8)/*.h)
-HDRS += $(wildcard $(SUBDIR18)/*.h)
-HDRS += $(wildcard $(SUBDIR19)/*.h)
-HDRS += $(wildcard $(SUBDIR20)/*.h)
+HDRS += $(wildcard $(SUBDIR9)/*.h)
 HDRS += ../libdospath/libdospath.h
 
 OBJS = $(addprefix $(OBJDIR)/, $(patsubst %.cpp,%.o,$(SRCS:.c=.o)))

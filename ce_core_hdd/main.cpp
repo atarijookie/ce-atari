@@ -11,66 +11,72 @@
 #include <errno.h>
 #include <limits.h>
 
-#include "settings.h"
-#include "global.h"
-#include "ccorethread.h"
-#include "debug.h"
-#include "update.h"
-#include "version.h"
-#include "cmdsockthread.h"
-#include "extension/extensionrecvthread.h"
-#include "chipinterface_network/chipinterfacenetwork.h"
+#include "misc/settings.h"
+#include "misc/global.h"
+#include "hdd/corehdd.h"
+#include "misc/debug.h"
+#include "misc/version.h"
+#include "misc/cmdsockthread.h"
+#include "chipinterface/chipinterface.h"
 #include "../libdospath/libdospath.h"
+#include "discovery/discovery.h"
+#include "ikbd/ikbd.h"
 
 volatile sig_atomic_t sigintReceived = 0;
 void sigint_handler(int sig);
 
-void handlePthreadCreate(const char* threadName, pthread_t* pThreadInfo, void* threadCode);
 void parseCmdLineArguments(int argc, char *argv[]);
 void printfPossibleCmdLineArgs(void);
 
-void loadLastHwConfig(void);
-void initializeFlags(void);
-
-THwConfig           hwConfig;                           // info about the current HW setup
-TFlags              flags;                              // global flags from command line
 InterProcessEvents  events;
-SharedObjects       shared;
-ChipInterface*      chipInterface;
 ExternalServices    externalServices;
+bool justShowHelp = false;
+int logLevel = LOG_ERROR;
+
+void discoveryMain(void);
+pthread_t discoveryThreadInfo;
+
+int fddThreadCode(void);
+pthread_t fddThreadInfo;
+
+pthread_t cmdSockThreadInfo;
+pthread_t ikbdThreadInfo;
 
 bool otherInstanceIsRunning(void);
-int  runCore(void);
+int runCoreHdd(void);
+
+bool noCapture = false;
 
 int main(int argc, char *argv[])
 {
-    pthread_mutex_init(&shared.mtxHdd,   NULL);
-    pthread_mutex_init(&shared.mtxImages, NULL);
-
     printf("\033[H\033[2J\n");
 
-    initializeFlags();                                          // initialize flags
-    Debug::out(LOG_INFO, "\n\n"); Debug::out(LOG_INFO, "---------------------------------------------------");
+    justShowHelp = false;
+    Debug::setLogLevel(LOG_ERROR);      // init current log level to LOG_ERROR
+
+    logHdd(LOG_INFO, "\n\n"); logHdd(LOG_INFO, "---------------------------------------------------");
 
     parseCmdLineArguments(argc, argv);                          // then parse cmd line arguments and set global variables
     Debug::printfLogLevelString();
 
-    Utils::loadDotEnv();                                        // load dotEnv before setting default log file
-    Debug::getCoreLogFileName(true);    // call this with force=true to re-create the log file name
+    Utils::loadDotEnv();                                       // load dotEnv before setting default log file
+    for(int i=LOGFILE_DISCOVERY; i<=LOGFILE_IKBD; i++) {
+        Debug::getCoreLogFileName(true, i);    // call this with force=true to re-create the log file name
+    }
     Debug::logLevelFromDotEnv();        // set log level from .env value of LOG_LEVEL
 
-    ldp_setParam(1, (uint64_t) flags.logLevel);                         // libDOSpath - set log level to file
+    ldp_setParam(1, (uint64_t) logLevel);                         // libDOSpath - set log level to file
     std::string logDir = Utils::dotEnvValue("LOG_DIR", LOG_DIR_DEFAULT);  // path to logs dir
     Utils::mergeHostPaths(logDir, "libdospath.log");                    // full path = logs dir + filename
     ldp_setParam(2, (uint64_t) logDir.c_str());                         // libDOSpath - set log file path
-    Debug::out(LOG_ERROR, "setting libdospath log file to: %s and log level to: %d", logDir.c_str(), flags.logLevel);
+    logHdd(LOG_ERROR, "setting libdospath log file to: %s and log level to: %d", logDir.c_str(), logLevel);
 
     Utils::screenShotVblEnabled(false);                         // screenshot vbl not enabled by default
     preloadGlobalsFromDotEnv();
 
     //------------------------------------
     // if should only show help and quit
-    if(flags.justShowHelp) {
+    if(justShowHelp) {
         printfPossibleCmdLineArgs();
         return 0;
     }
@@ -78,14 +84,12 @@ int main(int argc, char *argv[])
     //------------------------------------
     // before touching GPIO make sure that no other instance is running
     if(otherInstanceIsRunning()) {
-        Debug::out(LOG_ERROR, "Other instance of CosmosEx is running, terminate it before starting a new one!");
+        logHdd(LOG_ERROR, "Other instance of CosmosEx is running, terminate it before starting a new one!");
         printf("\nOther instance of CosmosEx is running, terminate it before starting a new one!\n\n\n");
         return 0;
     }
 
-    Debug::out(LOG_INFO, "logLevel: %d", flags.logLevel);
-
-    loadLastHwConfig();                                     // load last found HW IF, HW version, SCSI machine
+    logHdd(LOG_INFO, "logLevel: %d", logLevel);
 
     //------------------------------------
     // register signal handlers
@@ -97,94 +101,58 @@ int main(int argc, char *argv[])
         printf("Cannot register SIGHUP handler!\n");
     }
 
-    return runCore();
-}
+    handlePthreadCreate("discovery service", &discoveryThreadInfo, (void*) discoveryMain);
+    handlePthreadCreate("command socket", &cmdSockThreadInfo, (void*) cmdSockThreadCode);
+    handlePthreadCreate("floppy core", &fddThreadInfo, (void*) fddThreadCode);
+    handlePthreadCreate("ikbd core", &ikbdThreadInfo, (void*) ikbdThreadCode);
 
-void pthread_kill_join(const char* threadName, pthread_t& threadInfo)
-{
-    printf("Stoping %s thread\n", threadName);
-    pthread_kill(threadInfo, SIGINT);           // stop the select()
-    pthread_join(threadInfo, NULL);             // wait until thread finishes
+    int ret = runCoreHdd();
+
+    pthread_kill_join("ikbd core", ikbdThreadInfo);
+    pthread_kill_join("floppy core", fddThreadInfo);
+    pthread_kill_join("command socket", cmdSockThreadInfo);
+    pthread_kill_join("discovery service", discoveryThreadInfo);
+
+    return ret;
 }
 
 // return path and filename to pid file for this core's instance, include port to distinguish between instances
 std::string pidFileName(void)
 {
     std::string pidDir = Utils::dotEnvValue("PID_DIR", PID_DIR_DEFAULT);
-    std::string pidFilePath = pidDir + std::string("/ce_hdd_") + std::to_string(flags.portClient) + std::string(".pid");
+    std::string pidFilePath = pidDir + std::string("/ce_hdd_") + std::to_string(SERVER_TCP_PORT_HDD) + std::string(".pid");
     return pidFilePath;
 }
 
-int runCore(void)
+int runCoreHdd(void)
 {
-    CCoreThread *core;
-    pthread_t cmdSockThreadInfo;
-    pthread_t extensionThreadInfo;
+    CoreHdd *coreHdd;
 
-    Debug::out(LOG_INFO, "runCore as network server");
-    hwConfig.version = 3;
-    chipInterface = new ChipInterfaceNetwork();     // create network chip interface
-    chipInterface->ciOpen();                        // try to open it
-
-    //------------------------------------
-    // normal app run follows
     Debug::printfLogLevelString();
 
     char appVersion[16];
     Version::getAppVersion(appVersion);
-    Debug::out(LOG_INFO, "CosmosEx HDD core starting at port %d, version: %s", flags.portClient, appVersion);
-    printf("\nCosmosEx HDD core starting at port %d, version: %s\n", flags.portClient, appVersion);
+    logHdd(LOG_INFO, "CosmosEx HDD core starting at port %d, version: %s", SERVER_TCP_PORT_HDD, appVersion);
+    printf("\nCosmosEx HDD core starting at port %d, version: %s\n", SERVER_TCP_PORT_HDD, appVersion);
 
     Utils::setTimezoneVariable_inThisContext();
 
     //-------------
-    core = new CCoreThread();
-
-    handlePthreadCreate("command socket", &cmdSockThreadInfo, (void*) cmdSockThreadCode);
-    handlePthreadCreate("extension", &extensionThreadInfo, (void*) extensionThreadCode);
+    coreHdd = new CoreHdd();
 
     printf("Entering main loop...\n");
-
-    core->run();                // run the main thread
-
+    coreHdd->run();                // run the main thread
     printf("\n\nExit from main loop\n");
 
-    delete core;
-
-    pthread_kill_join("command socket", cmdSockThreadInfo);
-    pthread_kill_join("extension", extensionThreadInfo);
-
-    //---------------------------------------------------
-    // Closing of GPIO should be done after stopping IKBD thread and DISPLAY thread
-    // as they also use some GPIO pins and we want them to be able to use them until the end.
-    chipInterface->ciClose();                           // close gpio
-    delete chipInterface;
-    chipInterface = NULL;
-    //---------------------------------------------------
+    delete coreHdd;
 
     // remove PID file on termination
     std::string pidFilePath = pidFileName();
     unlink(pidFilePath.c_str());
 
-    Debug::out(LOG_INFO, "CosmosEx terminated.");
+    logHdd(LOG_INFO, "CosmosEx terminated.");
     printf("Terminated\n");
     return 0;
-}
-
-void loadLastHwConfig(void)
-{
-    Settings s;
-
-    hwConfig.changed        = false;
-    memset(hwConfig.hwSerial, 0, 13);
-}
-
-void initializeFlags(void)
-{
-    flags.justShowHelp = false;
-    Debug::setLogLevel(LOG_ERROR);      // init current log level to LOG_ERROR
-    flags.portServerReport = 7200;
-    flags.portClient = 7300;
 }
 
 void parseCmdLineArguments(int argc, char *argv[])
@@ -214,27 +182,15 @@ void parseCmdLineArguments(int argc, char *argv[])
             continue;
         }
 
-        if(argv[i][0] == 'p') {
-            isKnownTag = true;                                      // this is a known tag
-            int res = sscanf(argv[i] + 1, "%d", &flags.portClient);
-            if(res != 1) {
-                printf(">>> BAD CLIENT PORT VALUE: '%s' <<<\n", argv[i] + 1);
-                Debug::out(LOG_ERROR, ">>> BAD CLIENT PORT VALUE: '%s' <<<\n", argv[i] + 1);
-            }
-        }
-
-        if(argv[i][0] == 'r') {
-            isKnownTag = true;                                      // this is a known tag
-            int res = sscanf(argv[i] + 1, "%d", &flags.portServerReport);
-            if(res != 1) {
-                printf(">>> BAD REPORT PORT VALUE: '%s' <<<\n", argv[i] + 1);
-                Debug::out(LOG_ERROR, ">>> BAD REPORT PORT VALUE: '%s' <<<\n", argv[i] + 1);
-            }
+        // don't capture USB mouse and keyboard
+        if(strcmp(argv[i], "nocap") == 0) {
+            isKnownTag = true;
+            noCapture = true;
         }
 
         if(strcmp(argv[i], "help") == 0 || strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "/?") == 0 || strcmp(argv[i], "?") == 0) {
-            isKnownTag          = true;                             // this is a known tag
-            flags.justShowHelp  = true;
+            isKnownTag = true;                             // this is a known tag
+            justShowHelp  = true;
             continue;
         }
 
@@ -248,25 +204,11 @@ void printfPossibleCmdLineArgs(void)
 {
     printf("\nPossible command line args:\n");
     printf("llx      - set log level to x (default is 1, max is 4)\n");
-    printf("pXXXX    - set listening port to XXXX\n");
-    printf("rXXXX    - set port for status reporting to XXXX\n");
-}
-
-void handlePthreadCreate(const char* threadName, pthread_t* pThreadInfo, void* threadCode)
-{
-    int res = pthread_create(pThreadInfo, NULL, (void* (*)(void*)) threadCode, NULL);
-
-    if(res != 0) {
-        Debug::out(LOG_ERROR, "Failed to create %s thread, %s won't work...", threadName, threadName);
-    } else {
-        Debug::out(LOG_DEBUG, "%s thread created", threadName);
-        pthread_setname_np(*pThreadInfo, threadName);
-    }
 }
 
 void sigint_handler(int sig)
 {
-    Debug::out(LOG_DEBUG, "Some SIGNAL received, terminating.");
+    logHdd(LOG_DEBUG, "Some SIGNAL received, terminating.");
     sigintReceived = 1;
 }
 
@@ -284,29 +226,29 @@ bool otherInstanceIsRunning(void)
 
     f = fopen(pidFilePath.c_str(), "r");
     if(!f) {    // can't open file? other instance probably not running (or is, but can't figure out, so screw it)
-        Debug::out(LOG_DEBUG, "otherInstanceIsRunning - couldn't open %s, returning false", pidFilePath.c_str());
+        logHdd(LOG_DEBUG, "otherInstanceIsRunning - couldn't open %s, returning false", pidFilePath.c_str());
     } else {
         int r = fscanf(f, "%d", &other_pid);
         fclose(f);
         if(r != 1) {
-            Debug::out(LOG_ERROR, "otherInstanceIsRunning - can't read pid in %s, returning false", pidFilePath.c_str());
+            logHdd(LOG_ERROR, "otherInstanceIsRunning - can't read pid in %s, returning false", pidFilePath.c_str());
         } else {
-            Debug::out(LOG_DEBUG, "otherInstanceIsRunning - %s pid=%d (own pid=%d)", pidFilePath.c_str(), other_pid, self_pid);
+            logHdd(LOG_DEBUG, "otherInstanceIsRunning - %s pid=%d (own pid=%d)", pidFilePath.c_str(), other_pid, self_pid);
             snprintf(proc_path, sizeof(proc_path), "/proc/%d/exe", other_pid);
             if(readlink("/proc/self/exe", self_exe, sizeof(self_exe)) < 0) {
-                Debug::out(LOG_ERROR, "otherInstanceIsRunning readlink(%s): %s", "/proc/self/exe", strerror(errno));
+                logHdd(LOG_ERROR, "otherInstanceIsRunning readlink(%s): %s", "/proc/self/exe", strerror(errno));
             } else if(readlink(proc_path, other_exe, sizeof(other_exe)) < 0) {
-                Debug::out(LOG_ERROR, "otherInstanceIsRunning readlink(%s): %s", proc_path, strerror(errno));
+                logHdd(LOG_ERROR, "otherInstanceIsRunning readlink(%s): %s", proc_path, strerror(errno));
             } else if(strcmp(other_exe, self_exe) == 0) {
                 // NOTE: is it needed to check the process status to discard zombies ???
-                Debug::out(LOG_DEBUG, "otherInstanceIsRunning - found another instance of %s with pid %d", other_exe, other_pid);
+                logHdd(LOG_DEBUG, "otherInstanceIsRunning - found another instance of %s with pid %d", other_exe, other_pid);
                 return true;
             }
         }
     }
 
     Utils::intToFile(self_pid, pidFilePath.c_str());
-    Debug::out(LOG_DEBUG, "otherInstanceIsRunning -- pid %d written to %s", self_pid, pidFilePath.c_str());
+    logHdd(LOG_DEBUG, "otherInstanceIsRunning -- pid %d written to %s", self_pid, pidFilePath.c_str());
 
     return false;
 }
