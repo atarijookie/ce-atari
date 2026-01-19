@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -108,12 +109,26 @@ func (s *Server) handleHostDir(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "cannot read directory", http.StatusBadRequest)
 		return
 	}
-	response := make([]DirEntry, 0, len(entries))
+	
+	// Separate directories and files
+	dirs := make([]string, 0)
+	files := make([]string, 0)
 	for _, e := range entries {
-		response = append(response, DirEntry{
-			Name:  e.Name(),
-			IsDir: e.IsDir(),
-		})
+		if e.IsDir() {
+			dirs = append(dirs, e.Name())
+		} else {
+			files = append(files, e.Name())
+		}
+	}
+	
+	// Sort both lists
+	sort.Strings(dirs)
+	sort.Strings(files)
+	
+	// Return in the requested format
+	response := map[string]interface{}{
+		"dirs":  dirs,
+		"files": files,
 	}
 	writeJSON(w, http.StatusOK, response)
 }

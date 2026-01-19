@@ -35,12 +35,12 @@ function getDirContent(new_path) {
     document.getElementById('currentPath').textContent = dir;
 
     $.ajax({
-        url: '/config/get_dir_content',
-        type: 'POST',
+        url: '/host/dir?path=' + encodeURIComponent(new_path),
+        type: 'GET',
         dataType: 'json',
-        data: JSON.stringify({ 'path': new_path }),
         success: function (data) {
             var dirs = data.dirs;
+            var files = data.files;
 
             const itemList = document.getElementById('itemList');
             itemList.innerHTML = '';
@@ -51,6 +51,15 @@ function getDirContent(new_path) {
                 div.className = 'item';
                 div.textContent = "[" + item + "]";
                 div.onclick = () => getDirContent(fullpath);
+                itemList.appendChild(div);
+            });
+
+            files.forEach(item => {
+                var fullpath = (new_path == "/") ? ("/" + item) : (new_path + "/" + item);
+                const div = document.createElement('div');
+                div.className = 'item';
+                div.textContent = item;
+                div.onclick = () => onFileSelected(fullpath);
                 itemList.appendChild(div);
             });
         },
@@ -125,16 +134,32 @@ function onIdsSave() {
 
 // save the configured paths and drive drives
 function putDrivesConfig() {
+    // Get MAC address from URL parameters
+    function getURLParameter(name) {
+        name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+        var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+        var results = regex.exec(location.search);
+        return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+    }
+    
+    var mac = getURLParameter('mac');
+    if (!mac) {
+        alert("Error: No MAC address in URL");
+        return;
+    }
+    
+    // Save to the translated endpoint: /hdd/{mac}/translated
     $.ajax({
-        url: '/config/set_drives',
+        url: '/hdd/' + encodeURIComponent(mac) + '/translated',
         type: 'PUT',
-        dataType: 'json',
+        contentType: 'application/json',
         data: JSON.stringify({ 'paths': paths, 'drive_types': driveTypes }),
         success: function (data) {
             alert("Config saved.");
         },
         error: function (xhr) {
-            console.log("Error: " + xhr.statusText);
+            console.log("Error saving config: " + xhr.statusText);
+            alert("Error saving config: " + xhr.statusText);
         },
     })
 }
