@@ -17,50 +17,81 @@
     <div class="container">
         <div class="row">
             <div class="span10">
-                <ul class="nav nav-pills">
-                    <li class="active"><a href="/">Home</a></li>
-                    <li><a href="http://joo.kie.sk/?page_id=415" target="_blank">Manual</a></li>
-                    <li><a href="/acsi_ids.html">ACSI IDs</a></li>
-                    <li><a href="/gem_drives.html">GEM Drives</a></li>
-                    <li><a href="/floppy.html">Floppy</a></li>
-                    <li><a href="/remote">Remote</a></li>
-                    <li><a href="/screenshots">Screenshots</a></li>
-                    <li><a href="/status">Status</a></li>
-                </ul>
+                <div id="breadcrumbs-container"></div>
+                <script src="js/breadcrumbs.js"></script>
         <h3>Welcome!</h3>
             </div>
             <div class="span2">
                 <img class="logo" src="img/ce_logo.png">
             </div>
         </div>
-        <p>
-        You successfully connected your <a href="http://joo.kie.sk?page_id=384">CosmosEx</a> to the network.
-        </p>
 
         <br>
-        <p>
-            You can download the tools for your device:
-            <ul class="list-disc">
-                <li><b><a href="/debug/core/ce_dd.prg">CE_DD.PRG</a></b></li>
-                <li><b><a href="/debug/core/ce_conf.st">All config tools as ST floppy image</a></b></li>
-                <li><b><a href="/debug/core/ce_conf.zip">All config tools as ZIP archive</a></b></li>
-            </ul>
-        </p>
-        <br>
+        <h4>Devices</h4>
+        <div id="devices-container" style="display: flex; flex-direction: column; gap: 10px; max-width: 300px;">
+            <p>Loading devices...</p>
+        </div>
 
-        <p>
-        This start page provides important links for your device.
-        <ul class="list-disc">
-            <li>the <a href="http://joo.kie.sk/?page_id=415" target="_blank">manual</a></li>
-            <li>the <a href="/remote">remote</a> - remote control your ST from your browser with this virtual keyboard and mouse</li>
-            <li>the <a href="/screenshots">screenshots</a> - take screenshots from your ST when triggered via browser</li>
-            <li>the <a href="/floppy.html">floppy</a> - upload and activate disk images for floppy emulation</li>
-            <li>the <a href="/acsi_ids.html">ACSI IDs</a> - configure ACSI IDs of your device</li>
-            <li>the <a href="/gem_drives.html">GEM Drives</a> - map host directories to Atari GEM drives</li>
-            <li>the <a href="/debug">debug information</a> - show some information about your CosmosEx</li>
-            <li>the <a href="/credits">credits</a> - learn about all the opensource components used to build this little webserver</li>
-        </ul>
-        </p>
     </div>
+
+    <script>
+    // Fetch and display devices
+    function loadDevices() {
+        fetch('/devices', {
+            method: 'GET',
+            credentials: 'include'
+        })
+        .then(function(response) {
+            if (!response.ok) {
+                throw new Error('Failed to load devices');
+            }
+            return response.json();
+        })
+        .then(function(devices) {
+            var container = document.getElementById('devices-container');
+
+            if (devices.length === 0) {
+                container.innerHTML = '<p>No devices found.</p>';
+                return;
+            }
+
+            // Clear loading message
+            container.innerHTML = '';
+
+            // Create buttons for each device
+            devices.forEach(function(device) {
+                var button = document.createElement('button');
+                button.className = 'device-button';
+                button.style.cssText = 'padding: 10px 20px; font-size: 14px; cursor: pointer; background-color: #3baf16; color: white; border: none; border-radius: 4px; text-align: left;';
+                button.textContent = device.name || device.mac;
+                button.title = 'MAC: ' + device.mac + (device.connected ? ' (Connected)' : ' (Not Connected)');
+
+                // Add click handler - navigate to device page with MAC parameter (without colons)
+                button.onclick = function() {
+                    // Remove colons from MAC for URL
+                    var macNoColons = device.mac.replace(/:/g, '');
+                    window.location.href = '/device.html?mac=' + encodeURIComponent(macNoColons);
+                };
+
+                // Style based on connection status
+                if (device.connected) {
+                    button.style.backgroundColor = '#3baf16';
+                } else {
+                    button.style.backgroundColor = '#999';
+                    button.style.opacity = '0.7';
+                }
+
+                container.appendChild(button);
+            });
+        })
+        .catch(function(error) {
+            console.error('Error loading devices:', error);
+            document.getElementById('devices-container').innerHTML = '<p style="color: red;">Error loading devices. Please refresh the page.</p>';
+        });
+    }
+
+    // Load devices when page loads
+    document.addEventListener('DOMContentLoaded', loadDevices);
+    </script>
     </body>
 </html>

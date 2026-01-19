@@ -1,0 +1,94 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html lang="en">
+    <head>
+        <meta http-equiv="content-type" content="text/html; charset=utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
+        <title>Device Configuration - CosmosEx</title>
+        <script>
+        document.write('<link rel="stylesheet" type="text/css" href="css/combined.css">');
+        </script>
+    </head>
+    <body>
+    <div class="container">
+        <div class="row">
+            <div class="span10">
+                <div id="breadcrumbs-container"></div>
+                <script src="js/breadcrumbs.js"></script>
+                <h3>Device Configuration</h3>
+            </div>
+            <div class="span2">
+                <img class="logo" src="img/ce_logo.png">
+            </div>
+        </div>
+        
+        <div id="device-info" style="margin: 20px 0;">
+            <p><strong>MAC Address:</strong> <span id="mac-address">Loading...</span></p>
+        </div>
+        
+        <div id="device-buttons" style="display: flex; flex-direction: column; gap: 15px; max-width: 300px;">
+            <button id="acsi-button" class="device-action-button" style="padding: 15px 25px; font-size: 16px; cursor: pointer; background-color: #3baf16; color: white; border: none; border-radius: 4px; text-align: left;">
+                ACSI IDs
+            </button>
+            <button id="gem-button" class="device-action-button" style="padding: 15px 25px; font-size: 16px; cursor: pointer; background-color: #3baf16; color: white; border: none; border-radius: 4px; text-align: left;">
+                GEM Drives
+            </button>
+            <button id="floppy-button" class="device-action-button" style="padding: 15px 25px; font-size: 16px; cursor: pointer; background-color: #3baf16; color: white; border: none; border-radius: 4px; text-align: left;">
+                Floppy
+            </button>
+            <button id="status-button" class="device-action-button" style="padding: 15px 25px; font-size: 16px; cursor: pointer; background-color: #3baf16; color: white; border: none; border-radius: 4px; text-align: left;">
+                Status
+            </button>
+        </div>
+    </div>
+
+    <script>
+    // Get MAC address from URL parameters
+    function getURLParameter(name) {
+        name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+        var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+        var results = regex.exec(location.search);
+        return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+    }
+    
+    var mac = getURLParameter('mac');
+    
+    if (!mac) {
+        document.getElementById('mac-address').textContent = 'No MAC address specified';
+        document.getElementById('device-buttons').innerHTML = '<p style="color: red;">Error: No MAC address specified. Please go back and select a device.</p>';
+    } else {
+        // Display MAC address
+        document.getElementById('mac-address').textContent = mac;
+        
+        // Set up button click handlers
+        // Format MAC for display (add colons if it's 12 hex chars)
+        function formatMACForDisplay(mac) {
+            if (mac.length === 12 && /^[0-9a-fA-F]{12}$/.test(mac)) {
+                return mac.substring(0,2) + ':' + mac.substring(2,4) + ':' + mac.substring(4,6) + ':' + 
+                       mac.substring(6,8) + ':' + mac.substring(8,10) + ':' + mac.substring(10,12);
+            }
+            return mac;
+        }
+        
+        // Display MAC address with colons
+        document.getElementById('mac-address').textContent = formatMACForDisplay(mac);
+        
+        // Set up button click handlers (MAC already without colons from URL)
+        document.getElementById('acsi-button').onclick = function() {
+            window.location.href = '/acsi_ids.html?mac=' + encodeURIComponent(mac);
+        };
+        
+        document.getElementById('gem-button').onclick = function() {
+            window.location.href = '/gem_drives.html?mac=' + encodeURIComponent(mac);
+        };
+        
+        document.getElementById('floppy-button').onclick = function() {
+            window.location.href = '/floppy.html?mac=' + encodeURIComponent(mac);
+        };
+        
+        document.getElementById('status-button').onclick = function() {
+            window.location.href = '/status.html?mac=' + encodeURIComponent(mac);
+        };
+    }
+    </script>
+    </body>
+</html>

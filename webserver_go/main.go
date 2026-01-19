@@ -393,7 +393,7 @@ func (w *rotatingFileWriter) rotate() error {
 
 // loadEnvFromDotFile loads simple KEY=VALUE lines from the given .env file
 // in the current working directory. It silently ignores missing files
-// and malformed lines.
+// and malformed lines. Supports variable substitution like ${VAR}.
 func loadEnvFromDotFile(path string) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -401,6 +401,8 @@ func loadEnvFromDotFile(path string) {
 		return
 	}
 
+	// First pass: collect all variables into a map
+	envVars := make(map[string]string)
 	lines := strings.Split(string(data), "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -417,8 +419,66 @@ func loadEnvFromDotFile(path string) {
 			}
 
 			if key != "" {
-				_ = os.Setenv(key, val)
+				envVars[key] = val
 			}
 		}
 	}
+
+	// Second pass: resolve variable references and set environment variables
+	for key, val := range envVars {
+		resolved := resolveEnvVar(val, envVars, make(map[string]bool))
+		_ = os.Setenv(key, resolved)
+	}
+}
+
+// resolveEnvVar replaces ${VAR} references in a string with their values.
+// It handles nested references and prevents circular dependencies.
+func resolveEnvVar(value string, envVars map[string]string, visited map[string]bool) string {
+	// Find all ${VAR} patterns
+	var result strings.Builder
+	i := 0
+	for i < len(value) {
+		// Look for ${ pattern
+		if i < len(value)-1 && value[i] == '$' && value[i+1] == '{' {
+			// Find the closing }
+			end := strings.Index(value[i+2:], "}")
+			if end == -1 {
+				// No closing brace, keep as-is
+				result.WriteByte(value[i])
+				i++
+				continue
+			}
+			end += i + 2 // Adjust for offset
+
+			// Extract variable name
+			varName := strings.TrimSpace(value[i+2 : end])
+			
+			// Check for circular reference
+			if visited[varName] {
+				// Circular reference detected, return original
+				result.WriteString(value[i : end+1])
+				i = end + 1
+				continue
+			}
+
+			// Look up variable value
+			varVal := ""
+			if v, ok := envVars[varName]; ok {
+				// Recursively resolve nested variables
+				visited[varName] = true
+				varVal = resolveEnvVar(v, envVars, visited)
+				delete(visited, varName)
+			} else if v := os.Getenv(varName); v != "" {
+				// Check system environment as fallback
+				varVal = v
+			}
+
+			result.WriteString(varVal)
+			i = end + 1
+		} else {
+			result.WriteByte(value[i])
+			i++
+		}
+	}
+	return result.String()
 }
