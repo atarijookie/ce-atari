@@ -72,6 +72,17 @@ type Server struct {
 	hostDevices   []HostDevice
 }
 
+// responseWriter wraps http.ResponseWriter to capture status codes
+type responseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.statusCode = code
+	rw.ResponseWriter.WriteHeader(code)
+}
+
 func main() {
 	loadEnvFromDotFile(".env")
 
@@ -145,7 +156,28 @@ func newServer() *Server {
 	}
 
 	r.Post("/auth/login", s.handleLogin)
+
+	// Serve login.html publicly so users can access the login page without authentication.
+	r.Get("/login.html", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "static/login.html")
+	})
+
+	// Redirect root and /login to login page.
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/login.html", http.StatusFound)
+	})
+	r.Get("/login", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/login.html", http.StatusFound)
+	})
+
 	r.Group(func(protected chi.Router) {
+		// Log all requests first
+		protected.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				log.Printf("request - %s %s", r.Method, r.URL.Path)
+				next.ServeHTTP(w, r)
+			})
+		})
 		protected.Use(s.authMiddleware)
 		protected.Post("/auth/logout", s.handleLogout)
 		protected.Get("/devices", s.handleListDevices)
@@ -158,12 +190,64 @@ func newServer() *Server {
 		protected.Get("/status/{mac}", s.handleGetStatus)
 		protected.Get("/host/dir", s.handleHostDir)
 		protected.Get("/host/devices", s.handleHostDevices)
-	})
 
-	// Serve static files (HTML, JS, images, etc.) from the local "static" directory.
-	// This directory lives next to the Go sources / binary working directory.
-	fileServer := http.FileServer(http.Dir("static"))
-	r.Handle("/*", fileServer)
+		// Serve static files (HTML, JS, images, etc.) from the local "static" directory.
+		// This directory lives next to the Go sources / binary working directory.
+		// Static files require authentication.
+		// Use Handle with /* to catch all remaining routes
+		protected.Handle("/*", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Get the file path from the URL
+			filePath := "static" + r.URL.Path
+			log.Printf("fileServer - request path: %s, file path: %s", r.URL.Path, filePath)
+			
+			// Check if file exists
+			info, err := os.Stat(filePath)
+			if os.IsNotExist(err) {
+				// Silently ignore favicon.ico requests if file doesn't exist
+				if r.URL.Path == "/favicon.ico" {
+					http.NotFound(w, r)
+					return
+				}
+				log.Printf("fileServer - file not found: %s (requested: %s)", filePath, r.URL.Path)
+				http.NotFound(w, r)
+				return
+			}
+			
+			// If it's a directory, don't serve it
+			if info.IsDir() {
+				http.NotFound(w, r)
+				return
+			}
+			
+			log.Printf("fileServer - serving %s", r.URL.Path)
+			// Open and serve the file directly to avoid any redirects
+			file, err := os.Open(filePath)
+			if err != nil {
+				log.Printf("fileServer - error opening file: %v", err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			defer file.Close()
+			
+			// Set content type based on file extension
+			if strings.HasSuffix(filePath, ".html") {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			} else if strings.HasSuffix(filePath, ".css") {
+				w.Header().Set("Content-Type", "text/css")
+			} else if strings.HasSuffix(filePath, ".js") {
+				w.Header().Set("Content-Type", "application/javascript")
+			} else if strings.HasSuffix(filePath, ".png") {
+				w.Header().Set("Content-Type", "image/png")
+			} else if strings.HasSuffix(filePath, ".jpg") || strings.HasSuffix(filePath, ".jpeg") {
+				w.Header().Set("Content-Type", "image/jpeg")
+			} else if strings.HasSuffix(filePath, ".gif") {
+				w.Header().Set("Content-Type", "image/gif")
+			}
+			
+			http.ServeContent(w, r, info.Name(), info.ModTime(), file)
+			log.Printf("fileServer - served %s successfully", r.URL.Path)
+		}))
+	})
 
 	return s
 }
@@ -171,10 +255,24 @@ func newServer() *Server {
 func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := parseBearerToken(r.Header.Get("Authorization"))
+		if token == "" {
+			// Try to get token from cookie
+			if cookie, err := r.Cookie("auth_token"); err == nil {
+				token = cookie.Value
+				log.Printf("authMiddleware - found token in cookie for path %s", r.URL.Path)
+			} else {
+				log.Printf("authMiddleware - no cookie found (err: %v) for path %s", err, r.URL.Path)
+			}
+		} else {
+			log.Printf("authMiddleware - found token in Authorization header for path %s", r.URL.Path)
+		}
 		if token == "" || !s.tokenValid(token) {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			log.Printf("authMiddleware - token invalid or missing (token empty: %v, valid: %v) for path %s", token == "", token != "" && s.tokenValid(token), r.URL.Path)
+			// Redirect to login page instead of returning 401.
+			http.Redirect(w, r, "/login.html", http.StatusFound)
 			return
 		}
+		log.Printf("authMiddleware - token valid, allowing access to %s", r.URL.Path)
 		next.ServeHTTP(w, r)
 	})
 }

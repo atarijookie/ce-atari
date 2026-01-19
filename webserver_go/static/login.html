@@ -1783,24 +1783,103 @@ body>#login #dont_have_an_account a:hover { border-bottom: 2px solid #f90 }
 
 <div id="login">
 
-<form method="POST" action="/auth/login">
+<form id="login_form" method="POST" action="/auth/login">
 
     <div class="field_container">
-      <input type="text" id="username" name="username" placeholder="Username">
+      <input type="text" id="username" name="username" placeholder="Username" required>
     </div>
 
     <div class="field_container">
-      <input type="Password"  id="password" name="password" placeholder="Password">
+      <input type="password" id="password" name="password" placeholder="Password" required>
+    </div>
+
+    <div class="field_container" id="error_container" style="display: none; color: #f90; margin-bottom: 12px;">
+      <div id="error_message"></div>
     </div>
 
     <div class="field_container">
-      <button id="sign_in_button" type="submit">
+      <button id="sign_in_button" type="button">
         <span class="button_text">Sign In</span>
       </button>
     </div>
 
-    <h2> {{ message }} </h2>
-
 </form>
 
 </div>
+
+<script>
+document.getElementById('sign_in_button').addEventListener('click', function(e) {
+    e.preventDefault();
+    
+    var username = document.getElementById('username').value;
+    var password = document.getElementById('password').value;
+    var errorContainer = document.getElementById('error_container');
+    var errorMessage = document.getElementById('error_message');
+    
+    // Hide previous errors
+    errorContainer.style.display = 'none';
+    
+    if (!username || !password) {
+        errorMessage.textContent = 'Please enter both username and password';
+        errorContainer.style.display = 'block';
+        return;
+    }
+    
+    // Disable button during request
+    var button = document.getElementById('sign_in_button');
+    button.disabled = true;
+    button.querySelector('.button_text').textContent = 'Signing in...';
+    
+    // Make login request
+    fetch('/auth/login', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Include cookies in request and response
+        body: JSON.stringify({
+            username: username,
+            password: password
+        })
+    })
+    .then(function(response) {
+        console.log('Login response status:', response.status);
+        if (response.ok) {
+            return response.json().then(function(data) {
+                console.log('Login successful, token received:', data.token ? 'yes' : 'no');
+                // Store token in localStorage (optional, for API calls)
+                if (data.token) {
+                    localStorage.setItem('auth_token', data.token);
+                }
+                // Small delay to ensure cookie is set, then redirect
+                console.log('Redirecting to /index.html...');
+                setTimeout(function() {
+                    window.location.replace('/index.html');
+                }, 100);
+            });
+        } else {
+            console.log('Login failed with status:', response.status);
+            // Parse error response if available
+            return response.text().then(function(text) {
+                throw new Error(text || 'Login failed');
+            });
+        }
+    })
+    .catch(function(error) {
+        console.error('Login error:', error);
+        // Show error message
+        errorMessage.textContent = 'Invalid username or password';
+        errorContainer.style.display = 'block';
+        
+        // Re-enable button
+        button.disabled = false;
+        button.querySelector('.button_text').textContent = 'Sign In';
+    });
+});
+
+// Also handle Enter key press
+document.getElementById('login_form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    document.getElementById('sign_in_button').click();
+});
+</script>

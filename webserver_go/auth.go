@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/msteinert/pam"
 )
@@ -17,20 +18,38 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	log.Printf("handleLogin %s %s", r.Method, r.URL.Path)
 
 	var req LoginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
+
+	// Check Content-Type to determine if it's form data or JSON
+	contentType := r.Header.Get("Content-Type")
+	if strings.HasPrefix(contentType, "application/x-www-form-urlencoded") {
+		// Parse form data
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			log.Printf("handleLogin - invalid request body - form")
+			return
+		}
+		req.Username = r.FormValue("username")
+		req.Password = r.FormValue("password")
+	} else {
+		// Parse JSON
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			log.Printf("handleLogin - invalid request body - json")
+			return
+		}
 	}
 
 	if err := pamAuthFunc(req.Username, req.Password); err != nil {
 		// Treat any PAM error as invalid credentials to avoid leaking details.
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
+		log.Printf("handleLogin - invalid credentials")
 		return
 	}
 
 	token, err := generateToken()
 	if err != nil {
 		http.Error(w, "could not create session", http.StatusInternalServerError)
+		log.Printf("handleLogin - could not create session")
 		return
 	}
 
@@ -38,6 +57,29 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	s.authTokens[token] = req.Username
 	s.mu.Unlock()
 
+	// Always set cookie for browser-based logins (both form and JSON)
+	// This allows JavaScript redirects to work properly
+	http.SetCookie(w, &http.Cookie{
+		Name:     "auth_token",
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	// For form submissions, redirect to index.html
+	if strings.HasPrefix(contentType, "application/x-www-form-urlencoded") {
+		tokenPreview := token
+		if len(token) > 10 {
+			tokenPreview = token[:10]
+		}
+		log.Printf("handleLogin - OK, token stored: %s..., redirecting to index.html", tokenPreview)
+		http.Redirect(w, r, "/index.html", http.StatusFound)
+		return
+	}
+
+	// For JSON requests, return JSON response (cookie is already set)
+	log.Printf("handleLogin - OK and writeJSON")
 	writeJSON(w, http.StatusOK, LoginResponse{Token: token})
 }
 
