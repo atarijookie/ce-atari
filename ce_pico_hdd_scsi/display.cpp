@@ -27,7 +27,7 @@ const uint8_t segmentsNumbers[10] = {0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0
 //                                      A     b     C     d     E     F     G     H     I     J   (K)     L   (M)     n     O     P   (Q)     r     S   (T)     U   (V)   (W)   (X)   (Y)   (Z)
 const uint8_t segmentsLetters[26] = {0x77, 0x7C, 0x39, 0x5E, 0x79, 0x71, 0x3D, 0x76, 0x06, 0x1E, 0x00, 0x38, 0x00, 0x54, 0x3F, 0x73, 0x00, 0x50, 0x6D, 0x00, 0x3E, 0x00, 0x00, 0x00, 0x00, 0x00};
 
-const uint8_t segmentsSnake[8] = {0x01, 0x02, 0x40, 0x10, 0x08, 0x04, 0x40, 0x20};
+const uint8_t segmentsSnake[6] = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20};
 
 // use this to transform standard .GFEDCBA (76543210) order to our ABC.DEGF (01273465) order
 const uint8_t segmentOrder[8] = {0, 1, 2, 7, 3, 4, 6, 5};
@@ -64,7 +64,7 @@ void display(uint8_t what)
         val = segmentsLetters[what - 'a'];
     }
 
-    if(what >= DISP_SNAKE_0 && what <= DISP_SNAKE_7) {  // for progress snake
+    if(what >= DISP_SNAKE_0 && what <= DISP_SNAKE_5) {  // for progress snake
         val = segmentsSnake[what - DISP_SNAKE_0];
     }
 

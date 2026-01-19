@@ -77,17 +77,17 @@ void core1_main_loop(void)
 
                 if ((now - lastSendFwTime) >= 1000)
                 {
-                    // display another part of snake phase
-                    display(snakePhase);
-                    snakePhase++;
-                    if(snakePhase > DISP_SNAKE_7) {
-                        snakePhase = DISP_SNAKE_0;
-                    }
+                    lastSendFwTime = now;
 
                     // if connected, keep sending SEND_FW_VER commands
                     if(connected)
                     {
-                        lastSendFwTime = now;
+                        // display another part of snake phase
+                        display(snakePhase);
+                        snakePhase++;
+                        if(snakePhase > DISP_SNAKE_5) {
+                            snakePhase = DISP_SNAKE_0;
+                        }
 
                         IPCbuffer* bfr = ipcGetFreeBuffer(0, CMD_TIMEOUT_SHORT);
                         if(bfr) {
