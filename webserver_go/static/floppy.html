@@ -354,26 +354,30 @@
     <body>
     <div class="container">
         <div class="row">
-            <div class="span12">
-                <div id="breadcrumbs-container"></div>
+            <div class="span12" style="display: flex; flex-direction: column; align-items: center;">
+                <div id="breadcrumbs-container" style="width: 100%;"></div>
                 <script src="js/breadcrumbs.js"></script>
-                <h2>CosmosEx</h2>
-                <h3>Floppy</h3>
-        <p>Select a disk image (*.ST, *.MSA) and upload it to your CosmosEx. </p>
+                <div style="display: flex; flex-direction: column; align-items: flex-start; max-width: 600px; width: 100%;">
+                  <h2 style="margin: 0; align-self: flex-start;">CosmosEx</h2>
+                  <h3 style="margin: 0; align-self: flex-start;">Floppy</h3>
+                  <p style="margin: 0; align-self: flex-start;">Select a disk image (*.ST, *.MSA) and upload it to your CosmosEx. </p>
+                </div>
             </div>
         </div>
 
-        <div style="margin-top: 15px;">
-          <div id="image-name" style="font-size: 18px; font-weight: bold;">Loading...</div>
-          <div id="image-path" style="font-size: 13px; color: #555; margin-bottom: 10px;"></div>
-          <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <button id="prev-image" style="padding: 10px 14px; font-size: 16px;">&lt;</button>
-              <button id="select-image" style="padding: 10px 18px; font-size: 16px; min-width: 90px;">Select</button>
-              <button id="next-image" style="padding: 10px 14px; font-size: 16px;">&gt;</button>
-            </div>
-            <div style="display: flex; align-items: center; justify-content: center;">
-              <button id="eject-image" style="padding: 10px 18px; font-size: 16px; min-width: 90px;">Eject</button>
+        <div style="margin-top: 15px; display: flex; flex-direction: column; align-items: center;">
+          <div style="display: flex; flex-direction: column; align-items: flex-start; max-width: 600px; width: 100%;">
+            <div id="image-name" style="font-size: 18px; font-weight: bold;">Loading...</div>
+            <div id="image-path" style="font-size: 13px; color: #555; margin-bottom: 10px;"></div>
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <button id="prev-image" style="padding: 10px 14px; font-size: 16px;">&lt;</button>
+                <button id="select-image" style="padding: 10px 18px; font-size: 16px; min-width: 90px;">Select</button>
+                <button id="next-image" style="padding: 10px 14px; font-size: 16px;">&gt;</button>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: center;">
+                <button id="eject-image" style="padding: 10px 18px; font-size: 16px; min-width: 90px;">Eject</button>
+              </div>
             </div>
           </div>
         </div>

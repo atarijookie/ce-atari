@@ -234,6 +234,10 @@ func newServer() *Server {
 		protected.Get("/device/{mac}/name", s.handleGetDeviceName)
 		protected.Put("/device/{mac}/name", s.handlePutDeviceName)
 		protected.Get("/device/{mac}/features", s.handleGetDeviceFeatures)
+		protected.Get("/screen/{mac}", s.handleGetScreen)
+		protected.Post("/screen/{mac}/screenshot", s.handlePostScreenScreenshot)
+		protected.Post("/screen/{mac}/vbl", s.handlePostScreenVBL)
+		protected.Get("/screen/{mac}/vbl", s.handleGetScreenVBL)
 		protected.Get("/host/dir", s.handleHostDir)
 		protected.Get("/host/devices", s.handleHostDevices)
 
