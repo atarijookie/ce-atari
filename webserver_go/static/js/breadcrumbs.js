@@ -23,10 +23,19 @@ function renderBreadcrumbs() {
         
         // Add device breadcrumb if we have a MAC
         if (mac) {
-            var macFormatted = formatMACForDisplay(mac);
+            // Use name parameter if available, otherwise use MAC
+            var name = params.get('name');
+            var deviceName = name || formatMACForDisplay(mac);
+            
+            // Build URL with both mac and name parameters
+            var deviceUrl = '/device.html?mac=' + encodeURIComponent(mac);
+            if (name) {
+                deviceUrl += '&name=' + encodeURIComponent(name);
+            }
+            
             breadcrumbs.push({
-                text: macFormatted,
-                url: '/device.html?mac=' + encodeURIComponent(mac)
+                text: deviceName,
+                url: deviceUrl
             });
         }
         

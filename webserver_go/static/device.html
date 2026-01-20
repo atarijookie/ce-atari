@@ -20,6 +20,14 @@
         </div>
 
         <div id="device-info" style="margin: 20px 0;">
+            <div style="margin-bottom: 15px;">
+                <p><strong>Name:</strong> 
+                    <input type="text" id="device-name-input" style="padding: 5px 10px; font-size: 14px; min-width: 200px; margin-left: 10px;">
+                    <button id="save-name-button" disabled style="padding: 5px 15px; font-size: 14px; margin-left: 10px; cursor: pointer; background-color: #3baf16; color: white; border: none; border-radius: 4px; opacity: 0.7;">
+                        Saved
+                    </button>
+                </p>
+            </div>
             <p><strong>MAC Address:</strong> <span id="mac-address">Loading...</span></p>
         </div>
 
@@ -52,6 +60,7 @@
     }
 
     var mac = getURLParameter('mac');
+    var deviceName = getURLParameter('name');
 
     if (!mac) {
         document.getElementById('mac-address').textContent = 'No MAC address specified';
@@ -73,25 +82,190 @@
         // Display MAC address with colons
         document.getElementById('mac-address').textContent = formatMACForDisplay(mac);
 
+        // Track original device name for change detection
+        var originalDeviceName = '';
+
+        // Update Save button state based on whether name has changed
+        function updateSaveButtonState() {
+            var input = document.getElementById('device-name-input');
+            var button = document.getElementById('save-name-button');
+            var currentValue = input.value;
+            
+            if (currentValue === originalDeviceName) {
+                // No change - show "Saved" and disable
+                button.textContent = 'Saved';
+                button.disabled = true;
+                button.style.opacity = '0.7';
+            } else {
+                // Changed - show "Save" and enable
+                button.textContent = 'Save';
+                button.disabled = false;
+                button.style.opacity = '1';
+            }
+        }
+
+        // Load device name
+        function loadDeviceName() {
+            // Use name from URL parameter if available, otherwise fetch from server
+            if (deviceName) {
+                originalDeviceName = deviceName;
+                document.getElementById('device-name-input').value = deviceName;
+                updateSaveButtonState();
+            } else {
+                fetch('/device/' + encodeURIComponent(mac) + '/name', { method: 'GET' })
+                    .then(function(res) {
+                        if (!res.ok) {
+                            throw new Error('GET failed ' + res.status);
+                        }
+                        return res.text();
+                    })
+                    .then(function(name) {
+                        originalDeviceName = name;
+                        document.getElementById('device-name-input').value = name;
+                        updateSaveButtonState();
+                        // Update URL with name parameter without reloading
+                        if (name && name !== mac) {
+                            var newUrl = window.location.pathname + '?mac=' + encodeURIComponent(mac) + '&name=' + encodeURIComponent(name);
+                            window.history.replaceState({}, '', newUrl);
+                            deviceName = name; // Update local variable
+                        }
+                    })
+                    .catch(function(err) {
+                        console.log('Error loading device name:', err);
+                    });
+            }
+        }
+
+        // Save device name
+        function saveDeviceName() {
+            var newDeviceName = document.getElementById('device-name-input').value;
+            fetch('/device/' + encodeURIComponent(mac) + '/name', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'text/plain' },
+                body: newDeviceName
+            })
+            .then(function(res) {
+                if (!res.ok) {
+                    throw new Error('PUT failed ' + res.status);
+                }
+                // Update original value to current value and update button state
+                originalDeviceName = newDeviceName;
+                deviceName = newDeviceName; // Update local variable
+                updateSaveButtonState();
+                // Update URL with new name parameter without reloading
+                var newUrl = window.location.pathname + '?mac=' + encodeURIComponent(mac) + '&name=' + encodeURIComponent(newDeviceName);
+                window.history.replaceState({}, '', newUrl);
+                // Re-render breadcrumbs to show updated name
+                if (typeof renderBreadcrumbs === 'function') {
+                    renderBreadcrumbs();
+                }
+            })
+            .catch(function(err) {
+                console.log('Error saving device name:', err);
+                alert('Error saving device name: ' + err);
+            });
+        }
+
+        // Load device features and show/hide buttons accordingly
+        function loadDeviceFeatures() {
+            fetch('/device/' + encodeURIComponent(mac) + '/features', { method: 'GET' })
+                .then(function(res) {
+                    if (!res.ok) {
+                        throw new Error('GET failed ' + res.status);
+                    }
+                    return res.json();
+                })
+                .then(function(features) {
+                    // Show/hide buttons based on features
+                    var acsiButton = document.getElementById('acsi-button');
+                    var gemButton = document.getElementById('gem-button');
+                    var floppyButton = document.getElementById('floppy-button');
+                    var ikbdButton = document.getElementById('ikbd-button');
+                    var statusButton = document.getElementById('status-button');
+
+                    // Show ACSI IDs and GEM Drives only if acsi OR scsi is true
+                    var showAcsiButtons = features.acsi || features.scsi;
+                    if (acsiButton) {
+                        acsiButton.style.display = showAcsiButtons ? 'block' : 'none';
+                        // Update button text based on features
+                        if (showAcsiButtons) {
+                            if (features.acsi) {
+                                acsiButton.textContent = 'ACSI IDs';
+                            } else if (features.scsi) {
+                                acsiButton.textContent = 'SCSI IDs';
+                            }
+                        }
+                    }
+                    if (gemButton) {
+                        gemButton.style.display = showAcsiButtons ? 'block' : 'none';
+                    }
+
+                    // Show Floppy only if fdd is true
+                    if (floppyButton) {
+                        floppyButton.style.display = features.fdd ? 'block' : 'none';
+                    }
+
+                    // Show IKBD only if ikbd is true
+                    if (ikbdButton) {
+                        ikbdButton.style.display = features.ikbd ? 'block' : 'none';
+                    }
+
+                    // Status button is always shown (no change needed)
+                })
+                .catch(function(err) {
+                    console.log('Error loading device features:', err);
+                    // On error, show all buttons (default behavior - assume all features enabled)
+                    var acsiButton = document.getElementById('acsi-button');
+                    var gemButton = document.getElementById('gem-button');
+                    var floppyButton = document.getElementById('floppy-button');
+                    var ikbdButton = document.getElementById('ikbd-button');
+                    if (acsiButton) acsiButton.style.display = 'block';
+                    if (gemButton) gemButton.style.display = 'block';
+                    if (floppyButton) floppyButton.style.display = 'block';
+                    if (ikbdButton) ikbdButton.style.display = 'block';
+                });
+        }
+
+        // Load device name on page load
+        loadDeviceName();
+
+        // Load device features on page load
+        loadDeviceFeatures();
+
+        // Set up save button click handler
+        document.getElementById('save-name-button').onclick = saveDeviceName;
+
+        // Set up input change listener to enable/disable save button
+        document.getElementById('device-name-input').addEventListener('input', updateSaveButtonState);
+
+        // Helper function to build URL with mac and name parameters
+        function buildDeviceUrl(path) {
+            var url = path + '?mac=' + encodeURIComponent(mac);
+            if (deviceName) {
+                url += '&name=' + encodeURIComponent(deviceName);
+            }
+            return url;
+        }
+
         // Set up button click handlers (MAC already without colons from URL)
         document.getElementById('acsi-button').onclick = function() {
-            window.location.href = '/acsi_ids.html?mac=' + encodeURIComponent(mac);
+            window.location.href = buildDeviceUrl('/acsi_ids.html');
         };
 
         document.getElementById('gem-button').onclick = function() {
-            window.location.href = '/gem_drives.html?mac=' + encodeURIComponent(mac);
+            window.location.href = buildDeviceUrl('/gem_drives.html');
         };
 
         document.getElementById('floppy-button').onclick = function() {
-            window.location.href = '/floppy.html?mac=' + encodeURIComponent(mac);
+            window.location.href = buildDeviceUrl('/floppy.html');
         };
 
         document.getElementById('ikbd-button').onclick = function() {
-            window.location.href = '/ikbd.html?mac=' + encodeURIComponent(mac);
+            window.location.href = buildDeviceUrl('/ikbd.html');
         };
 
         document.getElementById('status-button').onclick = function() {
-            window.location.href = '/status.html?mac=' + encodeURIComponent(mac);
+            window.location.href = buildDeviceUrl('/status.html');
         };
     }
     </script>

@@ -29,11 +29,63 @@
             devTypes.push(0);
           }
 
+          // Get MAC address from URL parameters
+          function getURLParameter(name) {
+            name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+            var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+            var results = regex.exec(location.search);
+            return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+          }
+
+          // Helper function to replace text in all text nodes
+          function replaceTextInNode(node, search, replace) {
+            if (node.nodeType === Node.TEXT_NODE) {
+              node.textContent = node.textContent.replace(new RegExp(search, 'g'), replace);
+            } else {
+              for (var i = 0; i < node.childNodes.length; i++) {
+                replaceTextInNode(node.childNodes[i], search, replace);
+              }
+            }
+          }
+
+          // Load device features and update ACSI/SCSI text
+          function loadDeviceFeatures() {
+            var mac = getURLParameter('mac');
+            if (!mac) {
+              return;
+            }
+            
+            fetch('/device/' + encodeURIComponent(mac) + '/features', { method: 'GET' })
+              .then(function(res) {
+                if (!res.ok) {
+                  throw new Error('GET failed ' + res.status);
+                }
+                return res.json();
+              })
+              .then(function(features) {
+                // Replace ACSI with SCSI if scsi is true (but not if acsi is also true)
+                // If acsi is true, keep ACSI (even if scsi is also true)
+                if (features.scsi && !features.acsi) {
+                  // Replace all occurrences of "ACSI" with "SCSI" throughout the document
+                  replaceTextInNode(document.body, 'ACSI', 'SCSI');
+                  // Also update title
+                  if (document.title) {
+                    document.title = document.title.replace(/ACSI/g, 'SCSI');
+                  }
+                }
+                // If acsi is true (even if scsi is also true), keep ACSI - no change needed
+              })
+              .catch(function(err) {
+                console.log('Error loading device features:', err);
+              });
+          }
+
           // bind handlers to combo change and get IDs from backend
           window.onload = function() {
             $("[name=file-selector]").hide();
             bindHandlersAcsiIDs();
             getIdsConfig();
+            loadDeviceFeatures();
           }
         </script>
         <style>

@@ -59,15 +59,32 @@
             devices.forEach(function(device) {
                 var button = document.createElement('button');
                 button.className = 'device-button';
-                button.style.cssText = 'padding: 15px 25px; font-size: 16px; cursor: pointer; background-color: #3baf16; color: white; border: none; border-radius: 4px; text-align: center; width: 100%; display: block;';
-                button.textContent = device.name || device.mac;
+                button.style.cssText = 'padding: 15px 25px; cursor: pointer; background-color: #3baf16; color: white; border: none; border-radius: 4px; text-align: center; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;';
                 button.title = 'MAC: ' + device.mac + (device.connected ? ' (Connected)' : ' (Not Connected)');
 
-                // Add click handler - navigate to device page with MAC parameter (without colons)
+                // Create name text (larger)
+                var nameText = document.createElement('span');
+                nameText.textContent = device.name || device.mac;
+                nameText.style.cssText = 'font-size: 16px; font-weight: bold; display: block;';
+                
+                // Create MAC text (smaller, second line)
+                var macText = document.createElement('span');
+                macText.textContent = device.mac;
+                macText.style.cssText = 'font-size: 12px; opacity: 0.9; display: block; margin-top: 4px;';
+
+                // Add name and MAC to button
+                button.appendChild(nameText);
+                button.appendChild(macText);
+
+                // Add click handler - navigate to device page with MAC and name parameters
                 button.onclick = function() {
                     // Remove colons from MAC for URL
                     var macNoColons = device.mac.replace(/:/g, '');
-                    window.location.href = '/device.html?mac=' + encodeURIComponent(macNoColons);
+                    var url = '/device.html?mac=' + encodeURIComponent(macNoColons);
+                    if (device.name) {
+                        url += '&name=' + encodeURIComponent(device.name);
+                    }
+                    window.location.href = url;
                 };
 
                 // Style based on connection status (always green; optional visual hint via opacity)

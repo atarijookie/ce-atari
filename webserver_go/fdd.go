@@ -162,3 +162,37 @@ func (s *Server) handleGetFDDImageStep(w http.ResponseWriter, r *http.Request, s
 
 	writeJSON(w, http.StatusOK, map[string]string{"mac": mac, "image": newImage})
 }
+
+// handleFloppyAction sends a floppy action command to the core
+func handleFloppyAction(action, mac string) error {
+	cmd := map[string]string{"module": "floppy", "action": action, "mac": mac}
+	cmdJSON, err := json.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+	if err := sendToCmdSocket(string(cmdJSON)); err != nil {
+		log.Printf("handleFloppyAction - failed to send cmd socket: %v", err)
+		return err
+	}
+	return nil
+}
+
+func (s *Server) handleDeleteFDDImage(w http.ResponseWriter, r *http.Request) {
+	log.Printf("handleDeleteFDDImage %s %s", r.Method, r.URL.Path)
+
+	mac := chi.URLParam(r, "mac")
+
+	// Send eject command to core (log error but don't fail the request)
+	if err := handleFloppyAction("eject", mac); err != nil {
+		log.Printf("handleDeleteFDDImage - failed to send eject command: %v", err)
+	}
+
+	// Clear the floppy image setting file
+	if err := s.writeFddImage(mac, ""); err != nil {
+		log.Printf("handleDeleteFDDImage - failed to write empty FLOPPY_IMAGE: %v", err)
+		http.Error(w, "cannot write FLOPPY_IMAGE", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
