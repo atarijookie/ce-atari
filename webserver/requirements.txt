@@ -1,7 +1,0 @@
-setproctitle
-urllib3
-flask
-gunicorn
-gevent
-simplepam
-python-dotenv

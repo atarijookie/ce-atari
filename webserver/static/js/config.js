@@ -8,19 +8,34 @@ function bindHandlersAcsiIDs() {
 
 // get ACSI IDs and paths from backend and update UI
 function getIdsConfig() {
+    // Get MAC address from URL parameters
+    function getURLParameter(name) {
+        name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+        var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+        var results = regex.exec(location.search);
+        return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+    }
+    
+    var mac = getURLParameter('mac');
+    if (!mac) {
+        console.log("Error: No MAC address in URL");
+        return;
+    }
+    
+    // Fetch from the new endpoint: /hdd/{mac}/raw
     $.ajax({
-        url: '/config/get_ids',
+        url: '/hdd/' + encodeURIComponent(mac) + '/raw',
         type: 'GET',
         dataType: 'json',
         success: function (data) {
             paths = data.paths;
             devTypes = data.dev_types;
 
-            console.log("config/get_ids - data: " + data + ", paths: " + paths + ", devTypes: " + devTypes);
+            console.log("hdd/" + mac + "/raw - data: " + JSON.stringify(data) + ", paths: " + paths + ", devTypes: " + devTypes);
             updateIdsFromData();
         },
         error: function (xhr) {
-            console.log("Error: " + xhr.statusText);
+            console.log("Error fetching device config: " + xhr.statusText);
         },
     })
 }
@@ -33,10 +48,9 @@ function getDirContent(new_path) {
     document.getElementById('currentPath').textContent = dir;
 
     $.ajax({
-        url: '/config/get_dir_content',
-        type: 'POST',
+        url: '/host/dir?path=' + encodeURIComponent(new_path),
+        type: 'GET',
         dataType: 'json',
-        data: JSON.stringify({ 'path': new_path }),
         success: function (data) {
             var dirs = data.dirs;
             var files = data.files;
@@ -126,18 +140,52 @@ function onIdsSave() {
 
 // save the configured paths and device types
 function putIdsConfig() {
+    // Get MAC address from URL parameters
+    function getURLParameter(name) {
+        name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+        var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+        var results = regex.exec(location.search);
+        return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+    }
+    
+    var mac = getURLParameter('mac');
+    if (!mac) {
+        alert("Error: No MAC address in URL");
+        return;
+    }
+    
+    // Save to the new endpoint: /hdd/{mac}/raw
     $.ajax({
-        url: '/config/set_ids',
+        url: '/hdd/' + encodeURIComponent(mac) + '/raw',
         type: 'PUT',
-        dataType: 'json',
+        contentType: 'application/json',
         data: JSON.stringify({ 'paths': paths, 'dev_types': devTypes }),
         success: function (data) {
-            alert("Config saved.");
+            setSaveMessage("Settings saved.", false);
         },
         error: function (xhr) {
-            console.log("Error: " + xhr.statusText);
+            console.log("Error saving config: " + xhr.statusText);
+            setSaveMessage("Error saving config: " + xhr.statusText, true);
         },
     })
+}
+
+function setSaveMessage(text, isError) {
+    var el = document.getElementById('save-message');
+    if (!el) return;
+    el.textContent = text || '';
+    if (!text) {
+        el.style.display = 'none';
+        return;
+    }
+    el.style.display = 'inline';
+    el.style.color = isError ? '#c00' : '#3baf16';
+    el.style.fontWeight = 'bold';
+    if (!isError) {
+        setTimeout(function() {
+            el.style.display = 'none';
+        }, 5000);
+    }
 }
 
 // go through all the rows, switch combo boxes to selected values and show paths on screen
