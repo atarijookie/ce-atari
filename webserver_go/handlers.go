@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -87,14 +88,24 @@ func (s *Server) handleGetStatus(w http.ResponseWriter, r *http.Request) {
 	log.Printf("handleGetStatus %s %s", r.Method, r.URL.Path)
 
 	mac := chi.URLParam(r, "mac")
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	status, ok := s.status[mac]
-	if !ok {
-		http.Error(w, "unknown mac", http.StatusNotFound)
+	logDir := os.Getenv("LOG_DIR")
+	if logDir == "" {
+		logDir = "/tmp/ce/log"
+	}
+	statusFile := filepath.Join(logDir, mac+".txt")
+
+	content, err := os.ReadFile(statusFile)
+	if err != nil {
+		msg := "File " + statusFile + " not present."
+		log.Printf("handleGetStatus - %s", msg)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(msg))
 		return
 	}
-	writeJSON(w, http.StatusOK, status)
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(content)
 }
 
 func (s *Server) handleHostDir(w http.ResponseWriter, r *http.Request) {

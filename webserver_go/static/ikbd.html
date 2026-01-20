@@ -1,0 +1,427 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html lang="en">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
+    <title>CosmosEx - IKBD</title>
+    <script>
+      document.write('<link rel="stylesheet" type="text/css" href="css/combined.css">');
+    </script>
+    <style>
+      body {
+        margin: 0;
+        font-family: sans-serif;
+      }
+
+      .option-row {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin: 20px 0;
+      }
+
+      .option-row label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 16px;
+        cursor: pointer;
+      }
+
+      .controls-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+        margin-top: 10px;
+      }
+
+      .control-card {
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 16px;
+        min-width: 280px;
+        max-width: 320px;
+        background: #fafafa;
+      }
+
+      .control-card h4 {
+        margin: 0 0 12px 0;
+      }
+
+      .arrow-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(3, 1fr);
+        gap: 10px;
+      }
+
+      .arrow-grid input {
+        width: 100%;
+        padding: 10px;
+        font-size: 14px;
+        box-sizing: border-box;
+      }
+
+      .arrow-grid .fire {
+        background: #fff3cd;
+        border: 1px solid #f0ad4e;
+      }
+
+      .arrow-grid .spacer {
+        visibility: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="row">
+        <div class="span12">
+          <div id="breadcrumbs-container"></div>
+          <script src="js/breadcrumbs.js"></script>
+          <h2>CosmosEx - IKBD</h2>
+          <h3>Keyboard and joystick mapping</h3>
+          <p><strong>MAC Address:</strong> <span id="mac-address">Loading...</span></p>
+
+          <div class="option-row">
+            <label><input type="checkbox" id="first-joy">First Joy is 0</label>
+            <label><input type="checkbox" id="mouse-wheel-keys">Mouse wheel as keys</label>
+          </div>
+
+          <div class="controls-wrapper">
+            <div class="control-card">
+          <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 15px;">
+            <input type="checkbox" id="keys0-enabled" checked>
+            Enable Keys 0
+          </label>
+          <h4>Keys 0</h4>
+              <div class="arrow-grid">
+                <div class="spacer"></div>
+                <input type="text" id="keys0-up" placeholder="Up (W)">
+                <div class="spacer"></div>
+
+                <input type="text" id="keys0-left" placeholder="Left (A)">
+                <input type="text" id="keys0-fire" class="fire" placeholder="Fire">
+                <input type="text" id="keys0-right" placeholder="Right (D)">
+
+                <div class="spacer"></div>
+                <input type="text" id="keys0-down" placeholder="Down (S)">
+                <div class="spacer"></div>
+              </div>
+            </div>
+
+            <div class="control-card">
+          <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 15px;">
+            <input type="checkbox" id="keys1-enabled" checked>
+            Enable Keys 1
+          </label>
+          <h4>Keys 1</h4>
+              <div class="arrow-grid">
+                <div class="spacer"></div>
+                <input type="text" id="keys1-up" placeholder="Up (W)">
+                <div class="spacer"></div>
+
+                <input type="text" id="keys1-left" placeholder="Left (A)">
+                <input type="text" id="keys1-fire" class="fire" placeholder="Fire">
+                <input type="text" id="keys1-right" placeholder="Right (D)">
+
+                <div class="spacer"></div>
+                <input type="text" id="keys1-down" placeholder="Down (S)">
+                <div class="spacer"></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top: 20px;">
+            <button id="save-ikbd" style="padding: 10px 16px; font-size: 16px;">Save</button>
+            <span id="save-message" style="display: none; margin-left: 12px; color: #3baf16; font-weight: bold;">Settings saved</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      function getURLParameter(name) {
+        name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+        var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+        var results = regex.exec(location.search);
+        return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+      }
+
+      function formatMACForDisplay(mac) {
+        if (mac.length === 12 && /^[0-9a-fA-F]{12}$/.test(mac)) {
+          return mac.substring(0,2) + ':' + mac.substring(2,4) + ':' + mac.substring(4,6) + ':' +
+                 mac.substring(6,8) + ':' + mac.substring(8,10) + ':' + mac.substring(10,12);
+        }
+        return mac;
+      }
+
+      var mac = getURLParameter('mac');
+      var macEl = document.getElementById('mac-address');
+
+      if (!mac) {
+        macEl.textContent = 'No MAC address specified';
+      } else {
+        macEl.textContent = formatMACForDisplay(mac);
+      }
+
+      function setMessageVisible(visible) {
+        var el = document.getElementById('save-message');
+        if (!el) return;
+        el.style.display = visible ? 'inline' : 'none';
+      }
+
+      // Allowed meta key labels.
+      const allowedMeta = [
+        'ESC','BACKSPACE','TAB','ENTER','SPACE','LCTRL','RCTRL','LSHIFT','RSHIFT','LALT','CAPS',
+        'F1','F2','F3','F4','F5','F6','F7','F8','F9','F10','F11','F12',
+        'HOME','INSERT','DELETE','KPMINUS','KPPLUS','UP','DOWN','LEFT','RIGHT',
+        'KPLPARENT','KPRPARENT','KPSLASH','KPASTERISK','KPDOT','KPENTER'
+      ];
+
+      const codeToMeta = {
+        Escape: 'ESC',
+        Backspace: 'BACKSPACE',
+        Tab: 'TAB',
+        Enter: 'ENTER',
+        Space: 'SPACE',
+        ControlLeft: 'LCTRL',
+        ControlRight: 'RCTRL',
+        ShiftLeft: 'LSHIFT',
+        ShiftRight: 'RSHIFT',
+        AltLeft: 'LALT',
+        CapsLock: 'CAPS',
+        Home: 'HOME',
+        Insert: 'INSERT',
+        Delete: 'DELETE',
+        NumpadSubtract: 'KPMINUS',
+        NumpadAdd: 'KPPLUS',
+        ArrowUp: 'UP',
+        ArrowDown: 'DOWN',
+        ArrowLeft: 'LEFT',
+        ArrowRight: 'RIGHT',
+        NumpadDivide: 'KPSLASH',
+        NumpadMultiply: 'KPASTERISK',
+        NumpadDecimal: 'KPDOT',
+        NumpadEnter: 'KPENTER',
+        Numpad9: 'KPLPARENT',
+        Numpad0: 'KPRPARENT',
+      };
+
+      // Convert a key string to a normalized value (meta or single ASCII letter/digit), or empty string if invalid.
+      function normalizeKeyValue(raw) {
+        if (!raw) return '';
+        var val = ('' + raw).trim().toUpperCase();
+        if (val.length === 1 && /[A-Z0-9]/.test(val)) {
+          return val;
+        }
+        if (allowedMeta.indexOf(val) !== -1) {
+          return val;
+        }
+        return '';
+      }
+
+      function attachKeyCapture(inputEl) {
+        if (!inputEl) return;
+        inputEl.addEventListener('keydown', function(e) {
+          // Allow navigation keys to propagate for cursor movement inside the field.
+          // If the key is meta or single ASCII, capture and set the value.
+          const code = e.code;
+          const key = e.key;
+          let mapped = null;
+
+          if (codeToMeta[code]) {
+            mapped = codeToMeta[code];
+          } else if (key === ' ') {
+            mapped = 'SPACE';
+          } else if (key && key.length === 1 && /[A-Za-z0-9]/.test(key)) {
+            mapped = key.toUpperCase();
+          } else if (key && key.startsWith('F')) {
+            // Handle F1-F12
+            const upperKey = key.toUpperCase();
+            if (allowedMeta.indexOf(upperKey) !== -1) {
+              mapped = upperKey;
+            }
+          }
+
+          if (mapped) {
+            inputEl.value = mapped;
+            e.preventDefault();
+          }
+        });
+
+        inputEl.addEventListener('blur', function() {
+          const normalized = normalizeKeyValue(inputEl.value);
+          inputEl.value = normalized;
+        });
+      }
+
+      function attachAllKeyCaptures() {
+        ['keys0','keys1'].forEach(function(prefix) {
+          ['up','left','down','right','fire'].forEach(function(suffix) {
+            attachKeyCapture(document.getElementById(prefix + '-' + suffix));
+          });
+        });
+      }
+
+      function getKeySet(prefix) {
+        return {
+          up: document.getElementById(prefix + '-up').value || '',
+          left: document.getElementById(prefix + '-left').value || '',
+          down: document.getElementById(prefix + '-down').value || '',
+          right: document.getElementById(prefix + '-right').value || '',
+          fire: document.getElementById(prefix + '-fire').value || ''
+        };
+      }
+
+      function setKeySet(prefix, obj) {
+        document.getElementById(prefix + '-up').value = (obj && obj.up) ? obj.up : '';
+        document.getElementById(prefix + '-left').value = (obj && obj.left) ? obj.left : '';
+        document.getElementById(prefix + '-down').value = (obj && obj.down) ? obj.down : '';
+        document.getElementById(prefix + '-right').value = (obj && obj.right) ? obj.right : '';
+        document.getElementById(prefix + '-fire').value = (obj && obj.fire) ? obj.fire : '';
+      }
+
+      const defaultKeys0 = ['A','S','D','W','LSHIFT']; // order: left,down,right,up,fire
+      const defaultKeys1 = ['LEFT','DOWN','RIGHT','UP','RSHIFT']; // order: left,down,right,up,fire
+
+      function parseKeySettingsString(s, defaultsArr) {
+        let parts = [];
+        if (s) {
+          // Prefer JSON if present
+          try {
+            var obj = JSON.parse(s);
+            if (obj && typeof obj === 'object') {
+              return {
+                up: obj.up || '',
+                left: obj.left || '',
+                down: obj.down || '',
+                right: obj.right || '',
+                fire: obj.fire || ''
+              };
+            }
+          } catch (e) {}
+          parts = ('' + s).split('%');
+        }
+        if (parts.length < 5) {
+          // Fill missing with defaults
+          parts = defaultsArr.slice();
+        }
+        // Expect order: left, down, right, up, fire
+        return {
+          up: parts[3] ? parts[3].trim() : '',
+          left: parts[0] ? parts[0].trim() : '',
+          down: parts[1] ? parts[1].trim() : '',
+          right: parts[2] ? parts[2].trim() : '',
+          fire: parts[4] ? parts[4].trim() : ''
+        };
+      }
+
+      function serializeKeySettings(obj) {
+        // Store as percent-separated in order: left, down, right, up, fire
+        const parts = [
+          obj.left || '',
+          obj.down || '',
+          obj.right || '',
+          obj.up || '',
+          obj.fire || '',
+        ];
+        return parts.join('%');
+      }
+
+      function validateKeySet(obj) {
+        const normalized = {};
+        const fields = ['up','left','down','right','fire'];
+        for (var i = 0; i < fields.length; i++) {
+          var key = fields[i];
+          normalized[key] = normalizeKeyValue(obj[key]);
+        }
+        return normalized;
+      }
+
+      async function loadIkbdSettings() {
+        if (!mac) return;
+        try {
+          const res = await fetch('/ikbd/' + encodeURIComponent(mac), { method: 'GET' });
+          if (!res.ok) throw new Error('GET failed: ' + res.status);
+          const data = await res.json();
+
+          document.getElementById('first-joy').checked = (data.joy_first_is_0 === 1);
+          document.getElementById('mouse-wheel-keys').checked = (data.mouse_wheel_as_keys === 1);
+          document.getElementById('keys0-enabled').checked = (data.keyboard_joy0 === 1);
+          document.getElementById('keys1-enabled').checked = (data.keyboard_joy1 === 1);
+
+          setKeySet('keys0', parseKeySettingsString(data.keyboard_keys_settings0, defaultKeys0));
+          setKeySet('keys1', parseKeySettingsString(data.keyboard_keys_settings1, defaultKeys1));
+        } catch (e) {
+          console.log('Error loading IKBD settings:', e);
+        }
+      }
+
+      async function saveIkbdSettings() {
+        if (!mac) {
+          alert('Error: No MAC address in URL');
+          return;
+        }
+        setMessageVisible(false);
+
+        const keys0Raw = getKeySet('keys0');
+        const keys1Raw = getKeySet('keys1');
+        const keys0Norm = validateKeySet(keys0Raw);
+        const keys1Norm = validateKeySet(keys1Raw);
+
+        const anyEmpty = (obj) => !obj.up || !obj.left || !obj.down || !obj.right || !obj.fire;
+        if (anyEmpty(keys0Norm)) {
+          // Fill defaults and block save
+          setKeySet('keys0', {
+            up: defaultKeys0[3],
+            left: defaultKeys0[0],
+            down: defaultKeys0[1],
+            right: defaultKeys0[2],
+            fire: defaultKeys0[4],
+          });
+          alert('Keys 0 are incomplete. Defaults restored; please review and save again.');
+          return;
+        }
+        if (anyEmpty(keys1Norm)) {
+          setKeySet('keys1', {
+            up: defaultKeys1[3],
+            left: defaultKeys1[0],
+            down: defaultKeys1[1],
+            right: defaultKeys1[2],
+            fire: defaultKeys1[4],
+          });
+          alert('Keys 1 are incomplete. Defaults restored; please review and save again.');
+          return;
+        }
+
+        const payload = {
+          joy_first_is_0: document.getElementById('first-joy').checked ? 1 : 0,
+          mouse_wheel_as_keys: document.getElementById('mouse-wheel-keys').checked ? 1 : 0,
+          keyboard_joy0: document.getElementById('keys0-enabled').checked ? 1 : 0,
+          keyboard_joy1: document.getElementById('keys1-enabled').checked ? 1 : 0,
+          keyboard_keys_settings0: serializeKeySettings(keys0Norm),
+          keyboard_keys_settings1: serializeKeySettings(keys1Norm)
+        };
+
+        try {
+          const res = await fetch('/ikbd/' + encodeURIComponent(mac), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (!res.ok) throw new Error('PUT failed: ' + res.status);
+          setMessageVisible(true);
+          setTimeout(function() { setMessageVisible(false); }, 2000);
+        } catch (e) {
+          console.log('Error saving IKBD settings:', e);
+          alert('Error saving settings');
+        }
+      }
+
+      // Wire up page behavior
+      document.getElementById('save-ikbd').onclick = function() { saveIkbdSettings(); };
+      attachAllKeyCaptures();
+      loadIkbdSettings();
+    </script>
+  </body>
+</html>

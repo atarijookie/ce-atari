@@ -81,6 +81,8 @@ function getCurrentPageName(path) {
         '/gem_drives.html': 'GEM Drives',
         '/floppy.html': 'Floppy',
         '/floppy': 'Floppy', // Handle both with and without .html
+        '/ikbd.html': 'IKBD',
+        '/ikbd': 'IKBD', // Handle both with and without .html
         '/status.html': 'Status',
         '/login.html': 'Login'
     };

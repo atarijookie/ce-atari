@@ -249,8 +249,8 @@ void Ikbd::loadSettings(void)
     mouseWheelAsArrowsUpDown = s.getBool("MOUSE_WHEEL_AS_KEYS", true);
 
     // get enabled flags for keyb joys
-    keybJoy0 = s.getBool("KEYBORD_JOY0", false);
-    keybJoy1 = s.getBool("KEYBORD_JOY1", false);
+    keybJoy0 = s.getBool("KEYBOARD_JOY0", false);
+    keybJoy1 = s.getBool("KEYBOARD_JOY1", false);
 
     keyJoyKeys.setKeyTranslator(&keyTranslator);        // first set the translator
     keyJoyKeys.loadKeys();                              // load the keys used for keyb joys

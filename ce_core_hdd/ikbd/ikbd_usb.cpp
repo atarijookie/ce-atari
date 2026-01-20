@@ -727,14 +727,14 @@ bool Ikbd::handleHotkeys(int pcKey, bool pressed, bool skipKeyboardTranslation)
         } else if (f12sPressed > 0) {
             if (leftShiftsPressed > 0) {
                 keybJoy0 = !keybJoy0;
-                s.setBool("KEYBORD_JOY0", keybJoy0);
+                s.setBool("KEYBOARD_JOY0", keybJoy0);
                 logIkbd(LOG_DEBUG, "Ikbd::handleHotkeys - toggle joy0 translation [before: %s, now: %s]",
                          keybJoy0 ? "OFF" : "ON", keybJoy0 ? "ON" : "OFF");
                 waitingForHotkeyRelease = true;
             }
             if (rightShiftsPressed > 0) {
                 keybJoy1 = !keybJoy1;
-                s.setBool("KEYBORD_JOY1", keybJoy1);
+                s.setBool("KEYBOARD_JOY1", keybJoy1);
                 logIkbd(LOG_DEBUG, "Ikbd::handleHotkeys - toggle joy1 translation [before: %s, now: %s]",
                          keybJoy1 ? "OFF" : "ON", keybJoy1 ? "ON" : "OFF");
                 waitingForHotkeyRelease = true;

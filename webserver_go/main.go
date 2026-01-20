@@ -187,6 +187,8 @@ func newServer() *Server {
 		protected.Put("/hdd/{mac}/translated", s.handlePutHDDTranslated)
 		protected.Get("/fdd/{mac}/image", s.handleGetFDDImage)
 		protected.Put("/fdd/{mac}/image", s.handlePutFDDImage)
+		protected.Get("/ikbd/{mac}", s.handleGetIKBD)
+		protected.Put("/ikbd/{mac}", s.handlePutIKBD)
 		protected.Get("/status/{mac}", s.handleGetStatus)
 		protected.Get("/host/dir", s.handleHostDir)
 		protected.Get("/host/devices", s.handleHostDevices)
@@ -199,7 +201,7 @@ func newServer() *Server {
 			// Get the file path from the URL
 			filePath := "static" + r.URL.Path
 			log.Printf("fileServer - request path: %s, file path: %s", r.URL.Path, filePath)
-			
+
 			// Check if file exists
 			info, err := os.Stat(filePath)
 			if os.IsNotExist(err) {
@@ -212,13 +214,13 @@ func newServer() *Server {
 				http.NotFound(w, r)
 				return
 			}
-			
+
 			// If it's a directory, don't serve it
 			if info.IsDir() {
 				http.NotFound(w, r)
 				return
 			}
-			
+
 			log.Printf("fileServer - serving %s", r.URL.Path)
 			// Open and serve the file directly to avoid any redirects
 			file, err := os.Open(filePath)
@@ -228,7 +230,7 @@ func newServer() *Server {
 				return
 			}
 			defer file.Close()
-			
+
 			// Set content type based on file extension
 			if strings.HasSuffix(filePath, ".html") {
 				w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -243,7 +245,7 @@ func newServer() *Server {
 			} else if strings.HasSuffix(filePath, ".gif") {
 				w.Header().Set("Content-Type", "image/gif")
 			}
-			
+
 			http.ServeContent(w, r, info.Name(), info.ModTime(), file)
 			log.Printf("fileServer - served %s successfully", r.URL.Path)
 		}))
@@ -452,7 +454,7 @@ func resolveEnvVar(value string, envVars map[string]string, visited map[string]b
 
 			// Extract variable name
 			varName := strings.TrimSpace(value[i+2 : end])
-			
+
 			// Check for circular reference
 			if visited[varName] {
 				// Circular reference detected, return original

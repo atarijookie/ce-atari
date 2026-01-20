@@ -270,7 +270,7 @@ void Ikbd::processMouse(input_event *ev)
     if(ev->type == EV_KEY) {        // on button press
         int btnNew = mouseBtnNow;
 
-        // Following block checks if it's not a mouse button, and if it's not, it will let the keyboard code 
+        // Following block checks if it's not a mouse button, and if it's not, it will let the keyboard code
         // handle this EV_KEY event. This is because Logitech K400 on RPi appears only as mouse device instead of mouse device + keyboard device,
         // but the EV_KEY events are still sent - through that single mouse device.
         if(ev->code != BTN_LEFT && ev->code != BTN_RIGHT) {
@@ -454,7 +454,7 @@ void Ikbd::processKeyboard(input_event *ev, bool skipKeyboardTranslation)
 void Ikbd::processJoystick(js_event *jse, int joyNumber)
 {
     TJoystickState *js;
-    
+
     if(joyNumber == 0 || joyNumber == 1) {          // if the index is OK, use it
         js = &joystick[joyNumber];
     } else {                                        // index is not OK, quit
@@ -728,14 +728,14 @@ bool Ikbd::handleHotkeys(int pcKey, bool pressed, bool skipKeyboardTranslation)
         } else if (f12sPressed > 0) {
             if (leftShiftsPressed > 0) {
                 keybJoy0 = !keybJoy0;
-                s.setBool("KEYBORD_JOY0", keybJoy0);
+                s.setBool("KEYBOARD_JOY0", keybJoy0);
                 Debug::out(LOG_DEBUG, "Ikbd::handleHotkeys - toggle joy0 translation [before: %s, now: %s]",
                          keybJoy0 ? "OFF" : "ON", keybJoy0 ? "ON" : "OFF");
                 waitingForHotkeyRelease = true;
             }
             if (rightShiftsPressed > 0) {
                 keybJoy1 = !keybJoy1;
-                s.setBool("KEYBORD_JOY1", keybJoy1);
+                s.setBool("KEYBOARD_JOY1", keybJoy1);
                 Debug::out(LOG_DEBUG, "Ikbd::handleHotkeys - toggle joy1 translation [before: %s, now: %s]",
                          keybJoy1 ? "OFF" : "ON", keybJoy1 ? "ON" : "OFF");
                 waitingForHotkeyRelease = true;
