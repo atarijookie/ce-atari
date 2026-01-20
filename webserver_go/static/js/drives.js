@@ -170,13 +170,31 @@ function putDrivesConfig() {
         contentType: 'application/json',
         data: JSON.stringify({ 'paths': paths, 'drive_types': driveTypes }),
         success: function (data) {
-            alert("Config saved.");
+            setSaveMessage("Settings saved.", false);
         },
         error: function (xhr) {
             console.log("Error saving config: " + xhr.statusText);
-            alert("Error saving config: " + xhr.statusText);
+            setSaveMessage("Error saving config: " + xhr.statusText, true);
         },
     })
+}
+
+function setSaveMessage(text, isError) {
+    var el = document.getElementById('save-message');
+    if (!el) return;
+    el.textContent = text || '';
+    if (!text) {
+        el.style.display = 'none';
+        return;
+    }
+    el.style.display = 'inline';
+    el.style.color = isError ? '#c00' : '#3baf16';
+    el.style.fontWeight = 'bold';
+    if (!isError) {
+        setTimeout(function() {
+            el.style.display = 'none';
+        }, 5000);
+    }
 }
 
 // go through all the rows, switch combo boxes to selected values and show paths on screen

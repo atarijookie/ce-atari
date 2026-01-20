@@ -108,6 +108,14 @@ func (s *Server) handlePutIKBD(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Send reload command to core
+	cmd := map[string]string{"module": "ikbd", "action": "reload"}
+	if cmdJSON, err := json.Marshal(cmd); err == nil {
+		if err := sendToCmdSocket(string(cmdJSON)); err != nil {
+			log.Printf("handlePutIKBD - failed to send cmd socket: %v", err)
+		}
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }
 

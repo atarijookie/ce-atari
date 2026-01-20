@@ -4,7 +4,9 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -109,11 +111,45 @@ func main() {
 	}
 	addr := ":" + port
 
+	// Get local IP address for URL
+	localIP := getLocalIP()
+	url := "http://" + localIP + ":" + port
+	if localIP == "127.0.0.1" || localIP == "localhost" {
+		url = "http://localhost:" + port
+	}
+
 	s := newServer()
-	log.Printf("starting server on %s", addr)
+	fmt.Println("Starting server on", addr)
+	fmt.Println("Navigate to:", url)
+
+	// Start goroutine to print status every 10 seconds
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			fmt.Println("Server running on", addr, "-", url)
+		}
+	}()
+
 	if err := http.ListenAndServe(addr, s.router); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
+}
+
+// getLocalIP returns the first non-loopback IP address found, or "127.0.0.1" if none found
+func getLocalIP() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "127.0.0.1"
+	}
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String()
+			}
+		}
+	}
+	return "127.0.0.1"
 }
 
 func newServer() *Server {
@@ -187,6 +223,8 @@ func newServer() *Server {
 		protected.Put("/hdd/{mac}/translated", s.handlePutHDDTranslated)
 		protected.Get("/fdd/{mac}/image", s.handleGetFDDImage)
 		protected.Put("/fdd/{mac}/image", s.handlePutFDDImage)
+		protected.Get("/fdd/{mac}/image/next", s.handleGetFDDImageNext)
+		protected.Get("/fdd/{mac}/image/prev", s.handleGetFDDImagePrev)
 		protected.Get("/ikbd/{mac}", s.handleGetIKBD)
 		protected.Put("/ikbd/{mac}", s.handlePutIKBD)
 		protected.Get("/status/{mac}", s.handleGetStatus)

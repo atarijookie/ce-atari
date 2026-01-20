@@ -12,7 +12,6 @@
         //unfortunately we have to support IE<10, so decide on zepto/jquery here
     		document.write('<script type="text/javascript" src=js/' + ('__proto__' in {} ? 'zepto' : 'jquery') + '.js><\/script>');
     		document.write('<script type="text/javascript"">var jQuery=Zepto;<\/script>');
-    		document.write('<script type="text/javascript" src=js/floppy.js><\/script>');
 //        document.write('<link rel="stylesheet" type="text/css" href="css/combined.css">');
         document.write('<link rel="stylesheet" type="text/css" href="css/style.css">');
     		</script>
@@ -22,25 +21,217 @@
         <script type='text/javascript'>
           var dir = "/home";
           var selectedFile = "";
+          var currentImagePath = "";
 
-          var paths = [];
-          var selectingFileForIndex = -1;
-
-          // initialize paths and devTypes
-          for(var i=0; i<8; i++) {
-            paths.push("");
+          function getURLParameter(name) {
+            name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+            var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+            var results = regex.exec(location.search);
+            return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
           }
 
-          // bind handlers to combo change and get IDs from backend
+          function splitPath(p) {
+            if (!p) return { dir: "", name: "" };
+            var parts = p.split('/');
+            var name = parts.pop() || "";
+            var d = parts.join('/');
+            if (d === "") { d = "/"; }
+            return { dir: d, name: name };
+          }
+
+          function updateDisplay(path) {
+            currentImagePath = path || "";
+            var info = splitPath(currentImagePath);
+            document.getElementById('image-name').textContent = 'File: ' + (info.name || 'No image selected');
+            document.getElementById('image-path').textContent = 'Path: ' + (info.dir || '');
+          }
+
+          function loadCurrentImage() {
+            var mac = getURLParameter('mac');
+            if (!mac) {
+              updateDisplay("");
+              document.getElementById('image-name').textContent = 'Error: No MAC address specified';
+              return;
+            }
+            fetch('/fdd/' + encodeURIComponent(mac) + '/image', { method: 'GET' })
+              .then(function(res) { return res.json(); })
+              .then(function(data) {
+                updateDisplay(data.image || "");
+              })
+              .catch(function(err) {
+                console.log('Error fetching image:', err);
+                updateDisplay("");
+              });
+          }
+
+          function getDirContent(new_path) {
+            selectedFile = "";
+            dir = new_path;
+            document.getElementById('currentPath').textContent = dir;
+
+            $.ajax({
+              url: '/host/dir?path=' + encodeURIComponent(new_path),
+              type: 'GET',
+              dataType: 'json',
+              success: function (data) {
+                var dirs = data.dirs;
+                var files = data.files;
+
+                const itemList = document.getElementById('itemList');
+                itemList.innerHTML = '';
+
+                dirs.forEach(item => {
+                  var fullpath = (new_path == "/") ? ("/" + item) : (new_path + "/" + item);
+                  const div = document.createElement('div');
+                  div.className = 'item';
+                  div.textContent = "[" + item + "]";
+                  div.onclick = () => getDirContent(fullpath);
+                  itemList.appendChild(div);
+                });
+
+                files.forEach(item => {
+                  var fullpath = (new_path == "/") ? ("/" + item) : (new_path + "/" + item);
+                  const div = document.createElement('div');
+                  div.className = 'item';
+                  div.textContent = item;
+                  div.onclick = () => onFileSelected(fullpath);
+                  itemList.appendChild(div);
+                });
+              },
+              error: function (xhr) {
+                console.log("Error: " + xhr.statusText);
+              },
+            })
+          }
+
+          function onFileSelected(filePath) {
+            if (filePath == selectedFile) {
+              selectByText(selectedFile, false);
+              selectedFile = "";
+            } else {
+              selectByText(selectedFile, false);
+              selectedFile = filePath;
+              selectByText(filePath, true);
+            }
+          }
+
+          function selectByText(fullFilePath, selectNotUnselect) {
+            var items = document.getElementsByClassName("item");
+            var fileName = fullFilePath.split('/').pop();
+            for (var x = 0; x < items.length; x++) {
+              var item = items[x];
+              if (item.textContent == fileName || item.textContent == "[" + fileName + "]") {
+                item.style.backgroundColor = selectNotUnselect ? "#cccccc" : "#ffffff";
+                break;
+              }
+            }
+          }
+
+          function openSelector() {
+            var info = splitPath(currentImagePath);
+            dir = info.dir || "/home";
+            if (!dir) { dir = "/home"; }
+            getDirContent(dir);
+            var overlay = document.getElementsByClassName('container-file-selector')[0];
+            if (overlay) { overlay.style.display = 'flex'; }
+            $("[name=file-selector]").show();
+          }
+
+          function goUp() {
+            const parts = dir.split('/');
+            if (parts.length > 1) {
+              parts.pop();
+            }
+            var new_path = parts.join('/');
+            if (new_path == "") {
+              new_path = "/";
+            }
+            getDirContent(new_path);
+          }
+
+          function onSelectorCancel() {
+            $("[name=file-selector]").hide();
+            var overlay = document.getElementsByClassName('container-file-selector')[0];
+            if (overlay) { overlay.style.display = 'none'; }
+          }
+
+          function onSelectorOK() {
+            if (!selectedFile) {
+              return;
+            }
+            var ext = selectedFile.split('.').pop().toLowerCase();
+            if(ext != 'msa' && ext != 'st') {
+              alert("File extension '" + ext + "' is not supported floppy image format - .msa / .st");
+              return;
+            }
+            saveImage(selectedFile);
+            $("[name=file-selector]").hide();
+            var overlay = document.getElementsByClassName('container-file-selector')[0];
+            if (overlay) { overlay.style.display = 'none'; }
+          }
+
+          function saveImage(path) {
+            var mac = getURLParameter('mac');
+            if (!mac) {
+              alert('Error: No MAC address specified');
+              return;
+            }
+            fetch('/fdd/' + encodeURIComponent(mac) + '/image', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ image: path })
+            }).then(function(res) {
+              if (!res.ok) { throw new Error('PUT failed ' + res.status); }
+              updateDisplay(path);
+            }).catch(function(err) {
+              console.log('Error saving image:', err);
+              alert('Error saving image: ' + err);
+            });
+          }
+
+          function stepImage(direction) {
+            var mac = getURLParameter('mac');
+            if (!mac) {
+              alert('Error: No MAC address specified');
+              return;
+            }
+            var endpoint = direction > 0 ? '/fdd/' + encodeURIComponent(mac) + '/image/next'
+                                         : '/fdd/' + encodeURIComponent(mac) + '/image/prev';
+            fetch(endpoint, { method: 'GET' })
+              .then(function(res) {
+                if (!res.ok) { throw new Error('GET failed ' + res.status); }
+                return res.json();
+              })
+              .then(function(data) {
+                updateDisplay(data.image || "");
+              })
+              .catch(function(err) {
+                console.log('Error stepping image:', err);
+                alert('Error stepping image: ' + err);
+              });
+          }
+
+          document.addEventListener('DOMContentLoaded', function() {
+            var btn = document.getElementById('select-image');
+            if (btn) {
+              btn.onclick = openSelector;
+            }
+            var prevBtn = document.getElementById('prev-image');
+            if (prevBtn) {
+              prevBtn.onclick = function() { stepImage(-1); };
+            }
+            var nextBtn = document.getElementById('next-image');
+            if (nextBtn) {
+              nextBtn.onclick = function() { stepImage(+1); };
+            }
+          });
+
           window.onload = function() {
             $("[name=file-selector]").hide();
-            getSlots();
-            getFddClients();
+            var overlay = document.getElementsByClassName('container-file-selector')[0];
+            if (overlay) { overlay.style.display = 'none'; }
+            loadCurrentImage();
           }
-
-          const interval = setInterval(function() {
-            getFddClients();
-          }, 10000);
         </script>
         <style>
           button {
@@ -65,7 +256,15 @@
 
           .container-file-selector {
             z-index: 1000;
-            position: absolute;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.2);
           }
 
           .file-selector {
@@ -137,67 +336,21 @@
             <div class="span12">
                 <div id="breadcrumbs-container"></div>
                 <script src="js/breadcrumbs.js"></script>
-                <h2>CosmosEx - Floppy</h2>
+                <h2>CosmosEx</h2>
+                <h3>Floppy</h3>
         <p>Select a disk image (*.ST, *.MSA) and upload it to your CosmosEx. </p>
             </div>
         </div>
 
-        <form id="combo-form">
-          <center>
-            <table id="device-ids-table">
-              <tr bgcolor="#cccccc"><td><b>Floppy slot</b></td><td><b>Device ip</b></td><td><b>path to image</b></td></tr>
-
-              <tr>
-                <td><center>1</center></td>
-                <td id="ip0"></td>
-                <td id="path0"></td>
-              </tr>
-
-              <tr>
-                <td><center>2</center></td>
-                <td id="ip1"></td>
-                <td id="path1"></td>
-              </tr>
-
-              <tr>
-                <td><center>3</center></td>
-                <td id="ip2"></td>
-                <td id="path2"></td>
-              </tr>
-
-              <tr>
-                <td><center>4</center></td>
-                <td id="ip3"></td>
-                <td id="path3"></td>
-              </tr>
-
-              <tr>
-                <td><center>5</center></td>
-                <td id="ip4"></td>
-                <td id="path4"></td>
-              </tr>
-
-              <tr>
-                <td><center>6</center></td>
-                <td id="ip5"></td>
-                <td id="path5"></td>
-              </tr>
-
-              <tr>
-                <td><center>7</center></td>
-                <td id="ip6"></td>
-                <td id="path6"></td>
-              </tr>
-
-              <tr>
-                <td><center>8</center></td>
-                <td id="ip7"></td>
-                <td id="path7"></td>
-              </tr>
-            </table>
-            <p></p>
-        </center>
-      </form>
+        <div style="margin-top: 15px;">
+          <div id="image-name" style="font-size: 18px; font-weight: bold;">Loading...</div>
+          <div id="image-path" style="font-size: 13px; color: #555; margin-bottom: 10px;"></div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <button id="prev-image" style="padding: 10px 14px; font-size: 16px;">&lt;</button>
+            <button id="select-image" style="padding: 10px 18px; font-size: 16px; min-width: 90px;">Select</button>
+            <button id="next-image" style="padding: 10px 14px; font-size: 16px;">&gt;</button>
+          </div>
+        </div>
     </div>
 
     <div class="container-file-selector">

@@ -25,7 +25,7 @@
 
         <br>
         <h4>Devices</h4>
-        <div id="devices-container" style="display: flex; flex-direction: column; gap: 10px; max-width: 300px;">
+        <div id="devices-container" style="display: flex; flex-direction: column; gap: 15px; max-width: 300px;">
             <p>Loading devices...</p>
         </div>
 
@@ -59,7 +59,7 @@
             devices.forEach(function(device) {
                 var button = document.createElement('button');
                 button.className = 'device-button';
-                button.style.cssText = 'padding: 10px 20px; font-size: 14px; cursor: pointer; background-color: #3baf16; color: white; border: none; border-radius: 4px; text-align: left;';
+                button.style.cssText = 'padding: 15px 25px; font-size: 16px; cursor: pointer; background-color: #3baf16; color: white; border: none; border-radius: 4px; text-align: center; width: 100%; display: block;';
                 button.textContent = device.name || device.mac;
                 button.title = 'MAC: ' + device.mac + (device.connected ? ' (Connected)' : ' (Not Connected)');
 
@@ -70,11 +70,9 @@
                     window.location.href = '/device.html?mac=' + encodeURIComponent(macNoColons);
                 };
 
-                // Style based on connection status
-                if (device.connected) {
-                    button.style.backgroundColor = '#3baf16';
-                } else {
-                    button.style.backgroundColor = '#999';
+                // Style based on connection status (always green; optional visual hint via opacity)
+                button.style.backgroundColor = '#3baf16';
+                if (!device.connected) {
                     button.style.opacity = '0.7';
                 }
 

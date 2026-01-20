@@ -145,6 +145,14 @@ func (s *Server) handlePutHDDRaw(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	
+	// Send reload command to core
+	cmd := map[string]string{"module": "disks", "action": "reload_raw"}
+	if cmdJSON, err := json.Marshal(cmd); err == nil {
+		if err := sendToCmdSocket(string(cmdJSON)); err != nil {
+			log.Printf("handlePutHDDRaw - failed to send cmd socket: %v", err)
+		}
+	}
+	
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -327,6 +335,14 @@ func (s *Server) handlePutHDDTranslated(w http.ResponseWriter, r *http.Request) 
 			log.Printf("handlePutHDDTranslated - error writing file %s: %v", confDriveFile, err)
 			http.Error(w, "cannot write config drive file", http.StatusInternalServerError)
 			return
+		}
+	}
+	
+	// Send reload command to core
+	cmd := map[string]string{"module": "disks", "action": "reload_trans"}
+	if cmdJSON, err := json.Marshal(cmd); err == nil {
+		if err := sendToCmdSocket(string(cmdJSON)); err != nil {
+			log.Printf("handlePutHDDTranslated - failed to send cmd socket: %v", err)
 		}
 	}
 	
