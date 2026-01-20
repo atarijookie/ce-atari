@@ -1497,19 +1497,19 @@ body>#signup #key_benefits p {
 body>#login {
     border-top: 8px solid #ffffff;
     margin: 0 auto;
-    padding: 30px 0 0;
+    padding: 0;
     width: 100%;
 }
-body>#login h1 {
+body>#login > h1 {
     border-radius: 100px;
     -moz-border-radius: 100px;
     -webkit-border-radius: 100px;
-    background-color: #fff;
+    background-color: transparent;
     display: inline-block;
-    margin: 0 auto;
+    margin: 0;
     position: relative;
-    top: 52px;
-    width: 130px;
+    top: 0;
+    width: auto;
     z-index: 1;
 }
 body>#login h1:not(.subdomain_image):not(.subdomain) a {
@@ -1567,10 +1567,10 @@ body>#login form {
     box-sizing: border-box;
     -moz-box-sizing: border-box;
     -wekbit-box-sizing: border-box;
-    border: 8px solid #F5F3F0;
+    border: none;
     display: inline-block;
-    margin: 27px auto 0;
-    padding: 60px 50px 45px;
+    margin: 0;
+    padding: 0;
     position: relative;
     z-index: 0;
 }
@@ -1591,14 +1591,15 @@ body>#login form button {
     border-radius: 7px;
     -moz-border-radius: 7px;
     -webkit-border-radius: 7px;
-    background-color: #f6f6f6;
+    background-color: rgba(102,229,46,0.1);
     cursor: pointer;
-    margin-left: 12px;
+    margin-left: 0;
     height: 56px;
     padding: 5px;
     width: auto;
+    transition: all 0.3s ease;
 }
-body>#login form button:hover { background-color: #f8f8f8 }
+body>#login form button:hover { background-color: rgba(102,229,46,0.18) }
 body>#login form button:active { padding: 5px }
 body>#login form button:active .button_text {
     box-shadow: 0 0 8px #ccc;
@@ -1631,43 +1632,48 @@ body>#login form button .button_text {
     border-radius: 4px;
     -moz-border-radius: 4px;
     -webkit-border-radius: 4px;
-    box-shadow: 0 0 4px rgba(0,0,0,0.2);
-    -moz-box-shadow: 0 0 4px rgba(0,0,0,0.2);
-    -webkit-box-shadow: 0 0 4px rgba(0,0,0,0.2);
-    background-color: #f0f0f0;
+    box-shadow: 0 0 4px rgba(59, 175, 22, 0.2);
+    -moz-box-shadow: 0 0 4px rgba(59, 175, 22, 0.2);
+    -webkit-box-shadow: 0 0 4px rgba(59, 175, 22, 0.2);
+    background-color: #3baf16;
     background-repeat: repeat-x;
-    background-image: linear-gradient(top, #fafafa, #f0f0f0);
-    background-image: -khtml-gradient(linear, left top, left bottom, from(#fafafa), to(#f0f0f0));
-    background-image: -moz-linear-gradient(top, #fafafa, #f0f0f0);
-    background-image: -ms-linear-gradient(top, #fafafa, #f0f0f0);
-    background-image: -o-linear-gradient(top, #fafafa, #f0f0f0);
-    background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%, #fafafa), color-stop(100%, #f0f0f0));
-    background-image: -webkit-linear-gradient(top, #fafafa, #f0f0f0);
-    color: #807b6e;
+    background-image: linear-gradient(top, #66e52e, #3baf16);
+    background-image: -khtml-gradient(linear, left top, left bottom, from(#66e52e), to(#3baf16));
+    background-image: -moz-linear-gradient(top, #66e52e, #3baf16);
+    background-image: -ms-linear-gradient(top, #66e52e, #3baf16);
+    background-image: -o-linear-gradient(top, #66e52e, #3baf16);
+    background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%, #66e52e), color-stop(100%, #3baf16));
+    background-image: -webkit-linear-gradient(top, #66e52e, #3baf16);
+    color: #fff;
     display: inline-block;
-    font-size: 16px;
-    font-weight: 500;
+    font-size: 18px;
+    font-weight: bold;
     height: 46px;
     line-height: 46px;
-    padding: 0 25px;
-    text-shadow: 1px 1px 0 #fff;
+    padding: 0 40px;
+    text-shadow: 0 0 3px #246b0d;
     width: auto;
 }
 body>#login form input[type=text],
 body>#login form input[type=email],
 body>#login form input[type=password] {
-    border-color: #F5F3F0;
+    border-color: #ddd;
     border-style: solid;
-    border-width: 4px;
+    border-width: 2px;
+    border-radius: 6px;
     display: inline-block;
     position: relative;
+    padding: 14px 18px;
+    transition: all 0.3s ease;
 }
 body>#login form input[type=text]:focus,
 body>#login form input[type=email]:focus,
 body>#login form input[type=password]:focus {
-    border-color: #59de2c;
+    border-color: #3baf16;
     border-width: 2px;
     padding: 14px 18px;
+    box-shadow: 0 0 0 3px rgba(59, 175, 22, 0.1);
+    outline: none;
 }
 body>#login form input[type=text].error,
 body>#login form input[type=email].error,
@@ -1781,24 +1787,26 @@ body>#login #dont_have_an_account a {
 body>#login #dont_have_an_account a:hover { border-bottom: 2px solid #f90 }
 </style>
 
-<div id="login">
+<div id="login" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);">
 
-<form id="login_form" method="POST" action="/auth/login">
+  <h1 style="font-size: 48px; font-weight: bold; color: #3baf16; margin: 0 0 40px 0; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">CosmosEx</h1>
 
-    <div class="field_container">
-      <input type="text" id="username" name="username" placeholder="Username" required>
+<form id="login_form" method="POST" action="/auth/login" style="background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.1); border-radius: 12px; padding: 50px 60px; border: 1px solid #e0e0e0; min-width: 380px;">
+
+    <div class="field_container" style="margin-bottom: 20px;">
+      <input type="text" id="username" name="username" placeholder="Username" required style="width: 100%; box-sizing: border-box;">
     </div>
 
-    <div class="field_container">
-      <input type="password" id="password" name="password" placeholder="Password" required>
+    <div class="field_container" style="margin-bottom: 25px;">
+      <input type="password" id="password" name="password" placeholder="Password" required style="width: 100%; box-sizing: border-box;">
     </div>
 
-    <div class="field_container" id="error_container" style="display: none; color: #f90; margin-bottom: 12px;">
+    <div class="field_container" id="error_container" style="display: none; color: #f90; margin-bottom: 15px; text-align: center; font-size: 14px; padding: 10px; background: #fff3cd; border-radius: 6px; border: 1px solid #f0ad4e;">
       <div id="error_message"></div>
     </div>
 
-    <div class="field_container">
-      <button id="sign_in_button" type="button">
+    <div class="field_container" style="display: flex; justify-content: center; margin-top: 10px;">
+      <button id="sign_in_button" type="button" style="margin: 0;">
         <span class="button_text">Sign In</span>
       </button>
     </div>

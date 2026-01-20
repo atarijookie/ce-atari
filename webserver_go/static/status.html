@@ -73,10 +73,94 @@
             getStatus();                    // get first status now
             setInterval(getStatus, 10000);  // refresh status every 10 seconds
         });
+
+        // Logout function
+        function logout() {
+            fetch('/auth/logout', {
+                method: 'POST',
+                credentials: 'include'
+            })
+            .then(function(response) {
+                // Clear localStorage if token is stored there
+                if (localStorage.getItem('auth_token')) {
+                    localStorage.removeItem('auth_token');
+                }
+                // Redirect to login page
+                window.location.href = '/login.html';
+            })
+            .catch(function(error) {
+                console.error('Logout error:', error);
+                // Redirect to login page even on error
+                window.location.href = '/login.html';
+            });
+        }
         </script>
+        <style>
+            body {
+                background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+                min-height: 100vh;
+                margin: 0;
+                padding: 20px 0;
+            }
+            .container {
+                background: white;
+                border-radius: 12px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+                padding: 30px;
+                max-width: 1200px;
+                margin: 20px auto;
+                position: relative;
+            }
+            #pre_status {
+                background: #fafafa;
+                border: 1px solid #ddd;
+                border-radius: 8px;
+                padding: 20px;
+                margin-top: 20px;
+            }
+            #logout-button {
+                position: absolute;
+                top: 15px;
+                right: 15px;
+                padding: 8px 16px;
+                font-size: 14px;
+                background-color: #666;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                z-index: 1000;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+                transition: background-color 0.3s ease;
+            }
+            #logout-button:hover {
+                background-color: #555;
+            }
+            .footer-links {
+                margin-top: 40px;
+                padding-top: 20px;
+                border-top: 1px solid #e0e0e0;
+                text-align: center;
+                font-size: 14px;
+                color: #666;
+            }
+            .footer-links a {
+                color: #0066cc;
+                text-decoration: none;
+                margin: 0 10px;
+            }
+            .footer-links a:hover {
+                text-decoration: underline;
+            }
+            .footer-links span {
+                color: #999;
+                margin: 0 5px;
+            }
+        </style>
   </head>
   <body>
     <div class="container">
+    <button id="logout-button" onclick="logout()">Logout</button>
         <div class="row">
             <div class="span12">
                 <div id="breadcrumbs-container"></div>
@@ -86,6 +170,10 @@
                 <div id="status-timestamp" style="margin-top: 8px; font-style: italic;"></div>
             </div>
          </div>
+
+        <div class="footer-links">
+            <a href="https://joo.kie.sk/?page_id=384" target="_blank">homepage</a><span>|</span><a href="https://joo.kie.sk/?page_id=415" target="_blank">manual</a><span>|</span><a href="credits.html">credits</a>
+        </div>
      </div>
   </body>
 </html>

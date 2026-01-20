@@ -88,13 +88,31 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 
 	token := parseBearerToken(r.Header.Get("Authorization"))
 	if token == "" {
+		// Try to get token from cookie (for browser-based logout)
+		if cookie, err := r.Cookie("auth_token"); err == nil {
+			token = cookie.Value
+		}
+	}
+	
+	if token == "" {
 		http.Error(w, "missing token", http.StatusBadRequest)
 		return
 	}
 
+	// Delete token from server
 	s.mu.Lock()
 	delete(s.authTokens, token)
 	s.mu.Unlock()
+
+	// Clear the cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "auth_token",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1,
+	})
 
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -15,9 +15,72 @@
             get_loglevel();
         });
         </script>
+        <style>
+            #logout-button {
+                position: absolute;
+                top: 15px;
+                right: 15px;
+                padding: 8px 16px;
+                font-size: 14px;
+                background-color: #666;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                z-index: 1000;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+                transition: background-color 0.3s ease;
+            }
+            #logout-button:hover {
+                background-color: #555;
+            }
+            .footer-links {
+                margin-top: 40px;
+                padding-top: 20px;
+                border-top: 1px solid #e0e0e0;
+                text-align: center;
+                font-size: 14px;
+                color: #666;
+            }
+            .footer-links a {
+                color: #0066cc;
+                text-decoration: none;
+                margin: 0 10px;
+            }
+            .footer-links a:hover {
+                text-decoration: underline;
+            }
+            .footer-links span {
+                color: #999;
+                margin: 0 5px;
+            }
+        </style>
+        <script>
+            // Logout function
+            function logout() {
+                fetch('/auth/logout', {
+                    method: 'POST',
+                    credentials: 'include'
+                })
+                .then(function(response) {
+                    // Clear localStorage if token is stored there
+                    if (localStorage.getItem('auth_token')) {
+                        localStorage.removeItem('auth_token');
+                    }
+                    // Redirect to login page
+                    window.location.href = '/login.html';
+                })
+                .catch(function(error) {
+                    console.error('Logout error:', error);
+                    // Redirect to login page even on error
+                    window.location.href = '/login.html';
+                });
+            }
+        </script>
   </head>
   <body>
-    <div class="container">
+    <div class="container" style="position: relative;">
+    <button id="logout-button" onclick="logout()">Logout</button>
         <div class="row">
             <div class="span10">
                 <ul class="nav nav-pills">
@@ -53,6 +116,11 @@
         <li><a href="debug/logfile/{{file}}">{{file}}</a></li>
       {% endfor %}
     </ul>
+
+    <div class="footer-links">
+        <a href="https://joo.kie.sk/?page_id=384" target="_blank">homepage</a><span>|</span><a href="https://joo.kie.sk/?page_id=415" target="_blank">manual</a><span>|</span><a href="credits.html">credits</a>
+    </div>
+    </div>
   </body>
 </html>
 

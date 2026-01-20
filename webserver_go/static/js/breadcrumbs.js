@@ -93,6 +93,7 @@ function getCurrentPageName(path) {
         '/ikbd.html': 'IKBD',
         '/ikbd': 'IKBD', // Handle both with and without .html
         '/status.html': 'Status',
+        '/credits.html': 'Credits',
         '/login.html': 'Login'
     };
     
