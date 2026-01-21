@@ -109,11 +109,9 @@ typedef struct {
     volatile bool hddReloadTranslated;
 
     volatile int fddAction;
-    int fddIndex;
-    std::string fddFlename;
-    std::string fdddHostPath;
+    std::string fddMac;
 
-    volatile bool loadIkbdConfig;
+    volatile bool ikbdReloadConfig;
 } InterProcessEvents;
 
 extern InterProcessEvents events;

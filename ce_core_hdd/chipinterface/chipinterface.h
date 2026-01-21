@@ -69,6 +69,7 @@ public:
     void clientsDisconnectInactive(void);
     ClientInfo* clientsGetOne(int clientIndex);                     // get by client index
     ClientInfo* clientsGetOneByFloppySlot(int floppySlotIndex);     // get by floppy slot
+    ClientInfo* clientsGetOneByMac(uint8_t* mac);                   // get by mac
     ClientInfo* clientGetByFd(int clientFd);
     ClientInfo* clientGetByIndex(int index);
 

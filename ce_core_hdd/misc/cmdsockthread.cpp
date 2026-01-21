@@ -127,6 +127,8 @@ void *cmdSockThreadCode(void *ptr)
                 handleSceencastAction(action, data);
             } else if(module == "floppy") {         // for floppy module?
                 handleFloppyAction(action, data);
+            } else if(module == "ikbd") {           // for ikbd module?
+                handleIkbdAction(action, data);
             } else {                                // for uknown module?
                 logHdd(LOG_WARNING, "cmdSockThreadCode: uknown module '%s', ignoring message!", module.c_str());
             }
@@ -274,6 +276,13 @@ void sendMousePacket(int iX, int iY)
 
 void handleIkbdAction(std::string& action, json& data)
 {
+    // on ikbd settings reload
+    if(action == "reload") {
+        events.ikbdReloadConfig = true;
+        return;
+    }
+
+    // on mouse
     if(action == "mouse") {
         /*
         example data:
@@ -315,7 +324,12 @@ void handleIkbdAction(std::string& action, json& data)
         } else {
             logHdd(LOG_WARNING, "handleIkbdAction: mouse - missing 'type' in message, ignoring message!");
         }
-    } else if(action == "keyboard") {
+
+        return;
+    }
+
+    // on keyboard
+    if(action == "keyboard") {
         /*
         example data:
             {'module': 'ikbd', 'action': 'keyboard', 'type': 'pc', 'code': 35, 'state': 'down'}
@@ -336,19 +350,19 @@ void handleIkbdAction(std::string& action, json& data)
             logHdd(LOG_WARNING, "handleIkbdAction: keyboard - missing 'code' or 'state' in message, ignoring message!");
         }
 
-    } else {
-        logHdd(LOG_WARNING, "handleIkbdAction: unknown action '%s', ignoring message!", action.c_str());
+        return;
     }
+
+    logHdd(LOG_WARNING, "handleIkbdAction: unknown action '%s', ignoring message!", action.c_str());
 }
 
 void handleSceencastAction(std::string& action, json& data)
 {
     if(action == "do_screenshot") {                     // take a screenshot?
         events.doScreenShot = true;
-    } else if(action == "screenshot_vbl_enable") {      // enable screenshot VBLs
-        Utils::screenShotVblEnabled(true);
-    } else if(action == "screenshot_vbl_disable") {     // disable screenshot VBLs
-        Utils::screenShotVblEnabled(false);
+    } else if(action == "vbl") {
+        int value = data["value"].get<int>();
+        Utils::screenShotVblEnabled(value);
     } else {
         logHdd(LOG_WARNING, "handleSceencastAction: unknown action '%s', ignoring message!", action.c_str());
     }
@@ -367,33 +381,16 @@ void handleDisksAction(std::string& action, json& data)
 
 void handleFloppyAction(std::string& action, json& data)
 {
-    int slot = -1;
-
-    if(data.contains("slot")) {                 // if can get slot, get slot number
-        slot = data["slot"].get<int>();
+    if(data.contains("mac")) {                 // get mac if you can
+        events.fddMac = data["mac"].get<std::string>();
+    } else {
+        events.fddMac = "";
     }
 
     if(action == "insert") {                    // for 'insert' action
-        if(data.contains("image")) {            // image is present in message
-            std::string empty;
-            std::string pathAndFile = data["image"].get<std::string>();     // get image full path
-
-            std::string path, file;
-            Utils::splitFilenameFromPath(pathAndFile, path, file);          // get just filename from full path
-
-            // store details into events, action as the last one
-            events.fddIndex = slot;
-            events.fddFlename = file;
-            events.fdddHostPath = pathAndFile;
-            events.fddAction = FDD_ACTION_NONE;
-        } else {
-            logFdd(LOG_WARNING, "handleFloppyAction: missing 'image' in message, ignoring message!");
-        }
+        events.fddAction = FDD_ACTION_INSERT;
     } else if(action == "eject") {              // for 'eject' action
-        events.fddIndex = slot;
         events.fddAction = FDD_ACTION_EJECT;
-    } else if(action == "activate") {           // for 'activate' action
-
     } else {
         logFdd(LOG_WARNING, "handleFloppyAction: unknown action '%s', ignoring message!", action.c_str());
     }

@@ -731,6 +731,17 @@ ClientInfo* ChipInterface::clientsGetOneByFloppySlot(int floppySlotIndex)     //
     return NULL;    // not found, return null
 }
 
+ClientInfo* ChipInterface::clientsGetOneByMac(uint8_t* mac)     // get by mac
+{
+    for(int i=0; i<MAX_CLIENTS; i++) {
+        if(memcmp(clients[i].mac, mac, 6) == 0) {       // found matching mac? return pointer
+            return &clients[i];
+        }
+    }
+
+    return NULL;    // not found, return null
+}
+
 void ChipInterface::dropRestOfData(int clientIndex, uint8_t* buffer, uint32_t bufferSize)
 {
     if(clientIndex < 0 || clientIndex >= MAX_CLIENTS) {

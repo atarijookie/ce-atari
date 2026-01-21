@@ -45,6 +45,10 @@ private:
 
     void loadLastImageIntoSlot(int clientIndex);
 
+
+    void parseMac(const std::string& macStr, uint8_t* mac);
+    void handleFddAction(void);
+
     //----------------------------------
     // recovery stuff
     void insertSpecialFloppyImage(int specialImageId);

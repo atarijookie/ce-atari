@@ -65,8 +65,8 @@ void *ikbdThreadCode(void *ptr)
         Utils::sleepMs(1);      // intentional sleep to not utilize cpu to max when looping too much before client disconnect
 
         // reload config if needed
-        if(events.loadIkbdConfig) {
-            events.loadIkbdConfig = false;
+        if(events.ikbdReloadConfig) {
+            events.ikbdReloadConfig = false;
             ikbd.loadSettings();
         }
 

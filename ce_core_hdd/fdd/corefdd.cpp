@@ -81,11 +81,10 @@ void CoreFdd::run(void)
         Utils::sleepMs(1);      // intentional sleep to not utilize cpu to max when looping too much before client disconnect
 
         // handle floppy actions from command socket
-        switch(events.fddAction) {
-            case FDD_ACTION_INSERT: imageSilo->add(events.fddIndex, events.fddFlename, events.fdddHostPath); break;
-            case FDD_ACTION_EJECT:  imageSilo->remove(events.fddIndex); break;
+        if(events.fddAction != FDD_ACTION_NONE) {
+            handleFddAction();
+            events.fddAction = FDD_ACTION_NONE;
         }
-        events.fddAction = FDD_ACTION_NONE;
 
         ciFdd->clientsDisconnectInactive();
 
@@ -342,4 +341,51 @@ void CoreFdd::handleSectorWritten(int clientIndex)
 
     logFdd(LOG_DEBUG, "handleSectorWritten -- track %d, side %d, sector %d", track, side, sector);
     floppyEncoder_decodeMfmWrittenSector(client->floppySlotIndex, track, side, sector, writtenSector, byteCount); // let floppy encoder handle decoding, reencoding, saving
+}
+
+void CoreFdd::parseMac(const std::string& macStr, uint8_t* mac)
+{
+    if (macStr.size() != 12)
+    {
+        logFdd(LOG_WARNING, "MAC must be 12 hex characters");
+        return;
+    }
+
+    for(size_t i = 0; i < 6; i++)
+    {
+        char hex[3] = {macStr[2 * i], macStr[2 * i + 1], 0};
+        int val;
+        sscanf(hex, "%X", &val);
+        mac[i] = val;
+    }
+}
+
+void CoreFdd::handleFddAction(void)
+{
+    uint8_t mac[6];
+    memset(mac, 0, 6);
+    parseMac(events.fddMac, mac);
+
+    ClientInfo* client = ciFdd->clientsGetOneByMac(mac);
+
+    if(!client) {
+        logFdd(LOG_WARNING, "Failed to handle fdd action, because client with mac %s not found", events.fddMac.c_str());
+        return;
+    }
+
+    if(events.fddAction == FDD_ACTION_EJECT) {
+        logFdd(LOG_DEBUG, "ejecting slot %d", client->floppySlotIndex);
+        imageSilo->remove(client->floppySlotIndex);
+        return;
+    }
+
+    if(events.fddAction == FDD_ACTION_INSERT) {
+        Settings s;
+        s.setPrefix(client->mac, 6);                                // mac as prefix to settings
+        const char *pPathAndFile = s.getString("FLOPPY_IMAGE", ""); // try to read the value
+        std::string pathAndFile = pPathAndFile;
+        logFdd(LOG_DEBUG, "inserting %s into slot %d", pPathAndFile, client->floppySlotIndex);
+        imageSilo->loadImageToSlot(client->floppySlotIndex, pathAndFile.c_str());
+        return;
+    }
 }
