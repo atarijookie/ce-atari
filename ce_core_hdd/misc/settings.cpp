@@ -343,16 +343,16 @@ FILE *Settings::sOpen(const char *key, bool readNotWrite)
 {
     std::string settingsDir = Utils::dotEnvValue("SETTINGS_DIR", "./settings"); // path to settings dir
 
-    std::string keyWithPrefix = prefix[0] ? (std::string(prefix) + std::string(key)) : std::string(key);
-    std::string path = Utils::mergeHostPaths2(settingsDir, keyWithPrefix);
+    std::string path = settingsDir;
 
-    FILE *file;
-
-    if(readNotWrite) {
-        file = fopen(path.c_str(), "r");                // try to open file for reading
-    } else {
-        file = fopen(path.c_str(), "w");                // try to open file for writing
+    if(prefix[0]) {     // prefix present? merge it into settings path
+        path = Utils::mergeHostPaths2(settingsDir, std::string(prefix));
     }
 
+    Utils::mkpath(path.c_str(), S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);   // create dir if it does not exist
+
+    path = Utils::mergeHostPaths2(path, std::string(key));  // add key at the end of settings + prefix path
+
+    FILE *file = fopen(path.c_str(), readNotWrite ? "r" : "w");
     return file;
 }
