@@ -149,9 +149,7 @@ void *cmdSockThreadCode(void *ptr)
 void handleGenericAction(std::string& action, json& data)
 {
     if(action == "generate_status") {
-        StatusReport *sr = new StatusReport();
-        sr->createReportFileFromEnv();
-        delete sr;
+        StatusReport::createReportFiles();
     } else if(action == "set_loglevel") {
         int loglevel = 1;
 

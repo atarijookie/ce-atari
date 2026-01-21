@@ -5,6 +5,11 @@
 #include <stdint.h>
 #include <pthread.h>
 
+#define DEV_FEATURE_IKBD    8
+#define DEV_FEATURE_FDD     4
+#define DEV_FEATURE_SCSI    2
+#define DEV_FEATURE_ACSI    1
+
 #define FD_EMPTY    -1
 
 // commands sent from host to device
@@ -71,8 +76,7 @@ typedef struct {
     int  version;               // returned from Hans: HW version (1 for HW from 2014, 2 for HW from 2015, 3 for HW from 2020)
     int  hddIface;              // returned from Hans: HDD interface type (ACSI or SCSI (added in 2015))
     int  scsiMachine;           // when HwHddIface is HDD_IF_SCSI, this specifies what machine (TT or Falcon) is using this device
-
-    uint8_t hwSerial[13];          // contains HW serial number, if HW version is 3 and device is running for few seconds
+    uint16_t tosVersion;
 
     bool changed;               // true if the value has changes recently
 } THwConfig;

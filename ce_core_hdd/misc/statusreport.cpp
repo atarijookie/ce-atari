@@ -13,385 +13,137 @@
 #include "../hdd/translated/translateddisk.h"
 #include "../hdd/native/scsi.h"
 
-extern DebugVars    dbgVars;
+TClientStatus statuses[MAX_CLIENTS];
 
-volatile TStatuses statuses;
-
-static const char * netIfStatus(const uint8_t * p)
-{
-    static char str[64];
-    if(p[0] == 0 || (p[1] == 0 && p[2] == 0 && p[3] == 0 && p[4] == 0)) {
-        snprintf(str, sizeof(str), "no");
-    } else {
-        snprintf(str, sizeof(str), "yes : %d.%d.%d.%d", (int)p[1], (int)p[2], (int)p[3], (int)p[4]);
-    }
-    return str;
-}
-
-void StatusReport::createReportFileFromEnv(void)
+void StatusReport::createSingleReportFile(int i)
 {
     std::string report;
-    createReport(report, REPORTFORMAT_JSON);                        // report to json string
-    Utils::textToFileFromEnv(report.c_str(), "CORE_STATUS_FILE");   // string to expected core status file
+    report.clear();
+    char tmp[256];
+
+    sprintf(tmp, "IP: %d.%d.%d.%d\n", (statuses[i].ipAddr >> 24) & 0xff, (statuses[i].ipAddr >> 16) & 0xff, (statuses[i].ipAddr >> 8) & 0xff, statuses[i].ipAddr & 0xff);
+    report += tmp;
+
+    sprintf(tmp, "MAC: %02X:%02X:%02X:%02X:%02X:%02X\n", statuses[i].mac[0], statuses[i].mac[1], statuses[i].mac[2], statuses[i].mac[3], statuses[i].mac[4], statuses[i].mac[5]);
+    report += tmp;
+
+    struct tm *tm_info = localtime(&statuses[i].timestamp);
+    strftime(tmp, sizeof(tmp), "%Y-%m-%d %H:%M", tm_info);
+    report += std::string("last seen: ");
+    report += std::string(tmp);
+    report += std::string("\n");
+
+    if(statuses[i].features) {
+        report += std::string("features: ");
+
+        if(statuses[i].features & DEV_FEATURE_ACSI) report += std::string("ACSI ");
+        if(statuses[i].features & DEV_FEATURE_SCSI) report += std::string("SCSI ");
+        if(statuses[i].features & DEV_FEATURE_IKBD) report += std::string("IKBD ");
+        if(statuses[i].features & DEV_FEATURE_FDD) report += std::string("FDD ");
+
+        report += std::string("\n");
+    }
+
+    sprintf(tmp, "FW version: %s\n", statuses[i].fwVer);
+    report += tmp;
+
+    if(statuses[i].tosVersion) {
+        sprintf(tmp, "TOS version: %04X\n", statuses[i].tosVersion);
+        report += tmp;
+    }
+
+    if(statuses[i].scsiMachine) {
+        const char* mch = "UNKNOWN";
+        mch = (statuses[i].scsiMachine == SCSI_MACHINE_TT) ? "TT" : mch;
+        mch = (statuses[i].scsiMachine == SCSI_MACHINE_FALCON) ? "Falcon" : mch;
+
+        sprintf(tmp, "SCSI machine: %s\n", mch);
+        report += tmp;
+    }
+
+    // no change since last time? don't write to file
+    if(!statuses[i].lastWrittenReport.compare(report)) {
+        return;
+    }
+
+    // if changed, write to file
+    std::string logDir = Utils::dotEnvValue("LOG_DIR", LOG_DIR_DEFAULT);  // path to logs dir
+    sprintf(tmp, "%02X%02X%02X%02X%02X%02X.txt", statuses[i].mac[0], statuses[i].mac[1], statuses[i].mac[2], statuses[i].mac[3], statuses[i].mac[4], statuses[i].mac[5]);
+    std::string fileAndPath = Utils::mergeHostPaths2(logDir, std::string(tmp));
+
+    Utils::textToFile(report.c_str(), fileAndPath.c_str());     // write to file
+
+    statuses[i].lastWrittenReport = report;     // keep copy of string, so we can tell if next write is needed or not
 }
 
-void StatusReport::createReport(std::string &report, int reportFormat)
+void StatusReport::createReportFiles(void)
 {
-    report = "";
-    startReport (report, reportFormat);
+    for(int i=0; i<MAX_CLIENTS; i++)
+    {
+        if(statuses[i].ipAddr == 0) {       // no ip == no device here
+            continue;
+        }
 
-    //------------------
-    // general section
-    startSection(report, "general status", reportFormat);
-
-    uint8_t ipaddrs[10];
-    Utils::getIpAdds(ipaddrs);
-
-    // dumpPair(report, "HDD interface type",      (hwConfig.hddIface == HDD_IF_ACSI) ? "ACSI" : "SCSI", reportFormat);
-    dumpPair(report, "eth0  up and running",    netIfStatus(ipaddrs),   reportFormat);
-    dumpPair(report, "wlan0 up and running",    netIfStatus(ipaddrs+5), reportFormat);
-
-    char humanTime[128];
-    time_t t = time(NULL);
-    struct tm tm = *localtime(&t);
-    sprintf(humanTime, "%04d-%02d-%02d, %02d:%02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
-    dumpPair(report, "Current date & time",     humanTime, reportFormat);
-
-    endSection  (report, reportFormat);
-
-    //------------------
-    // USB drives
-    startSection(report, "USB drives", reportFormat);
-
-    // TranslatedDisk * translated = TranslatedDisk::getInstance();
-
-    // for(int i=2; i<MAX_DRIVES; i++) {
-    //     if(translated->driveIsEnabled(i)) {
-    //         std::string driveName = std::string("Drive X");
-    //         driveName[6] = 'A' + i;
-
-    //         std::string reportString;
-    //         translated->driveGetReport(i, reportString);
-
-    //         dumpPair(report, driveName.c_str(), reportString.c_str(), reportFormat, false, TEXT_COL1_WIDTH, 60);
-    //     }
-    // }
-
-    endSection  (report, reportFormat);
-
-    // //------------------
-    // // ACSI SCSI ID status / media
-    // startSection(report, "ACSI/SCSI ID status / media", reportFormat);
-    // for(int i=0; i < 8; i++) {
-    //     char tmp[10];
-    //     std::string desc;
-    //     snprintf(tmp, sizeof(tmp), "ID %d", i);
-    //     // TDevInfo *devInfo = shared.scsi->getDevInfo(i);
-
-    //     if(devInfo) {
-    //         switch(devInfo->hostSourceType) {
-    //         case SOURCETYPE_NONE:                   desc = "none";  break;
-    //         case SOURCETYPE_IMAGE:                  desc = "HDD Image"; break;
-    //         case SOURCETYPE_IMAGE_TRANSLATEDBOOT:   desc = "Translated boot Image"; break;
-    //         case SOURCETYPE_DEVICE:                 desc = "Device"; break;
-    //         case SOURCETYPE_SD_CARD:                desc = "SD Card"; break;
-    //         default:                                desc = "unknown";
-    //         }
-
-    //         desc += " : ";
-
-    //         switch(devInfo->accessType) {
-    //         case SCSI_ACCESSTYPE_FULL:      desc += " (RW)"; break;
-    //         case SCSI_ACCESSTYPE_READ_ONLY: desc += " (READ-ONLY)"; break;
-    //         case SCSI_ACCESSTYPE_NO_DATA:   desc += " (NO DATA)"; break;
-    //         default:                        desc += " (unknown)";
-    //         }
-    //     } else {
-    //         desc = "no media attached";
-    //     }
-
-    //     dumpPair(report, tmp, desc.c_str(), reportFormat);
-    // }
-    // endSection  (report, reportFormat);
-
-    //------------------
-    // chips and interfaces
-    startSection   (report, "chips and interfaces live status",        reportFormat);
-    putStatusHeader(report, reportFormat);
-
-    // const char* chipName = (hwConfig.version < 3) ? "Hans  chip" : "Horst chip";
-    // dumpStatus     (report, chipName,              statuses.hans,      reportFormat);
-
-    // if(hwConfig.version < 3) {  // v1 and v2 contain Franz, v3 it's only horst
-    //     dumpStatus (report, "Franz chip",          statuses.franz,     reportFormat);
-    // }
-
-    dumpStatus     (report, "Hard Drive IF",       statuses.hdd,       reportFormat);
-    // TODO: rework
-    // dumpStatus     (report, "Floppy IF",           statuses.fdd,       reportFormat);
-    dumpStatus     (report, "IKBD from ST",        statuses.ikbdSt,    reportFormat);
-    dumpStatus     (report, "IKBD from USB",       statuses.ikbdUsb,   reportFormat);
-    endSection     (report,                                            reportFormat);
-
-    //------------------
-
-    endReport   (report, reportFormat);
-}
-
-void StatusReport::putStatusHeader(std::string &report, int reportFormat)
-{
-    switch(reportFormat) {
-    case REPORTFORMAT_RAW_TEXT:
-        report += std::string( fixStringToLength("What chip or interface",  TEXT_COL1_WIDTH)) + std::string(": ");
-        report += std::string( fixStringToLength("When was alive sign",     TEXT_COL2_WIDTH)) + std::string(" - ");
-        report += std::string( fixStringToLength("What alive sign",         TEXT_COL3_WIDTH)) + std::string("\n");
-        break;
-
-        case REPORTFORMAT_HTML_FULL:
-        case REPORTFORMAT_HTML_ONLYBODY:
-        report += "<tr>";
-        report += "    <th class='thStatus'>What chip or interface </th>";
-        report += "    <th class='thStatus'>When was alive sign    </th>";
-        report += "    <th class='thStatus'>Is that good or bad?   </th>";
-        report += "    <th class='thStatus'>What was the alive sign</th> </tr>\n";
-        break;
+        createSingleReportFile(i);
     }
 }
 
-void StatusReport::dumpStatus(std::string &report, const char *desciprion, volatile TStatus &status, int reportFormat)
+int StatusReport::getIndexFromMac(uint8_t* mac, bool& isNew)
 {
-    uint32_t now       = Utils::getCurrentMs();
-    int   aliveAgo;
-    char  aliveAgoString[64];
-    bool  good;
+    int idx = -1;
+    uint8_t emptyMac[6];
+    memset(emptyMac, 0, 6);
 
-    if(status.aliveTime == 0) {     // never received alive sign?
-        aliveAgo    = -1;           // never
-        good        = false;
-        strcpy(aliveAgoString, "never");
-    } else {
-        uint32_t diffMs    = now - status.aliveTime;       // calculate how many ms have passed since last alive sign
-        aliveAgo        = diffMs / 1000;                // convert ms to s
-        good            = true;
+    for(int i=0; i<MAX_CLIENTS; i++)
+    {
+        if(memcmp(statuses[i].mac, mac, 6) == 0) {         // found position of this mac?
+            idx = i;
+            break;
+        }
 
-        if(aliveAgo < 1) {
-            strcpy(aliveAgoString, "few ms ago");
-        } else if(aliveAgo < 60) {
-            sprintf(aliveAgoString, "%d seconds ago", aliveAgo);
-        } else {
-            int aliveMinutes = aliveAgo / 60;
-            sprintf(aliveAgoString, "%d minute%s ago", aliveMinutes, (aliveMinutes > 1) ? "s" : "");
+        if(memcmp(statuses[i].mac, emptyMac, 6) == 0) {    // found position of empty mac?
+            idx = i;
+            break;
         }
     }
 
-    const char *aliveSignString = aliveSignIntToString(status.aliveSign);
-    std::string aliveStr;
-
-    switch(reportFormat) {
-    case REPORTFORMAT_RAW_TEXT:
-        report += std::string( fixStringToLength(desciprion, TEXT_COL1_WIDTH) ) + std::string(": ");
-
-        aliveStr = aliveAgoString + std::string(" (") + (good ? "good" : "bad") + std::string(")");
-        report += fixStringToLength(aliveStr.c_str(),   TEXT_COL2_WIDTH)        + std::string(" - ");
-
-        report += fixStringToLength(aliveSignString,    TEXT_COL3_WIDTH) + std::string("\n");
-        break;
-
-        case REPORTFORMAT_HTML_FULL:
-        case REPORTFORMAT_HTML_ONLYBODY:
-        report += "<tr><th class='thStatus'>";
-        report += desciprion;
-        report += "</th><td><center>";
-        report += aliveAgoString;
-        report += "</center></td><td ";
-        report += good ? "class='aliveGood'" : "class='aliveBad'";
-        report += "><center>";
-        report += good ? "good" : "bad";
-        report += "</center></td><td><center>";
-        report += aliveSignString;
-        report += "</center></td></tr>";
-        break;
-
-        case REPORTFORMAT_JSON:
-        if(noOfElements > 0) {
-            report += ",";
-        }
-
-        report += "{\"desc\":\"";
-        report += desciprion;
-        report += "\", \"liveAgo\":\"";
-        report += aliveAgoString;
-        report += "\", \"good\":\"";
-        report += good ? "true" : "false";
-        report += "\", \"aliveSign\":\"";
-        report += aliveSignString;
-        report += "\"}";
-        break;
-    }
-
-    noOfElements++;
+    return idx;
 }
 
-void StatusReport::dumpPair(std::string &report, const char *key, const char *value, int reportFormat, bool centerValue, int len1, int len2)
+void StatusReport::storeIpAndFwVer(uint8_t* mac, uint32_t ipAddr, char* fwVer)
 {
-    switch(reportFormat) {
-    case REPORTFORMAT_RAW_TEXT:
-        report += fixStringToLength(key,    len1);
-        report += ": ";
-        report += fixStringToLength(value,  len2);
-        report += "\n";
-        break;
+    bool isNew;
+    int idx = getIndexFromMac(mac, isNew);
 
-        case REPORTFORMAT_HTML_FULL:
-        case REPORTFORMAT_HTML_ONLYBODY:
-        report += "<tr><th class='thStatus'>";
-        report += key;
-        report += "</th><td ";
-        report += centerValue ? "class='valueCenter'" : "class='valueLeft'";
-        report += ">";
-        report += value;
-        report += "</td></tr>";
-        break;
-
-        case REPORTFORMAT_JSON:
-        if(noOfElements > 0) {
-            report += ",";
-        }
-
-        report += "{\"key\":\"";
-        report += key;
-        report += "\", \"value\":\"";
-        report += value;
-        report += "\"}";
-        break;
+    if(idx == -1) {     // matching and empty position not found? quit
+        return;
     }
 
-    noOfElements++;
-}
+    // store at index
+    memcpy(statuses[idx].mac, mac, 6);
+    statuses[idx].ipAddr = ipAddr;
+    strcpy(statuses[idx].fwVer, fwVer);
+    statuses[idx].timestamp = time(NULL);
 
-void StatusReport::startSection(std::string &report, const char *sectionName, int reportFormat)
-{
-    noOfElements = 0;
-
-    switch(reportFormat) {
-    case REPORTFORMAT_RAW_TEXT:
-        report += sectionName;
-        report += "\n----------------------------------------\n";
-        break;
-
-        case REPORTFORMAT_HTML_FULL:
-        case REPORTFORMAT_HTML_ONLYBODY:
-        report += "<b>";
-        report += sectionName;
-        report += "</b><br> <table>";
-        break;
-
-        case REPORTFORMAT_JSON:
-        if(noOfSections > 0) {
-            report += ",";
-        }
-
-        report += "\"";
-        report += sectionName;
-        report += "\":[";
-        break;
-    }
-
-    noOfSections++;
-}
-
-void StatusReport::endSection(std::string &report, int reportFormat)
-{
-    switch(reportFormat) {
-    case REPORTFORMAT_RAW_TEXT:
-        report += "\n\n";
-        break;
-
-        case REPORTFORMAT_HTML_FULL:
-        case REPORTFORMAT_HTML_ONLYBODY:
-        report += "</table><br><br>\n";
-        break;
-
-        case REPORTFORMAT_JSON:
-        report += "]\n";
-        break;
+    if(isNew) {
+        createSingleReportFile(idx);
     }
 }
 
-void StatusReport::startReport(std::string &report, int reportFormat)
+void StatusReport::storeTosAndMachine(uint8_t* mac, uint16_t tosVersion, int scsiMachine)
 {
-    noOfElements = 0;
-    noOfSections = 0;
+    bool isNew;
+    int idx = getIndexFromMac(mac, isNew);
 
-    switch(reportFormat) {
-    case REPORTFORMAT_RAW_TEXT:
-        report += "CosmosEx device report\n";
-        report += "----------------------\n\n";
-        break;
-
-        case REPORTFORMAT_HTML_FULL:        // output html, head and body for full
-        report += "<html><head><title>CosmosEx device report</title></head>";
-        report += "<body><b>CosmosEx device report</b><br><br>";
-        break;
-
-        case REPORTFORMAT_HTML_ONLYBODY:    // don't output anything special for body only
-        break;
-
-        case REPORTFORMAT_JSON:
-        report += "{";
-        break;
+    if(idx == -1) {     // matching and empty position not found? quit
+        return;
     }
-}
 
-void StatusReport::endReport(std::string &report, int reportFormat)
-{
-    switch(reportFormat) {
-    case REPORTFORMAT_RAW_TEXT:
-        report += "\n";
-        break;
+    // store at index
+    statuses[idx].tosVersion = tosVersion;
+    statuses[idx].scsiMachine = scsiMachine;
 
-        case REPORTFORMAT_HTML_FULL:
-        report += "\n</body></html>";
-        break;
-
-        case REPORTFORMAT_HTML_ONLYBODY:
-        break;
-
-        case REPORTFORMAT_JSON:
-        report += "}\n";
-        break;
+    if(isNew) {
+        createSingleReportFile(idx);
     }
-}
-
-const char *StatusReport::aliveSignIntToString(int aliveSign)
-{
-    switch(aliveSign) {
-        case ALIVE_FWINFO:      return "FW info";
-        case ALIVE_CMD:         return "command";
-        case ALIVE_RW:          return "read or write cmd";
-        case ALIVE_READ:        return "read command";
-        case ALIVE_WRITE:       return "write command";
-        case ALIVE_IKBD_CMD:    return "IKBD command";
-        case ALIVE_KEYDOWN:     return "key pressed";
-        case ALIVE_MOUSEVENT:   return "mouse moved / clicked";
-        case ALIVE_JOYEVENT:    return "joy moved / pressed";
-
-        case ALIVE_DEAD:
-        default:
-            return "nothing";
-    }
-}
-
-char *StatusReport::fixStringToLength(const char *inStr, int outLen)
-{
-    static char tmp[100];
-
-    memset(tmp, ' ', outLen);                               // first fill it with spaces
-    tmp[outLen] = 0;
-
-    int inLen = strlen(inStr);
-    int cpLen = (inLen < outLen) ? inLen : outLen;
-    strncpy(tmp, inStr, cpLen);
-
-    return tmp;
 }

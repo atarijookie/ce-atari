@@ -1,4 +1,4 @@
-module github.com/atarijookie/ce-atari/webserver_go
+module github.com/atarijookie/ce-atari/webserver
 
 go 1.19
 

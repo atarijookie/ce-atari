@@ -27,7 +27,6 @@ extern DebugVars    dbgVars;
 HddClient::HddClient(ChipInterface* chipInterfaceIn, int& fdClientIn) : chipInterface(chipInterfaceIn), fdClient(fdClientIn)
 {
     hwConfig.changed = false;
-    memset(hwConfig.hwSerial, 0, 13);
 
     retryMod = new RetryModule();
 
@@ -61,29 +60,16 @@ HddClient::~HddClient()
 bool HddClient::handleHdd(uint8_t* inBuff)
 {
     bool isAcsiCommand = false;
-    uint32_t now = Utils::getCurrentMs();
 
     switch(inBuff[3]) {
         case ATN_FW_VERSION:
-            statuses.hans.aliveTime = now;
-            statuses.hans.aliveSign = ALIVE_FWINFO;
-
             handleFwVersion_hans();
             break;
 
         case ATN_ACSI_COMMAND:
             isAcsiCommand = true;
-
             dbgVars.isInHandleAcsiCommand = 1;
-
-            statuses.hdd.aliveTime  = now;
-            statuses.hdd.aliveSign  = ALIVE_RW;
-
-            statuses.hans.aliveTime = now;
-            statuses.hans.aliveSign = ALIVE_CMD;
-
             handleAcsiCommand(inBuff + 8);
-
             dbgVars.isInHandleAcsiCommand = 0;
         break;
 
@@ -259,6 +245,9 @@ uint8_t HddClient::getIdBits(void)
 {
     // get the bits from struct
     uint8_t enabledIDbits = acsiIdInfo.enabledIDbits;
+
+    ClientInfo* ci = chipInterface->clientGetByFd(fdClient);
+    StatusReport::storeTosAndMachine(ci->mac, hwConfig.tosVersion, hwConfig.scsiMachine);
 
     if(hwConfig.hddIface != HDD_IF_SCSI) {          // not SCSI? Don't change anything
 //        logHdd(LOG_DEBUG, "HddClient::getIdBits() -- we're running on ACSI");

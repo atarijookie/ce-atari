@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"encoding/json"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -35,6 +36,13 @@ func (s *Server) handleGetStatus(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(msg))
 		return
+	}
+
+	cmd := map[string]string{"module": "all", "action": "generate_status", "mac": mac}
+	if cmdJSON, err := json.Marshal(cmd); err == nil {
+		if err := sendToCmdSocket(string(cmdJSON)); err != nil {
+			log.Printf("handleGetStatus - failed to send cmd socket: %v", err)
+		}
 	}
 
 	w.Header().Set("Content-Type", "text/plain")

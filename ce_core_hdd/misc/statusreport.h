@@ -2,86 +2,31 @@
 #define _STATUSREPORT_H_
 
 #include <stdint.h>
-
-// when not received anything
-#define ALIVE_DEAD      0
-
-// for Franz & Hans - if the chips are communicating
-#define ALIVE_FWINFO    0x10
-#define ALIVE_CMD       0x11
-
-// ACSI / SCSI & FDD interface - if ST is communicating through them
-#define ALIVE_RW        0x20
-#define ALIVE_READ      0x21
-#define ALIVE_WRITE     0x22
-
-// IKBD interface
-#define ALIVE_IKBD_CMD  0x30
-#define ALIVE_KEYDOWN   0x31
-#define ALIVE_MOUSEVENT 0x32
-#define ALIVE_JOYEVENT  0x33
-
-/*
-Should also report:
-- ACSI or SCSI interface selected
-- component versions (main app, hans, franz, xilinx)
-- current date / time on CE
-- has ethernet and wifi connection (if up, IP?)
-- got mouse, keyboard, joy?
-- mounted usb drives & letters
-- RAW / translated mount of USB drives
-- mounted FDD images, selected FDD slot
-*/
+#include "../chipinterface/chipinterfacedefs.h"
 
 typedef struct {
-    uint32_t   aliveTime;
-    uint8_t    aliveSign;
-} TStatus;
+    uint32_t    ipAddr;
+    uint8_t     mac[6];
+    char        fwVer[16];      // YYYY-MM-DD
+    time_t      timestamp;      // store using time(NULL); then to human time:    struct tm *tm_info = localtime(&timestamp); char buffer[80]; strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", tm_info);
 
-typedef struct {
-    TStatus hans;
-    TStatus franz;
+    uint8_t     features;       // ikbd, fdd, acsi, scsi
+    uint16_t    tosVersion;     // e.g. 0x0205
+    int         scsiMachine;    // SCSI_MACHINE_TT | SCSI_MACHINE_FALCON
 
-    TStatus hdd;
-    TStatus fdd;
+    std::string lastWrittenReport;
+} TClientStatus;
 
-    TStatus ikbdSt;
-    TStatus ikbdUsb;
-} TStatuses;
-
-extern volatile TStatuses statuses;
-
-#define REPORTFORMAT_RAW_TEXT       0
-#define REPORTFORMAT_HTML_FULL      1
-#define REPORTFORMAT_HTML_ONLYBODY  2
-#define REPORTFORMAT_JSON           3
-
-#define TEXT_COL1_WIDTH     40
-#define TEXT_COL2_WIDTH     20
-#define TEXT_COL3_WIDTH     20
+extern TClientStatus statuses[MAX_CLIENTS];
 
 class StatusReport {
 public:
-    void createReportFileFromEnv(void);
-    void createReport(std::string &report, int reportFormat);
+    static void createReportFiles(void);
+    static void createSingleReportFile(int i);
 
-private:
-    int  noOfElements;
-    int  noOfSections;
-
-    void startReport    (std::string &report, int reportFormat);
-    void endReport      (std::string &report, int reportFormat);
-
-    void startSection   (std::string &report, const char *sectionName,  int reportFormat);
-    void endSection     (std::string &report,                           int reportFormat);
-
-    void putStatusHeader(std::string &report, int reportFormat);
-    void dumpStatus     (std::string &report, const char *desciprion, volatile TStatus &status, int reportFormat);
-    void dumpPair       (std::string &report, const char *key,               const char *value, int reportFormat, bool centerValue=true, int len1=TEXT_COL1_WIDTH, int len2=TEXT_COL2_WIDTH);
-
-    const char *aliveSignIntToString(int aliveSign);
-          char *fixStringToLength(const char *inStr, int len);
+    static int getIndexFromMac(uint8_t* mac, bool& isNew);
+    static void storeIpAndFwVer(uint8_t* mac, uint32_t ipAddr, char* fwVer);
+    static void storeTosAndMachine(uint8_t* mac, uint16_t tosVersion, int scsiMachine);
 };
 
 #endif
-

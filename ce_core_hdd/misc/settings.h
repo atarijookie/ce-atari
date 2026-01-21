@@ -52,7 +52,6 @@ public:
     void loadFloppyConfig(FloppyConfig *fc);
     void saveFloppyConfig(FloppyConfig *fc);
 
-    static void generateLicenseKeyName(uint8_t* hwSerial, char *keyName);
     static void binToHex(uint8_t *inBfr, int len, char *outBfr);
 
 private:

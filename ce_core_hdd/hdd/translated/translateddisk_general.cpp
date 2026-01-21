@@ -345,6 +345,8 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
         hwConfig->scsiMachine = SCSI_MACHINE_UNKNOWN;
     }
 
+    hwConfig->tosVersion = tosVersion;
+
     //------------------------------------
 
     uint16_t translatedDrives = getDrivesBitmap();          // get bitmap of all translated drives we got

@@ -20,6 +20,7 @@
 #include "../misc/debug.h"
 #include "../misc/global.h"
 #include "../misc/version.h"
+#include "../misc/statusreport.h"
 #include "../discovery/discovery.h"
 
 #define SERVER_STATUS_NOT_RUNNING   0       // when this server slot is not used yet and server is not running
@@ -244,7 +245,13 @@ uint8_t ChipInterface::getFWversionHdd(int fdClient)
 
     Version v;
     v.fromInts(Utils::bcdToInt(bfr[1]) + 2000, Utils::bcdToInt(bfr[2]), Utils::bcdToInt(bfr[3]));       // store found FW version of Hans
-    Debug::out(whichLog, LOG_DEBUG, "FW: %d-%02d-%02d", v.getYear(), v.getMonth(), v.getDay());
+
+    uint8_t* mac = ci->mac;
+    char fwVerStr[64];
+    sprintf(fwVerStr, "%d-%02d-%02d", v.getYear(), v.getMonth(), v.getDay());
+    StatusReport::storeIpAndFwVer(mac, ci->ipAddr, fwVerStr);
+
+    Debug::out(whichLog, LOG_DEBUG, "FW: %s, mac: %02X:%02X:%02X:%02X:%02X:%02X", fwVerStr, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
     return bfr[5];
 }
@@ -278,8 +285,11 @@ bool ChipInterface::getFWversionFdd(int clientIndex)
     }
 
     uint8_t* mac = clients[clientIndex].mac;
+    char fwVerStr[64];
+    sprintf(fwVerStr, "%d-%02d-%02d", year, month, day);
+    StatusReport::storeIpAndFwVer(mac, clients[clientIndex].ipAddr, fwVerStr);
 
-    Debug::out(whichLog, LOG_DEBUG, "FW: Franz, %d-%02d-%02d, mac: %02X:%02X:%02X:%02X:%02X:%02X", year, month, day, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    Debug::out(whichLog, LOG_DEBUG, "FW: %s, mac: %02X:%02X:%02X:%02X:%02X:%02X", fwVerStr, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     return macChanged;
 }
 
