@@ -84,6 +84,7 @@ void TranslatedDisk::setMac(uint8_t* mac)
     if(memcmp(mac, this->mac, 6) != 0) {    // mac changed?
         memcpy(this->mac, mac, 6);
         loadSettings();
+        findAttachedDisks();
     }
 }
 

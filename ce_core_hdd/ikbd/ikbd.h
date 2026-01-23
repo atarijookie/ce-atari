@@ -71,8 +71,6 @@ public:
     int processReceivedCommands(bool skipKeyboardTranslation, int fdUartRead);
 
 private:
-    uint8_t mac[6];
-
     ChipInterface* ciIkbd;
 
     enum JoystickState {

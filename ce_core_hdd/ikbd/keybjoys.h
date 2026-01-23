@@ -50,7 +50,6 @@ public:
 
     JoyKeysPcSt   joyKeys[2];
 private:
-    uint8_t mac[6];
     KeyTranslator *keyTranslator;
 
     void loadKeys(int joyNumber);
