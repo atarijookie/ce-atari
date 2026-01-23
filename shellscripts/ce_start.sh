@@ -18,23 +18,15 @@ mkdir -p "$LOG_DIR"
 mkdir -p "$SETTINGS_DIR"
 mkdir -p "$PID_DIR"
 
-# make a copy of config drive into the expected destination 
+# make a copy of config drive into the expected destination
 cp -rf "${BIN_DIR}/configdrive" "$CONFIG_DRIVE_PATH"
 
 echo "Starting processes."
 
-# run the service discovery
-./ce_discovery.elf > /dev/null 2>&1 &
-
-# run ikbd server
-./ce_ikbd.elf > /dev/null  2>&1 &
-
-# run fdd server
-./ce_fdd.elf > /dev/null  2>&1 &
+# run ce cores
+./ce_cores.elf > /dev/null 2>&1 &
 
 # run web server
-cd webserver
-./ce_web.sh > /dev/null 2>&1 &
-cd - > /dev/null 2>&1
+./webserver > /dev/null 2>&1 &
 
 echo "Processes have been started."

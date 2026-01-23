@@ -120,7 +120,7 @@ int main(int argc, char *argv[])
 std::string pidFileName(void)
 {
     std::string pidDir = Utils::dotEnvValue("PID_DIR", PID_DIR_DEFAULT);
-    std::string pidFilePath = pidDir + std::string("/ce_hdd_") + std::to_string(SERVER_TCP_PORT_HDD) + std::string(".pid");
+    std::string pidFilePath = pidDir + std::string("/ce_cores.pid");
     return pidFilePath;
 }
 

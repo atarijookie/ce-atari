@@ -16,44 +16,32 @@ mkdir -p "$DATA_DIR"
 mkdir -p "$LOG_DIR"
 mkdir -p "$SETTINGS_DIR"
 mkdir -p "$PID_DIR"
+mkdir -p "$BIN_DIR"
 
 cd libdospath
 echo "building libdospath"
 make -j4
 cd - > /dev/null 2>&1
 
-cd ce_discovery
-echo "building ce_discovery"
+cd ce_cores
+echo "building ce_cores"
 make -j4
-cp ./ce_discovery.elf "$BIN_DIR"
-cd - > /dev/null 2>&1
-
-cd ce_core_hdd
-echo "building ce_core_hdd"
-make -j4
-cp ./ce_hdd.elf "$BIN_DIR"
+cp ./ce_cores.elf "$BIN_DIR"
 cp ./ce_logo.bin "$BIN_DIR"
 cp -r ./configdrive "$BIN_DIR"
 cd - > /dev/null 2>&1
 
-cd ce_core_fdd
-echo "building ce_core_fdd"
-make -j4
-cp ./ce_fdd.elf "$BIN_DIR"
+cd webserver
+echo "building webserver"
+go build
+cp ./webserver "$BIN_DIR"
 cd - > /dev/null 2>&1
 
-cd ce_core_ikbd
-echo "building ce_core_ikbd"
-make -j4
-cp ./ce_ikbd.elf "$BIN_DIR"
-cd - > /dev/null 2>&1
-
-echo "copying webserver"
-cp -r ./webserver "$BIN_DIR"
+echo "copying webserver pages"
+cp -r ./webserver/static "$BIN_DIR"
 
 echo "copying .env file"
 cp ./.env "$BIN_DIR"
-ln -sf "${BIN_DIR}/.env" "${BIN_DIR}/webserver/.env"
 
 echo "copying shell scripts"
 cp ./shellscripts/ce_start.sh "$BIN_DIR"
