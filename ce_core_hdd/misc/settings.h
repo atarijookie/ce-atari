@@ -25,6 +25,7 @@ class Settings
 {
 public:
     Settings(void);
+    Settings(uint8_t* mac);
     virtual ~Settings(void) { };
 
     void setPrefix(uint8_t* bytes, int len);
@@ -55,6 +56,8 @@ public:
     static void binToHex(uint8_t *inBfr, int len, char *outBfr);
 
 private:
+    void init(uint8_t* prefixBytes, int len);
+
     char prefix[32];
 
     FILE *sOpen(const char *key, bool readNotWrite);

@@ -510,7 +510,7 @@ void Utils::store24bits(uint8_t *bfr, uint32_t val)
 
 void Utils::createTimezoneString(char *str)
 {
-    Settings  s;
+    Settings s;
     float     utcOffset;
     utcOffset = s.getFloat("TIME_UTC_OFFSET", 0);          // read UTC offset from settings
 
@@ -703,7 +703,7 @@ bool Utils::unZIPfloppyImageAndReturnFirstImage(const char *inZipFilePath, std::
     }
 
     // construct path to unZIPed image
-    outImageFilePath = "/tmp/zipedfdd/";
+    outImageFilePath = "/tmp/zipedfloppy/";
     outImageFilePath.append(de->d_name);
 
     logHdd(LOG_DEBUG, "Utils::unZIPfloppyImageAndReturnFirstImage -- this ZIP file: %s contains this floppy image file: %s", inZipFilePath, outImageFilePath.c_str());

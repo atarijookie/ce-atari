@@ -40,8 +40,6 @@ HddClient::HddClient(ChipInterface* chipInterfaceIn, int& fdClientIn) : chipInte
 
     translated = new TranslatedDisk(dataTrans, &hwConfig);
 
-    loadSettings();
-
     memset(outBuf, 0, INBUF_SIZE);
     memset(inBuff, 0, INBUF_SIZE);
 }
@@ -171,57 +169,19 @@ void HddClient::handleAcsiCommand(uint8_t *bufIn)
     }
 }
 
-void HddClient::fillDisplayLines(void)
-{
-    char tmpLine1[256], tmpLine2[256], tmp[32];
-
-    #define MAX_DEV_TYPES       4
-    const char *devTypeString[MAX_DEV_TYPES] = {"OFF", "SD", "RAW", "CE"};
-
-    if(hwConfig.hddIface == HDD_IF_ACSI) {  // is ACSI?
-        strcpy(tmpLine1, "ACSI: ");
-    } else {                                // is SCSI?
-        strcpy(tmpLine1, "SCSI: ");
-    }
-
-    strcpy(tmpLine2, tmpLine1);
-
-    int i;
-    for(i=0; i<8; i++) {
-        // first HDD line: just enabled IDs
-        strcpy(tmp, "x ");
-        tmp[0] = (acsiIdInfo.enabledIDbits & (1 << i)) ? '0' + i : '-';    // show ID if enabled, dash if not enabled
-        strcat(tmpLine1, tmp);     // add to 1st line
-
-        // second HDD line: IDs vs. device types
-        int devType = acsiIdInfo.acsiIDdevType[i];
-        if(devType != DEVTYPE_OFF && devType > 0 && devType < MAX_DEV_TYPES) {
-            const char* devTypeStr = devTypeString[devType];    // convert type int into string
-            sprintf(tmp, "%d:%s ", i, devTypeStr);
-            strcat(tmpLine2, tmp);
-        }
-    }
-
-    // now set the constructed strings
-    // TODO: store display data elsewhere
-    // display_setLine(DISP_LINE_HDD_IDS, tmpLine1);
-    // display_setLine(DISP_LINE_HDD_TYPES, tmpLine2);
-}
-
-void HddClient::loadSettings(void)
-{
-    logHdd(LOG_DEBUG, "HddClient::loadSettings");
-
-    Settings s;
-    s.loadAcsiIDs(&acsiIdInfo);
-
-    fillDisplayLines();     // fill lines for front display
-}
-
 void HddClient::handleFwVersion_hans(void)
 {
     uint8_t xilinxInfo = chipInterface->getFWversionHdd(fdClient);
     extractInterfaceInfo(xilinxInfo);
+
+    ClientInfo* ci = chipInterface->clientGetByFd(fdClient);
+
+    if(ci) {
+        StatusReport::storeTosAndMachine(ci->mac, hwConfig.tosVersion, hwConfig.scsiMachine);
+
+        scsi->setMac(ci->mac);
+        translated->setMac(ci->mac);
+    }
 
     // send enabled hdd ids to device
     uint8_t config[2];
@@ -236,7 +196,6 @@ void HddClient::handleFwVersion_hans(void)
 
         scsi->updateTranslatedBootMedia();   // also update CE_DD bootsector with proper SCSI ID
 
-        fillDisplayLines();                         // fill lines for front display
         saveHwConfig();                             // save the new config
     }
 }
@@ -245,9 +204,6 @@ uint8_t HddClient::getIdBits(void)
 {
     // get the bits from struct
     uint8_t enabledIDbits = acsiIdInfo.enabledIDbits;
-
-    ClientInfo* ci = chipInterface->clientGetByFd(fdClient);
-    StatusReport::storeTosAndMachine(ci->mac, hwConfig.tosVersion, hwConfig.scsiMachine);
 
     if(hwConfig.hddIface != HDD_IF_SCSI) {          // not SCSI? Don't change anything
 //        logHdd(LOG_DEBUG, "HddClient::getIdBits() -- we're running on ACSI");
@@ -320,6 +276,5 @@ void HddClient::reloadDrivesRaw(void)
 
 void HddClient::reloadDrivesTranslated(void)
 {
-    translated->loadSettings();
     translated->findAttachedDisks();
 }

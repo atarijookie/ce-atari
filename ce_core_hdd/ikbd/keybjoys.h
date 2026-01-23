@@ -31,7 +31,7 @@ class KeybJoyKeys {
 public:
     KeybJoyKeys(void);
     void setKeyTranslator(KeyTranslator *keyTrans);
-    
+
     bool isKeybJoyKey       (bool pcNotSt, int joyNumber, int key);
     bool isKeybJoyKeyPc     (int joyNumber, int pcKey);
     bool isKeybJoyKeyAtari  (int joyNumber, int pcKey);
@@ -41,20 +41,21 @@ public:
     bool isKeyLeft  (bool pcNotSt, int joyNumber, int pcKey);
     bool isKeyRight (bool pcNotSt, int joyNumber, int pcKey);
     bool isKeyButton(bool pcNotSt, int joyNumber, int pcKey);
-    
+
     void loadKeys(void);
     void saveKeys(void);
-    
+
     bool keybJoyHumanSettingsValidForSingleJoy(int joyNumber);
     bool keybJoyHumanSettingsValidBetweenJoys(void);
-    
+
     JoyKeysPcSt   joyKeys[2];
-private:    
+private:
+    uint8_t mac[6];
     KeyTranslator *keyTranslator;
 
     void loadKeys(int joyNumber);
     void saveKeys(int joyNumber);
-    
+
     JoyKeys *getkeybJoysStruct(bool pcNotSt, int joyNumber);
 };
 

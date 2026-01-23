@@ -39,11 +39,6 @@ private:
     AcsiDataTrans* dataTrans;
 
     //-----------------------------------
-    // settings and config stuff
-
-    void loadSettings(void);
-
-    //-----------------------------------
     // hard disk stuff
     AcsiIDinfo acsiIdInfo;
     RetryModule* retryMod;
@@ -59,7 +54,6 @@ private:
 
     //----------------------------------
     // other
-    void fillDisplayLines(void);
     void extractInterfaceInfo(uint8_t xilinxInfo);
 };
 

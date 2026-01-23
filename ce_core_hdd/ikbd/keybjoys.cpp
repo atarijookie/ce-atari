@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+#include <cstring>
 
 #include "../misc/settings.h"
 #include "../misc/debug.h"
@@ -12,6 +13,7 @@
 
 KeybJoyKeys::KeybJoyKeys(void)
 {
+    memset(mac, 0, 6);
     keyTranslator = NULL;
 }
 
@@ -99,7 +101,7 @@ void KeybJoyKeys::loadKeys(int joyNumber)
     JoyKeysPcSt     *keysStruct     = (joyNumber == 0) ? &joyKeys[0]                : &joyKeys[1];                  // to which structure we should store it?
 
     // get the settings
-    Settings s;
+    Settings s(mac);
     char *keys = s.getString(settingsName, defaultKeys);
 
     // store the human readable keys directly to struct
@@ -143,7 +145,7 @@ void KeybJoyKeys::loadKeys(int joyNumber)
 
 void KeybJoyKeys::saveKeys(int joyNumber)
 {
-    Settings s;
+    Settings s(mac);
 
     const char   *settingsName   = (joyNumber == 0) ? KEYBOARD_KEYS_SETTINGS0    : KEYBOARD_KEYS_SETTINGS1;  // what settings name we should use?
     JoyKeysHuman *keysStruct     = (joyNumber == 0) ? &joyKeys[0].human          : &joyKeys[1].human;        // from which structure we should save it?

@@ -105,6 +105,8 @@ public:
     TranslatedDisk(AcsiDataTrans *dt, THwConfig* hwConfig);
     virtual ~TranslatedDisk();
 
+    void setMac(uint8_t* mac);
+
     void loadSettings(void);
     void findAttachedDisks(void);
 
@@ -127,10 +129,9 @@ public:
 		return conf[driveIndex].hostRootPath.c_str();
 	}
 
-    void fillTranslatedDisplayLines(void);
-
 private:
-    AcsiDataTrans       *dataTrans;
+    uint8_t mac[6];
+    AcsiDataTrans *dataTrans;
     THwConfig* hwConfig;
 
     uint8_t            *dataBuffer;

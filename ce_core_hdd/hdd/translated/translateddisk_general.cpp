@@ -30,6 +30,7 @@ TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt, THwConfig* hwConfig)
 {
     dataTrans = dt;
     this->hwConfig = hwConfig;
+    memset(mac, 0, 6);
 
     dataBuffer  = new uint8_t[ACSI_BUFFER_SIZE];
     dataBuffer2 = new uint8_t[ACSI_BUFFER_SIZE];
@@ -78,9 +79,17 @@ TranslatedDisk::~TranslatedDisk()
     destroyFindStorages();
 }
 
+void TranslatedDisk::setMac(uint8_t* mac)
+{
+    if(memcmp(mac, this->mac, 6) != 0) {    // mac changed?
+        memcpy(this->mac, mac, 6);
+        loadSettings();
+    }
+}
+
 void TranslatedDisk::loadSettings(void)
 {
-    Settings s;
+    Settings s(mac);
     configDriveLetter = s.getChar("DRIVELETTER_CONFDRIVE", 'C');
     configDriveIndex = configDriveLetter - 65;
 }
@@ -89,7 +98,7 @@ void TranslatedDisk::findAttachedDisks(void)
 {
     logHdd(LOG_DEBUG, "TranslatedDisk::findAttachedDisks starting");
 
-    Settings s;
+    Settings s(mac);
 
     for(int i=2; i<MAX_DRIVES; i++) {               // go through all the possible drives
         char driveLetter = ((char) (65 + i));
@@ -358,7 +367,7 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
     dc.translatedDrives  = translatedDrives;             // just translated drives
     dc.configDrive       = configDriveIndex;             // index of config drive
 
-    Settings s;
+    Settings s(mac);
     dc.settingsResolution   = s.getInt("SCREEN_RESOLUTION", 1);
     for(int i = 2; i < MAX_DRIVES; i++) {
         dc.label[i] = conf[i].label;
@@ -382,7 +391,7 @@ void TranslatedDisk::onGetConfig(uint8_t *cmd)
 
     //------------------
     // this can be used to set the right date and time on ST
-    Settings s;
+    Settings s(mac);
     bool    setDateTime;
     float   utcOffset;
     setDateTime = s.getBool ("TIME_SET",        true);
@@ -1099,40 +1108,4 @@ void TranslatedDisk::driveGetReport(int driveIndex, std::string &reportString)
     }
 
     reportString = "drive";     // TODO: get drive type (config / usb / shared) from mounter
-}
-
-void TranslatedDisk::fillTranslatedDisplayLines(void)
-{
-    char tmp[64];
-
-    // mount USB drives as raw/translated + ZIP files are dirs/files
-    Settings s;
-
-    // TODO: store display data elsewhere
-    // display_setLine(DISP_LINE_TRAN_SETT, tmp);
-
-    // what letter is for config and shared drive?
-    sprintf(tmp, "config:%c            ", configDriveLetter);
-    // TODO: store display data elsewhere
-    // display_setLine(DISP_LINE_CONF_SHAR, tmp);
-
-    // other drives
-    bool hasDrive = false;
-    strcpy(tmp, "drvs: ");
-    for(int i=2; i<MAX_DRIVES; i++) {   // if drive is normal and enabled
-        if(conf[i].enabled) {
-            char tmp2[2];
-            tmp2[0] = 'A' + i;  // drive letter
-            tmp2[1] = 0;        // string terminator
-            strcat(tmp, tmp2);  // append
-            hasDrive = true;
-        }
-    }
-
-    if(!hasDrive) {             // no drives present?
-        strcat(tmp, "-");
-    }
-
-    // TODO: store display data elsewhere
-    // display_setLine(DISP_LINE_TRAN_DRIV, tmp);
 }

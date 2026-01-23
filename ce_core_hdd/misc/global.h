@@ -149,9 +149,6 @@ void preloadGlobalsFromDotEnv(void);
 #define PATH_ATARI_CE_HDIMG_TTP             "CE_HDIMG.TTP"
 #define PATH_ATARI_CE_MEDIAPLAY             "CEMEDIAP.TTP"
 
-#define NETSERVER_WEBROOT                   "/tmp/ce_netserver_webroot"
-#define NETSERVER_WEBROOT_INDEX             NETSERVER_WEBROOT "/index.html"
-
 // These were global const string constants, but now they depend on .env content, so they are now
 // loaded on app start and used when needed.
 extern std::string corePath;

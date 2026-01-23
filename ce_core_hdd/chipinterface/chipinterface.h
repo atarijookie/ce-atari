@@ -15,6 +15,7 @@ typedef struct {
     int         fdClient;           // tcp socket fd
     uint32_t    ipAddr;             // client's IP addr
     uint8_t     mac[6];             // client's mac addr
+    uint8_t     features;           // DEV_FEATURE_ bits
     int         floppySlotIndex;    // which floppy slot this IP is using
     uint32_t    lastMs;             // value of getCurrentMs() when was last time anything was received from this client
 
@@ -43,6 +44,7 @@ public:
     void dropRestOfData(int clientIndex, uint8_t* buffer, uint32_t bufferSize);
 
     // to handle FW version
+    uint8_t getFWversion(int clientIndex, bool hddNotFdd);
     uint8_t getFWversionHdd(int fdClient);
     bool getFWversionFdd(int clientIndex);
 
@@ -104,7 +106,7 @@ private:
     void createListeningSocket(void);
     uint32_t recvFromClient(int& fdClient, uint8_t* buf, int maxLen);
 
-    bool waitForAtn(int clientIndex, int atnIdWant, uint8_t atnCode, uint32_t timeoutMs, uint8_t *inBuf);
+    bool waitForAtn(int clientIndex, int atnIdWant, uint8_t atnCodeWant, uint32_t timeoutMs, uint8_t *inBuf);
 
     //-----------
     void clientsClearOne(ClientInfo* info);     // clear data structure of one clients
@@ -114,7 +116,7 @@ private:
     int  clientsGetFloppySlotIndexForIp(uint32_t ipAddr);
     void clientsStoreOne(ClientInfo* info, int newSock, uint32_t ipAddr);
 
-    void clientsWriteToFile(void);
+    void storeDeviceFeatures(uint8_t* mac, uint8_t featureBits);
 };
 
 #endif

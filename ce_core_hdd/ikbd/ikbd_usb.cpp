@@ -711,7 +711,7 @@ bool Ikbd::handleHotkeys(int pcKey, bool pressed, bool skipKeyboardTranslation)
     }
 
     if ((leftShiftsPressed > 0 || rightShiftsPressed > 0) && ctrlsPressed > 0 && pressed) {
-        Settings s;
+        Settings s(mac);
         if (f11sPressed > 0) {
             firstJoyIs0 = !firstJoyIs0;
             s.setBool("JOY_FIRST_IS_0", firstJoyIs0);

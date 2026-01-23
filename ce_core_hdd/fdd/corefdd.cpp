@@ -223,8 +223,7 @@ void CoreFdd::loadLastImageIntoSlot(int clientIndex)
         return;
     }
 
-    Settings s;
-    s.setPrefix(client->mac, 6);                        // mac as prefix to settings
+    Settings s(client->mac);
     const char *pPathAndFile = s.getString("FLOPPY_IMAGE", "");  // try to read the value
     std::string pathAndFile = pPathAndFile;
 
@@ -380,8 +379,7 @@ void CoreFdd::handleFddAction(void)
     }
 
     if(events.fddAction == FDD_ACTION_INSERT) {
-        Settings s;
-        s.setPrefix(client->mac, 6);                                // mac as prefix to settings
+        Settings s(client->mac);
         const char *pPathAndFile = s.getString("FLOPPY_IMAGE", ""); // try to read the value
         std::string pathAndFile = pPathAndFile;
         logFdd(LOG_DEBUG, "inserting %s into slot %d", pPathAndFile, client->floppySlotIndex);

@@ -40,7 +40,6 @@ ChipInterface::ChipInterface(int whichLogFile, int whichAtnCode, uint32_t whichS
     fdListen = FD_EMPTY;
 
     clientsClearAll();
-    clientsWriteToFile();
 
     bufOut = new uint8_t[MFM_STREAM_SIZE];
     bufIn = new uint8_t[MFM_STREAM_SIZE];
@@ -62,17 +61,20 @@ void ChipInterface::createListeningSocket(void)
     }
 
     // open socket
-    if ((fdListen = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
-        Debug::out(whichLog, LOG_ERROR, "netServer - failed to open socket");
+    if ((fdListen = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        Debug::out(whichLog, LOG_ERROR, "ChipInterface::createListeningSocket - failed to open socket");
         return;
     }
 
     // Forcefully attach socket to the port
     int opt = 1;
 
-    if (setsockopt(fdListen, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
-        Debug::out(whichLog, LOG_ERROR, "netServer - setsockopt() failed");
-        return;
+    if (setsockopt(fdListen, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))) {
+        Debug::out(whichLog, LOG_ERROR, "ChipInterface::createListeningSocket - setsockopt() failed for SO_REUSEADDR");
+    }
+
+    if (setsockopt(fdListen, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt))) {
+        Debug::out(whichLog, LOG_ERROR, "ChipInterface::createListeningSocket - setsockopt() failed for SO_REUSEPORT");
     }
 
     // change the socket into non-blocking
@@ -84,17 +86,17 @@ void ChipInterface::createListeningSocket(void)
 
     // bind to address
     if (bind(fdListen, (struct sockaddr *) &addressListen, sizeof(addressListen)) < 0) {
-        Debug::out(whichLog, LOG_ERROR, "netServer - bind() failed");
+        Debug::out(whichLog, LOG_ERROR, "ChipInterface::createListeningSocket - bind() failed");
         return;
     }
 
     // mark the socket as a passive socket
     if (listen(fdListen, 5) < 0) {
-        Debug::out(whichLog, LOG_ERROR, "netServer - listen() failed");
+        Debug::out(whichLog, LOG_ERROR, "ChipInterface::createListeningSocket - listen() failed");
         return;
     }
 
-    Debug::out(whichLog, LOG_INFO, "netServer - listening on tcp port: %d", SERVER_TCP_PORT_HDD);
+    Debug::out(whichLog, LOG_INFO, "ChipInterface::createListeningSocket - listening on tcp port: %d", SERVER_TCP_PORT_HDD);
 }
 
 void ChipInterface::acceptSocketIfNeededAndPossible(void)
@@ -133,7 +135,6 @@ void ChipInterface::acceptSocketIfNeededAndPossible(void)
 
     // got the new client socket now
     clientsStoreOne(clientInfo, newSock, clientIpInt);
-    clientsWriteToFile();
 
     Debug::out(whichLog, LOG_INFO, "acceptSocketIfNeededAndPossible() - client #%d connected from %s, will use floppy slot #%d", idx, clientIp, clientInfo->floppySlotIndex);
 }
@@ -173,7 +174,7 @@ bool ChipInterface::actionNeeded(int clientIndex, uint8_t *inBuf)
 {
     int& fdClient = clients[clientIndex].fdClient;
 
-    if(fdClient <= 0) {                 // (still) no client connected? no action needed
+    if(fdClient < 0) {                 // (still) no client connected? no action needed
         //Debug::out(whichLog, LOG_DEBUG, "actionNeeded() - client not connected yet");
         return false;
     }
@@ -232,65 +233,66 @@ uint8_t ChipInterface::getFWversionHdd(int fdClient)
         return 0;
     }
 
+    return getFWversion(ci->index, true);
+}
+
+uint8_t ChipInterface::getFWversion(int clientIndex, bool hddNotFdd)
+{
+    ClientInfo* ci = &clients[clientIndex];
+
     #define FW_VER_SIZE     32
     uint8_t bfr[FW_VER_SIZE];
 
     memset(bfr, 0, FW_VER_SIZE);
-    int readCnt = readRestOfData(ci->index, bfr, FW_VER_SIZE);
+    int readCnt = readRestOfData(clientIndex, bfr, FW_VER_SIZE);
 
     if(readCnt < 12) {
         Debug::out(whichLog, LOG_ERROR, "getFWversion() -- not enough data received: %d", readCnt);
         return 0;
     }
 
-    Version v;
-    v.fromInts(Utils::bcdToInt(bfr[1]) + 2000, Utils::bcdToInt(bfr[2]), Utils::bcdToInt(bfr[3]));       // store found FW version of Hans
+    int year = Utils::bcdToInt(bfr[1]) + 2000;
+    int month = Utils::bcdToInt(bfr[2]);
+    int day = Utils::bcdToInt(bfr[3]);
 
-    uint8_t* mac = ci->mac;
+    bool macChanged = false;
+    if(memcmp(ci->mac, bfr + 6, 6) != 0) {   // mac changed? (e.g. first received)
+        memcpy(ci->mac, bfr + 6, 6);         // copy mac address into client's info
+        macChanged = true;
+    }
+
     char fwVerStr[64];
-    sprintf(fwVerStr, "%d-%02d-%02d", v.getYear(), v.getMonth(), v.getDay());
-    StatusReport::storeIpAndFwVer(mac, ci->ipAddr, fwVerStr);
+    sprintf(fwVerStr, "%d-%02d-%02d", year, month, day);
+    StatusReport::storeIpAndFwVer(ci->mac, ci->ipAddr, fwVerStr, bfr[4]);
 
-    Debug::out(whichLog, LOG_DEBUG, "FW: %s, mac: %02X:%02X:%02X:%02X:%02X:%02X", fwVerStr, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    // features changed? store it to settings
+    if(clients[clientIndex].features != bfr[4]) {
+        clients[clientIndex].features = bfr[4];
+        storeDeviceFeatures(ci->mac, bfr[4]);
+    }
 
-    return bfr[5];
+    Debug::out(whichLog, LOG_DEBUG, "FW: %s, mac: %02X:%02X:%02X:%02X:%02X:%02X", fwVerStr, ci->mac[0], ci->mac[1], ci->mac[2], ci->mac[3], ci->mac[4], ci->mac[5]);
+
+    // for hdd return xilinx info, for fdd return if mac changed
+    return hddNotFdd ? bfr[5] : macChanged;
+}
+
+void ChipInterface::storeDeviceFeatures(uint8_t* mac, uint8_t featureBits)
+{
+    std::string featureString;
+
+    if(featureBits & DEV_FEATURE_ACSI) featureString += "A";
+    if(featureBits & DEV_FEATURE_SCSI) featureString += "S";
+    if(featureBits & DEV_FEATURE_FDD) featureString += "F";
+    if(featureBits & DEV_FEATURE_IKBD) featureString += "I";
+
+    Settings s(mac);
+    s.setString("features", featureString.c_str());
 }
 
 bool ChipInterface::getFWversionFdd(int clientIndex)
 {
-    // fwResponseBfr should be filled with Franz config - by calling setFDDconfig() (and not calling anything else inbetween)
-    // sendDataToChip(fdClient, fwResponseBfr, FDD_FW_RESPONSE_LEN);
-
-    #define FW_VER_SIZE     32
-    uint8_t fwVer[FW_VER_SIZE];
-
-    memset(fwVer, 0, FW_VER_SIZE);
-    int readCnt = readRestOfData(clientIndex, fwVer, FW_VER_SIZE);
-
-    if(readCnt < 12) {
-        Debug::out(whichLog, LOG_ERROR, "getFWversion() -- not enough data received: %d", readCnt);
-        return false;
-    }
-
-    int year = Utils::bcdToInt(fwVer[1]) + 2000;
-    int month = Utils::bcdToInt(fwVer[2]);
-    int day = Utils::bcdToInt(fwVer[3]);
-
-    bool macChanged = false;
-    if(memcmp(clients[clientIndex].mac, fwVer + 6, 6) != 0) {   // mac changed? (e.g. first received)
-        memcpy(clients[clientIndex].mac, fwVer + 6, 6);         // copy mac address into client's info
-        macChanged = true;
-
-        clientsWriteToFile();
-    }
-
-    uint8_t* mac = clients[clientIndex].mac;
-    char fwVerStr[64];
-    sprintf(fwVerStr, "%d-%02d-%02d", year, month, day);
-    StatusReport::storeIpAndFwVer(mac, clients[clientIndex].ipAddr, fwVerStr);
-
-    Debug::out(whichLog, LOG_DEBUG, "FW: %s, mac: %02X:%02X:%02X:%02X:%02X:%02X", fwVerStr, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-    return macChanged;
+    return getFWversion(clientIndex, false);
 }
 
 bool ChipInterface::hdd_sendData_start(int& fdClient, uint32_t totalDataCount, uint8_t scsiStatus, bool withStatus)
@@ -424,7 +426,7 @@ uint8_t* ChipInterface::fdd_sectorWritten(int clientIndex, int &side, int &track
     return (bufIn + 2);         // return pointer to received written sector (beyond sector / track bytes)
 }
 
-bool ChipInterface::waitForAtn(int clientIndex, int atnIdWant, uint8_t atnCode, uint32_t timeoutMs, uint8_t *inBuf)
+bool ChipInterface::waitForAtn(int clientIndex, int atnIdWant, uint8_t atnCodeWant, uint32_t timeoutMs, uint8_t *inBuf)
 {
     gotAtnId = 0;
     gotAtnCode = 0;
@@ -435,14 +437,13 @@ bool ChipInterface::waitForAtn(int clientIndex, int atnIdWant, uint8_t atnCode, 
     // we might need to wait for ATN multiple times, as there might be ZEROS packet or IKBD packet before we read wanted Hans or Franz packet
     while(sigintReceived == 0) {
         // check for any ATN code waiting from Hans
-        int atnIdGot = bufReader->waitForAtn(atnCode, timeoutMs);            // which chip wants to communicate? (which chip's stream we should process?)
-        uint8_t atnCode = bufReader->getAtnCode();                           // what command does this chip wants us to handle?
+        int atnIdGot = bufReader->waitForAtn(atnCodeWant, timeoutMs);   // which chip wants to communicate? (which chip's stream we should process?)
+        uint8_t atnCodeGot = bufReader->getAtnCode();                   // what command does this chip wants us to handle?
 
         if(atnIdGot == NET_ATN_DISCONNECTED) {         // if buffered reader detected client disconnect, close it and quit
             Debug::out(whichLog, LOG_DEBUG, "waitForAtn() - DISCONNECTED!");
 
             clientsCloseOne(&clients[clientIndex]);
-            clientsWriteToFile();
 
             return false;
         }
@@ -462,7 +463,7 @@ bool ChipInterface::waitForAtn(int clientIndex, int atnIdWant, uint8_t atnCode, 
 
         // store which chip wants which command to be handled
         gotAtnId = atnIdGot;
-        gotAtnCode = atnCode;
+        gotAtnCode = atnCodeGot;
 
         if(atnIdWant == NET_ATN_ANY_ID) {               // waiting for ANY? then Franz or Hans is fine
             return true;
@@ -610,6 +611,7 @@ void ChipInterface::clientsClearOne(ClientInfo* info)
     memset(info->mac, 0, 6);
     info->floppySlotIndex = FD_EMPTY;
     info->lastMs = 0;
+    info->features = 0;
 }
 
 void ChipInterface::clientsClearAll(void)
@@ -689,7 +691,6 @@ void ChipInterface::clientsDisconnectInactive(void)
 
         if(diff > 15000) {
             clientsCloseOne(&clients[i]);
-            clientsWriteToFile();
 
             Debug::out(whichLog, LOG_INFO, "disconnected inactive client #%i", i);
         }
@@ -763,49 +764,6 @@ void ChipInterface::dropRestOfData(int clientIndex, uint8_t* buffer, uint32_t bu
     memset(buffer, 0, bufferSize);
     int readSize = MIN(ci->bufReader.dataSizeRest(), bufferSize);
     recvFromClient(clientIndex, buffer, readSize);
-}
-
-void ChipInterface::clientsWriteToFile(void)
-{
-    std::string slots;
-    slots = "{";
-
-    Settings s;
-    int gotClients = 0;
-    int clientIndex = 0;
-
-    for(int i=0; i<MAX_CLIENTS; i++) {
-        if(clients[i].fdClient != FD_EMPTY) {
-            gotClients++;
-        }
-    }
-
-    for(int i=0; i<MAX_CLIENTS; i++) {
-        clientIndex++;
-        ClientInfo* c = &clients[i];
-
-        bool isLast = (clientIndex >= gotClients);
-
-        if(c->fdClient != FD_EMPTY) {
-            char slotInfo[1024];
-
-            s.setPrefix(c->mac, 6);                         // mac as prefix to settings
-            const char *name = s.getString("NAME", "");     // try to read the value
-
-            sprintf(slotInfo, "\"%d\": {\"ip\": \"%d.%d.%d.%d\", \"mac\": \"%02X:%02X:%02X:%02X:%02X:%02X\", \"name\": \"%s\"}%s",
-                c->floppySlotIndex,
-                (c->ipAddr >> 24) & 0xff, (c->ipAddr >> 16) & 0xff, (c->ipAddr >> 8) & 0xff, c->ipAddr  & 0xff,
-                c->mac[0], c->mac[1], c->mac[2], c->mac[3], c->mac[4], c->mac[5],
-                name,
-                (isLast ? "" : ", ")
-            );
-
-            slots += slotInfo;
-        }
-    }
-    slots += "}";
-
-    Utils::textToFileFromEnv(slots.c_str(), "FILE_FLOPPY_SLOTS");
 }
 
 int ChipInterface::readRestOfData(int clientIndex, uint8_t* buffer, uint32_t bufferSize)

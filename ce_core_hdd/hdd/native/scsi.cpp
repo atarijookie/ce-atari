@@ -13,6 +13,7 @@
 Scsi::Scsi(void)
 {
     int i;
+    memset(mac, 0, 6);
 
     dataTrans = 0;
 
@@ -37,11 +38,19 @@ void Scsi::setAcsiDataTrans(AcsiDataTrans *dt)
     dataTrans = dt;
 }
 
+void Scsi::setMac(uint8_t* mac)
+{
+    if(memcmp(mac, this->mac, 6) != 0) {    // mac changed?
+        memcpy(this->mac, mac, 6);
+        findAttachedDisks();
+    }
+}
+
 void Scsi::findAttachedDisks(void)
 {
     logHdd(LOG_DEBUG, "Scsi::findAttachedDisks() - starting");
 
-    Settings s;
+    Settings s(mac);
     s.loadAcsiIDs(&acsiIdInfo);
 
     for(int i=0; i<8; i++) {                        // go through all the possible drives

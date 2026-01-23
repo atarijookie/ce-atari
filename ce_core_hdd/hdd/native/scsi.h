@@ -58,6 +58,8 @@ public:
     Scsi(void);
     virtual ~Scsi();
 
+    void setMac(uint8_t* mac);
+
     void setAcsiDataTrans(AcsiDataTrans *dt);
     void findAttachedDisks(void);
     void processCommand(uint8_t *command);
@@ -75,6 +77,7 @@ public:
     static uint8_t getCmdLengthFromCmdBytesScsi(uint8_t* cmd);
 
 private:
+    uint8_t mac[6];
     AcsiDataTrans   *dataTrans;
 
     uint8_t            acsiId;                 // current acsi ID for the command

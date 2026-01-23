@@ -10,9 +10,9 @@
 #include "debug.h"
 #include "utils.h"
 
-Settings::Settings(void)
+void Settings::init(uint8_t* prefixBytes, int len)
 {
-    setPrefix(NULL, 0);
+    setPrefix(prefixBytes, len);
 
     std::string settingsDir = Utils::dotEnvValue("SETTINGS_DIR", "./settings"); // path to settings dir
     int res = mkdir(settingsDir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);      // mod: 0x775
@@ -26,6 +26,16 @@ Settings::Settings(void)
             logHdd(LOG_ERROR, "Settings: failed to create settings directory %s - %s", settingsDir.c_str(), strerror(errno));
         }
     }
+}
+
+Settings::Settings(void)
+{
+    init(NULL, 0);
+}
+
+Settings::Settings(uint8_t* mac)
+{
+    init(mac, 6);
 }
 
 void Settings::setPrefix(uint8_t* bytes, int len)

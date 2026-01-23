@@ -28,6 +28,7 @@ Ikbd::Ikbd(ChipInterface* ciIkbd)
 {
     this->ciIkbd = ciIkbd;
 
+    memset(mac, 0, 6);
     loadSettings();
 
     initDevs();
@@ -52,7 +53,7 @@ Ikbd::Ikbd(ChipInterface* ciIkbd)
 
 void Ikbd::loadSettings(void)
 {
-    Settings s;
+    Settings s(mac);
     firstJoyIs0 = s.getBool("JOY_FIRST_IS_0", false);
 
     if(firstJoyIs0) {

@@ -1610,7 +1610,7 @@ void TranslatedDisk::onTestWrite(uint8_t *cmd)
 void TranslatedDisk::onTestGetACSIids(uint8_t *cmd)
 {
     AcsiIDinfo  acsiIdInfo;
-    Settings    s;
+    Settings s(mac);
     s.loadAcsiIDs(&acsiIdInfo);                                 // read the list of device types from settings
 
     for(int id=0; id<8; id++) {                                 // now store it one after another to buffer

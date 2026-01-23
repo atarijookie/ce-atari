@@ -110,7 +110,7 @@ int StatusReport::getIndexFromMac(uint8_t* mac, bool& isNew)
     return idx;
 }
 
-void StatusReport::storeIpAndFwVer(uint8_t* mac, uint32_t ipAddr, char* fwVer)
+void StatusReport::storeIpAndFwVer(uint8_t* mac, uint32_t ipAddr, char* fwVer, uint8_t features)
 {
     bool isNew;
     int idx = getIndexFromMac(mac, isNew);
@@ -124,6 +124,7 @@ void StatusReport::storeIpAndFwVer(uint8_t* mac, uint32_t ipAddr, char* fwVer)
     statuses[idx].ipAddr = ipAddr;
     strcpy(statuses[idx].fwVer, fwVer);
     statuses[idx].timestamp = time(NULL);
+    statuses[idx].features = features;
 
     if(isNew) {
         createSingleReportFile(idx);
