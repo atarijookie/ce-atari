@@ -19,6 +19,7 @@
 #include "../misc/utils.h"
 #include "../misc/statusreport.h"
 #include "../chipinterface/chipinterface.h"
+#include "../discovery/discovery.h"
 
 #define DEV_CHECK_TIME_MS       3000
 #define UPDATE_CHECK_TIME       1000
@@ -48,7 +49,7 @@ void CoreHdd::run(void)
     memset(inBuff, 0, INBUF_SIZE);
 
     // create network chip interface
-    ChipInterface* ciHdd = new ChipInterface(LOGFILE_HDD, NET_ATN_HANS_ID, SYNC_TAG_HDD);
+    ChipInterface* ciHdd = new ChipInterface(LOGFILE_HDD, NET_ATN_HANS_ID, SYNC_TAG_HDD, SERVER_TCP_PORT_HDD);
     ciHdd->ciOpen();
 
     // create hdd clients, 1 hdd client per each tcp client

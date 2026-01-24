@@ -19,6 +19,7 @@
 #include "../misc/utils.h"
 #include "../misc/settings.h"
 #include "../chipinterface/chipinterface.h"
+#include "../discovery/discovery.h"
 
 #include "ikbd.h"
 
@@ -39,7 +40,7 @@ void *ikbdThreadCode(void *ptr)
     logIkbd(LOG_DEBUG, "ikbdThreadCode will enter loop...");
 
     // create network chip interface
-    ChipInterface* ciIkbd = new ChipInterface(LOGFILE_FDD, NET_ATN_FRANZ_ID, SYNC_TAG_FDD);
+    ChipInterface* ciIkbd = new ChipInterface(LOGFILE_IKBD, 0, 0, SERVER_TCP_PORT_IKBD);
     ciIkbd->ciOpen();
 
     Ikbd ikbd(ciIkbd);

@@ -132,8 +132,8 @@ int runCoreHdd(void)
 
     char appVersion[16];
     Version::getAppVersion(appVersion);
-    logHdd(LOG_INFO, "CosmosEx HDD core starting at port %d, version: %s", SERVER_TCP_PORT_HDD, appVersion);
-    printf("\nCosmosEx HDD core starting at port %d, version: %s\n", SERVER_TCP_PORT_HDD, appVersion);
+    logHdd(LOG_INFO, "CosmosEx cores starting");
+    printf("\nCosmosEx cores starting\n");
 
     Utils::setTimezoneVariable_inThisContext();
 

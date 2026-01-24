@@ -27,11 +27,12 @@
 #define SERVER_STATUS_FREE          1       // server is running but no client is connected there
 #define SERVER_STATUS_OCCUPIED      2       // server is running and client is connected
 
-ChipInterface::ChipInterface(int whichLogFile, int whichAtnCode, uint32_t whichSyncTagCode)
+ChipInterface::ChipInterface(int whichLogFile, int whichAtnCode, uint32_t whichSyncTagCode, uint16_t portListen)
 {
     whichLog = whichLogFile;
     whichAtn = whichAtnCode;
     whichSyncTag = whichSyncTagCode;
+    this->portListen = portListen;
 
     for(int i=0; i<MAX_CLIENTS; i++) {
         clients[i].bufReader.setSyncTag(whichSyncTagCode);
@@ -82,7 +83,7 @@ void ChipInterface::createListeningSocket(void)
 
     addressListen.sin_family = AF_INET;
     addressListen.sin_addr.s_addr = INADDR_ANY;
-    addressListen.sin_port = htons( SERVER_TCP_PORT_HDD );
+    addressListen.sin_port = htons( portListen );
 
     // bind to address
     if (bind(fdListen, (struct sockaddr *) &addressListen, sizeof(addressListen)) < 0) {
@@ -96,7 +97,7 @@ void ChipInterface::createListeningSocket(void)
         return;
     }
 
-    Debug::out(whichLog, LOG_INFO, "ChipInterface::createListeningSocket - listening on tcp port: %d", SERVER_TCP_PORT_HDD);
+    Debug::out(whichLog, LOG_INFO, "ChipInterface::createListeningSocket - listening on tcp port: %d", portListen);
 }
 
 void ChipInterface::acceptSocketIfNeededAndPossible(void)

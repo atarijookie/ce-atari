@@ -69,7 +69,7 @@ void CoreFdd::run(void)
     loadSettings();
 
     // create network chip interface
-    ciFdd = new ChipInterface(LOGFILE_FDD, NET_ATN_FRANZ_ID, SYNC_TAG_FDD);
+    ciFdd = new ChipInterface(LOGFILE_FDD, NET_ATN_FRANZ_ID, SYNC_TAG_FDD, SERVER_TCP_PORT_FDD);
     ciFdd->ciOpen();
 
     imageSilo = new ImageSilo(ciFdd);

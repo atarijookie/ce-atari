@@ -5,8 +5,8 @@
 #define CLIENT_UDP_PORT             7201        // this is where the CE device will wait for discovery response
 
 #define SERVER_TCP_PORT_HDD         7300        // port used by HDD core
-#define SERVER_TCP_PORT_FDD         7400        // port used by FDD core
-#define SERVER_TCP_PORT_IKBD        7401        // port used by IKBD core
+#define SERVER_TCP_PORT_FDD         7301        // port used by FDD core
+#define SERVER_TCP_PORT_IKBD        7302        // port used by IKBD core
 
 typedef struct {
     uint8_t     status;         // one of the SERVER_STATUS_* values

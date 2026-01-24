@@ -25,7 +25,7 @@ typedef struct {
 class ChipInterface
 {
 public:
-    ChipInterface(int whichLogFile, int whichAtnCode, uint32_t whichSyncTagCode);
+    ChipInterface(int whichLogFile, int whichAtnCode, uint32_t whichSyncTagCode, uint16_t portListen);
     virtual ~ChipInterface();
 
     // this return CHIP_IF_V1_V2 or some other
@@ -91,6 +91,7 @@ private:
     int whichLog;
     int whichAtn;
     uint32_t whichSyncTag;
+    uint16_t portListen;
 
     int fdListen;                       // socket for listen()
     ClientInfo clients[MAX_CLIENTS];
