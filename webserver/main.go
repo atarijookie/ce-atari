@@ -48,7 +48,7 @@ type (
 		MAC        string    `json:"mac"`
 		Online     bool      `json:"online"`
 		HDDEnabled bool      `json:"hddEnabled"`
-		FDEnabled  bool      `json:"fdEnabled"`
+		FDDEnabled bool      `json:"fddEnabled"`
 		UpdatedAt  time.Time `json:"updatedAt"`
 	}
 
@@ -180,40 +180,14 @@ func getLocalIP() string {
 func newServer() *Server {
 	r := chi.NewRouter()
 	s := &Server{
-		router:     r,
+		router: r,
 		authTokens: map[string]string{},
-		devices: []Device{
-			{MAC: "aa:bb:cc:dd:ee:01", Name: "Living room", Connected: true},
-			{MAC: "aa:bb:cc:dd:ee:02", Name: "Office", Connected: false},
-		},
-		hddRaw: map[string][]RawDevice{
-			"aa:bb:cc:dd:ee:01": {
-				{ID: "dev1", Path: "/mnt/hdd1"},
-				{ID: "dev2", Path: "/mnt/hdd2"},
-			},
-		},
-		hddTranslated: map[string][]TranslatedMapping{
-			"aa:bb:cc:dd:ee:01": {
-				{Drive: "C", Path: "/mnt/hdd1/system"},
-				{Drive: "D", Path: "/mnt/hdd2/data"},
-			},
-		},
-		fddImage: map[string]string{
-			"aa:bb:cc:dd:ee:01": "/images/os.img",
-		},
-		status: map[string]Status{
-			"aa:bb:cc:dd:ee:01": {
-				MAC:        "aa:bb:cc:dd:ee:01",
-				Online:     true,
-				HDDEnabled: true,
-				FDEnabled:  true,
-				UpdatedAt:  time.Now(),
-			},
-		},
-		hostDevices: []HostDevice{
-			{ID: "disk0", Description: "Internal SSD"},
-			{ID: "usb1", Description: "USB Flash Drive"},
-		},
+		devices: []Device{},
+		hddRaw: map[string][]RawDevice{},
+		hddTranslated: map[string][]TranslatedMapping{},
+		fddImage: map[string]string{},
+		status: map[string]Status{},
+		hostDevices: []HostDevice{},
 	}
 
 	r.Post("/auth/login", s.handleLogin)

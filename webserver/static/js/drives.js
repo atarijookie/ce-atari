@@ -220,6 +220,15 @@ function onComboChanged(index) {
         case "1": td.innerHTML = `<button type="button" onclick="handleSelectClick(${index});">Select host dir</button> &nbsp; ${paths[index]}`; break;
         case "2": td.innerHTML = "[CONFIG DRIVE]"; break;
     }
+
+    var tr = td && td.parentElement ? td.parentElement : null;
+    if (tr && tr.tagName === "TR") {
+        if (devtype === "0") {
+            tr.classList.add("drive-type-off");
+        } else {
+            tr.classList.remove("drive-type-off");
+        }
+    }
 }
 
 // on 'Select file' button clicked, get the dir content and show the file selector

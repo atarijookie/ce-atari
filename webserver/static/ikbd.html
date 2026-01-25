@@ -156,6 +156,30 @@
         color: #999;
         margin: 0 5px;
       }
+
+      .ikbd-single-column {
+        border: none;
+        border-collapse: collapse;
+        margin: 20px 0;
+        width: 100%;
+        max-width: 320px;
+      }
+      .ikbd-single-column td {
+        border: none;
+        padding: 8px 0;
+        vertical-align: top;
+        text-align: left;
+      }
+      .ikbd-single-column tr:nth-child(5) td {
+        text-align: center;
+      }
+      .ikbd-single-column td label {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 16px;
+        cursor: pointer;
+      }
     </style>
   </head>
   <body>
@@ -167,61 +191,55 @@
           <script src="js/breadcrumbs.js"></script>
           <h2>CosmosEx</h2>
           <h3>Keyboard and joystick mapping</h3>
-          <p><strong>MAC Address:</strong> <span id="mac-address">Loading...</span></p>
 
-          <div class="option-row">
-            <label><input type="checkbox" id="first-joy">First Joy is 0</label>
-            <label><input type="checkbox" id="mouse-wheel-keys">Mouse wheel as keys</label>
-          </div>
-
-          <div class="controls-wrapper">
-            <div class="control-card">
-          <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 15px;">
-            <input type="checkbox" id="keys0-enabled" checked>
-            Enable Keys 0
-          </label>
-          <h4>Keys 0</h4>
-              <div class="arrow-grid">
-                <div class="spacer"></div>
-                <input type="text" id="keys0-up" placeholder="Up (W)">
-                <div class="spacer"></div>
-
-                <input type="text" id="keys0-left" placeholder="Left (A)">
-                <input type="text" id="keys0-fire" class="fire" placeholder="Fire">
-                <input type="text" id="keys0-right" placeholder="Right (D)">
-
-                <div class="spacer"></div>
-                <input type="text" id="keys0-down" placeholder="Down (S)">
-                <div class="spacer"></div>
+          <table class="ikbd-single-column">
+            <tr><td><label><input type="checkbox" id="first-joy">First Joy is 0</label></td></tr>
+            <tr><td><label><input type="checkbox" id="mouse-wheel-keys">Mouse wheel as keys</label></td></tr>
+            <tr><td>
+              <div class="control-card">
+                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 15px;">
+                  <input type="checkbox" id="keys0-enabled" checked>
+                  Enable Keys 0
+                </label>
+                <h4>Keys 0</h4>
+                <div class="arrow-grid">
+                  <div class="spacer"></div>
+                  <input type="text" id="keys0-up" placeholder="Up (W)">
+                  <div class="spacer"></div>
+                  <input type="text" id="keys0-left" placeholder="Left (A)">
+                  <input type="text" id="keys0-fire" class="fire" placeholder="Fire">
+                  <input type="text" id="keys0-right" placeholder="Right (D)">
+                  <div class="spacer"></div>
+                  <input type="text" id="keys0-down" placeholder="Down (S)">
+                  <div class="spacer"></div>
+                </div>
               </div>
-            </div>
-
-            <div class="control-card">
-          <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 15px;">
-            <input type="checkbox" id="keys1-enabled" checked>
-            Enable Keys 1
-          </label>
-          <h4>Keys 1</h4>
-              <div class="arrow-grid">
-                <div class="spacer"></div>
-                <input type="text" id="keys1-up" placeholder="Up (W)">
-                <div class="spacer"></div>
-
-                <input type="text" id="keys1-left" placeholder="Left (A)">
-                <input type="text" id="keys1-fire" class="fire" placeholder="Fire">
-                <input type="text" id="keys1-right" placeholder="Right (D)">
-
-                <div class="spacer"></div>
-                <input type="text" id="keys1-down" placeholder="Down (S)">
-                <div class="spacer"></div>
+            </td></tr>
+            <tr><td>
+              <div class="control-card">
+                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 15px;">
+                  <input type="checkbox" id="keys1-enabled" checked>
+                  Enable Keys 1
+                </label>
+                <h4>Keys 1</h4>
+                <div class="arrow-grid">
+                  <div class="spacer"></div>
+                  <input type="text" id="keys1-up" placeholder="Up (W)">
+                  <div class="spacer"></div>
+                  <input type="text" id="keys1-left" placeholder="Left (A)">
+                  <input type="text" id="keys1-fire" class="fire" placeholder="Fire">
+                  <input type="text" id="keys1-right" placeholder="Right (D)">
+                  <div class="spacer"></div>
+                  <input type="text" id="keys1-down" placeholder="Down (S)">
+                  <div class="spacer"></div>
+                </div>
               </div>
-            </div>
-          </div>
-
-          <div style="margin-top: 20px;">
-            <button id="save-ikbd" style="padding: 10px 16px; font-size: 16px;">Save</button>
-            <span id="save-message" style="display: none; margin-left: 12px; color: #3baf16; font-weight: bold;">Settings saved</span>
-          </div>
+            </td></tr>
+            <tr><td>
+              <button id="save-ikbd" style="padding: 10px 16px; font-size: 16px;">Save</button>
+              <span id="save-message" style="display: none; margin-left: 12px; color: #3baf16; font-weight: bold;">Settings saved</span>
+            </td></tr>
+          </table>
 
           <div class="footer-links">
             <a href="https://joo.kie.sk/?page_id=384" target="_blank">homepage</a><span>|</span><a href="https://joo.kie.sk/?page_id=415" target="_blank">manual</a><span>|</span><a href="credits.html">credits</a>
@@ -238,22 +256,7 @@
         return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
       }
 
-      function formatMACForDisplay(mac) {
-        if (mac.length === 12 && /^[0-9a-fA-F]{12}$/.test(mac)) {
-          return mac.substring(0,2) + ':' + mac.substring(2,4) + ':' + mac.substring(4,6) + ':' +
-                 mac.substring(6,8) + ':' + mac.substring(8,10) + ':' + mac.substring(10,12);
-        }
-        return mac;
-      }
-
       var mac = getURLParameter('mac');
-      var macEl = document.getElementById('mac-address');
-
-      if (!mac) {
-        macEl.textContent = 'No MAC address specified';
-      } else {
-        macEl.textContent = formatMACForDisplay(mac);
-      }
 
       function setMessageVisible(visible) {
         var el = document.getElementById('save-message');

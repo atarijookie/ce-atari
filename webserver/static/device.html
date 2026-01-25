@@ -45,10 +45,27 @@
             h2, h3 {
                 text-align: center;
             }
+            .span12 h2 {
+                margin-bottom: 2px;
+            }
+            .span12 h3 {
+                margin-top: 0;
+                margin-bottom: 6px;
+            }
+            #device-info table {
+                border: none;
+                border-collapse: collapse;
+            }
+            #device-info td {
+                border: none;
+                padding: 2px 8px 2px 0;
+                vertical-align: middle;
+            }
+            #device-info td:first-child {
+                font-weight: bold;
+                white-space: nowrap;
+            }
             #device-info {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
                 text-align: left;
             }
             #device-buttons {
@@ -106,16 +123,22 @@
             </div>
         </div>
 
-        <div id="device-info" style="margin: 20px 0;">
-            <div style="margin-bottom: 15px;">
-                <p><strong>Name:</strong> 
-                    <input type="text" id="device-name-input" style="padding: 5px 10px; font-size: 14px; min-width: 200px; margin-left: 10px;">
-                    <button id="save-name-button" disabled style="padding: 5px 15px; font-size: 14px; margin-left: 10px; cursor: pointer; background-color: #3baf16; color: white; border: none; border-radius: 4px; opacity: 0.7;">
-                        Saved
-                    </button>
-                </p>
-            </div>
-            <p><strong>MAC Address:</strong> <span id="mac-address">Loading...</span></p>
+        <div id="device-info" style="margin: 12px 0;">
+            <table>
+                <tr>
+                    <td>Name:</td>
+                    <td>
+                        <input type="text" id="device-name-input" style="padding: 5px 10px; font-size: 14px; min-width: 200px;">
+                        <button id="save-name-button" disabled style="padding: 5px 15px; font-size: 14px; margin-left: 8px; cursor: pointer; background-color: #3baf16; color: white; border: none; border-radius: 4px; opacity: 0.7;">
+                            Saved
+                        </button>
+                    </td>
+                </tr>
+                <tr>
+                    <td>MAC Address:</td>
+                    <td><span id="mac-address">Loading...</span></td>
+                </tr>
+            </table>
         </div>
 
         <div id="device-buttons" style="display: flex; flex-direction: column; gap: 15px; max-width: 300px;">
