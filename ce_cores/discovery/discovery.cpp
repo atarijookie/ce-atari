@@ -21,11 +21,15 @@
 #include "../misc/debug.h"
 #include "../misc/utils.h"
 #include "discovery.h"
+#include "../chipinterface/chipinterface.h"
 
 void onClientRequest(sockaddr_in *clientAddr, uint8_t *recvData, int len);
 void udpSend(uint32_t ip, uint16_t port, uint8_t* data, uint16_t len);
 
 uint8_t serverIp[4] = {127, 0, 0, 1};
+
+#define IP_TO_MAC_COUNT  (3 * MAX_CLIENTS)
+TClientIpToMac ipToMac[IP_TO_MAC_COUNT];
 
 int discoveryServerOpenSocket(void)
 {
@@ -107,10 +111,41 @@ void discoveryMain(void)
     logDiscovery(LOG_ERROR, "Terminating CosmosEx network server");
 }
 
+void getMacForIp(uint32_t clientIp, uint8_t* mac)
+{
+    memset(mac, 0, 6);      // start with zeros
+
+    for(int i=0; i<IP_TO_MAC_COUNT; i++) {
+        if(ipToMac[i].clientIp == clientIp) {   // found ip? copy mac
+            memcpy(mac, ipToMac[i].mac, 6);
+            break;
+        }
+    }
+}
+
 void onClientRequest(sockaddr_in *clientAddr, uint8_t *recvData, int len)
 {
     uint32_t clientIp = clientAddr->sin_addr.s_addr;    // get client address
 
+    // find slot for this ip-to-mac mapping
+    int idx = 0;
+    int lastTimeMin = ipToMac[0].lastTime;
+    for(int i=0; i<IP_TO_MAC_COUNT; i++) {
+        if(ipToMac[i].clientIp == clientIp || ipToMac[i].clientIp == 0) {   // existing slot or empty slot? use it
+            idx = i;
+            break;
+        }
+
+        if(ipToMac[i].lastTime != 0 && ipToMac[i].lastTime < lastTimeMin) {     // this slot has older time that the minimum so far?
+            idx = i;
+        }
+    }
+
+    // copy mac into the slot
+    memcpy(ipToMac[idx].mac, recvData + 4, 6);
+    ipToMac[idx].lastTime = time(NULL);
+
+    // send response back
     uint8_t response[10];
     memset(response, 0, sizeof(response));  // clear all bytes
     memcpy(response, "CELR", 4);            // 0..3: CE Lite Response

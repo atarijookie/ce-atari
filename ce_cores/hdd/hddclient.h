@@ -26,6 +26,8 @@ public:
 
     void sendHalfWord(void);
 
+    void onMacUpdated(void);
+
 private:
     uint8_t inBuff[INBUF_SIZE];
     uint8_t outBuf[INBUF_SIZE];

@@ -100,13 +100,13 @@ void ChipInterface::createListeningSocket(void)
     Debug::out(whichLog, LOG_INFO, "ChipInterface::createListeningSocket - listening on tcp port: %d", portListen);
 }
 
-void ChipInterface::acceptSocketIfNeededAndPossible(void)
+int ChipInterface::acceptSocketIfNeededAndPossible(void)
 {
     int idx = clientsGetEmptyIndex();
 
     // out of empty indexes, don't accept
     if(idx < 0 || idx >= MAX_CLIENTS) {
-        return;
+        return FD_EMPTY;
     }
 
     ClientInfo* clientInfo = &clients[idx];
@@ -118,7 +118,7 @@ void ChipInterface::acceptSocketIfNeededAndPossible(void)
     int newSock = accept(fdListen, (struct sockaddr *) &addressClient, &addrSize);
 
     if(newSock < 0) {       // nothing to accept, would block? quit
-        return;
+        return FD_EMPTY;
     }
 
     struct timeval tv;
@@ -135,9 +135,16 @@ void ChipInterface::acceptSocketIfNeededAndPossible(void)
     uint32_t clientIpInt = ntohl(addressClient.sin_addr.s_addr);
 
     // got the new client socket now
-    clientsStoreOne(clientInfo, newSock, clientIpInt);
+    clientsStoreOne(clientInfo, newSock, clientIpInt, whichLog == LOGFILE_FDD);
+    getMacForIp(addressClient.sin_addr.s_addr, clientInfo->mac);
 
-    Debug::out(whichLog, LOG_INFO, "acceptSocketIfNeededAndPossible() - client #%d connected from %s, will use floppy slot #%d", idx, clientIp, clientInfo->floppySlotIndex);
+    Debug::out(whichLog, LOG_INFO, "acceptSocketIfNeededAndPossible() - client #%d connected from %s", idx, clientIp);
+
+    if(whichLog == LOGFILE_FDD) {       // floppy chip interface will also log the slot index
+        Debug::out(whichLog, LOG_INFO, "acceptSocketIfNeededAndPossible() - client #%d will use floppy slot #%d", idx, clientInfo->floppySlotIndex);
+    }
+
+    return idx;
 }
 
 bool ChipInterface::ciOpen(void)
@@ -670,11 +677,11 @@ int ChipInterface::clientsGetFloppySlotIndexForIp(uint32_t ipAddr)
     return FD_EMPTY;
 }
 
-void ChipInterface::clientsStoreOne(ClientInfo* info, int newSock, uint32_t ipAddr)
+void ChipInterface::clientsStoreOne(ClientInfo* info, int newSock, uint32_t ipAddr, bool isFdd)
 {
     info->fdClient = newSock;
     info->lastMs = Utils::getCurrentMs();
-    info->floppySlotIndex = clientsGetFloppySlotIndexForIp(ipAddr);
+    info->floppySlotIndex = isFdd ? clientsGetFloppySlotIndexForIp(ipAddr) : 0;     // for floppy get slot index, for hdd or ikbd just use 0 here
     info->ipAddr = ipAddr;  // store ip after calling clientsGetFloppySlotIndexForIp() so it won't match this same client for the 1st time
 }
 

@@ -169,19 +169,26 @@ void HddClient::handleAcsiCommand(uint8_t *bufIn)
     }
 }
 
+void HddClient::onMacUpdated(void)
+{
+    ClientInfo* ci = chipInterface->clientGetByFd(fdClient);
+
+    if(!ci) {
+        return;
+    }
+
+    StatusReport::storeTosAndMachine(ci->mac, hwConfig.tosVersion, hwConfig.scsiMachine);
+
+    scsi->setMac(ci->mac);
+    translated->setMac(ci->mac);
+}
+
 void HddClient::handleFwVersion_hans(void)
 {
     uint8_t xilinxInfo = chipInterface->getFWversionHdd(fdClient);
     extractInterfaceInfo(xilinxInfo);
 
-    ClientInfo* ci = chipInterface->clientGetByFd(fdClient);
-
-    if(ci) {
-        StatusReport::storeTosAndMachine(ci->mac, hwConfig.tosVersion, hwConfig.scsiMachine);
-
-        scsi->setMac(ci->mac);
-        translated->setMac(ci->mac);
-    }
+    onMacUpdated();
 
     // send enabled hdd ids to device
     uint8_t config[2];

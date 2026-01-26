@@ -9,12 +9,11 @@
 #define SERVER_TCP_PORT_IKBD        7302        // port used by IKBD core
 
 typedef struct {
-    uint8_t     status;         // one of the SERVER_STATUS_* values
-    uint32_t    clientIp;       // IP of client that is connected to this server
-    uint32_t    lastUpdate;     // time when this struct was last updated
-    int         pid;            // pid of server's process
-} TCEServerStatus;
+    uint32_t clientIp;
+    uint8_t mac[6];
+    time_t lastTime;
+} TClientIpToMac;
 
-#define MAX_SERVER_COUNT    8
+void getMacForIp(uint32_t clientIp, uint8_t* mac);
 
 #endif

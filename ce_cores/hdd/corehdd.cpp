@@ -100,7 +100,11 @@ void CoreHdd::run(void)
 
         // if listening socket is set, handle it
         if(FD_ISSET(fdListen, &readfds)) {
-            ciHdd->acceptSocketIfNeededAndPossible();
+            int idx = ciHdd->acceptSocketIfNeededAndPossible();
+
+            if(idx != FD_EMPTY) {
+                hddClients[idx]->onMacUpdated();
+            }
         }
 
         someClientActive = false;

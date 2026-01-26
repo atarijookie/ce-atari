@@ -140,7 +140,9 @@ void *ikbdThreadCode(void *ptr)
 
         // if listening socket is set, handle it
         if(FD_ISSET(fdListen, &readfds)) {
-            ciIkbd->acceptSocketIfNeededAndPossible();
+            int idx = ciIkbd->acceptSocketIfNeededAndPossible();
+
+            // TODO: use idx and mac to differentiate between connected devices
         }
 
         // process the incoming data from original keyboard and from ST

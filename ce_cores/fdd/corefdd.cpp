@@ -132,7 +132,11 @@ void CoreFdd::run(void)
 
         // if listening socket is set, handle it
         if(FD_ISSET(fdListen, &readfds)) {
-            ciFdd->acceptSocketIfNeededAndPossible();
+            int idx = ciFdd->acceptSocketIfNeededAndPossible();
+
+            if(idx != FD_EMPTY) {
+                loadLastImageIntoSlot(idx);
+            }
         }
 
         // check which fds are ready to be handled and handle them

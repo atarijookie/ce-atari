@@ -82,7 +82,7 @@ public:
     void storeHeaderToBuffer(uint16_t cmdCode, uint32_t futureDatalen, uint8_t* buffer);
 
     int setAllClientFds(fd_set* readfds);
-    void acceptSocketIfNeededAndPossible(void);
+    int acceptSocketIfNeededAndPossible(void);
 
     // ikbd related
     void ikbdUartWriteToAll(uint8_t* bfr, int len);
@@ -115,7 +115,7 @@ private:
     void clientsCloseOne(ClientInfo* info);     // closes socket if open, then does clientsClearOne()
     int  clientsGetEmptyIndex(void);
     int  clientsGetFloppySlotIndexForIp(uint32_t ipAddr);
-    void clientsStoreOne(ClientInfo* info, int newSock, uint32_t ipAddr);
+    void clientsStoreOne(ClientInfo* info, int newSock, uint32_t ipAddr, bool isFdd);
 
     void storeDeviceFeatures(uint8_t* mac, uint8_t featureBits);
 };
