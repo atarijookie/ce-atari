@@ -37,7 +37,7 @@ private:
     // floppy stuff
 
     bool handleFdd(int clientIndex, int fdClient, int floppySlotIndex, uint8_t* inBuff);
-    void handleFwVersion_franz(int clientIndex);
+    void handleFwVersion_franz(ClientInfo* ci);
     void handleSendTrack(int clientIndex);
     void handleSendImageToIndex(int clientIndex);
     void handleSendImageToClient(ClientInfo* client);

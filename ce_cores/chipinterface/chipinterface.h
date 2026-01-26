@@ -40,13 +40,13 @@ public:
 
     //----------------
     // if following function returns true, some command is waiting for action in the inBuf and hardNotFloppy flag distiguishes hard-drive or floppy-drive command
-    bool actionNeeded(int clientIndex, uint8_t *inBuf);
-    void dropRestOfData(int clientIndex, uint8_t* buffer, uint32_t bufferSize);
+    bool actionNeeded(ClientInfo* ci, uint8_t *inBuf);
+    void dropRestOfData(ClientInfo* ci, uint8_t* buffer, uint32_t bufferSize);
 
     // to handle FW version
-    uint8_t getFWversion(int clientIndex, bool hddNotFdd);
-    uint8_t getFWversionHdd(int fdClient);
-    bool getFWversionFdd(int clientIndex);
+    uint8_t getFWversion(ClientInfo* ci, bool hddNotFdd);
+    uint8_t getFWversionHdd(ClientInfo* ci);
+    bool getFWversionFdd(ClientInfo* ci);
 
     //----------------
     // HDD: READ/WRITE functions for large (>1 MB) block transfers (Scsi::readSectors(), Scsi::writeSectors()) and also by the convenient functions above
@@ -75,7 +75,7 @@ public:
     ClientInfo* clientGetByFd(int clientFd);
     ClientInfo* clientGetByIndex(int index);
 
-    int readRestOfData(int clientIndex, uint8_t* buffer, uint32_t bufferSize);
+    int readRestOfData(ClientInfo* ci, uint8_t* buffer, uint32_t bufferSize);
     bool sendHeaderToChip(int& fdClient, uint16_t cmdCode, uint32_t futureDatalen);                // send header to chip
     bool sendDataToChip(int& fdClient, uint8_t* data, uint32_t len);                               // send data to chip
     bool sendHeaderAndDataToChip(int& fdClient, uint16_t cmdCode, uint8_t* data, uint32_t len);    // send header and data to chip

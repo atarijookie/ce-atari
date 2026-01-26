@@ -23,10 +23,6 @@
 #include "../misc/statusreport.h"
 #include "../discovery/discovery.h"
 
-#define SERVER_STATUS_NOT_RUNNING   0       // when this server slot is not used yet and server is not running
-#define SERVER_STATUS_FREE          1       // server is running but no client is connected there
-#define SERVER_STATUS_OCCUPIED      2       // server is running and client is connected
-
 ChipInterface::ChipInterface(int whichLogFile, int whichAtnCode, uint32_t whichSyncTagCode, uint16_t portListen)
 {
     whichLog = whichLogFile;
@@ -178,17 +174,10 @@ int ChipInterface::setAllClientFds(fd_set* readfds)
     return maxFd;
 }
 
-bool ChipInterface::actionNeeded(int clientIndex, uint8_t *inBuf)
+bool ChipInterface::actionNeeded(ClientInfo* ci, uint8_t *inBuf)
 {
-    int& fdClient = clients[clientIndex].fdClient;
-
-    if(fdClient < 0) {                 // (still) no client connected? no action needed
-        //Debug::out(whichLog, LOG_DEBUG, "actionNeeded() - client not connected yet");
-        return false;
-    }
-
     int bytesAvailable;
-    int rv = ioctl(fdClient, FIONREAD, &bytesAvailable);    // how many bytes we can read?
+    int rv = ioctl(ci->fdClient, FIONREAD, &bytesAvailable);    // how many bytes we can read?
 
     if(rv < 0 || bytesAvailable <= 0) {                     // ioctl fail or nothing to read? no action needed
         return false;
@@ -203,7 +192,7 @@ bool ChipInterface::actionNeeded(int clientIndex, uint8_t *inBuf)
     // we might need to wait for ATN multiple times, as there might be ZEROS packet or IKBD packet before we read wanted Hans or Franz packet
     while(sigintReceived == 0) {
         // check for any ATN code waiting from Hans
-        bool good = waitForAtn(clientIndex, NET_ATN_ANY_ID, ATN_ANY, 0, inBuf);    // which chip wants to communicate? (which chip's stream we should process?)
+        bool good = waitForAtn(ci->index, NET_ATN_ANY_ID, ATN_ANY, 0, inBuf);    // which chip wants to communicate? (which chip's stream we should process?)
 
         if(!good) {                                         // not good? break loop, no action needed
             break;
@@ -213,7 +202,7 @@ bool ChipInterface::actionNeeded(int clientIndex, uint8_t *inBuf)
 
         if(gotAtnId == NET_ATN_HANS_ID) {                   // for Hans
             if(gotAtnCode == ATN_ACSI_COMMAND) {            // for this command read all ACSI command bytes
-                recvFromClient(fdClient, inBuf + 8, 14);
+                recvFromClient(ci->fdClient, inBuf + 8, 14);
             }
 
             return true;
@@ -232,27 +221,18 @@ bool ChipInterface::actionNeeded(int clientIndex, uint8_t *inBuf)
     return false;
 }
 
-uint8_t ChipInterface::getFWversionHdd(int fdClient)
+uint8_t ChipInterface::getFWversionHdd(ClientInfo* ci)
 {
-    ClientInfo* ci = clientGetByFd(fdClient);
-
-    if(!ci) {
-        Debug::out(whichLog, LOG_ERROR, "getFWversion() -- no client found for fdClient: %d", fdClient);
-        return 0;
-    }
-
-    return getFWversion(ci->index, true);
+    return getFWversion(ci, true);
 }
 
-uint8_t ChipInterface::getFWversion(int clientIndex, bool hddNotFdd)
+uint8_t ChipInterface::getFWversion(ClientInfo* ci, bool hddNotFdd)
 {
-    ClientInfo* ci = &clients[clientIndex];
-
     #define FW_VER_SIZE     32
     uint8_t bfr[FW_VER_SIZE];
 
     memset(bfr, 0, FW_VER_SIZE);
-    int readCnt = readRestOfData(clientIndex, bfr, FW_VER_SIZE);
+    int readCnt = readRestOfData(ci, bfr, FW_VER_SIZE);
 
     if(readCnt < 12) {
         Debug::out(whichLog, LOG_ERROR, "getFWversion() -- not enough data received: %d", readCnt);
@@ -274,8 +254,8 @@ uint8_t ChipInterface::getFWversion(int clientIndex, bool hddNotFdd)
     StatusReport::storeIpAndFwVer(ci->mac, ci->ipAddr, fwVerStr, bfr[4]);
 
     // features changed? store it to settings
-    if(clients[clientIndex].features != bfr[4]) {
-        clients[clientIndex].features = bfr[4];
+    if(ci->features != bfr[4]) {
+        ci->features = bfr[4];
         storeDeviceFeatures(ci->mac, bfr[4]);
     }
 
@@ -298,9 +278,9 @@ void ChipInterface::storeDeviceFeatures(uint8_t* mac, uint8_t featureBits)
     s.setString("features", featureString.c_str());
 }
 
-bool ChipInterface::getFWversionFdd(int clientIndex)
+bool ChipInterface::getFWversionFdd(ClientInfo* ci)
 {
-    return getFWversion(clientIndex, false);
+    return getFWversion(ci, false);
 }
 
 bool ChipInterface::hdd_sendData_start(int& fdClient, uint32_t totalDataCount, uint8_t scsiStatus, bool withStatus)
@@ -420,7 +400,8 @@ void ChipInterface::fdd_sendImageParamsToChip(int& fdClient, bool finished, int 
 uint8_t* ChipInterface::fdd_sectorWritten(int clientIndex, int &side, int &track, int &sector, int &byteCount)
 {
     // get all the remaining data
-    byteCount = readRestOfData(clientIndex, bufIn, MFM_STREAM_SIZE);
+    ClientInfo* ci = &clients[clientIndex];
+    byteCount = readRestOfData(ci, bufIn, MFM_STREAM_SIZE);
 
     // get the written sector, side, track number
     sector  = bufIn[1];
@@ -679,6 +660,8 @@ int ChipInterface::clientsGetFloppySlotIndexForIp(uint32_t ipAddr)
 
 void ChipInterface::clientsStoreOne(ClientInfo* info, int newSock, uint32_t ipAddr, bool isFdd)
 {
+    Debug::out(whichLog, LOG_DEBUG, "clientsStoreOne - client %d - storing fdClient: %d, ipAddr: %08x, isFdd: %d", info->index, newSock, ipAddr, isFdd);
+
     info->fdClient = newSock;
     info->lastMs = Utils::getCurrentMs();
     info->floppySlotIndex = isFdd ? clientsGetFloppySlotIndexForIp(ipAddr) : 0;     // for floppy get slot index, for hdd or ikbd just use 0 here
@@ -761,24 +744,18 @@ ClientInfo* ChipInterface::clientsGetOneByMac(uint8_t* mac)     // get by mac
     return NULL;    // not found, return null
 }
 
-void ChipInterface::dropRestOfData(int clientIndex, uint8_t* buffer, uint32_t bufferSize)
+void ChipInterface::dropRestOfData(ClientInfo* ci, uint8_t* buffer, uint32_t bufferSize)
 {
-    if(clientIndex < 0 || clientIndex >= MAX_CLIENTS) {
-        return;
-    }
-
-    ClientInfo* ci = &clients[clientIndex];
-
     memset(buffer, 0, bufferSize);
     int readSize = MIN(ci->bufReader.dataSizeRest(), bufferSize);
-    recvFromClient(clientIndex, buffer, readSize);
+    recvFromClient(ci->fdClient, buffer, readSize);
 }
 
-int ChipInterface::readRestOfData(int clientIndex, uint8_t* buffer, uint32_t bufferSize)
+int ChipInterface::readRestOfData(ClientInfo* ci, uint8_t* buffer, uint32_t bufferSize)
 {
     memset(buffer, 0, bufferSize);
-    int readSize = MIN(clients[clientIndex].bufReader.dataSizeRest(), bufferSize);
-    return recvFromClient(clientIndex, buffer, readSize);
+    int readSize = MIN(ci->bufReader.dataSizeRest(), bufferSize);
+    return recvFromClient(ci->fdClient, buffer, readSize);
 }
 
 void ChipInterface::ikbdUartWriteToAll(uint8_t* bfr, int len)

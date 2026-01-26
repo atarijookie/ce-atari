@@ -168,7 +168,7 @@ bool CoreFdd::handleOneClient(int clientIndex, int fdClient, int floppySlotIndex
     uint8_t inBuff[FDD_BUF_SIZE];
     memset(inBuff, 0, FDD_BUF_SIZE);
 
-    bool needsAction = ciFdd->actionNeeded(clientIndex, inBuff);
+    bool needsAction = ciFdd->actionNeeded(ciFdd->clientsGetOne(clientIndex), inBuff);
 
     if(needsAction) {   // floppy drive needs action?
         handleFdd(clientIndex, fdClient, floppySlotIndex, inBuff);
@@ -181,9 +181,11 @@ bool CoreFdd::handleFdd(int clientIndex, int fdClient, int floppySlotIndex, uint
 {
     bool isFddCommand = false;
 
+    ClientInfo* ci = ciFdd->clientsGetOne(clientIndex);
+
     switch(inBuff[3]) {
     case ATN_FW_VERSION:                    // device has sent FW version
-        handleFwVersion_franz(clientIndex);
+        handleFwVersion_franz(ci);
         break;
 
     case ATN_SECTOR_WRITTEN:                // device has sent written sector data
@@ -248,13 +250,13 @@ void CoreFdd::loadLastImageIntoSlot(int clientIndex)
     imageSilo->loadImageToSlot(client->floppySlotIndex, pathAndFile.c_str());
 }
 
-void CoreFdd::handleFwVersion_franz(int clientIndex)
+void CoreFdd::handleFwVersion_franz(ClientInfo* ci)
 {
     // ciFdd->setFDDconfig(setFloppyConfig, &floppyConfig, setDiskChanged, diskChanged);
-    bool macChanged = ciFdd->getFWversionFdd(clientIndex);
+    bool macChanged = ciFdd->getFWversionFdd(ci);
 
     if(macChanged) {
-        loadLastImageIntoSlot(clientIndex);
+        loadLastImageIntoSlot(ci->index);
     }
 }
 
@@ -262,7 +264,9 @@ void CoreFdd::handleSendTrack(int clientIndex)
 {
     #define BFR_SIZE    32
     uint8_t inBuf[BFR_SIZE];
-    int readCnt = ciFdd->readRestOfData(clientIndex, inBuf, BFR_SIZE);
+
+    ClientInfo* client = ciFdd->clientsGetOne(clientIndex);
+    int readCnt = ciFdd->readRestOfData(client, inBuf, BFR_SIZE);
 
     if(readCnt < 2) {
         logFdd(LOG_ERROR, "handleSendTrack() -- not enough data received: %d", readCnt);
@@ -271,8 +275,6 @@ void CoreFdd::handleSendTrack(int clientIndex)
 
     int side = inBuf[0];                      // now read the current floppy position
     int track = inBuf[1];
-
-    ClientInfo* client = ciFdd->clientsGetOne(clientIndex);
 
     int tr, si, spt;
     imageSilo->getParams(client->floppySlotIndex, tr, si, spt);      // read the floppy image params
@@ -300,9 +302,9 @@ void CoreFdd::handleSendImageToIndex(int clientIndex)
     #define BFR_SIZE    32
     uint8_t inBuf[BFR_SIZE];
 
-    ciFdd->readRestOfData(clientIndex, inBuf, BFR_SIZE);
-
     ClientInfo* client = ciFdd->clientsGetOne(clientIndex);
+
+    ciFdd->readRestOfData(client, inBuf, BFR_SIZE);
     handleSendImageToClient(client);
 }
 

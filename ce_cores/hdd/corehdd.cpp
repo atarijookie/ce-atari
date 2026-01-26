@@ -55,7 +55,7 @@ void CoreHdd::run(void)
     // create hdd clients, 1 hdd client per each tcp client
     for(int i=0; i<MAX_CLIENTS; i++) {
         ClientInfo* ci = ciHdd->clientGetByIndex(i);
-        hddClients[i] = new HddClient(ciHdd, ci->fdClient);
+        hddClients[i] = new HddClient(ciHdd, ci);
     }
 
     //------------------------------
@@ -93,7 +93,7 @@ void CoreHdd::run(void)
             if(errno == EINTR) {
                 continue;   // a signal was delivered
             } else {
-                logFdd(LOG_ERROR, "FloppyThread::run() select: %s", strerror(errno));
+                logHdd(LOG_ERROR, "run() select: %s", strerror(errno));
                 continue;
             }
         }
@@ -118,13 +118,15 @@ void CoreHdd::run(void)
             }
 
             if(FD_ISSET(ci->fdClient, &readfds)) {    // this fd read for read?
-                bool needsAction = ciHdd->actionNeeded(i, inBuff);
+                bool needsAction = ciHdd->actionNeeded(ci, inBuff);
 
                 if(needsAction) {   // client #i needs action?
+                    // logHdd(LOG_DEBUG, "client %d, fdClient %d needs action", i, ci->fdClient);
+
                     someClientActive = true;
                     hddClients[i]->handleHdd(inBuff);
 
-                    ciHdd->dropRestOfData(i, inBuff, INBUF_SIZE);
+                    ciHdd->dropRestOfData(ci, inBuff, INBUF_SIZE);
                     ci->lastMs = Utils::getCurrentMs();     // mark client as active
                 }
             }

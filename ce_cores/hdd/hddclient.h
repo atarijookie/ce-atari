@@ -17,7 +17,7 @@ class Scsi;
 class HddClient
 {
 public:
-    HddClient(ChipInterface* cin, int& fdClient);
+    HddClient(ChipInterface* cin, ClientInfo* ci);
     virtual ~HddClient();
 
     bool handleHdd(uint8_t* inBuff);
@@ -33,7 +33,7 @@ private:
     uint8_t outBuf[INBUF_SIZE];
 
     ChipInterface* chipInterface;
-    int& fdClient;
+    ClientInfo* ci;
 
     THwConfig hwConfig;
     Scsi* scsi;

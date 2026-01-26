@@ -112,7 +112,7 @@ int BufferedReader::waitForAtn(uint8_t atnCode, uint32_t timeoutMs)
 
         if(recvCnt > 0) {                               // if read was OK, we got those bytes and we can restart the loop
             gotBytes += recvCnt;
-            logHdd(LOG_DEBUG, "waitForAtn() - received data, gotBytes: %d", gotBytes);
+            // logHdd(LOG_DEBUG, "waitForAtn() - received data, gotBytes: %d", gotBytes);
             continue;
         }
 

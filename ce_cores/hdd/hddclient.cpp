@@ -24,14 +24,17 @@
 
 extern DebugVars    dbgVars;
 
-HddClient::HddClient(ChipInterface* chipInterfaceIn, int& fdClientIn) : chipInterface(chipInterfaceIn), fdClient(fdClientIn)
+HddClient::HddClient(ChipInterface* chipInterfaceIn, ClientInfo* ci)
 {
+    chipInterface = chipInterfaceIn;
+    this->ci = ci;
+
     hwConfig.changed = false;
 
     retryMod = new RetryModule();
 
     dataTrans = new AcsiDataTrans();
-    dataTrans->setCommunicationObject(chipInterfaceIn, &fdClient);
+    dataTrans->setCommunicationObject(chipInterfaceIn, &ci->fdClient);
     dataTrans->setRetryObject(retryMod);
 
     scsi = new Scsi();
@@ -171,12 +174,6 @@ void HddClient::handleAcsiCommand(uint8_t *bufIn)
 
 void HddClient::onMacUpdated(void)
 {
-    ClientInfo* ci = chipInterface->clientGetByFd(fdClient);
-
-    if(!ci) {
-        return;
-    }
-
     StatusReport::storeTosAndMachine(ci->mac, hwConfig.tosVersion, hwConfig.scsiMachine);
 
     scsi->setMac(ci->mac);
@@ -185,7 +182,7 @@ void HddClient::onMacUpdated(void)
 
 void HddClient::handleFwVersion_hans(void)
 {
-    uint8_t xilinxInfo = chipInterface->getFWversionHdd(fdClient);
+    uint8_t xilinxInfo = chipInterface->getFWversionHdd(ci);
     extractInterfaceInfo(xilinxInfo);
 
     onMacUpdated();
@@ -194,7 +191,7 @@ void HddClient::handleFwVersion_hans(void)
     uint8_t config[2];
     config[0] = CMD_ACSI_CONFIG;
     config[1] = getIdBits();        // get the enabled IDs
-    chipInterface->sendHeaderAndDataToChip(fdClient, CMD_ACSI_CONFIG, config, 2);
+    chipInterface->sendHeaderAndDataToChip(ci->fdClient, CMD_ACSI_CONFIG, config, 2);
 
     //----------------------------------
     // if HW info changed
