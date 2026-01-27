@@ -15,50 +15,48 @@
 ScreencastAcsiCommand::ScreencastAcsiCommand(AcsiDataTrans *dt):dataTrans(dt)
 {
     dataBuffer  = new uint8_t[SCREENCAST_BUFFER_SIZE];
-    sharedMemoryOpen();
 }
 
 ScreencastAcsiCommand::~ScreencastAcsiCommand()
 {
-    sharedMemoryClose();
 	delete []dataBuffer;
 }
 
-void ScreencastAcsiCommand::sharedMemoryOpen(void)
+void ScreencastAcsiCommand::sharedMemoryOpen(int& aSharedMemFd, sem_t** aSharedMemSemaphore, uint8_t** aSharedMemPointer)
 {
 	// initialize values
-	sharedMemFd = -1;
-	sharedMemPointer = NULL;
-	sharedMemSemaphore = SEM_FAILED;
+	aSharedMemFd = -1;
+	*aSharedMemPointer = NULL;
+	*aSharedMemSemaphore = SEM_FAILED;
 
     // create semaphore
     std::string semaphoreName = Utils::dotEnvValue("SCREENCAST_SEMAPHORE_NAME");
-    sharedMemSemaphore = sem_open(semaphoreName.c_str(), O_CREAT, 0666, 0);
+    *aSharedMemSemaphore = sem_open(semaphoreName.c_str(), O_CREAT, 0666, 0);
 
-    if(sharedMemSemaphore == SEM_FAILED) {
+    if(*aSharedMemSemaphore == SEM_FAILED) {
         logHdd(LOG_ERROR, "ScreenCastAcsiCommand::openSharedMemory - failed to create semaphore: %d", errno);
     }
 
     // open the shared memory file
     std::string sharedMemoryName = Utils::dotEnvValue("SCREENCAST_MEMORY_NAME");
-    sharedMemFd = shm_open(sharedMemoryName.c_str(), O_RDWR | O_CREAT, 0666);
+    aSharedMemFd = shm_open(sharedMemoryName.c_str(), O_RDWR | O_CREAT, 0666);
 
-    if(sharedMemFd < 0) {
+    if(aSharedMemFd < 0) {
         logHdd(LOG_ERROR, "ScreenCastAcsiCommand::openSharedMemory - failed to create shared memory file: %d", errno);
         return;
     }
 
     // map the shared memory
-    void* mmapRes = mmap(0, SCREENCAST_BUFFER_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, sharedMemFd, 0);
+    void* mmapRes = mmap(0, SCREENCAST_BUFFER_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, aSharedMemFd, 0);
 
     if(mmapRes != MAP_FAILED) {                         // on success, use as address
-        ftruncate(sharedMemFd, SCREENCAST_BUFFER_SIZE);    // resize from 0 to required size
-        sharedMemPointer = (uint8_t*) mmapRes;                // store pointer
-        memset(sharedMemPointer, 0, SCREENCAST_BUFFER_SIZE);  // set all to zeros
+        ftruncate(aSharedMemFd, SCREENCAST_BUFFER_SIZE);    // resize from 0 to required size
+        *aSharedMemPointer = (uint8_t*) mmapRes;                // store pointer
+        memset(*aSharedMemPointer, 0, SCREENCAST_BUFFER_SIZE);  // set all to zeros
 
         FILE *f = fopen("ce_logo.bin", "rb");           // if can open this logo file
         if(f) {
-            fread(sharedMemPointer + 1, 1, 32032, f);   // fill the initial screencast buffer with logo
+            fread(*aSharedMemPointer + 1, 1, 32032, f);   // fill the initial screencast buffer with logo
             fclose(f);
         } else {
             logHdd(LOG_WARNING, "ScreenCastAcsiCommand::openSharedMemory - failed to load ce_logo.bin");
@@ -70,28 +68,35 @@ void ScreencastAcsiCommand::sharedMemoryOpen(void)
     }
 }
 
-void ScreencastAcsiCommand::sharedMemoryClose(void)
+void ScreencastAcsiCommand::sharedMemoryClose(int& aSharedMemFd, sem_t** aSharedMemSemaphore, uint8_t** aSharedMemPointer)
 {
-	if(sharedMemPointer) {                  // got pointer to shared memory?
-	    munmap(sharedMemPointer, SCREENCAST_BUFFER_SIZE);
-	    sharedMemPointer = NULL;
+	if(*aSharedMemPointer) {                  // got pointer to shared memory?
+	    munmap(*aSharedMemPointer, SCREENCAST_BUFFER_SIZE);
+	    *aSharedMemPointer = NULL;
 	}
 
-    if(sharedMemFd >= 0) {                  // got fd for shared memory?
-        close(sharedMemFd);
-	    sharedMemFd = -1;
+    if(aSharedMemFd >= 0) {                  // got fd for shared memory?
+        close(aSharedMemFd);
+	    aSharedMemFd = -1;
 
         std::string sharedMemoryName = Utils::dotEnvValue("SCREENCAST_MEMORY_NAME");
 	    shm_unlink(sharedMemoryName.c_str());
 	}
 
-	if(sharedMemSemaphore != SEM_FAILED) {  // got semaphore?
-	    sem_close(sharedMemSemaphore);
-	    sharedMemSemaphore = SEM_FAILED;
+	if(*aSharedMemSemaphore != SEM_FAILED) {  // got semaphore?
+	    sem_close(*aSharedMemSemaphore);
+	    *aSharedMemSemaphore = SEM_FAILED;
 
         std::string semaphoreName = Utils::dotEnvValue("SCREENCAST_SEMAPHORE_NAME");
 	    sem_unlink(semaphoreName.c_str());
 	}
+}
+
+void ScreencastAcsiCommand::sharedMemorySet(int aSharedMemFd, sem_t* aSharedMemSemaphore, uint8_t* aSharedMemPointer)
+{
+    sharedMemFd = aSharedMemFd;
+    sharedMemSemaphore = aSharedMemSemaphore;
+    sharedMemPointer = aSharedMemPointer;
 }
 
 void ScreencastAcsiCommand::processCommand(uint8_t *command)

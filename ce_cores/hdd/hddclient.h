@@ -1,6 +1,11 @@
 #ifndef HDDCLIENT_H
 #define HDDCLIENT_H
 
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <semaphore.h>
+#include <unistd.h>
+
 #include "../misc/global.h"
 #include "../misc/settings.h"
 #include "../misc/version.h"
@@ -17,7 +22,7 @@ class Scsi;
 class HddClient
 {
 public:
-    HddClient(ChipInterface* cin, ClientInfo* ci);
+    HddClient(ChipInterface* cin, ClientInfo* ci, int aSharedMemFd, sem_t* aSharedMemSemaphore, uint8_t* aSharedMemPointer);
     virtual ~HddClient();
 
     bool handleHdd(uint8_t* inBuff);
@@ -39,6 +44,11 @@ private:
     Scsi* scsi;
     TranslatedDisk* translated;
     AcsiDataTrans* dataTrans;
+
+    // for screencast
+    int sharedMemFd;
+    sem_t* sharedMemSemaphore;
+    uint8_t *sharedMemPointer;
 
     //-----------------------------------
     // hard disk stuff

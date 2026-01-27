@@ -8,6 +8,10 @@
 #include <vector>
 #include <map>
 #include <string>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <semaphore.h>
+#include <unistd.h>
 
 #include "../../../libdospath/libdospath.h"
 #include "../../misc/settings.h"
@@ -102,7 +106,7 @@ class ZipDirEntry {
 class TranslatedDisk
 {
 public:
-    TranslatedDisk(AcsiDataTrans *dt, THwConfig* hwConfig);
+    TranslatedDisk(AcsiDataTrans *dt, THwConfig* hwConfig, int aSharedMemFd, sem_t* aSharedMemSemaphore, uint8_t* aSharedMemPointer);
     virtual ~TranslatedDisk();
 
     void setMac(uint8_t* mac);

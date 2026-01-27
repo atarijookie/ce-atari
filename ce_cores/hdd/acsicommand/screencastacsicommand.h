@@ -12,6 +12,12 @@ public:
   	ScreencastAcsiCommand(AcsiDataTrans *dt);
   	~ScreencastAcsiCommand();
   	void processCommand(uint8_t *command);
+
+	void sharedMemorySet(int aSharedMemFd, sem_t* aSharedMemSemaphore, uint8_t* aSharedMemPointer);
+
+	static void sharedMemoryOpen(int& aSharedMemFd, sem_t** aSharedMemSemaphore, uint8_t** aSharedMemPointer);
+	static void sharedMemoryClose(int& aSharedMemFd, sem_t** aSharedMemSemaphore, uint8_t** aSharedMemPointer);
+
 private:
     void readScreen(void);
     void readPalette(void);
@@ -22,8 +28,5 @@ private:
 	int sharedMemFd;
 	sem_t *sharedMemSemaphore;
 	uint8_t *sharedMemPointer;
-
-	void sharedMemoryOpen(void);
-	void sharedMemoryClose(void);
 };
 #endif

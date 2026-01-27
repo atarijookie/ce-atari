@@ -8,14 +8,19 @@
 #include <dirent.h>
 #include <errno.h>
 #include <net/if.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <semaphore.h>
+#include <unistd.h>
 
 #include "misc/global.h"
 #include "misc/debug.h"
-#include "hdd/corehdd.h"
-#include "hdd/hddclient.h"
+#include "corehdd.h"
+#include "hddclient.h"
 #include "translated/translateddisk.h"
 #include "native/scsi.h"
 #include "native/scsi_defs.h"
+#include "acsicommand/screencastacsicommand.h"
 #include "../misc/utils.h"
 #include "../misc/statusreport.h"
 #include "../chipinterface/chipinterface.h"
@@ -52,10 +57,15 @@ void CoreHdd::run(void)
     ChipInterface* ciHdd = new ChipInterface(LOGFILE_HDD, NET_ATN_HANS_ID, SYNC_TAG_HDD, SERVER_TCP_PORT_HDD);
     ciHdd->ciOpen();
 
+    int sharedMemFd;
+    sem_t* sharedMemSemaphore;
+    uint8_t* sharedMemPointer;
+    ScreencastAcsiCommand::sharedMemoryOpen(sharedMemFd, &sharedMemSemaphore, &sharedMemPointer);
+
     // create hdd clients, 1 hdd client per each tcp client
     for(int i=0; i<MAX_CLIENTS; i++) {
         ClientInfo* ci = ciHdd->clientGetByIndex(i);
-        hddClients[i] = new HddClient(ciHdd, ci);
+        hddClients[i] = new HddClient(ciHdd, ci, sharedMemFd, sharedMemSemaphore, sharedMemPointer);
     }
 
     //------------------------------
@@ -137,6 +147,8 @@ void CoreHdd::run(void)
     for(int i=0; i<MAX_CLIENTS; i++) {
         delete hddClients[i];
     }
+
+    ScreencastAcsiCommand::sharedMemoryClose(sharedMemFd, &sharedMemSemaphore, &sharedMemPointer);
 
     // destroy chip interface
     ciHdd->ciClose();
