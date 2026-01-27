@@ -397,10 +397,9 @@ void ChipInterface::fdd_sendImageParamsToChip(int& fdClient, bool finished, int 
     sendHeaderAndDataToChip(fdClient, ATN_SEND_WHOLE_IMAGE, bfr, 4 + 32);   // 4 bytes param, 32 bytes filename
 }
 
-uint8_t* ChipInterface::fdd_sectorWritten(int clientIndex, int &side, int &track, int &sector, int &byteCount)
+uint8_t* ChipInterface::fdd_sectorWritten(ClientInfo* ci, int &side, int &track, int &sector, int &byteCount)
 {
     // get all the remaining data
-    ClientInfo* ci = &clients[clientIndex];
     byteCount = readRestOfData(ci, bufIn, MFM_STREAM_SIZE);
 
     // get the written sector, side, track number

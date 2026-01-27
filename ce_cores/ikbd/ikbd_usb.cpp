@@ -17,7 +17,7 @@
 #include "../chipinterface/chipinterface.h"
 #include "ikbd.h"
 
-extern TInputDevice ikbdDevs[INTYPE_MAX+1];
+extern TInputDevice ikbdDevs[INTYPE_COUNT];
 extern bool noCapture;
 
 void Ikbd::initDevs(void)
@@ -523,7 +523,7 @@ void Ikbd::processJoystick(js_event *jse, int joyNumber)
 
 int Ikbd::getFdByIndex(int index)
 {
-    if(index < 0 || index > 5) {
+    if(index < 0 || index >= INTYPE_COUNT) {
         return -1;
     }
 

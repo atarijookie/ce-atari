@@ -46,7 +46,7 @@ typedef struct {
 void *ikbdThreadCode(void *ptr);
 class ChipInterface;
 
-extern TInputDevice ikbdDevs[INTYPE_MAX+1];
+extern TInputDevice ikbdDevs[INTYPE_COUNT];
 
 class Ikbd
 {

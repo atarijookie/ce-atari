@@ -23,7 +23,99 @@
 
 #include "ikbd.h"
 
-TInputDevice ikbdDevs[INTYPE_MAX+1];
+TInputDevice ikbdDevs[INTYPE_COUNT];
+
+void findDevicesFromInotify(int inotifyFd, Ikbd& ikbd, int wd1, int wd2, int wd3)
+{
+    ssize_t res;
+
+    char buf[sizeof(struct inotify_event) + NAME_MAX + 1];
+    res = read(inotifyFd, buf, sizeof(buf));
+    if(res < 0) {
+        logIkbd(LOG_ERROR, "read(inotifyFd) : %s", strerror(errno));
+        return;
+    }
+
+    struct inotify_event *iev = (struct inotify_event *)buf;
+    logIkbd(LOG_DEBUG, "inotify msg %dbytes wd=%d mask=%04x name=%s", (int)res, iev->wd, iev->mask, (iev->len > 0) ? iev->name : "");
+    if(iev->wd == wd1) {
+        if(iev->len > 0 && (0 == strcmp(iev->name, "by-path"))) {
+            wd2 = inotify_add_watch(inotifyFd, "/dev/input/by-path", IN_CREATE | IN_DELETE_SELF);
+            if(wd2 < 0) logIkbd(LOG_ERROR, "inotify_add_watch(/dev/input/by-path, IN_CREATE | IN_DELETE_SELF)");
+        }
+    } else if(iev->wd == wd2) {
+        if(iev->mask & IN_DELETE_SELF) {
+            inotify_rm_watch(inotifyFd, wd2);
+            wd2 = -1;
+        } else {
+            // look for new input devices
+            ikbd.findDevices();
+        }
+    } else if(iev->wd == wd3) {
+        // look for new input devices
+        ikbd.findVirtualDevices();
+    }
+}
+
+void processInputFromAttachedDevices(Ikbd& ikbd, fd_set* pReadfds)
+{
+    struct input_event ev;
+    struct js_event js;
+    ssize_t res;
+    bool clientConnected = false;
+
+    for(int i = 0; i < INTYPE_COUNT; i++) {         // go through the input devices
+        int fd = ikbd.getFdByIndex(i);
+
+        if(fd < 0 || !FD_ISSET(fd, pReadfds)) {     // not open or not set? skip
+            continue;
+        }
+
+        switch(i) {
+            case INTYPE_MOUSE:
+            case INTYPE_KEYBOARD: // for keyboard and mouse
+            case INTYPE_VDEVMOUSE:
+            case INTYPE_VDEVKEYBOARD: // for virtual mouse and keyboard
+                res = read(ikbd.getFdByIndex(i), &ev, sizeof(input_event));
+                break;
+            case INTYPE_JOYSTICK1:
+            case INTYPE_JOYSTICK2: // for joysticks
+                res = read(ikbd.getFdByIndex(i), &js, sizeof(js_event));
+                break;
+        }
+
+        if(res < 0) {                                           // on error, skip the rest
+            if(errno == ENODEV) {                               // if device was removed, deinit it
+                ikbd.deinitDev(i);
+            } else {
+                logIkbd(LOG_ERROR, "ikbdThreadCode() read(%d) : %s", fd, strerror(errno));
+            }
+            continue;
+        }
+
+        if(res == 0) {                                           // on error, skip the rest
+            logIkbd(LOG_ERROR, "ikbdThreadCode() read(%d) returned 0 (EOF) closing %d", fd, i);
+            ikbd.deinitDev(i);
+            continue;
+        }
+
+        switch(i) {
+            case INTYPE_VDEVMOUSE:
+                ikbd.markVirtualMouseEvenTime();                // first mark the event time
+            case INTYPE_MOUSE:
+                ikbd.processMouse(&ev);                         // then process the event
+                break;
+            case INTYPE_KEYBOARD:
+            case INTYPE_VDEVKEYBOARD:
+                ikbd.processKeyboard(&ev, clientConnected);
+                break;
+            case INTYPE_JOYSTICK1:
+            case INTYPE_JOYSTICK2:
+                ikbd.processJoystick(&js, i - INTYPE_JOYSTICK1);
+                break;
+        }
+    }
+}
 
 void *ikbdThreadCode(void *ptr)
 {
@@ -34,7 +126,6 @@ void *ikbdThreadCode(void *ptr)
     int i;
     int inotifyFd;
     int wd1, wd2, wd3;
-    ssize_t res;
 
     logIkbd(LOG_DEBUG, "----------------------------------------------------------");
     logIkbd(LOG_DEBUG, "ikbdThreadCode will enter loop...");
@@ -75,7 +166,7 @@ void *ikbdThreadCode(void *ptr)
 
         max_fd = -1;
         FD_ZERO(&readfds);
-        for(i = 0; i < 6; i++) {                                       // go through the input devices
+        for(i = 0; i < INTYPE_COUNT; i++) {                                       // go through the input devices
             fd = ikbd.getFdByIndex(i);
             if(fd >= 0) {
                 FD_SET(fd, &readfds);
@@ -111,31 +202,7 @@ void *ikbdThreadCode(void *ptr)
         }
 
         if(inotifyFd >= 0 && FD_ISSET(inotifyFd, &readfds)) {
-            char buf[sizeof(struct inotify_event) + NAME_MAX + 1];
-            res = read(inotifyFd, buf, sizeof(buf));
-            if(res < 0) {
-                logIkbd(LOG_ERROR, "read(inotifyFd) : %s", strerror(errno));
-            } else {
-                struct inotify_event *iev = (struct inotify_event *)buf;
-                logIkbd(LOG_DEBUG, "inotify msg %dbytes wd=%d mask=%04x name=%s", (int)res, iev->wd, iev->mask, (iev->len > 0) ? iev->name : "");
-                if(iev->wd == wd1) {
-                    if(iev->len > 0 && (0 == strcmp(iev->name, "by-path"))) {
-                        wd2 = inotify_add_watch(inotifyFd, "/dev/input/by-path", IN_CREATE | IN_DELETE_SELF);
-                        if(wd2 < 0) logIkbd(LOG_ERROR, "inotify_add_watch(/dev/input/by-path, IN_CREATE | IN_DELETE_SELF)");
-                    }
-                } else if(iev->wd == wd2) {
-                    if(iev->mask & IN_DELETE_SELF) {
-                        inotify_rm_watch(inotifyFd, wd2);
-                        wd2 = -1;
-                    } else {
-                        // look for new input devices
-                        ikbd.findDevices();
-                    }
-                } else if(iev->wd == wd3) {
-                    // look for new input devices
-                    ikbd.findVirtualDevices();
-                }
-            }
+            findDevicesFromInotify(inotifyFd, ikbd, wd1, wd2, wd3);
         }
 
         // if listening socket is set, handle it
@@ -166,53 +233,7 @@ void *ikbdThreadCode(void *ptr)
         }
 
         // process events from attached input devices
-        struct input_event  ev;
-        struct js_event     js;
-
-        for(i = 0; i < 6; i++) {                                        // go through the input devices
-            fd = ikbd.getFdByIndex(i);
-
-            if(fd >= 0 && FD_ISSET(fd, &readfds)) {
-                switch(i) {
-                case INTYPE_MOUSE:
-                case INTYPE_KEYBOARD: // for keyboard and mouse
-                case INTYPE_VDEVMOUSE:
-                case INTYPE_VDEVKEYBOARD: // for virtual mouse and keyboard
-                    res = read(ikbd.getFdByIndex(i), &ev, sizeof(input_event));
-                    break;
-                case INTYPE_JOYSTICK1:
-                case INTYPE_JOYSTICK2: // for joysticks
-                    res = read(ikbd.getFdByIndex(i), &js, sizeof(js_event));
-                    break;
-                }
-                if(res < 0) {                                           // on error, skip the rest
-                    if(errno == ENODEV) {                               // if device was removed, deinit it
-                        ikbd.deinitDev(i);
-                    } else {
-                        logIkbd(LOG_ERROR, "ikbdThreadCode() read(%d) : %s", fd, strerror(errno));
-                    }
-                } else if( res==0 ) {                                           // on error, skip the rest
-                    logIkbd(LOG_ERROR, "ikbdThreadCode() read(%d) returned 0 (EOF) closing %d", fd, i);
-                    ikbd.deinitDev(i);
-                } else {
-                    switch(i) {
-                    case INTYPE_VDEVMOUSE:
-                        ikbd.markVirtualMouseEvenTime();                // first mark the event time
-                    case INTYPE_MOUSE:
-                        ikbd.processMouse(&ev);                         // then process the event
-                        break;
-                    case INTYPE_KEYBOARD:
-                    case INTYPE_VDEVKEYBOARD:
-                        ikbd.processKeyboard(&ev, clientConnected);
-                        break;
-                    case INTYPE_JOYSTICK1:
-                    case INTYPE_JOYSTICK2:
-                        ikbd.processJoystick(&js, i - INTYPE_JOYSTICK1);
-                        break;
-                    }
-                }
-            }
-        }
+        processInputFromAttachedDevices(ikbd, &readfds);
     }
 
     if(inotifyFd >= 0) {

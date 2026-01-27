@@ -19,7 +19,7 @@ public:
 
     void run(void);
     virtual void reloadSettings(int type);                                  // from ISettingsUser
-    bool handleOneClient(int clientIndex, int fdClient, int floppySlotIndex);
+    bool handleOneClient(ClientInfo* ci);
 
 private:
     bool shouldRun;
@@ -36,14 +36,13 @@ private:
     //-----------------------------------
     // floppy stuff
 
-    bool handleFdd(int clientIndex, int fdClient, int floppySlotIndex, uint8_t* inBuff);
+    bool handleFdd(ClientInfo* ci, uint8_t* inBuff);
     void handleFwVersion_franz(ClientInfo* ci);
-    void handleSendTrack(int clientIndex);
-    void handleSendImageToIndex(int clientIndex);
+    void handleSectorWritten(ClientInfo* ci);
+    void handleSendTrack(ClientInfo* ci);
     void handleSendImageToClient(ClientInfo* client);
-    void handleSectorWritten(int clientIndex);
 
-    void loadLastImageIntoSlot(int clientIndex);
+    void loadLastImageIntoSlot(ClientInfo* ci);
 
 
     void parseMac(const std::string& macStr, uint8_t* mac);

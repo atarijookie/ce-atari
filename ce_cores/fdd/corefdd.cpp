@@ -135,7 +135,7 @@ void CoreFdd::run(void)
             int idx = ciFdd->acceptSocketIfNeededAndPossible();
 
             if(idx != FD_EMPTY) {
-                loadLastImageIntoSlot(idx);
+                loadLastImageIntoSlot(ciFdd->clientsGetOne(idx));
             }
         }
 
@@ -148,7 +148,7 @@ void CoreFdd::run(void)
             }
 
             if(FD_ISSET(ci->fdClient, &readfds)) {    // this fd read for read?
-                if(handleOneClient(i, ci->fdClient, ci->floppySlotIndex)) {
+                if(handleOneClient(ci)) {
                     ci->lastMs = Utils::getCurrentMs();
                 }
             }
@@ -163,25 +163,25 @@ void CoreFdd::run(void)
     imageSilo = NULL;
 }
 
-bool CoreFdd::handleOneClient(int clientIndex, int fdClient, int floppySlotIndex)
+bool CoreFdd::handleOneClient(ClientInfo* ci)
 {
     uint8_t inBuff[FDD_BUF_SIZE];
     memset(inBuff, 0, FDD_BUF_SIZE);
 
-    bool needsAction = ciFdd->actionNeeded(ciFdd->clientsGetOne(clientIndex), inBuff);
+    bool needsAction = ciFdd->actionNeeded(ci, inBuff);
 
     if(needsAction) {   // floppy drive needs action?
-        handleFdd(clientIndex, fdClient, floppySlotIndex, inBuff);
+        handleFdd(ci, inBuff);
     }
 
     return needsAction;
 }
 
-bool CoreFdd::handleFdd(int clientIndex, int fdClient, int floppySlotIndex, uint8_t* inBuff)
+bool CoreFdd::handleFdd(ClientInfo* ci, uint8_t* inBuff)
 {
     bool isFddCommand = false;
-
-    ClientInfo* ci = ciFdd->clientsGetOne(clientIndex);
+    #define BFR_SIZE    32
+    uint8_t inBuf[BFR_SIZE];
 
     switch(inBuff[3]) {
     case ATN_FW_VERSION:                    // device has sent FW version
@@ -190,17 +190,18 @@ bool CoreFdd::handleFdd(int clientIndex, int fdClient, int floppySlotIndex, uint
 
     case ATN_SECTOR_WRITTEN:                // device has sent written sector data
         isFddCommand = true;
-        handleSectorWritten(clientIndex);
+        handleSectorWritten(ci);
         break;
 
     case ATN_SEND_TRACK:                    // device requests data of a whole track
         isFddCommand = true;
-        handleSendTrack(clientIndex);
+        handleSendTrack(ci);
         break;
 
     case ATN_SEND_WHOLE_IMAGE:
         isFddCommand = true;
-        handleSendImageToIndex(clientIndex);
+        ciFdd->readRestOfData(ci, inBuf, BFR_SIZE);
+        handleSendImageToClient(ci);
         break;
 
     default:
@@ -222,32 +223,27 @@ void CoreFdd::loadSettings(void)
     logFdd(LOG_DEBUG, "CoreFdd::loadSettings");
 }
 
-void CoreFdd::loadLastImageIntoSlot(int clientIndex)
+void CoreFdd::loadLastImageIntoSlot(ClientInfo* ci)
 {
-    ClientInfo* client = ciFdd->clientsGetOne(clientIndex);
-    if(!client) {
-        return;
-    }
-
-    Settings s(client->mac);
+    Settings s(ci->mac);
     const char *pPathAndFile = s.getString("FLOPPY_IMAGE", "");  // try to read the value
     std::string pathAndFile = pPathAndFile;
 
     if(!pathAndFile.empty()) {      // this specific device has file? store it also to slot #
-        logFdd(LOG_DEBUG, "CoreFdd::loadLastImageIntoSlot - have stored image for this specific device, saving to slot %d -> %s", client->floppySlotIndex, pathAndFile.c_str());
-        imageSilo->saveImageFilepathToSlot(client->floppySlotIndex, pathAndFile.c_str());
+        logFdd(LOG_DEBUG, "CoreFdd::loadLastImageIntoSlot - have stored image for this specific device, saving to slot %d -> %s", ci->floppySlotIndex, pathAndFile.c_str());
+        imageSilo->saveImageFilepathToSlot(ci->floppySlotIndex, pathAndFile.c_str());
     } else {                        // no image file for this specific device? try to get it from the slot #
-        pathAndFile = imageSilo->getImageFilePathFromSlotNo(client->floppySlotIndex);
+        pathAndFile = imageSilo->getImageFilePathFromSlotNo(ci->floppySlotIndex);
 
         if(!pathAndFile.empty()) {  // slot # had an image stored? store it for this specific device
-            logFdd(LOG_DEBUG, "CoreFdd::loadLastImageIntoSlot - no stored image for this specific device, but slot %d had image, so storing for specific device -> %s", client->floppySlotIndex, pathAndFile.c_str());
+            logFdd(LOG_DEBUG, "CoreFdd::loadLastImageIntoSlot - no stored image for this specific device, but slot %d had image, so storing for specific device -> %s", ci->floppySlotIndex, pathAndFile.c_str());
             s.setString("FLOPPY_IMAGE", pathAndFile.c_str());
         } else {
-            logFdd(LOG_DEBUG, "CoreFdd::loadLastImageIntoSlot - no stored image for this specific device and no stored image for slot %d, so no image to load", client->floppySlotIndex);
+            logFdd(LOG_DEBUG, "CoreFdd::loadLastImageIntoSlot - no stored image for this specific device and no stored image for slot %d, so no image to load", ci->floppySlotIndex);
         }
     }
 
-    imageSilo->loadImageToSlot(client->floppySlotIndex, pathAndFile.c_str());
+    imageSilo->loadImageToSlot(ci->floppySlotIndex, pathAndFile.c_str());
 }
 
 void CoreFdd::handleFwVersion_franz(ClientInfo* ci)
@@ -256,17 +252,16 @@ void CoreFdd::handleFwVersion_franz(ClientInfo* ci)
     bool macChanged = ciFdd->getFWversionFdd(ci);
 
     if(macChanged) {
-        loadLastImageIntoSlot(ci->index);
+        loadLastImageIntoSlot(ci);
     }
 }
 
-void CoreFdd::handleSendTrack(int clientIndex)
+void CoreFdd::handleSendTrack(ClientInfo* ci)
 {
     #define BFR_SIZE    32
     uint8_t inBuf[BFR_SIZE];
 
-    ClientInfo* client = ciFdd->clientsGetOne(clientIndex);
-    int readCnt = ciFdd->readRestOfData(client, inBuf, BFR_SIZE);
+    int readCnt = ciFdd->readRestOfData(ci, inBuf, BFR_SIZE);
 
     if(readCnt < 2) {
         logFdd(LOG_ERROR, "handleSendTrack() -- not enough data received: %d", readCnt);
@@ -277,7 +272,7 @@ void CoreFdd::handleSendTrack(int clientIndex)
     int track = inBuf[1];
 
     int tr, si, spt;
-    imageSilo->getParams(client->floppySlotIndex, tr, si, spt);      // read the floppy image params
+    imageSilo->getParams(ci->floppySlotIndex, tr, si, spt);      // read the floppy image params
 
     uint8_t *encodedTrack;
     int countInTrack;
@@ -290,22 +285,11 @@ void CoreFdd::handleSendTrack(int clientIndex)
     } else {                                                    // side + track within range? use encoded track
         logFdd(LOG_DEBUG, "handleSendTrack() -- Franz wants: [track %d, side %d]", track, side);
 
-        encodedTrack = imageSilo->getEncodedTrack(client->floppySlotIndex, track, side, countInTrack);
+        encodedTrack = imageSilo->getEncodedTrack(ci->floppySlotIndex, track, side, countInTrack);
         countInTrack = MIN(countInTrack, MFM_STREAM_SIZE);
     }
 
-    ciFdd->fdd_sendTrackToChip(client->fdClient, countInTrack, encodedTrack);
-}
-
-void CoreFdd::handleSendImageToIndex(int clientIndex)
-{
-    #define BFR_SIZE    32
-    uint8_t inBuf[BFR_SIZE];
-
-    ClientInfo* client = ciFdd->clientsGetOne(clientIndex);
-
-    ciFdd->readRestOfData(client, inBuf, BFR_SIZE);
-    handleSendImageToClient(client);
+    ciFdd->fdd_sendTrackToChip(ci->fdClient, countInTrack, encodedTrack);
 }
 
 void CoreFdd::handleSendImageToClient(ClientInfo* client)
@@ -335,17 +319,15 @@ void CoreFdd::handleSendImageToClient(ClientInfo* client)
     ciFdd->fdd_sendImageParamsToChip(client->fdClient, true, imgTracks, imgSides, imgSectorsPerTrack, fileName);
 }
 
-void CoreFdd::handleSectorWritten(int clientIndex)
+void CoreFdd::handleSectorWritten(ClientInfo* ci)
 {
     int side, track, sector, byteCount;
-    uint8_t *writtenSector = ciFdd->fdd_sectorWritten(clientIndex, side, track, sector, byteCount); // get side + track + sector number, byte count, and pointer to buffer where the written data is
+    uint8_t *writtenSector = ciFdd->fdd_sectorWritten(ci, side, track, sector, byteCount); // get side + track + sector number, byte count, and pointer to buffer where the written data is
 
     // Debug::outBfr(LOGFILE_FDD, writtenSector, byteCount);
 
-    ClientInfo* client = ciFdd->clientsGetOne(clientIndex);
-
     logFdd(LOG_DEBUG, "handleSectorWritten -- track %d, side %d, sector %d", track, side, sector);
-    floppyEncoder_decodeMfmWrittenSector(client->floppySlotIndex, track, side, sector, writtenSector, byteCount); // let floppy encoder handle decoding, reencoding, saving
+    floppyEncoder_decodeMfmWrittenSector(ci->floppySlotIndex, track, side, sector, writtenSector, byteCount); // let floppy encoder handle decoding, reencoding, saving
 }
 
 void CoreFdd::parseMac(const std::string& macStr, uint8_t* mac)

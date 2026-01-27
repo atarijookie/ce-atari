@@ -22,7 +22,7 @@
 
 #include "ikbd.h"
 
-extern TInputDevice ikbdDevs[INTYPE_MAX+1];
+extern TInputDevice ikbdDevs[INTYPE_COUNT];
 
 Ikbd::Ikbd(ChipInterface* ciIkbd)
 {
