@@ -53,6 +53,11 @@ func (s *Server) handleListDevices(w http.ResponseWriter, r *http.Request) {
 		}
 
 		folderName := entry.Name()
+
+		if(folderName == "000000000000") {
+			continue;
+		}
+
 		if isValidMACFormat(folderName) {
 			// Format MAC address with colons
 			macFormatted := formatMACWithColons(folderName)

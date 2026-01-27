@@ -42,7 +42,6 @@ void Settings::setPrefix(uint8_t* bytes, int len)
 {
     if(bytes != NULL && len > 0) {      // got pointer and length, store prefix as string
         binToHex(bytes, len, prefix);
-        strcat(prefix, "_");
     } else {        // no pointer or length, clear prefix
         memset(prefix, 0, 32);
     }

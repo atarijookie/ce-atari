@@ -6,8 +6,6 @@ if [ $(id -u) != 0 ]; then
   exit 0
 fi
 
-set -e
-
 # source .env file to get all the settings into env vars
 . ./.env
 

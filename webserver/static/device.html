@@ -148,6 +148,9 @@
             <button id="gem-button" class="device-action-button" style="padding: 15px 25px; font-size: 16px; cursor: pointer; background-color: #3baf16; color: white; border: none; border-radius: 4px; text-align: center;">
                 GEM Drives
             </button>
+            <button id="screencast-button" class="device-action-button" style="padding: 15px 25px; font-size: 16px; cursor: pointer; background-color: #3baf16; color: white; border: none; border-radius: 4px; text-align: center;">
+                ScreenCast
+            </button>
             <button id="floppy-button" class="device-action-button" style="padding: 15px 25px; font-size: 16px; cursor: pointer; background-color: #3baf16; color: white; border: none; border-radius: 4px; text-align: center;">
                 Floppy
             </button>
@@ -204,7 +207,7 @@
             var input = document.getElementById('device-name-input');
             var button = document.getElementById('save-name-button');
             var currentValue = input.value;
-            
+
             if (currentValue === originalDeviceName) {
                 // No change - show "Saved" and disable
                 button.textContent = 'Saved';
@@ -293,6 +296,7 @@
                     // Show/hide buttons based on features
                     var acsiButton = document.getElementById('acsi-button');
                     var gemButton = document.getElementById('gem-button');
+                    var screencastButton = document.getElementById('screencast-button');
                     var floppyButton = document.getElementById('floppy-button');
                     var ikbdButton = document.getElementById('ikbd-button');
                     var statusButton = document.getElementById('status-button');
@@ -313,6 +317,9 @@
                     if (gemButton) {
                         gemButton.style.display = showAcsiButtons ? 'block' : 'none';
                     }
+                    if (screencastButton) {
+                        screencastButton.style.display = showAcsiButtons ? 'block' : 'none';
+                    }
 
                     // Show Floppy only if fdd is true
                     if (floppyButton) {
@@ -331,10 +338,12 @@
                     // On error, show all buttons (default behavior - assume all features enabled)
                     var acsiButton = document.getElementById('acsi-button');
                     var gemButton = document.getElementById('gem-button');
+                    var screencastButton = document.getElementById('screencast-button');
                     var floppyButton = document.getElementById('floppy-button');
                     var ikbdButton = document.getElementById('ikbd-button');
                     if (acsiButton) acsiButton.style.display = 'block';
                     if (gemButton) gemButton.style.display = 'block';
+                    if (screencastButton) screencastButton.style.display = 'block';
                     if (floppyButton) floppyButton.style.display = 'block';
                     if (ikbdButton) ikbdButton.style.display = 'block';
                 });
@@ -368,6 +377,10 @@
 
         document.getElementById('gem-button').onclick = function() {
             window.location.href = buildDeviceUrl('/gem_drives.html');
+        };
+
+        document.getElementById('screencast-button').onclick = function() {
+            window.location.href = buildDeviceUrl('/remote.html');
         };
 
         document.getElementById('floppy-button').onclick = function() {

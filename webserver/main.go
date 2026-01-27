@@ -33,46 +33,12 @@ type (
 		Name      string `json:"name"`
 		Connected bool   `json:"connected"`
 	}
-
-	RawDevice struct {
-		ID   string `json:"id"`
-		Path string `json:"path"`
-	}
-
-	TranslatedMapping struct {
-		Drive string `json:"drive"`
-		Path  string `json:"path"`
-	}
-
-	Status struct {
-		MAC        string    `json:"mac"`
-		Online     bool      `json:"online"`
-		HDDEnabled bool      `json:"hddEnabled"`
-		FDDEnabled bool      `json:"fddEnabled"`
-		UpdatedAt  time.Time `json:"updatedAt"`
-	}
-
-	DirEntry struct {
-		Name  string `json:"name"`
-		IsDir bool   `json:"isDir"`
-	}
-
-	HostDevice struct {
-		ID          string `json:"id"`
-		Description string `json:"description"`
-	}
 )
 
 type Server struct {
 	router        *chi.Mux
 	mu            sync.RWMutex
 	authTokens    map[string]string
-	devices       []Device
-	hddRaw        map[string][]RawDevice
-	hddTranslated map[string][]TranslatedMapping
-	fddImage      map[string]string
-	status        map[string]Status
-	hostDevices   []HostDevice
 }
 
 // responseWriter wraps http.ResponseWriter to capture status codes
@@ -182,12 +148,6 @@ func newServer() *Server {
 	s := &Server{
 		router: r,
 		authTokens: map[string]string{},
-		devices: []Device{},
-		hddRaw: map[string][]RawDevice{},
-		hddTranslated: map[string][]TranslatedMapping{},
-		fddImage: map[string]string{},
-		status: map[string]Status{},
-		hostDevices: []HostDevice{},
 	}
 
 	r.Post("/auth/login", s.handleLogin)
@@ -238,7 +198,6 @@ func newServer() *Server {
 		protected.Post("/screen/{mac}/vbl", s.handlePostScreenVBL)
 		protected.Get("/screen/{mac}/vbl", s.handleGetScreenVBL)
 		protected.Get("/host/dir", s.handleHostDir)
-		protected.Get("/host/devices", s.handleHostDevices)
 
 		// Serve static files (HTML, JS, images, etc.) from the local "static" directory.
 		// This directory lives next to the Go sources / binary working directory.

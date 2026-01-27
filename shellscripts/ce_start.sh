@@ -21,12 +21,12 @@ mkdir -p "$PID_DIR"
 # make a copy of config drive into the expected destination
 cp -rf "${BIN_DIR}/configdrive" "$CONFIG_DRIVE_PATH"
 
-echo "Starting processes."
-
 # run ce cores
+echo "Starting cores"
 ./ce_cores.elf > /dev/null 2>&1 &
 
 # run web server
+echo "Starting webserver"
 ./webserver > /dev/null 2>&1 &
 
 echo "Processes have been started."

@@ -21,7 +21,7 @@ func (s *Server) handleHostDir(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "cannot read directory", http.StatusBadRequest)
 		return
 	}
-	
+
 	// Separate directories and files
 	dirs := make([]string, 0)
 	files := make([]string, 0)
@@ -32,23 +32,15 @@ func (s *Server) handleHostDir(w http.ResponseWriter, r *http.Request) {
 			files = append(files, e.Name())
 		}
 	}
-	
+
 	// Sort both lists
 	sort.Strings(dirs)
 	sort.Strings(files)
-	
+
 	// Return in the requested format
 	response := map[string]interface{}{
 		"dirs":  dirs,
 		"files": files,
 	}
 	writeJSON(w, http.StatusOK, response)
-}
-
-func (s *Server) handleHostDevices(w http.ResponseWriter, r *http.Request) {
-	log.Printf("handleHostDevices %s %s", r.Method, r.URL.Path)
-
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	writeJSON(w, http.StatusOK, s.hostDevices)
 }

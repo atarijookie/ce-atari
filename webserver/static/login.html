@@ -1816,6 +1816,30 @@ body>#login #dont_have_an_account a:hover { border-bottom: 2px solid #f90 }
 </div>
 
 <script>
+// Check if user is already authenticated on page load
+(function() {
+    // Try to fetch a protected endpoint to check if auth token cookie is valid
+    fetch('/devices', {
+        method: 'GET',
+        credentials: 'include' // Include cookies
+    })
+    .then(function(response) {
+        // Check if response is JSON (devices endpoint returns JSON when authenticated)
+        var contentType = response.headers.get('content-type');
+        if (response.ok && contentType && contentType.includes('application/json')) {
+            // User is already logged in, redirect to index
+            window.location.replace('/index.html');
+            return;
+        }
+        // If we get here, either not authenticated or got redirected to login
+        // The login form is already visible, so we don't need to do anything
+    })
+    .catch(function(error) {
+        // On error (network error, etc.), show login form (which is already visible)
+        console.log('Not authenticated, showing login form');
+    });
+})();
+
 document.getElementById('sign_in_button').addEventListener('click', function(e) {
     e.preventDefault();
     
