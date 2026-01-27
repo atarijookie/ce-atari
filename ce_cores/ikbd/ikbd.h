@@ -58,7 +58,6 @@ public:
     void findDevices(void);
     void findVirtualDevices();
     void closeDevs(void);
-    int  serialSetup(termios *ts);
 
     int getFdByIndex(int index);
     void deinitDev(int index);

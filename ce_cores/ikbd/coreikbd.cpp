@@ -117,6 +117,28 @@ void processInputFromAttachedDevices(Ikbd& ikbd, fd_set* pReadfds)
     }
 }
 
+void handleClients(Ikbd& ikbd, fd_set* pReadfds, ChipInterface* ciIkbd)
+{
+    bool clientConnected = false;
+
+    for(int i=0; i<MAX_CLIENTS; i++) {
+        ClientInfo* ci = ciIkbd->clientGetByIndex(i);
+
+        if(ci->fdClient == FD_EMPTY) {           // no client here? skip it
+            continue;
+        }
+
+        if(FD_ISSET(ci->fdClient, pReadfds)) {           // this fd read for read?
+            // process the incoming data from original keyboard and from ST
+            int bytesRead = ikbd.processReceivedCommands(clientConnected, ci->fdClient);
+
+            if(bytesRead > 0) {     // something was read, mark client as active
+                ci->lastMs = Utils::getCurrentMs();
+            }
+        }
+    }
+}
+
 void *ikbdThreadCode(void *ptr)
 {
     int max_fd;
@@ -170,7 +192,7 @@ void *ikbdThreadCode(void *ptr)
             fd = ikbd.getFdByIndex(i);
             if(fd >= 0) {
                 FD_SET(fd, &readfds);
-                if(fd > max_fd) max_fd = fd;
+                max_fd = MAX(max_fd, fd);
             }
         }
 
@@ -184,7 +206,7 @@ void *ikbdThreadCode(void *ptr)
 
         if(inotifyFd >= 0) {
             FD_SET(inotifyFd, &readfds);
-            if(inotifyFd > max_fd) max_fd = inotifyFd;
+            max_fd = MAX(max_fd, inotifyFd);
         }
 
         // add timeout to select(), so we can check for connection status, settings reload, etc.
@@ -213,24 +235,7 @@ void *ikbdThreadCode(void *ptr)
         }
 
         // process the incoming data from original keyboard and from ST
-        bool clientConnected = false;
-
-        for(int i=0; i<MAX_CLIENTS; i++) {
-            ClientInfo* ci = ciIkbd->clientGetByIndex(i);
-
-            if(ci->fdClient == FD_EMPTY) {           // no client here? skip it
-                continue;
-            }
-
-            if(FD_ISSET(ci->fdClient, &readfds)) {           // this fd read for read?
-                // process the incoming data from original keyboard and from ST
-                int bytesRead = ikbd.processReceivedCommands(clientConnected, ci->fdClient);
-
-                if(bytesRead > 0) {     // something was read, mark client as active
-                    ci->lastMs = Utils::getCurrentMs();
-                }
-            }
-        }
+        handleClients(ikbd, &readfds, ciIkbd);
 
         // process events from attached input devices
         processInputFromAttachedDevices(ikbd, &readfds);
