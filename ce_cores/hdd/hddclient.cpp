@@ -94,8 +94,10 @@ void HddClient::handleAcsiCommand(uint8_t *bufIn)
     uint8_t isIcd = false;
     uint8_t wasHandled = false;
 
+    AcsiIDinfo* acsiIdInfo = scsi->getAcsiIDinfo();
+
     uint8_t acsiId = bufIn[0] >> 5;                            // get just ACSI ID
-    if(acsiIdInfo.acsiIDdevType[acsiId] == DEVTYPE_OFF) {    // if this ACSI ID is off, reply with error and quit
+    if(acsiIdInfo->acsiIDdevType[acsiId] == DEVTYPE_OFF) {    // if this ACSI ID is off, reply with error and quit
         logHdd(LOG_WARNING, "HddClient::handleAcsiCommand - acsiId %d is OFF, sending CHECK CONDITION", acsiId);
         dataTrans->setStatus(SCSI_ST_CHECK_CONDITION);
         dataTrans->sendDataAndStatus();
@@ -207,7 +209,8 @@ void HddClient::handleFwVersion_hans(void)
 uint8_t HddClient::getIdBits(void)
 {
     // get the bits from struct
-    uint8_t enabledIDbits = acsiIdInfo.enabledIDbits;
+    AcsiIDinfo* acsiIdInfo = scsi->getAcsiIDinfo();
+    uint8_t enabledIDbits = acsiIdInfo->enabledIDbits;
 
     if(hwConfig.hddIface != HDD_IF_SCSI) {          // not SCSI? Don't change anything
 //        logHdd(LOG_DEBUG, "HddClient::getIdBits() -- we're running on ACSI");

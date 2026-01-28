@@ -110,17 +110,20 @@ void Scsi::clearDevInfo(int index, bool noDelete)
         return;
     }
 
-    devInfo[index].enabled = false;
-    devInfo[index].hostSourceType = SOURCETYPE_NONE;
-    devInfo[index].accessType = SCSI_ACCESSTYPE_NO_DATA;
+    TDevInfo& di = devInfo[index];
 
-    if(!noDelete && devInfo[index].dataMedia) {     // if we should delete if something is found and it's not null
-        devInfo[index].dataMedia->iclose();         // close if it was open
-        delete devInfo[index].dataMedia;            // delete it
+    di.enabled = false;
+    di.hostSourceType = SOURCETYPE_NONE;
+    di.accessType = SCSI_ACCESSTYPE_NO_DATA;
+
+    // if we should delete if something is found and it's not null (but don't delete tranBootMedia)
+    if(!noDelete && di.dataMedia && di.dataMedia != &tranBootMedia) {
+        di.dataMedia->iclose();         // close if it was open
+        delete di.dataMedia;            // delete it
     }
 
-    devInfo[index].dataMedia = NULL;                // pointer to NULL
-    devInfo[index].dataMediaDynamicallyAllocated = false;
+    di.dataMedia = NULL;                // pointer to NULL
+    di.dataMediaDynamicallyAllocated = false;
 }
 
 void Scsi::processCommand(uint8_t *command)
@@ -576,4 +579,9 @@ void Scsi::updateTranslatedBootMedia(void)
     }
 
     tranBootMedia.updateBootsectorConfigWithACSIid(idOnBus);
+}
+
+AcsiIDinfo* Scsi::getAcsiIDinfo(void)
+{
+    return &acsiIdInfo;
 }

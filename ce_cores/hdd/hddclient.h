@@ -52,7 +52,6 @@ private:
 
     //-----------------------------------
     // hard disk stuff
-    AcsiIDinfo acsiIdInfo;
     RetryModule* retryMod;
 
     void handleAcsiCommand(uint8_t *bufIn);

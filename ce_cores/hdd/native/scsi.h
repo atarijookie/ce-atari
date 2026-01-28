@@ -70,6 +70,8 @@ public:
         return &devInfo[id];
     }
 
+    AcsiIDinfo* getAcsiIDinfo(void);
+
     static const char * SourceTypeStr(int sourceType);
 
     static bool isICDcommand(uint8_t cmd0);
