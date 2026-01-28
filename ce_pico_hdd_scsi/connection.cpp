@@ -57,6 +57,7 @@ void ceDiscoverySend(void)
     // send upd broadcast
     uint8_t updPacket[5];
     strcpy((char *)updPacket, "CELC");
+    memcpy(updPacket + 4, settings.mac, 6);     // 4..9 - mac
 
     whichBroadcastAddr = !whichBroadcastAddr;   // toggle this flag
 
@@ -78,7 +79,7 @@ void ceDiscoverySend(void)
 
         // broadcast to subnet devices (e.g. 192.168.1.255)
         udp.beginPacket(addrBroadcast.toString().c_str(), SERVER_UDP_PORT);
-        udp.write(updPacket, 4);
+        udp.write(updPacket, 10);
         udp.endPacket();
     }
     else        // send to generic broadcast addr
@@ -87,7 +88,7 @@ void ceDiscoverySend(void)
 
         // broadcast to all possible devices (255.255.255.255)
         udp.beginPacket("255.255.255.255", SERVER_UDP_PORT);
-        udp.write(updPacket, 4);
+        udp.write(updPacket, 10);
         udp.endPacket();
     }
 }

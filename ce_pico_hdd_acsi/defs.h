@@ -15,6 +15,11 @@
     #define MAX(X,Y)    ((X > Y) ? X : Y)
 #endif
 
+#define DEV_FEATURE_IKBD    8
+#define DEV_FEATURE_FDD     4
+#define DEV_FEATURE_SCSI    2
+#define DEV_FEATURE_ACSI    1
+
 #define CMD_TIMEOUT_SECS_PER_MB 3
 #define CMD_TIMEOUT_ONESECOND   1000
 #define CMD_TIMEOUT_SHORT       (CMD_TIMEOUT_ONESECOND / 2)     // this period will be 0.5 second

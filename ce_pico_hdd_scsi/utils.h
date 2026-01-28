@@ -24,7 +24,7 @@ void cmdTimeoutChangeLength(uint32_t newPeriod);
 struct __attribute__((packed)) TSettings
 {
     uint32_t magic;
-    uint8_t mac[8];
+    uint8_t mac[6];
     uint8_t enabledIDs;
     uint8_t ikbdEnabled;
 };

@@ -120,6 +120,7 @@ void setupAtnBuffers(void)
     storeHeader(atnSendFwVersion, ATN_FW_VERSION, 0);
     storeWord(atnSendFwVersion + TX_HEADER_SIZE, version[0]);
     storeWord(atnSendFwVersion + TX_HEADER_SIZE + 2, version[1]);
+    atnSendFwVersion[TX_HEADER_SIZE + 4] = DEV_FEATURE_ACSI + DEV_FEATURE_IKBD;    // features bits - ACSI + IKBD
     atnSendFwVersion[TX_HEADER_SIZE + 5] = 0x41;                    // v.4, ACSI
 }
 

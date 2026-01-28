@@ -156,6 +156,8 @@ void storeHeader(uint8_t *bfr, uint16_t atnCode, uint32_t txLen)
 
 void saveSettings(void)
 {
+    multicore_lockout_start_blocking();
+
     settings.magic = SETTINGS_MAGIC;
 
     uint8_t* pSettings = (uint8_t*) &settings;
@@ -164,6 +166,8 @@ void saveSettings(void)
     }
 
     EEPROM.commit();
+
+    multicore_lockout_end_blocking();
 }
 
 void loadSettings(void)
