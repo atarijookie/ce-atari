@@ -3,7 +3,7 @@
     <head>
         <meta http-equiv="content-type" content="text/html; charset=utf-8">
 		    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
-        <title>CosmosEx Virtual Mouse / Keyboard</title>
+        <title>CosmosEx ScreenCast</title>
 		<script type="text/javascript" src="js/log.js"></script>
         <script>
         document.write('<link rel="stylesheet" type="text/css" href="css/combined.css">');
@@ -15,6 +15,7 @@
 		document.write('<script type="text/javascript" src="js/actual.js"><\/script>');
 		document.write('<script type="text/javascript" src="js/script.js"><\/script>'); */
 		</script>
+        <script type="text/javascript" src="js/atariscreen.min.js"></script>
     <!-- scale hack to show whole keyboard even on small devices -->
     <script>if ($(window).width() < 768) { $('meta[name=viewport]').attr('content','initial-scale='+$(window).width()/768+', maximum-scale='+$(window).width()/768+', user-scalable=0'); }</script>
 		<!-- <script type="text/javascript" src="js/keylinux.js"></script> -->
@@ -22,6 +23,136 @@
 		$(document).ready(function () {
 		 	CosmosEx.Remote.init();
 		});
+    </script>
+
+    <script>
+      (function() {
+        function getURLParameter(name) {
+          name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+          var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+          var results = regex.exec(location.search);
+          return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+        }
+
+        var mac = getURLParameter('mac');
+        if (!mac) {
+          return;
+        }
+
+        var element = null;
+        var demoScreen = null;
+        var currentRes = -1;
+        var counter = new Date().getTime() * 10;
+        var reloadMs = 200;
+        var isScreencastRunning = false;
+
+        function onLoadScreen() {
+          var dv = new DataView(this.response);
+          if (dv.byteLength === 32033) {
+            var res = dv.getInt8(0);
+            if (res !== currentRes && dv.byteLength > 0) {
+              console.log('screen resolution changed');
+              $('#demo_placeholder').html('');
+              demoScreen = null;
+              demoScreen = new AtariScreen(res, element, 'demo');
+              currentRes = res;
+            }
+            if (demoScreen !== null) {
+              demoScreen.ExtractPalette(dv, 1);
+              demoScreen.ExtractPlanarScreen(dv, 16 * 2 + 1);
+              demoScreen.Display();
+            }
+          }
+          dv = null;
+          if (isScreencastRunning) {
+            setTimeout(loadScreen, reloadMs);
+          }
+        }
+
+        function onErrorScreen() {
+          if (isScreencastRunning) {
+            setTimeout(loadScreen, reloadMs);
+          }
+        }
+
+        function loadScreen() {
+          if (!element) {
+            element = document.getElementById('demo_placeholder');
+            if (!element) {
+              return;
+            }
+          }
+          var xhr = new XMLHttpRequest();
+          counter++;
+          xhr.open('GET', '/screen/' + encodeURIComponent(mac) + '?' + counter, true);
+          xhr.responseType = 'arraybuffer';
+          xhr.onerror = onErrorScreen;
+          xhr.onload = onLoadScreen;
+          xhr.send(null);
+        }
+
+        function loadScreenOnce() {
+          if (!element) {
+            element = document.getElementById('demo_placeholder');
+            if (!element) {
+              return;
+            }
+          }
+          var xhr = new XMLHttpRequest();
+          counter++;
+          xhr.open('GET', '/screen/' + encodeURIComponent(mac) + '?' + counter, true);
+          xhr.responseType = 'arraybuffer';
+          xhr.onload = function() {
+            var dv = new DataView(this.response);
+            if (dv.byteLength === 32033) {
+              var res = dv.getInt8(0);
+              $('#demo_placeholder').html('');
+              demoScreen = null;
+              demoScreen = new AtariScreen(res, element, 'demo');
+              currentRes = res;
+              if (demoScreen !== null) {
+                demoScreen.ExtractPalette(dv, 1);
+                demoScreen.ExtractPlanarScreen(dv, 16 * 2 + 1);
+                demoScreen.Display();
+              }
+            }
+          };
+          xhr.send(null);
+        }
+
+        function startMacScreencast() {
+          if (!element) {
+            element = document.getElementById('demo_placeholder');
+          }
+          if (!element) {
+            return;
+          }
+          isScreencastRunning = true;
+          loadScreen();
+        }
+
+        $(document).ready(function () {
+          // Load initial screen on page load
+          loadScreenOnce();
+
+          var $btn = $('button#screencast');
+          // remove existing handlers from CosmosEx.Remote.init for this button
+          $btn.off();
+          $btn.on('touchstart mousedown click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if ($(this).hasClass('disabled')) {
+              return false;
+            }
+            $(this)
+              .addClass('disabled')
+              .attr('disabled', 'disabled')
+              .html('Screencast running...');
+            startMacScreencast();
+            return false;
+          });
+        });
+      })();
     </script>
 
 
@@ -81,8 +212,6 @@
         }
         #demo_placeholder {
             width: 100%;
-            min-width: 640px;
-            min-height: 400px;
             margin: 20px 0;
             display: block;
             position: relative;
@@ -90,12 +219,14 @@
         #demo_placeholder canvas {
             display: block;
             margin: 0 auto;
+            max-width: 100%;
+            height: auto;
         }
         #canvas {
-            width: 640px;
-            height: 400px;
             display: block;
             margin: 0 auto;
+            max-width: 100%;
+            height: auto;
         }
         #logout-button {
             position: absolute;

@@ -764,7 +764,7 @@ CosmosEx.Remote=function(){
                 $(".alert.desktop").removeClass("hidden");
                 $(".alert.desktop").addClass("current");
             } 
-            bShowHelp=true;
+            bShowHelp=false;
 
 	        	//various browser UI fixes
 				    $(document).bind("contextmenu",function(e){

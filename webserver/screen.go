@@ -31,11 +31,22 @@ func (s *Server) handleGetScreen(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Strip leading slashes from memName to avoid double slashes
+	memName = strings.TrimLeft(memName, "/")
+
 	// Open shared memory file using shm_open equivalent
 	// On Linux, shm_open creates files in /dev/shm/
 	shmPath := "/dev/shm/" + memName
 	f, err := os.OpenFile(shmPath, os.O_RDONLY, 0)
 	if err != nil {
+		// Check if file exists and provide more detailed error information
+		if _, statErr := os.Stat(shmPath); os.IsNotExist(statErr) {
+			log.Printf("handleGetScreen - shared memory file does not exist: %s (SCREENCAST_MEMORY_NAME=%s)", shmPath, os.Getenv("SCREENCAST_MEMORY_NAME"))
+		} else if statErr != nil {
+			log.Printf("handleGetScreen - failed to stat shared memory %s: %v", shmPath, statErr)
+		} else {
+			log.Printf("handleGetScreen - shared memory file exists but cannot be opened: %s (permission denied or other error: %v)", shmPath, err)
+		}
 		log.Printf("handleGetScreen - failed to open shared memory %s: %v", shmPath, err)
 		http.Error(w, "shared memory access failed", http.StatusBadRequest)
 		return
