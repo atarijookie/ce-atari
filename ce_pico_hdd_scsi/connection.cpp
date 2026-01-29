@@ -52,8 +52,6 @@ void ceDiscoverySend(void)
 
     lastAttempt = millis();
 
-    display(5);
-
     // send upd broadcast
     uint8_t updPacket[5];
     strcpy((char *)updPacket, "CELC");
@@ -172,8 +170,6 @@ void connectToCEhost(void)
     {
         return;
     }
-
-    display(6);
 
     debug("connectToCEhost - IP: %s, port: %d\n", hostIpString.c_str(), hostPortHdd);
 

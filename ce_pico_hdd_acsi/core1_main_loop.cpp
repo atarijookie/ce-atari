@@ -59,7 +59,6 @@ void core1_main_loop(void)
 
     debug("CORE 1 main\n");
     core1running = true;
-    uint8_t snakePhase = DISP_SNAKE_0;
 
     while(1)
     {
@@ -88,13 +87,6 @@ void core1_main_loop(void)
                     // if connected, keep sending SEND_FW_VER commands
                     if(connected)
                     {
-                        // display another part of snake phase
-                        display(snakePhase);
-                        snakePhase++;
-                        if(snakePhase > DISP_SNAKE_5) {
-                            snakePhase = DISP_SNAKE_0;
-                        }
-
                         IPCbuffer* bfr = ipcGetFreeBuffer(0, CMD_TIMEOUT_SHORT);
                         if(bfr) {
                             ipcSetBufferAndPutToFifo(bfr, 0, STATE_SEND_FW_VER, 0, NULL, 0);

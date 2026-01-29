@@ -1,91 +1,60 @@
-
 #include <cstdint>
 
 #include "defs.h"
 #include "display.h"
 #include "utils.h"
 
-void displayInit(void)
+extern volatile uint8_t core1state;
+extern volatile bool blinking;
+
+void blinkOnce(uint32_t onTimeMs, uint32_t offTimeMs)
 {
-    debug("displayInit\n");
-
-    gpio_set_function(PIN_IN_OE, GPIO_FUNC_SIO);
-    gpio_set_function(PIN_SEL_IO_DP_DS, GPIO_FUNC_SIO);
-    gpio_set_function(PIN_RST_CD_REQ_CP, GPIO_FUNC_SIO);
-
-    gpio_set_dir_out_masked((1 << PIN_SEL_IO_DP_DS) | (1 << PIN_RST_CD_REQ_CP) | (1 << PIN_IN_OE));
-
-    BIT_SET(PIN_IN_OE);         // disable input chip, so it won't interfere with DS and CP pins
-    BIT_CLR(PIN_SEL_IO_DP_DS);
-    BIT_CLR(PIN_RST_CD_REQ_CP);
+    LED_ON;
+    sleep_ms(onTimeMs);
+    LED_OFF;
+    sleep_ms(offTimeMs);
 }
 
-// these codes are for segments order GFEDCBA
-//                                      0     1     2     3     4     5     6     7     8     9
-const uint8_t segmentsNumbers[10] = {0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F};
+// Pico repeating timer
+repeating_timer_t timer;
 
-//                                      A     b     C     d     E     F     G     H     I     J   (K)     L   (M)     n     O     P   (Q)     r     S   (T)     U   (V)   (W)   (X)   (Y)   (Z)
-const uint8_t segmentsLetters[26] = {0x77, 0x7C, 0x39, 0x5E, 0x79, 0x71, 0x3D, 0x76, 0x06, 0x1E, 0x00, 0x38, 0x00, 0x54, 0x3F, 0x73, 0x00, 0x50, 0x6D, 0x00, 0x3E, 0x00, 0x00, 0x00, 0x00, 0x00};
-
-const uint8_t segmentsSnake[6] = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20};
-
-// use this to transform standard .GFEDCBA (76543210) order to our ABC.DEGF (01273465) order
-const uint8_t segmentOrder[8] = {0, 1, 2, 7, 3, 4, 6, 5};
-
-extern volatile uint8_t core1state;
-
-void display(uint8_t what)
+// Timer callback (runs every 100 ms)
+bool timerCallback(repeating_timer_t *t)
 {
     if(core1state != STATE_GET_COMMAND) {   // don't display anything unless the core1 is in the GET_COMMAND state (idle, between commands) - the display pins are shared with SCSI handshake
+        return true;
+    }
+
+    // TODO: scsi specific led set / clear logic
+
+    static int tickCounter = 0;
+
+    if(tickCounter < 1) {
+        LED_ON;
+    } else {
+        LED_OFF;
+    }
+
+    tickCounter++;
+    if(tickCounter >= 4) {
+        tickCounter = 0;
+    }
+
+    return true; // keep repeating
+}
+
+void blinkingStart(void)
+{
+    blinking = true;
+    add_repeating_timer_ms(100, timerCallback, NULL, &timer);
+}
+
+void blinkingStop(void)
+{
+    if(!blinking) {
         return;
     }
 
-    int lvlInOe = gpio_get_out_level(PIN_IN_OE);    // get the current output level of PIN_IN_OE
-    BIT_SET(PIN_IN_OE);                             // disable input chip, so it won't interfere with DS and CP pins
-
-    // change from SIO inputs to SIO outputs, so we can control the pins
-    gpio_set_dir_out_masked((1 << PIN_SEL_IO_DP_DS) | (1 << PIN_RST_CD_REQ_CP));
-
-    uint8_t val = 0;
-
-    if(what >= 0 && what <= 9) {        // for numbers
-        val = segmentsNumbers[what];
-    }
-
-    if(what >= '0' && what <= '9') {    // for ASCII numbers
-        val = segmentsNumbers[what - '0'];
-    }
-
-    if(what >= 'A' && what <= 'Z') {    // for capital letters
-        val = segmentsLetters[what - 'A'];
-    }
-
-    if(what >= 'a' && what <= 'z') {    // for small letters
-        val = segmentsLetters[what - 'a'];
-    }
-
-    if(what >= DISP_SNAKE_0 && what <= DISP_SNAKE_5) {  // for progress snake
-        val = segmentsSnake[what - DISP_SNAKE_0];
-    }
-
-    for(int i = 7; i >= 0; i--) {
-        int bitNo = segmentOrder[i];    // .GFEDCBA to ABC.DEGF order
-
-        if(val & (1 << bitNo)) {        // segment on? pin off
-            BIT_CLR(PIN_SEL_IO_DP_DS);
-        } else {                        // segment off? pin on
-            BIT_SET(PIN_SEL_IO_DP_DS);
-        }
-
-        BIT_CLR(PIN_RST_CD_REQ_CP);    // CP to L
-        busy_wait_at_least_cycles(10);
-        BIT_SET(PIN_RST_CD_REQ_CP);    // CP to H
-        busy_wait_at_least_cycles(10);
-        BIT_SET(PIN_RST_CD_REQ_CP);    // CP to L
-    }
-
-    gpio_put(PIN_IN_OE, lvlInOe);       // restore previous output level of PIN_IN_OE
-
-    // in GET_COMMAND mode (selection) the display pins are used as SIO inputs
-    gpio_set_dir_in_masked((1 << PIN_SEL_IO_DP_DS) | (1 << PIN_RST_CD_REQ_CP));
+    blinking = false;
+    cancel_repeating_timer(&timer);
 }

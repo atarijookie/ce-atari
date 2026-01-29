@@ -91,8 +91,7 @@
 
 #define PIN_KEYB_RX     28
 
-#define PIN_DS          14      // output
-#define PIN_CP          15      // output
+#define PIN_LED_ACT     14      // output
 
 #define PIN_LED_EVB     25
 
@@ -104,13 +103,13 @@
 #define BIT_CLR(PIN)    gpio_put(PIN, false)
 
 #ifdef LOG_LED
-    #define LED_OFF         {}
-    #define LED_ON          {}
-    #define LED_TOGGLE      { debug(".\n"); }
+    #define LED_OFF         { gpio_put(PIN_LED_ACT, 1); }
+    #define LED_ON          { gpio_put(PIN_LED_ACT, 0); }
+    #define LED_TOGGLE      { gpio_put(PIN_LED_ACT, (gpio_get_out_level(PIN_LED_ACT) == 0) ? 1 : 0); debug(".\n"); }
 #else
-    #define LED_OFF         gpio_put(PIN_LED_EVB, 0)
-    #define LED_ON          gpio_put(PIN_LED_EVB, 1)
-    #define LED_TOGGLE      { gpio_put(PIN_LED_EVB, (gpio_get_out_level(PIN_LED_EVB) == 0) ? 1 : 0); }
+    #define LED_OFF         { gpio_put(PIN_LED_ACT, 1); gpio_put(PIN_LED_EVB, 0); }
+    #define LED_ON          { gpio_put(PIN_LED_ACT, 0); gpio_put(PIN_LED_EVB, 1); }
+    #define LED_TOGGLE      { gpio_put(PIN_LED_ACT, (gpio_get_out_level(PIN_LED_ACT) == 0) ? 1 : 0); gpio_put(PIN_LED_EVB, (gpio_get_out_level(PIN_LED_EVB) == 0) ? 1 : 0); }
 #endif
 
 #endif /* DEFS_H_ */

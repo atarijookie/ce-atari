@@ -23,6 +23,9 @@ EthernetClient client;
 extern volatile bool core1running;
 void core1_main_loop(void);
 
+extern volatile bool connected;
+volatile bool blinking = true;
+
 void waitForCore1Running(void)
 {
     int loops = 0;
@@ -53,18 +56,17 @@ void ethernetInit(void)
     Ethernet.init(17);              // WIZnet W6100-EVB-Pico
     Ethernet.begin(settings.mac);   // set mac, get IP via hdcp
 
-    display(4);
-
     if(Ethernet.hardwareStatus() == EthernetNoHardware) {
         debug("No ethernet. HALT!\n");
-        display('E');
-        while(1);
+
+        while(1) {
+            blinkOnce(1900, 100);
+        }
     }
 
     while(Ethernet.linkStatus() == LinkOFF) {
         debug("cable not connected\n");
-        display('C');
-        delay(1000);
+        blinkOnce(400, 100);
     }
 
     debug("eth ip: %s\n", Ethernet.localIP().toString().c_str());
@@ -78,9 +80,14 @@ void ethernetInit(void)
 
 void setup(void)
 {
+    gpio_set_function(PIN_LED_ACT, GPIO_FUNC_SIO);
+    gpio_set_dir(PIN_LED_ACT, GPIO_OUT);
+
     gpio_set_function(PIN_LED_EVB, GPIO_FUNC_SIO);
     gpio_set_dir(PIN_LED_EVB, GPIO_OUT);
     LED_ON;             // turn LED on during setup
+
+    blinkingStart();
 
     debugInit();
     debug("\n\n------------\nCORE 0 setup\n");
@@ -88,13 +95,8 @@ void setup(void)
     loadSettings();
     debug("enabledIDs: %02X\n", settings.enabledIDs);
 
-    displayInit();
-    display(0);
-
     setupAtnBuffers(); // fill the ATN buffers with needed headers and terminators
     ipcInit();
-
-    display(1);
 
     // start core 1
     multicore_reset_core1();
@@ -103,11 +105,7 @@ void setup(void)
     multicore_launch_core1(core1_main_loop);
     waitForCore1Running();
 
-    display(2);
-
     ikbdInit();
-
-    display(3);
 
     ethernetInit();     // ethernet init
 }
@@ -131,6 +129,10 @@ void loop(void)
     LED_OFF;             // turn LED off when reached main loop
     debug("CORE 0 main\n");
 
+    uint32_t lastLedSetTime = millis();
+    int sendFwCount = 0;
+    bool ledOn = false;
+
     while(1)
     {
         #ifdef LOG_LED
@@ -143,6 +145,20 @@ void loop(void)
         // handle any data incoming
         handleIncommingData();
 
+        uint32_t now = millis();
+
+        // if not blinking (== device connected and running) turn LED off after 100 ms after it has been turned on by STATE_SEND_FW_VER
+        if (!blinking && ledOn && (now - lastLedSetTime) >= 20) {
+            ledOn = false;
+            LED_OFF;
+        }
+
+        // if blinking (== device startup) and now connected, stop periodic blinking
+        if(blinking && connected) {
+            blinkingStop();
+            blinking = false;
+        }
+
         // something in the queue for core0? get it, handle it
         IPCbuffer* bfr = ipcGetBufferFromFifo(0);
         if(bfr) {
@@ -151,7 +167,15 @@ void loop(void)
             {
                 // report FW version to host
                 case STATE_SEND_FW_VER:
-                    LED_TOGGLE;
+                    sendFwCount++;
+
+                    if(!blinking && sendFwCount >= 3) {
+                        sendFwCount = 0;
+                        LED_ON;
+                        ledOn = true;
+                    }
+                    lastLedSetTime = now;
+
                     sendHeaderAndDataToHost(SOCK_HDD, atnSendFwVersion, ATN_SENDFWVERSION_LEN_TX - TX_HEADER_SIZE);
                     break;
 
