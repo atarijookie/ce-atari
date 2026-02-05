@@ -259,7 +259,7 @@ uint8_t ChipInterface::getFWversion(ClientInfo* ci, bool hddNotFdd)
         storeDeviceFeatures(ci->mac, bfr[4]);
     }
 
-    Debug::out(whichLog, LOG_DEBUG, "FW: %s, mac: %02X:%02X:%02X:%02X:%02X:%02X", fwVerStr, ci->mac[0], ci->mac[1], ci->mac[2], ci->mac[3], ci->mac[4], ci->mac[5]);
+    Debug::out(whichLog, LOG_DEBUG, "FW: %s, mac: %02X:%02X:%02X:%02X:%02X:%02X, %s", fwVerStr, ci->mac[0], ci->mac[1], ci->mac[2], ci->mac[3], ci->mac[4], ci->mac[5], hddNotFdd ? "HDD" : "FDD");
 
     // for hdd return xilinx info, for fdd return if mac changed
     return hddNotFdd ? bfr[5] : macChanged;
@@ -273,6 +273,8 @@ void ChipInterface::storeDeviceFeatures(uint8_t* mac, uint8_t featureBits)
     if(featureBits & DEV_FEATURE_SCSI) featureString += "S";
     if(featureBits & DEV_FEATURE_FDD) featureString += "F";
     if(featureBits & DEV_FEATURE_IKBD) featureString += "I";
+
+    Debug::out(whichLog, LOG_DEBUG, "storeDeviceFeatures - mac: %02X:%02X:%02X:%02X:%02X:%02X, features: %s", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], featureString.c_str());
 
     Settings s(mac);
     s.setString("features", featureString.c_str());
