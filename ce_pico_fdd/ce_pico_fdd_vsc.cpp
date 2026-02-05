@@ -16,6 +16,7 @@
 #include "ikbd.h"
 #include "buttons.h"
 #include "mfm_read.h"
+#include "mfm_write.h"
 #include "psram.h"
 #include "defs.h"
 #include "utils.h"
@@ -37,6 +38,8 @@ uint8_t trackData1[READTRACKDATA_SIZE_BYTES];
 
 extern bool connectedToHost;
 uint32_t timeTrackStart;
+
+uint8_t mac[6];
 
 int imageState = IMAGE_NOT_LOADED;
 uint8_t imgTracks, imgSides, imgSectorsPerTrack;
@@ -179,6 +182,8 @@ void setup(void)
     queue_init(&fifoMfmWrite, 1, 64);
 
     multicore_launch_core1(core1_main_loop);    // start core1 for mfm stream handling
+
+    pio_mfm_write_setup();
 
     // Initialise the Wi-Fi chip
     if (cyw43_arch_init()) {
@@ -332,10 +337,10 @@ int main()
         // send heartbeat (fw version) once a second
         if (connectedToHost && (now - lastSendFwTime) >= 1000)
         {
-            // if(stWantsTheStream) {
-            //     hwPosition.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1; // get the current SIDE
-            //     debug("S %d %d\n", hwPosition.side, hwPosition.track);
-            // }
+            if(stWantsTheStream) {
+                hwPosition.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1; // get the current SIDE
+                debug("S %d %d\n", hwPosition.side, hwPosition.track);
+            }
 
             sendFwReport(now);
         }
@@ -440,6 +445,7 @@ void setupAtnBuffers(void)
     storeHeader(atnSendFwVersion, ATN_FW_VERSION, 0);
     storeWord(atnSendFwVersion + TX_HEADER_SIZE, version[0]);
     storeWord(atnSendFwVersion + TX_HEADER_SIZE + 2, version[1]);
+    atnSendFwVersion[TX_HEADER_SIZE + 4] = DEV_FEATURE_FDD + DEV_FEATURE_IKBD;    // features bits - ACSI + IKBD
 
     // one track request
     memset(atnSendTrackRequest, 0, ATN_SENDTRACK_REQ_LEN_TX);
@@ -455,8 +461,8 @@ void setupAtnBuffers(void)
 
 void storeMacAddress(void)
 {
-    uint8_t* pMac = atnSendFwVersion + TX_HEADER_SIZE + 6;
-    memset(pMac, 0, 6);
-    cyw43_hal_get_mac(CYW43_HAL_MAC_WLAN0, pMac);
-    debug("mac: %02X:%02X:%02X:%02X:%02X:%02X\n", pMac[0], pMac[1], pMac[2], pMac[3], pMac[4], pMac[5]);
+    memset(mac, 0, 6);
+    cyw43_hal_get_mac(CYW43_HAL_MAC_WLAN0, mac);            // get mac into the mac array
+    memcpy(atnSendFwVersion + TX_HEADER_SIZE + 6, mac, 6);  // copy mac into fw version array
+    debug("mac: %02X:%02X:%02X:%02X:%02X:%02X\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 }

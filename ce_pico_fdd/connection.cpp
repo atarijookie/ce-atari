@@ -29,6 +29,8 @@ struct udp_pcb* pcbUpd;
 
 TConnection connectionFdd;
 
+extern uint8_t mac[6];
+
 uint8_t hostIp[4];
 std::string hostIpString;
 ip_addr_t hostIpAddr;
@@ -210,8 +212,9 @@ void ceDiscoverySend(void)
     displayMessage("wifi connected", "CE host discovery");
 
     // alloc buffer, copy data to payload part
-    struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, 4 + 1, PBUF_RAM);
-    memcpy((char *)p->payload, "CELC", 4);
+    struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, 10 + 1, PBUF_RAM);
+    memcpy((char *)p->payload, "CELC", 4);      // 0..3 - CELC
+    memcpy(((char *)p->payload) + 4, mac, 6);    // 4..9 - mac
 
     whichBroadcastAddr = !whichBroadcastAddr;   // toggle this flag
 

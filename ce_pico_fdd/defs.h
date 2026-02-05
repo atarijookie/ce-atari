@@ -21,6 +21,11 @@
     #define MAX(X,Y)    ((X > Y) ? X : Y)
 #endif
 
+#define DEV_FEATURE_IKBD    8
+#define DEV_FEATURE_FDD     4
+#define DEV_FEATURE_SCSI    2
+#define DEV_FEATURE_ACSI    1
+
 // commands sent from device to host
 #define ATN_FW_VERSION          0x01        // followed by string with FW version (length: 4 WORDs - cmd, v[0], v[1], 0)
 #define ATN_SECTOR_WRITTEN      0x03        // sent: 3, side (highest bit) + track #, current sector #
@@ -88,7 +93,7 @@
 
 #define WRITEBUFFER_SIZE    1300
 
-typedef struct 
+typedef struct
 {
     uint8_t buffer[WRITEBUFFER_SIZE];  // buffer for the written data
     uint16_t count;                    // count of WORDs in buffer
@@ -97,7 +102,7 @@ typedef struct
 typedef struct {
     uint8_t track;
     uint8_t side;
-} TDrivePosition;   
+} TDrivePosition;
 
 typedef struct {
     uint8_t side;

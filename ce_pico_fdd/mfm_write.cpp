@@ -7,20 +7,9 @@
 #include "mfm_write.pio.h"
 #include "pico/util/queue.h"
 #include "hardware/dma.h"
+#include "mfm_write.h"
 
 #include "defs.h"
-
-#define MFM_4US         1
-#define MFM_6US         2
-#define MFM_8US         3
-
-// exact expected pulses would be: 23 ticks, 43 ticks, 63 ticks
-#define PULSE_TOO_SHORT 13
-#define PULSE_4US       33
-#define PULSE_6US       53
-#define PULSE_8US       73
-
-extern queue_t fifoMfmWrite;
 
 static PIO pioMfmWrite;
 static uint smMfmWrite;
