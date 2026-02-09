@@ -65,7 +65,7 @@ pico_set_program_version(ce_pico_fdd_vsc "0.1")
 
 # Modify the below lines to enable/disable output over UART/USB
 pico_enable_stdio_uart(ce_pico_fdd_vsc 1)
-pico_enable_stdio_usb(ce_pico_fdd_vsc 1)
+# pico_enable_stdio_usb(ce_pico_fdd_vsc 1)
 
 # Add the standard library to the build
 target_link_libraries(ce_pico_fdd_vsc

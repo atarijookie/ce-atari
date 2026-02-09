@@ -49,7 +49,7 @@ extern bool diskChanged;
 extern int imageState;
 
 extern SStreamed posStreamed, hwPosition;
-extern volatile bool reloadTrackSide0, reloadTrackSide1;
+extern volatile bool reloadTrack;
 
 void storeMacAddress(void);
 
@@ -499,11 +499,7 @@ void handleTrackReceived(void)
     psramStoreTrack(trackNo, sideNo, tmpTrackBfr + 2);
 
     if(trackNo == hwPosition.track) {   // we've just received the track that is being streamed out?
-        if(sideNo) {                    // must reload side 1
-            reloadTrackSide1 = true;
-        } else {                        // must reload side 0
-            reloadTrackSide0 = true;
-        }
+        reloadTrack = true;
     }
 
     debug("Rx %d side %d\n", trackNo, sideNo);

@@ -139,6 +139,36 @@ void psramStoreSector(int track, int side, int byteOffsetFromTrackStart, uint8_t
     critical_section_exit(&spi_critical_section);
 }
 
+/*
+For the supplied track, side, sector, find the starting address of the track in PSRAM,
+offset from start of track for the sector, and read it into the supplied trackData buffer
+with the offset to the sector.
+*/
+void psramLoadSector(int track, int side, int sector, uint8_t* trackDataStart)
+{
+    critical_section_enter_blocking(&spi_critical_section);
+
+    side = (side == 0) ? 0 : 1;     // limit side to values 0 and 1
+    track = MIN(track, MAX_TRACKS); // limit track to MAX_TRACKS
+    sector = MIN(sector, 11);       // limit sector to 11
+    uint32_t address = ((track * 2) + side) * READTRACKDATA_SIZE_BYTES;
+
+    // from the stream table read offset to this sector
+    uint8_t bfr[2];
+    psramReadBuffer(address + (2 * sector), bfr, 2);
+    uint32_t sectorOffsetBytes = getWord(bfr);
+
+    if(sectorOffsetBytes > 0) {        // sector offset present?
+        // read 1200 bytes from the sector start address into data buffer
+        // debug("L t: %d, i: %d, e: %d, o: %d\n", track, side, sector, sectorOffsetBytes);
+        psramReadBuffer(address + sectorOffsetBytes, trackDataStart + sectorOffsetBytes, ENCODED_SECTOR_MAX_SIZE);
+    } else {
+        // debug("L t: %d, i: %d, e: %d - NO offset\n", track, side, sector);
+    }
+
+    critical_section_exit(&spi_critical_section);
+}
+
 #define PSRAM_ADDR_FLAG     100000
 
 void psramConfigFlagSet(void)

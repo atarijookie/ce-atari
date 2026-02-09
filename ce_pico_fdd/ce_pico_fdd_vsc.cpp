@@ -9,7 +9,7 @@
 #include "hardware/timer.h"
 #include "hardware/uart.h"
 #include "hardware/watchdog.h"
-#include "tusb.h"
+// #include "tusb.h"
 
 #include "connection.h"
 #include "display.h"
@@ -21,6 +21,8 @@
 #include "defs.h"
 #include "utils.h"
 #include "serial_config.h"
+
+extern volatile bool core1running;
 
 uint16_t version[2] = {0xf025, 0x0901}; // this means: Franz, 2025-09-01
 uint8_t atnSendFwVersion[ATN_SENDFWVERSION_LEN_TX];
@@ -109,6 +111,25 @@ void readTrackData_goToStart(void)
     timeTrackStart = millis();                  // time of track start to now
 }
 
+void waitForCore1Running(void)
+{
+    int loops = 0;
+
+    while(true) {
+        sleep_ms(100);
+        loops++;
+
+        if(loops >= 10) {
+            loops = 0;
+            debug("CORE 0 waiting for CORE 1\n");
+        }
+
+        if(core1running) {
+            break;
+        }
+    }
+}
+
 void setup(void)
 {
     stdio_init_all();
@@ -181,7 +202,12 @@ void setup(void)
 
     queue_init(&fifoMfmWrite, 1, 64);
 
+    // start core 1
+    multicore_reset_core1();
+    multicore_fifo_drain();
+    sleep_ms(10);
     multicore_launch_core1(core1_main_loop);    // start core1 for mfm stream handling
+    waitForCore1Running();
 
     pio_mfm_write_setup();
 
@@ -318,12 +344,12 @@ int main()
         if((now - lastInputCheck) > 250) {
             lastInputCheck = now;
 
-            if(tud_mounted()) {         // USB connected and ready?
-                int key = getchar_timeout_us(0);
-                if(key == '\n' || key == '\r' || strlen(Settings.ssid) == 0) {
-                    serialConfigLoop();
-                }
-            }
+            // if(tud_mounted()) {         // USB connected and ready?
+            //     int key = getchar_timeout_us(0);
+            //     if(key == '\n' || key == '\r' || strlen(Settings.ssid) == 0) {
+            //         serialConfigLoop();
+            //     }
+            // }
         }
 
         // connect to wifi, discover CE server, connect to CE server

@@ -1,0 +1,42 @@
+(first two bytes received via network are track # and side #, but they are ignored
+and not stored to psram, so the offsets below are without these 2 additional bytes at start)
+
+offset  |   what
+---------------------------
+ 0..1        byte offset to end of stream (no valid data beyong this point)
+ 2..3        byte offset to sector 1
+ 4..5        byte offset to sector 2
+ 6..7        byte offset to sector 3
+ 8..9        byte offset to sector 4
+10..11       byte offset to sector 5
+12..13       byte offset to sector 6
+14..15       byte offset to sector 7
+16..17       byte offset to sector 8
+18..19       byte offset to sector 9
+20..21       byte offset to sector 10
+22..39       not used (would be used if there would be more sectors)
+
+(rest is encoded as mfm symbols, so there is no exact offset possible for the rest)
+
+60* 0x4e as mfm symbols
+
+sector - ENCODED_SECTOR_MAX_SIZE == 1200 B
+(this section repeats 8 or 9 or 10 times per track, based on sectors-per-track of the image)
+[
+    CMD_CURRENT_SECTOR + side + track + sector
+    12* 0x00 as mfm symbols
+     3* A1 mark
+    ID_mark + track side sector size crc
+    22* 0x4e as mfm symbols
+
+    CMD_DATA_PART_OF_SECTOR
+    12* 0x00 as mfm symbols
+    DAM_mark
+    512* data bytes as mfm symbols
+    CRC
+     40* 0x4e as mfm symbols
+    raw zeros appended to 1200 B size
+]
+
+CMD_TRACK_STREAM_END
+0

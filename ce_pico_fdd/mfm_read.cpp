@@ -15,6 +15,8 @@
 #include "display.h"
 #include "psram.h"
 
+volatile bool core1running = false;
+
 #define MFM_BUFFER_SIZE         2048                                // 12 address bits masked for ring mode (4096 bytes == 2048 words)
 #define MFM_BUFFER_HALF_SIZE    (MFM_BUFFER_SIZE / 2)
 #define MFM_READ_SIZE_FILLS     (MFM_BUFFER_HALF_SIZE / 4)
@@ -35,7 +37,7 @@ extern uint8_t trackData1[READTRACKDATA_SIZE_BYTES];
 extern uint32_t dataIndexInTrack;
 
 extern SStreamed posStreamed, hwPosition, posWritten;
-volatile bool reloadTrackSide0 = false, reloadTrackSide1 = false;
+volatile bool reloadTrack = false;
 void readTrackData_goToStart(void);
 
 void __isr dmaHandlerMfm(void);
@@ -95,22 +97,12 @@ void __isr dmaHandlerMfm(void)
 
 void getMfmDataToBuffer(uint8_t* bfr, int len)
 {
-    static int prevTrackNo = 255;
-
     // update SIDE var
     hwPosition.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1; // get the current SIDE
 
     // get current track and side we should be streaming, limit them to maximum values
     int trackNo = MIN(hwPosition.track, MAX_TRACKS);
     int sideNo = MIN(hwPosition.side, 1);
-
-    if(prevTrackNo != trackNo) {      // track changed? load new data from psram, restart stream
-        psramLoadTrack(hwPosition.track, 0, trackData0);
-        psramLoadTrack(hwPosition.track, 1, trackData1);
-
-        readTrackData_goToStart();
-    }
-    prevTrackNo = trackNo;
 
     uint8_t* pTrackDataStart = (sideNo == 0) ? trackData0 : trackData1;
     uint8_t* pTrackData = &pTrackDataStart[dataIndexInTrack];  // copy data from here
@@ -189,6 +181,8 @@ void core1_main_loop(void)
 {
     flash_safe_execute_core_init();     // call this for flash_safe_execute() to work
 
+    core1running = true;
+
     // set whole output buffer to same value
     for (int i = 0; i < MFM_BUFFER_SIZE; i++) {
         mfmBuffer[i] = 7;
@@ -198,16 +192,39 @@ void core1_main_loop(void)
     setupPwmOutput();
     setupDmaToPwm();
 
+    int loadTrack = 0xff;
+    int loadSector = 0xff;
+
+    gpio_function_t lastFunction = GPIO_FUNC_SIO;
+
     while(1)
     {
-        if(reloadTrackSide0) {      // track side 0 needs reload?
-            reloadTrackSide0 = false;
-            psramLoadTrack(hwPosition.track, 0, trackData0);
+        // if loaded track doesn't match the current hw track position, or should just reload track
+        if((loadTrack != hwPosition.track) || reloadTrack) {
+            reloadTrack = false;
+            loadTrack = hwPosition.track;     // start loading this track
+            loadSector = 1;
+
+            // While loading data, keep data output as 1 instead of previous track data.
+            // Seems like if the FDD controller still sees previous track to be streamed while new is loading,
+            // it will do additional STEP pulses, so it's better to turn off previous track data immediatelly.
+            gpio_set_function(PIN_RDATA, GPIO_FUNC_SIO);
+            gpio_set_dir(PIN_RDATA, GPIO_OUT);
+            gpio_put(PIN_RDATA, 1);
+            lastFunction = GPIO_FUNC_SIO;
         }
 
-        if(reloadTrackSide1) {      // track side 1 needs reload?
-            reloadTrackSide1 = false;
-            psramLoadTrack(hwPosition.track, 1, trackData1);
+        // valid sector # to load? load one sector for each side, will do next sector in next run
+        if(loadSector <= 11) {
+            psramLoadSector(loadTrack, 0, loadSector, trackData0);
+            psramLoadSector(loadTrack, 1, loadSector, trackData1);
+            loadSector++;
+        } else {
+            // data loaded, gpio function back to PWM output
+            if(lastFunction != GPIO_FUNC_PWM) {
+                gpio_set_function(PIN_RDATA, GPIO_FUNC_PWM);
+                lastFunction = GPIO_FUNC_PWM;
+            }
         }
 
         // MFM read buffer should be refilled?
