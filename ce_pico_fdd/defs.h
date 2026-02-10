@@ -21,6 +21,10 @@
     #define MAX(X,Y)    ((X > Y) ? X : Y)
 #endif
 
+#define MFM_4US         1
+#define MFM_6US         2
+#define MFM_8US         3
+
 #define DEV_FEATURE_IKBD    8
 #define DEV_FEATURE_FDD     4
 #define DEV_FEATURE_SCSI    2

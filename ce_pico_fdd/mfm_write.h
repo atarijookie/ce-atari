@@ -6,10 +6,6 @@
 
 #include "defs.h"
 
-#define MFM_4US         1
-#define MFM_6US         2
-#define MFM_8US         3
-
 // exact expected pulses would be: 23 ticks, 43 ticks, 63 ticks
 #define PULSE_TOO_SHORT 13
 #define PULSE_4US       33

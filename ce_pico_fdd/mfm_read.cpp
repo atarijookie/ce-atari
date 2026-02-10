@@ -35,6 +35,7 @@ volatile uint8_t fillWhat = FILL_NONE;
 extern uint8_t trackData0[READTRACKDATA_SIZE_BYTES];
 extern uint8_t trackData1[READTRACKDATA_SIZE_BYTES];
 extern uint32_t dataIndexInTrack;
+extern volatile uint32_t lastStepTime;
 
 extern SStreamed posStreamed, hwPosition, posWritten;
 volatile bool reloadTrack = false;
@@ -149,14 +150,9 @@ void getMfmDataToBuffer(uint8_t* bfr, int len)
 
 const uint16_t arrValues[4] = {7, 7, 11, 15};       // conversion table from mfm packed symbol to timer ARR value (for 0 us, 4 us, 6 us, 8 us)
 
-void fillHalfMfmBuffer(void)
+void fillHalfMfmBuffer(uint8_t what)
 {
-    if(fillWhat == FILL_NONE) {     // nothing to fill? quit
-        return;
-    }
-
-    uint16_t* bfr = (fillWhat == FILL_LOWER) ? &mfmBuffer[0] : &mfmBuffer[MFM_BUFFER_HALF_SIZE];
-    fillWhat = FILL_NONE;
+    uint16_t* bfr = (what == FILL_LOWER) ? &mfmBuffer[0] : &mfmBuffer[MFM_BUFFER_HALF_SIZE];
 
     // from the track buffer (with all the additional data and spaces) extract
     // just MFM_READ_SIZE_FILLS bytes which can be transformed into MFM intervals
@@ -177,6 +173,32 @@ void fillHalfMfmBuffer(void)
     }
 }
 
+void clearMfmBuffer(void)
+{
+    // byte 0x4e gets translated to times 666644
+    const int fourEtimes[6] = {MFM_6US, MFM_6US, MFM_6US, MFM_6US, MFM_4US, MFM_4US};
+    const int fourEarrValues[6] = {11, 11, 11, 11, 7, 7};
+
+    int idx = 0;
+
+    // fill whole mfm buffer with 0x4e times
+    for(int i=0; i<MFM_BUFFER_SIZE; i++) {
+        mfmBuffer[i] = fourEarrValues[idx];
+
+        idx++;
+        if(idx >= 6) {
+            idx = 0;
+        }
+    }
+}
+
+enum MfmStreamState {
+  STATE_STREAMING,          // no step occured recently, we can just stream
+  STATE_STEPPING,           // step happened less than 15 ms ago, there might be more, don't stream
+  STATE_REQUEST_LOAD,       // stepping stopped (was stepping, but last was 15 ms ago or more), we can load new track
+  STATE_LOADING             // we're now loading data from PSRAM to SRAM, once this is done we can start streaming
+};
+
 void core1_main_loop(void)
 {
     flash_safe_execute_core_init();     // call this for flash_safe_execute() to work
@@ -195,41 +217,62 @@ void core1_main_loop(void)
     int loadTrack = 0xff;
     int loadSector = 0xff;
 
-    gpio_function_t lastFunction = GPIO_FUNC_SIO;
+    MfmStreamState state = STATE_REQUEST_LOAD;
 
     while(1)
     {
-        // if loaded track doesn't match the current hw track position, or should just reload track
-        if((loadTrack != hwPosition.track) || reloadTrack) {
-            reloadTrack = false;
-            loadTrack = hwPosition.track;     // start loading this track
-            loadSector = 1;
+        uint32_t now = millis();
+        uint32_t timeMsSinceLastStep = now - lastStepTime;
 
-            // While loading data, keep data output as 1 instead of previous track data.
-            // Seems like if the FDD controller still sees previous track to be streamed while new is loading,
-            // it will do additional STEP pulses, so it's better to turn off previous track data immediatelly.
-            gpio_set_function(PIN_RDATA, GPIO_FUNC_SIO);
-            gpio_set_dir(PIN_RDATA, GPIO_OUT);
-            gpio_put(PIN_RDATA, 1);
-            lastFunction = GPIO_FUNC_SIO;
+        if(timeMsSinceLastStep < 15) {      // last STEP happened within last 15 ms?
+            if(state != STATE_STEPPING) {   // we weren't STEPPING before this? clear mfm buffer
+                clearMfmBuffer();
+            }
+
+            state = STATE_STEPPING;         // we're in the stepping state
         }
-
-        // valid sector # to load? load one sector for each side, will do next sector in next run
-        if(loadSector <= 11) {
-            psramLoadSector(loadTrack, 0, loadSector, trackData0);
-            psramLoadSector(loadTrack, 1, loadSector, trackData1);
-            loadSector++;
-        } else {
-            // data loaded, gpio function back to PWM output
-            if(lastFunction != GPIO_FUNC_PWM) {
-                gpio_set_function(PIN_RDATA, GPIO_FUNC_PWM);
-                lastFunction = GPIO_FUNC_PWM;
+        else
+        {   // last step happened at least 15 ms ago? we're not stepping anymore
+            if(state == STATE_STEPPING) {
+                state = STATE_REQUEST_LOAD;
             }
         }
 
+        // if we're streaming (not stepping, not loading) and reload was requested, move to load state
+        if(state == STATE_STREAMING && reloadTrack) {
+            reloadTrack = false;
+            state = STATE_REQUEST_LOAD;
+        }
+
+        // LOAD was requested, set the load variables and switch to streaming state
+        if(state == STATE_REQUEST_LOAD) {
+            reloadTrack = false;
+            loadTrack = hwPosition.track;     // start loading this track
+            loadSector = 1;
+            state = STATE_LOADING;
+        }
+
+        // valid sector # to load? load one sector for each side, will do next sector in next run
+        if(state == STATE_LOADING) {
+            if(loadSector <= 11) {
+                psramLoadSector(loadTrack, 0, loadSector, trackData0);
+                psramLoadSector(loadTrack, 1, loadSector, trackData1);
+                loadSector++;
+            } else {
+                state = STATE_STREAMING;
+            }
+        }
+
+        // int streamedSector = (dataIndexInTrack < 130) ? 1 : (((dataIndexInTrack - 130) / 1200) + 1);
+
         // MFM read buffer should be refilled?
         if(fillWhat != FILL_NONE) {
-            fillHalfMfmBuffer();
+            uint8_t whatCopy = fillWhat;    // make a copy of global var, so we can clear global var before entering fillHalfMfmBuffer
+            fillWhat = FILL_NONE;
+
+            if(state == STATE_STREAMING) {  // only if streaming now, fill buffer with data
+                fillHalfMfmBuffer(whatCopy);
+            }
         }
     }
 }

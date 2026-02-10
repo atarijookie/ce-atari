@@ -49,6 +49,7 @@ char imageFileName[32];
 bool diskChanged = false;
 uint32_t diskChangeEnd;
 uint32_t dataIndexInTrack = STREAM_START_OFFSET;
+volatile uint32_t lastStepTime = 0;
 
 queue_t fifoMfmWrite;
 
@@ -75,8 +76,6 @@ TWriteBuffer wrBuffer;  // buffer for written sectors
 // interrupt handler for STEP signal
 void __isr floppyStepISR(uint gpio, uint32_t event_mask)
 {
-    static uint32_t lastStepTime = 0;
-
     uint32_t now = millis();
 
     if((now - lastStepTime) < 1) {  // last step ISR was less than 2 ms ago? this is a glitch, ignore it
