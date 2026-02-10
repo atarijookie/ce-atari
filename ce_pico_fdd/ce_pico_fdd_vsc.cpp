@@ -39,7 +39,6 @@ uint8_t trackData0[READTRACKDATA_SIZE_BYTES];
 uint8_t trackData1[READTRACKDATA_SIZE_BYTES];
 
 extern bool connectedToHost;
-uint32_t timeTrackStart;
 
 uint8_t mac[6];
 
@@ -48,7 +47,6 @@ uint8_t imgTracks, imgSides, imgSectorsPerTrack;
 char imageFileName[32];
 bool diskChanged = false;
 uint32_t diskChangeEnd;
-uint32_t dataIndexInTrack = STREAM_START_OFFSET;
 volatile uint32_t lastStepTime = 0;
 
 queue_t fifoMfmWrite;
@@ -102,12 +100,6 @@ void __isr floppyStepISR(uint gpio, uint32_t event_mask)
     } else {                        // if track is not 0, TRACK00 to H
         gpio_put(PIN_TRACK00, 1);
     }
-}
-
-void readTrackData_goToStart(void)
-{
-    dataIndexInTrack = STREAM_START_OFFSET;     // stream index to start
-    timeTrackStart = millis();                  // time of track start to now
 }
 
 void waitForCore1Running(void)
@@ -184,8 +176,6 @@ void setup(void)
 
         while(1);   // should not get here, because storeSettingsFromPSRAMtoEEPROM should restart
     }
-
-    readTrackData_goToStart();
 
     setupAtnBuffers();
 
@@ -331,7 +321,6 @@ int main()
 
     uint32_t now = millis();
     lastSendFwTime = now;
-    timeTrackStart = now;
     uint32_t lastInputCheck = now;
 
     int WGatePrev = 1;
@@ -443,15 +432,6 @@ int main()
                     storeWrittenSectorDataToTrackLocally(posStreamed.side, posStreamed.track, posStreamed.sector, wrBuffer.buffer, wrBuffer.count);
                 }
             }
-        }
-
-        //------------
-        uint32_t timeSinceTrackStart = now - timeTrackStart;
-
-        gpio_put(PIN_INDEX, (timeSinceTrackStart <= 195) ? 1 : 0);  // INDEX is H for time 0-195, index L for times 196-200
-
-        if(timeSinceTrackStart >= 200) {    // track finished
-            readTrackData_goToStart();      // move the pointer in the track stream to start
         }
 
         //---------------------------

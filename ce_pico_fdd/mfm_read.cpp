@@ -34,8 +34,9 @@ volatile uint8_t fillWhat = FILL_NONE;
 
 extern uint8_t trackData0[READTRACKDATA_SIZE_BYTES];
 extern uint8_t trackData1[READTRACKDATA_SIZE_BYTES];
-extern uint32_t dataIndexInTrack;
+uint32_t dataIndexInTrack = STREAM_START_OFFSET;
 extern volatile uint32_t lastStepTime;
+uint32_t timeTrackStart;
 
 extern SStreamed posStreamed, hwPosition, posWritten;
 volatile bool reloadTrack = false;
@@ -192,6 +193,12 @@ void clearMfmBuffer(void)
     }
 }
 
+void readTrackData_goToStart(void)
+{
+    dataIndexInTrack = STREAM_START_OFFSET;     // stream index to start
+    timeTrackStart = millis();                  // time of track start to now
+}
+
 enum MfmStreamState {
   STATE_STREAMING,          // no step occured recently, we can just stream
   STATE_STEPPING,           // step happened less than 15 ms ago, there might be more, don't stream
@@ -205,10 +212,8 @@ void core1_main_loop(void)
 
     core1running = true;
 
-    // set whole output buffer to same value
-    for (int i = 0; i < MFM_BUFFER_SIZE; i++) {
-        mfmBuffer[i] = 7;
-    }
+    clearMfmBuffer();
+    readTrackData_goToStart();
 
     // start mfm output
     setupPwmOutput();
@@ -260,6 +265,12 @@ void core1_main_loop(void)
                 loadSector++;
             } else {
                 state = STATE_STREAMING;
+
+                // update dataIndexInTrack position based on the current timeSinceTrackStart position
+                now = millis();
+                uint32_t timeSinceTrackStart = now - timeTrackStart;
+                int streamedSectorIndex = (timeSinceTrackStart / 18);       // convert timeSinceTrackStart to sector index (0 - 10)
+                dataIndexInTrack = 130 + (streamedSectorIndex * 1200);      // update dataIndexInTrack to start streaming the sector based on timeSinceTrackStart
             }
         }
 
@@ -273,6 +284,16 @@ void core1_main_loop(void)
             if(state == STATE_STREAMING) {  // only if streaming now, fill buffer with data
                 fillHalfMfmBuffer(whatCopy);
             }
+        }
+
+        // index pulse generating and stream restart
+        now = millis();
+        uint32_t timeSinceTrackStart = now - timeTrackStart;
+
+        gpio_put(PIN_INDEX, (timeSinceTrackStart <= 195) ? 1 : 0);  // INDEX is H for time 0-195, index L for times 196-200
+
+        if(timeSinceTrackStart >= 200) {    // track finished
+            readTrackData_goToStart();      // move the pointer in the track stream to start
         }
     }
 }
