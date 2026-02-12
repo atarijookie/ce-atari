@@ -48,8 +48,10 @@ extern char imageFileName[32];
 extern bool diskChanged;
 extern int imageState;
 
-extern SStreamed posStreamed, hwPosition;
-extern volatile bool reloadTrack;
+extern TDrivePosition posStreamed, hwPosition;
+
+extern uint8_t trackData0[READTRACKDATA_SIZE_BYTES];
+extern uint8_t trackData1[READTRACKDATA_SIZE_BYTES];
 
 void storeMacAddress(void);
 
@@ -480,7 +482,7 @@ void showImageLoadProgress(void)
     displayMessage("Loading image", imageFileName, progress);  // show on display
 }
 
-uint8_t tmpTrackBfr[READTRACKDATA_SIZE_BYTES];
+uint8_t tmpTrackBfr[READTRACKDATA_SIZE_BYTES + 16];
 
 void handleTrackReceived(void)
 {
@@ -495,14 +497,15 @@ void handleTrackReceived(void)
     int trackNo = MIN(tmpTrackBfr[0], MAX_TRACKS - 1);
     int sideNo = MIN(tmpTrackBfr[1], 1);
 
+    debug("Rx t %d i %d l %d\n", trackNo, sideNo, lenData);
+
     // store the track track data into PSRAM
     psramStoreTrack(trackNo, sideNo, tmpTrackBfr + 2);
 
     if(trackNo == hwPosition.track) {   // we've just received the track that is being streamed out?
-        reloadTrack = true;
+        uint8_t* pTrack = (sideNo == 0) ? trackData0 : trackData1;  // pick the correct pointer for this side
+        memcpy(pTrack, tmpTrackBfr + 2, lenData);   // copy data directly to track buffer
     }
-
-    debug("Rx %d side %d\n", trackNo, sideNo);
 
     receivedTracks++;
 

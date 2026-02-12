@@ -104,18 +104,14 @@ typedef struct
 } TWriteBuffer;
 
 typedef struct {
-    uint8_t track;
-    uint8_t side;
+    volatile uint8_t side;
+    volatile uint8_t track;
+    volatile uint8_t sector;
 } TDrivePosition;
-
-typedef struct {
-    uint8_t side;
-    uint8_t track;
-    uint8_t sector;
-} SStreamed;
 
 #define READTRACKDATA_SIZE_BYTES    13800
 #define MAX_TRACKS                  90
+#define MAX_SECTORS_PER_TRACK       11
 
 #define ENCODED_SECTOR_MAX_SIZE     1200    // the mfm encoded sector - header + gaps + markers + data - should not exceed this size. Using fixed size to simplify sector write to memory in device.
 

@@ -7,6 +7,7 @@ void psramTest(void);
 
 void psramStoreTrack(int track, int side, uint8_t* data);
 void psramLoadTrack(int track, int side, uint8_t* data);
+void psramLoadTrack_currentSectorFirst(int track, int side, uint8_t* trackDataStart);
 
 void psramStoreSector(int track, int side, int byteOffsetFromTrackStart, uint8_t* data, uint32_t copyLength, uint32_t clearLength);
 void psramLoadSector(int track, int side, int sector, uint8_t* trackDataStart);

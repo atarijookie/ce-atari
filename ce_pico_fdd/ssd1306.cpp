@@ -31,13 +31,12 @@ BSD license, check license.txt for more information
 
 SSD1306::SSD1306()
 {
-    buffer = new uint8_t[SSD1306_BUFFER_SIZE];
+
 }
 
 SSD1306::~SSD1306()
 {
-    delete []buffer;
-    buffer = NULL;
+
 }
 
 // the most basic function, set a single pixel

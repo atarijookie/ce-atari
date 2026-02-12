@@ -42,6 +42,8 @@ void displayInit(void)
     gpio_pull_up(PIN_SDA);
     gpio_pull_up(PIN_SCL);
 
+    display = new SSD1306();
+
     displayPresent = isDisplayConnected(DISPLAY_I2C_ADDRESS);
 
     if(!displayPresent) {
@@ -49,8 +51,6 @@ void displayInit(void)
         return;
     }
     debug("displayInit - i2c display found\n");
-
-    display = new SSD1306();
 
     bool res = display->begin(SSD1306_SWITCHCAPVCC);    // low level OLED library
     display->clearDisplay();
@@ -67,11 +67,13 @@ void displayMessage(const char* msg1, const char* msg2, const char* msg3)
         return;
     }
 
-    display->clearDisplay();
+    // debug("displayMessage: %s, %s, %s\n", msg1, msg2, msg3);
 
-    if(msg1) gfx->drawString(0,   CHAR_H, msg1);
-    if(msg2) gfx->drawString(0, 2*CHAR_H, msg2);
-    if(msg3) gfx->drawString(0, 3*CHAR_H, msg3);
+    // display->clearDisplay();
 
-    display->display();
+    // if(msg1) gfx->drawString(0,   CHAR_H, msg1);
+    // if(msg2) gfx->drawString(0, 2*CHAR_H, msg2);
+    // if(msg3) gfx->drawString(0, 3*CHAR_H, msg3);
+
+    // display->display();
 }

@@ -108,7 +108,7 @@ public:
   void dim(int dim);
 
 private:
-    uint8_t *buffer;
+    uint8_t buffer[SSD1306_BUFFER_SIZE];
     uint8_t vccstate;
 };
 

@@ -35,14 +35,48 @@ volatile uint8_t fillWhat = FILL_NONE;
 extern uint8_t trackData0[READTRACKDATA_SIZE_BYTES];
 extern uint8_t trackData1[READTRACKDATA_SIZE_BYTES];
 uint32_t dataIndexInTrack = STREAM_START_OFFSET;
-extern volatile uint32_t lastStepTime;
-uint32_t timeTrackStart;
+volatile uint32_t lastStepTime = 0;
+volatile uint32_t timeTrackStart;
 
-extern SStreamed posStreamed, hwPosition, posWritten;
-volatile bool reloadTrack = false;
+extern TDrivePosition posStreamed, hwPosition, posWritten;
+
 void readTrackData_goToStart(void);
 
+extern queue_t fifoToCore0;
+extern queue_t fifoToCore1;
+
 void __isr dmaHandlerMfm(void);
+
+// interrupt handler for STEP signal
+void __isr floppyStepISR(uint gpio, uint32_t event_mask)
+{
+    uint32_t now = millis();
+
+    if((now - lastStepTime) < 1) {  // last step ISR was less than 2 ms ago? this is a glitch, ignore it
+        return;
+    }
+    lastStepTime = now;
+
+    if(BIT_IS_H(PIN_MOT_EN)) {       // motor not enabled? Skip the following code.
+        return;
+    }
+
+    if(BIT_IS_H(PIN_DIR)) {  // direction is High? track--
+        if(hwPosition.track > 0) {
+            hwPosition.track--;
+        }
+    } else  {                // direction is Low? track++
+        if(hwPosition.track < MAX_TRACKS) {
+            hwPosition.track++;
+        }
+    }
+
+    if(hwPosition.track == 0) {   // if track is 0, TRACK00 is L
+        gpio_put(PIN_TRACK00, 0);
+    } else {                        // if track is not 0, TRACK00 to H
+        gpio_put(PIN_TRACK00, 1);
+    }
+}
 
 void setupPwmOutput(void)
 {
@@ -199,10 +233,11 @@ void readTrackData_goToStart(void)
     timeTrackStart = millis();                  // time of track start to now
 }
 
+void requestTrackLoad(uint16_t track, uint16_t sector);
+
 enum MfmStreamState {
   STATE_STREAMING,          // no step occured recently, we can just stream
   STATE_STEPPING,           // step happened less than 15 ms ago, there might be more, don't stream
-  STATE_REQUEST_LOAD,       // stepping stopped (was stepping, but last was 15 ms ago or more), we can load new track
   STATE_LOADING             // we're now loading data from PSRAM to SRAM, once this is done we can start streaming
 };
 
@@ -215,14 +250,15 @@ void core1_main_loop(void)
     clearMfmBuffer();
     readTrackData_goToStart();
 
+    gpio_set_irq_enabled_with_callback(PIN_STEP, GPIO_IRQ_EDGE_FALL, true, floppyStepISR);
+
     // start mfm output
     setupPwmOutput();
     setupDmaToPwm();
 
-    int loadTrack = 0xff;
-    int loadSector = 0xff;
+    MfmStreamState state = STATE_STEPPING;
 
-    MfmStreamState state = STATE_REQUEST_LOAD;
+    uint8_t trackForSectorWant[MAX_SECTORS_PER_TRACK] = {0xff};
 
     while(1)
     {
@@ -239,51 +275,25 @@ void core1_main_loop(void)
         else
         {   // last step happened at least 15 ms ago? we're not stepping anymore
             if(state == STATE_STEPPING) {
-                state = STATE_REQUEST_LOAD;
+                queue_try_add(&fifoToCore0, (const void*) &hwPosition.track);
+                state = STATE_LOADING;
             }
         }
 
-        // if we're streaming (not stepping, not loading) and reload was requested, move to load state
-        if(state == STATE_STREAMING && reloadTrack) {
-            reloadTrack = false;
-            state = STATE_REQUEST_LOAD;
+        uint8_t trackGot = 0xff;
+        while(!queue_is_empty(&fifoToCore1)) {
+            queue_try_remove(&fifoToCore1, &trackGot);
         }
-
-        // LOAD was requested, set the load variables and switch to streaming state
-        if(state == STATE_REQUEST_LOAD) {
-            reloadTrack = false;
-            loadTrack = hwPosition.track;     // start loading this track
-            loadSector = 1;
-            state = STATE_LOADING;
+        if(trackGot == hwPosition.track) {
+            state = STATE_STREAMING;
         }
-
-        // valid sector # to load? load one sector for each side, will do next sector in next run
-        if(state == STATE_LOADING) {
-            if(loadSector <= 11) {
-                psramLoadSector(loadTrack, 0, loadSector, trackData0);
-                psramLoadSector(loadTrack, 1, loadSector, trackData1);
-                loadSector++;
-            } else {
-                state = STATE_STREAMING;
-
-                // update dataIndexInTrack position based on the current timeSinceTrackStart position
-                now = millis();
-                uint32_t timeSinceTrackStart = now - timeTrackStart;
-                int streamedSectorIndex = (timeSinceTrackStart / 18);       // convert timeSinceTrackStart to sector index (0 - 10)
-                dataIndexInTrack = 130 + (streamedSectorIndex * 1200);      // update dataIndexInTrack to start streaming the sector based on timeSinceTrackStart
-            }
-        }
-
-        // int streamedSector = (dataIndexInTrack < 130) ? 1 : (((dataIndexInTrack - 130) / 1200) + 1);
 
         // MFM read buffer should be refilled?
         if(fillWhat != FILL_NONE) {
             uint8_t whatCopy = fillWhat;    // make a copy of global var, so we can clear global var before entering fillHalfMfmBuffer
             fillWhat = FILL_NONE;
 
-            if(state == STATE_STREAMING) {  // only if streaming now, fill buffer with data
-                fillHalfMfmBuffer(whatCopy);
-            }
+            fillHalfMfmBuffer(whatCopy);
         }
 
         // index pulse generating and stream restart

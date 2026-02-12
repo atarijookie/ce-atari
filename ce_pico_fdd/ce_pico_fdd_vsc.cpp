@@ -33,7 +33,7 @@ void setupAtnBuffers(void);
 void requestTrack(uint8_t side, uint8_t track);
 void requestWholeImage(void);
 
-SStreamed posStreamed, hwPosition;
+TDrivePosition posStreamed, hwPosition;
 
 uint8_t trackData0[READTRACKDATA_SIZE_BYTES];
 uint8_t trackData1[READTRACKDATA_SIZE_BYTES];
@@ -47,9 +47,10 @@ uint8_t imgTracks, imgSides, imgSectorsPerTrack;
 char imageFileName[32];
 bool diskChanged = false;
 uint32_t diskChangeEnd;
-volatile uint32_t lastStepTime = 0;
 
 queue_t fifoMfmWrite;
+queue_t fifoToCore0;
+queue_t fifoToCore1;
 
 void pio_uart_setup(void);
 
@@ -70,37 +71,6 @@ TWriteBuffer wrBuffer;  // buffer for written sectors
     This way the serial config will work via USB, debug strings will
     go through UART and should never block indefinitelly.
 */
-
-// interrupt handler for STEP signal
-void __isr floppyStepISR(uint gpio, uint32_t event_mask)
-{
-    uint32_t now = millis();
-
-    if((now - lastStepTime) < 1) {  // last step ISR was less than 2 ms ago? this is a glitch, ignore it
-        return;
-    }
-    lastStepTime = now;
-
-    if(BIT_IS_H(PIN_MOT_EN)) {       // motor not enabled? Skip the following code.
-        return;
-    }
-
-    if(BIT_IS_H(PIN_DIR)) {  // direction is High? track--
-        if(hwPosition.track > 0) {
-            hwPosition.track--;
-        }
-    } else  {                // direction is Low? track++
-        if(hwPosition.track < MAX_TRACKS) {
-            hwPosition.track++;
-        }
-    }
-
-    if(hwPosition.track == 0) {   // if track is 0, TRACK00 is L
-        gpio_put(PIN_TRACK00, 0);
-    } else {                        // if track is not 0, TRACK00 to H
-        gpio_put(PIN_TRACK00, 1);
-    }
-}
 
 void waitForCore1Running(void)
 {
@@ -179,8 +149,6 @@ void setup(void)
 
     setupAtnBuffers();
 
-    gpio_set_irq_enabled_with_callback(PIN_STEP, GPIO_IRQ_EDGE_FALL, true, floppyStepISR);
-
     // Initialise UART 1
     gpio_set_function(PIN_KEYB_TX, UART_FUNCSEL_NUM(uart1, PIN_KEYB_TX));
     gpio_set_function(PIN_KEYB_TX_ORIG, UART_FUNCSEL_NUM(uart1, PIN_KEYB_TX_ORIG));
@@ -190,6 +158,8 @@ void setup(void)
     // pio_uart_setup();
 
     queue_init(&fifoMfmWrite, 1, 64);
+    queue_init(&fifoToCore0, 1, 32);
+    queue_init(&fifoToCore1, 1, 32);
 
     // start core 1
     multicore_reset_core1();
@@ -432,6 +402,20 @@ int main()
                     storeWrittenSectorDataToTrackLocally(posStreamed.side, posStreamed.track, posStreamed.sector, wrBuffer.buffer, wrBuffer.count);
                 }
             }
+        }
+
+        // While there is something in the fifo, fetch it and place it in trackWant.
+        // Keep emptying, until stored last one to avoid multiple reads (read only the last one)
+        uint8_t trackWant = 0xff;
+        while(!queue_is_empty(&fifoToCore0)) {
+            queue_try_remove(&fifoToCore0, &trackWant);
+        }
+
+        // got valid track to load? then load it
+        if(trackWant != 0xff) {
+            psramLoadTrack_currentSectorFirst(trackWant, 0, trackData0);
+            psramLoadTrack_currentSectorFirst(trackWant, 1, trackData1);
+            queue_try_add(&fifoToCore0, (const void*) &trackWant);
         }
 
         //---------------------------
