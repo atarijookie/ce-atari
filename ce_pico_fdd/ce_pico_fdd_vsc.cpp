@@ -415,7 +415,7 @@ int main()
         if(trackWant != 0xff) {
             psramLoadTrack_currentSectorFirst(trackWant, 0, trackData0);
             psramLoadTrack_currentSectorFirst(trackWant, 1, trackData1);
-            queue_try_add(&fifoToCore0, (const void*) &trackWant);
+            queue_try_add(&fifoToCore1, (const void*) &trackWant);
         }
 
         //---------------------------

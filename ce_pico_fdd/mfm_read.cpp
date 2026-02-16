@@ -293,7 +293,9 @@ void core1_main_loop(void)
             uint8_t whatCopy = fillWhat;    // make a copy of global var, so we can clear global var before entering fillHalfMfmBuffer
             fillWhat = FILL_NONE;
 
-            fillHalfMfmBuffer(whatCopy);
+            if(state == STATE_STREAMING) {
+                fillHalfMfmBuffer(whatCopy);
+            }
         }
 
         // index pulse generating and stream restart
