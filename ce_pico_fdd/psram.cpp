@@ -3,6 +3,7 @@
 #include "pico/stdlib.h"
 #include "pico/binary_info.h"
 #include "pico/critical_section.h"
+#include "pico/util/queue.h"
 #include "hardware/spi.h"
 #include "hardware/dma.h"
 
@@ -14,6 +15,7 @@ extern Settings_t Settings;
 critical_section_t spi_critical_section;
 
 extern volatile uint32_t timeTrackStart;
+extern queue_t fifoToCore1;
 
 // Write a buffer to PSRAM
 void psramWriteBuffer(uint32_t addr, const uint8_t *buffer, size_t length)
@@ -174,6 +176,12 @@ void psramLoadTrack_currentSectorFirst(int track, int side, uint8_t* trackDataSt
         }
 
         psramLoadSector(track, side, sectorNumber, trackDataStart);   // load sector from psram to track array
+
+        // after loading the 1st sector from psram, notify other core it can start streaming
+        if(side == 1 && offset == 0) {
+            uint8_t trackB = (uint8_t) track;
+            queue_try_add(&fifoToCore1, (const void*) &trackB);
+        }
     }
 }
 

@@ -210,20 +210,9 @@ void fillHalfMfmBuffer(uint8_t what)
 
 void clearMfmBuffer(void)
 {
-    // byte 0x4e gets translated to times 666644
-    const int fourEtimes[6] = {MFM_6US, MFM_6US, MFM_6US, MFM_6US, MFM_4US, MFM_4US};
-    const int fourEarrValues[6] = {11, 11, 11, 11, 7, 7};
-
-    int idx = 0;
-
-    // fill whole mfm buffer with 0x4e times
+    // copy 'all 4 us' pulses into current streaming buffer to allow shortest possible switch to start of track
     for(int i=0; i<MFM_BUFFER_SIZE; i++) {
-        mfmBuffer[i] = fourEarrValues[idx];
-
-        idx++;
-        if(idx >= 6) {
-            idx = 0;
-        }
+        mfmBuffer[i] = 11;
     }
 }
 
@@ -234,6 +223,18 @@ void readTrackData_goToStart(void)
 }
 
 void requestTrackLoad(uint16_t track, uint16_t sector);
+
+void updateStreamPositionByFloppyPosition(void)
+{
+    uint32_t now = millis();
+    uint32_t timeSinceTrackStart = now - timeTrackStart;
+    int currentSectorIndex = (timeSinceTrackStart / 18);        // convert timeSinceTrackStart to sector index (0 - 10)
+    int currentSectorNo = MIN(currentSectorIndex + 1, MAX_SECTORS_PER_TRACK);   // limit current sector number
+
+    // from the stream table read offset to this sector
+    uint32_t currentSectorStartIndex = getWord(trackData0 + (currentSectorNo * 2));
+    dataIndexInTrack = MIN(currentSectorStartIndex, READTRACKDATA_SIZE_BYTES-1);
+}
 
 enum MfmStreamState {
   STATE_STREAMING,          // no step occured recently, we can just stream
@@ -258,7 +259,7 @@ void core1_main_loop(void)
 
     MfmStreamState state = STATE_STEPPING;
 
-    uint8_t trackForSectorWant[MAX_SECTORS_PER_TRACK] = {0xff};
+    uint32_t tReq = 0, tStr = 0;
 
     while(1)
     {
@@ -277,6 +278,7 @@ void core1_main_loop(void)
             if(state == STATE_STEPPING) {
                 queue_try_add(&fifoToCore0, (const void*) &hwPosition.track);
                 state = STATE_LOADING;
+                tReq = millis();
             }
         }
 
@@ -286,6 +288,10 @@ void core1_main_loop(void)
         }
         if(trackGot == hwPosition.track) {
             state = STATE_STREAMING;
+            tStr = millis();
+            // debug("r->s %d\n", tStr - tReq);
+
+            updateStreamPositionByFloppyPosition();
         }
 
         // MFM read buffer should be refilled?

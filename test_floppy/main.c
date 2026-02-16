@@ -522,6 +522,18 @@ void readTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreverNotOnce)
     VT52_Goto_pos(0, 24);
     int x = 11;                     // 11 what?
 
+    if(testConf.fddViaTos) {
+        (void) Cconws("fread via TOS\n\r");
+    } else {
+        (void) Cconws("fread via custom functions\n\r");
+    }
+
+    (void) Cconws("Seek rate: ");
+    showInt(seekRateMs, 2);
+    (void) Cconws("\r\n");
+
+    (void) Cconws("\r\n");
+
     showLineStart(linearNotRandom, fl.track);
 
     BYTE isAfterStartOrError = 1;
@@ -707,7 +719,8 @@ BYTE showDebugInfoFunc(BYTE resultChar, int ms, int howManyTracksSeeked, int laz
     (void) Cconws("  \r\nOp time   : ");
     showInt(ms, 4);
 
-    if(msSeek > 0) {    // if got some seek time, show it
+    // if(msSeek > 0) {    // if got some seek time, show it
+    {
         (void) Cconws("  \r\nSeek time : ");
         showInt(msSeek, 4);
 
@@ -1039,6 +1052,8 @@ int floppy_write(BYTE *wrbuf, WORD dev, WORD sector, WORD track, WORD side, WORD
     argBufferPtr    = (DWORD) wrbuf;
     runFdcAsm();                            // do the requested action
 
+    afterSeek = getTicks();         // time stamp after seek finished
+
     if(argSuccess != 0) {                   // failed?
         return argSuccess;                  // return that error
     }
@@ -1096,7 +1111,7 @@ int floppy_read(BYTE *buf, WORD dev, WORD sector, WORD track, WORD side, WORD co
     runFdcAsm();                    // do the requested action
 
     afterSeek = getTicks();         // time stamp after seek finished
-    
+
     if(argSuccess != 0) {           // failed?
         return argSuccess;          // return that error
     }
