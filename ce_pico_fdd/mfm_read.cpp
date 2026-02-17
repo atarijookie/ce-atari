@@ -8,12 +8,14 @@
 #include "pico/flash.h"
 #include "pico/multicore.h"
 #include "pico/util/queue.h"
+#include "hardware/spi.h"
 
 #include "defs.h"
 #include "connection.h"
 #include "utils.h"
 #include "display.h"
 #include "psram.h"
+#include "ipc.h"
 
 volatile bool core1running = false;
 
@@ -40,10 +42,19 @@ volatile uint32_t timeTrackStart;
 
 extern TDrivePosition posStreamed, hwPosition, posWritten;
 
+void fillHalfMfmBuffer(uint8_t what);
 void readTrackData_goToStart(void);
 
-extern queue_t fifoToCore0;
-extern queue_t fifoToCore1;
+// extern queue_t fifoToCore0;
+// extern queue_t fifoToCore1;
+
+enum MfmStreamState {
+  STATE_STREAMING,          // no step occured recently, we can just stream
+  STATE_STEPPING,           // step happened less than 15 ms ago, there might be more, don't stream
+  STATE_LOADING             // we're now loading data from PSRAM to SRAM, once this is done we can start streaming
+};
+
+volatile MfmStreamState state = STATE_STEPPING;
 
 void __isr dmaHandlerMfm(void);
 
@@ -129,6 +140,10 @@ void __isr dmaHandlerMfm(void)
     halfDone = !halfDone;   // Flip half flag
 
     fillWhat = halfDone ? FILL_LOWER : FILL_UPPER;
+
+    if(state == STATE_STREAMING) {
+        fillHalfMfmBuffer(fillWhat);
+    }
 }
 
 void getMfmDataToBuffer(uint8_t* bfr, int len)
@@ -236,15 +251,18 @@ void updateStreamPositionByFloppyPosition(void)
     dataIndexInTrack = MIN(currentSectorStartIndex, READTRACKDATA_SIZE_BYTES-1);
 }
 
-enum MfmStreamState {
-  STATE_STREAMING,          // no step occured recently, we can just stream
-  STATE_STEPPING,           // step happened less than 15 ms ago, there might be more, don't stream
-  STATE_LOADING             // we're now loading data from PSRAM to SRAM, once this is done we can start streaming
-};
-
 void core1_main_loop(void)
 {
     flash_safe_execute_core_init();     // call this for flash_safe_execute() to work
+
+    // SPI initialisation.
+    spi_init(spi1, 16000000);
+    gpio_set_function(PIN_MISO, GPIO_FUNC_SPI);
+    gpio_set_function(PIN_SCK,  GPIO_FUNC_SPI);
+    gpio_set_function(PIN_MOSI, GPIO_FUNC_SPI);
+
+    // init PSRAM, read ID, test read and write
+    psramTest();
 
     core1running = true;
 
@@ -257,8 +275,6 @@ void core1_main_loop(void)
     setupPwmOutput();
     setupDmaToPwm();
 
-    MfmStreamState state = STATE_STEPPING;
-
     uint32_t tReq = 0, tStr = 0;
 
     while(1)
@@ -266,43 +282,72 @@ void core1_main_loop(void)
         uint32_t now = millis();
         uint32_t timeMsSinceLastStep = now - lastStepTime;
 
-        if(timeMsSinceLastStep < 15) {      // last STEP happened within last 15 ms?
-            if(state != STATE_STEPPING) {   // we weren't STEPPING before this? clear mfm buffer
-                clearMfmBuffer();
-            }
-
+        // last STEP happened within last 15 ms?
+        if(timeMsSinceLastStep < 15 && state != STATE_STEPPING) {
+            clearMfmBuffer();
             state = STATE_STEPPING;         // we're in the stepping state
         }
-        else
-        {   // last step happened at least 15 ms ago? we're not stepping anymore
-            if(state == STATE_STEPPING) {
-                queue_try_add(&fifoToCore0, (const void*) &hwPosition.track);
-                state = STATE_LOADING;
-                tReq = millis();
-            }
+
+        // last step happened at least 15 ms ago? we're not stepping anymore
+        if(timeMsSinceLastStep >= 15 && state == STATE_STEPPING) {
+            // queue_try_add(&fifoToCore0, (const void*) &hwPosition.track);
+            state = STATE_LOADING;
+            tReq = millis();
         }
 
-        uint8_t trackGot = 0xff;
-        while(!queue_is_empty(&fifoToCore1)) {
-            queue_try_remove(&fifoToCore1, &trackGot);
-        }
-        if(trackGot == hwPosition.track) {
-            state = STATE_STREAMING;
-            tStr = millis();
-            // debug("r->s %d\n", tStr - tReq);
+        if(state == STATE_LOADING) {
+            psramLoadTrack(hwPosition.track, 0, trackData0);
+            psramLoadTrack(hwPosition.track, 1, trackData1);
 
             updateStreamPositionByFloppyPosition();
+
+            state = STATE_STREAMING;
         }
 
-        // MFM read buffer should be refilled?
-        if(fillWhat != FILL_NONE) {
-            uint8_t whatCopy = fillWhat;    // make a copy of global var, so we can clear global var before entering fillHalfMfmBuffer
-            fillWhat = FILL_NONE;
+        // something in the queue for core1? get it, handle it
+        IPCbuffer* bfr = ipcGetBufferFromFifo(1);
+        if(bfr) {
+            // debug("c1: c %d\n", bfr->command);
+            switch(bfr->command)
+            {
+                // store the track track data into PSRAM
+                case CMD_STORE_TRACK:
+                {
+                    psramStoreTrack(bfr->trackNo, bfr->sideNo, bfr->data + 2);
 
-            if(state == STATE_STREAMING) {
-                fillHalfMfmBuffer(whatCopy);
+                    if(bfr->trackNo == hwPosition.track) {          // we've just received the track that is being streamed out?
+                        uint8_t* pTrack = (bfr->sideNo == 0) ? trackData0 : trackData1;     // pick the correct pointer for this side
+                        memcpy(pTrack, bfr->data + 2, bfr->length);   // copy data directly to track buffer
+                    }
+
+                    break;
+                }
             }
+
+            bfr->free = true;
         }
+
+        // uint8_t trackGot = 0xff;
+        // while(!queue_is_empty(&fifoToCore1)) {
+        //     queue_try_remove(&fifoToCore1, &trackGot);
+        // }
+        // if(trackGot == hwPosition.track) {
+        //     state = STATE_STREAMING;
+        //     tStr = millis();
+        //     // debug("r->s %d\n", tStr - tReq);
+
+        //     updateStreamPositionByFloppyPosition();
+        // }
+
+        // // MFM read buffer should be refilled?
+        // if(fillWhat != FILL_NONE) {
+        //     uint8_t whatCopy = fillWhat;    // make a copy of global var, so we can clear global var before entering fillHalfMfmBuffer
+        //     fillWhat = FILL_NONE;
+
+        //     if(state == STATE_STREAMING) {
+        //         fillHalfMfmBuffer(whatCopy);
+        //     }
+        // }
 
         // index pulse generating and stream restart
         now = millis();

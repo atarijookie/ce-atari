@@ -21,6 +21,7 @@
 #include "defs.h"
 #include "utils.h"
 #include "serial_config.h"
+#include "ipc.h"
 
 extern volatile bool core1running;
 
@@ -49,8 +50,6 @@ bool diskChanged = false;
 uint32_t diskChangeEnd;
 
 queue_t fifoMfmWrite;
-queue_t fifoToCore0;
-queue_t fifoToCore1;
 
 void pio_uart_setup(void);
 
@@ -122,30 +121,21 @@ void setup(void)
 
     displayInit();
 
-    // SPI initialisation.
-    spi_init(spi1, 16000000);
-    gpio_set_function(PIN_MISO, GPIO_FUNC_SPI);
-    gpio_set_function(PIN_SCK,  GPIO_FUNC_SPI);
-    gpio_set_function(PIN_MOSI, GPIO_FUNC_SPI);
-
-    // init PSRAM, read ID, test read and write
-    psramTest();
-
     loadSettingsFromEeprom();
 
-    // If the flag to enter config mode is set we must store settings from PSRAM to EEPROM.
-    // In order for flashing to work, we must ensure that only 1 core is writing to flash and running, so
-    // we must enter config mode and storing to flash before we call cyw43_arch_init(),
-    // which runs on other core.
-    if(psramConfigFlagGet()) {
-        debug("Storing settings to EEPROM\n");
-        displayMessage("STORING SETTINGS");
+    // // If the flag to enter config mode is set we must store settings from PSRAM to EEPROM.
+    // // In order for flashing to work, we must ensure that only 1 core is writing to flash and running, so
+    // // we must enter config mode and storing to flash before we call cyw43_arch_init(),
+    // // which runs on other core.
+    // if(psramConfigFlagGet()) {
+    //     debug("Storing settings to EEPROM\n");
+    //     displayMessage("STORING SETTINGS");
 
-        psramConfigFlagClear();
-        storeSettingsFromPSRAMtoEEPROM();
+    //     psramConfigFlagClear();
+    //     storeSettingsFromPSRAMtoEEPROM();
 
-        while(1);   // should not get here, because storeSettingsFromPSRAMtoEEPROM should restart
-    }
+    //     while(1);   // should not get here, because storeSettingsFromPSRAMtoEEPROM should restart
+    // }
 
     setupAtnBuffers();
 
@@ -158,8 +148,10 @@ void setup(void)
     // pio_uart_setup();
 
     queue_init(&fifoMfmWrite, 1, 64);
-    queue_init(&fifoToCore0, 1, 32);
-    queue_init(&fifoToCore1, 1, 32);
+
+    // queue_init(&fifoToCore0, 1, 32);
+    // queue_init(&fifoToCore1, 1, 32);
+    ipcInit();
 
     // start core 1
     multicore_reset_core1();
@@ -404,18 +396,18 @@ int main()
             }
         }
 
-        // While there is something in the fifo, fetch it and place it in trackWant.
-        // Keep emptying, until stored last one to avoid multiple reads (read only the last one)
-        uint8_t trackWant = 0xff;
-        while(!queue_is_empty(&fifoToCore0)) {
-            queue_try_remove(&fifoToCore0, &trackWant);
-        }
+        // // While there is something in the fifo, fetch it and place it in trackWant.
+        // // Keep emptying, until stored last one to avoid multiple reads (read only the last one)
+        // uint8_t trackWant = 0xff;
+        // while(!queue_is_empty(&fifoToCore0)) {
+        //     queue_try_remove(&fifoToCore0, &trackWant);
+        // }
 
-        // got valid track to load? then load it
-        if(trackWant != 0xff) {
-            psramLoadTrack_currentSectorFirst(trackWant, 0, trackData0);
-            psramLoadTrack_currentSectorFirst(trackWant, 1, trackData1);
-        }
+        // // got valid track to load? then load it
+        // if(trackWant != 0xff) {
+        //     psramLoadTrack_currentSectorFirst(trackWant, 0, trackData0);
+        //     psramLoadTrack_currentSectorFirst(trackWant, 1, trackData1);
+        // }
 
         //---------------------------
         // check the button state and press duration

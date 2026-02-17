@@ -17,6 +17,7 @@
 #include "psram.h"
 #include "client_context.h"
 #include "utils.h"
+#include "ipc.h"
 
 #define SERVER_UDP_PORT 7200 // port number where CE listens for client requests
 #define CLIENT_UDP_PORT 7201 // port where this client should listen for CE responses
@@ -49,9 +50,6 @@ extern bool diskChanged;
 extern int imageState;
 
 extern TDrivePosition posStreamed, hwPosition;
-
-extern uint8_t trackData0[READTRACKDATA_SIZE_BYTES];
-extern uint8_t trackData1[READTRACKDATA_SIZE_BYTES];
 
 void storeMacAddress(void);
 
@@ -482,31 +480,29 @@ void showImageLoadProgress(void)
     displayMessage("Loading image", imageFileName, progress);  // show on display
 }
 
-uint8_t tmpTrackBfr[READTRACKDATA_SIZE_BYTES + 16];
-
 void handleTrackReceived(void)
 {
     if(!isConnected(&connectionFdd)) {   // connectionFdd not connected, no header received
         return;
     }
 
-    int lenData = MIN(READTRACKDATA_SIZE_BYTES, fddHeader.len);  // limit read length to buffer length
-    connectionFdd.cc->read(tmpTrackBfr, lenData, 500);    // read into tmpTrackBuffer size lenData, wait max specified timeout
-
-    // read track # and side # from bfr
-    int trackNo = MIN(tmpTrackBfr[0], MAX_TRACKS - 1);
-    int sideNo = MIN(tmpTrackBfr[1], 1);
-
-    debug("Rx t %d i %d l %d\n", trackNo, sideNo, lenData);
-
-    // store the track track data into PSRAM
-    psramStoreTrack(trackNo, sideNo, tmpTrackBfr + 2);
-
-    if(trackNo == hwPosition.track) {   // we've just received the track that is being streamed out?
-        uint8_t* pTrack = (sideNo == 0) ? trackData0 : trackData1;  // pick the correct pointer for this side
-        memcpy(pTrack, tmpTrackBfr + 2, lenData);   // copy data directly to track buffer
+    IPCbuffer* bfr = ipcGetFreeBuffer(1, 500);
+    if(bfr == NULL) {
+        debug("handleTrackReceived - no free buffers\n");
+        return;
     }
 
+    bfr->length = MIN(bfr->maxDataSize, fddHeader.len);     // limit read length to buffer length
+    connectionFdd.cc->read(bfr->data, bfr->length, 500);    // read into tmpTrackBuffer size lenData, wait max specified timeout
+
+    // read track # and side # from bfr
+    bfr->trackNo = MIN(bfr->data[0], MAX_TRACKS - 1);
+    bfr->sideNo = MIN(bfr->data[1], 1);
+
+    // store data to buffer, add buffer index to queue
+    ipcSetBufferAndPutToFifo(bfr, 1, CMD_STORE_TRACK, bfr->length);
+
+    debug("Rx t %d i %d\n", bfr->trackNo, bfr->sideNo);
     receivedTracks++;
 
     if(imageState == IMAGE_REQUESTED) {
@@ -520,10 +516,11 @@ void handleImageReceived(void)
         return;
     }
 
-    int lenData = MIN(READTRACKDATA_SIZE_BYTES, fddHeader.len);  // limit read length to buffer length
-    connectionFdd.cc->read(tmpTrackBfr, lenData, 500);    // read into tmpTrackBuffer size lenData, wait max specified timeout
+    uint8_t tmpBfr[128];
+    int lenData = MIN(128, fddHeader.len);  // limit read length to buffer length
+    connectionFdd.cc->read(tmpBfr, lenData, 500);    // read into tmpTrackBuffer size lenData, wait max specified timeout
 
-    if(tmpTrackBfr[0] == 1)     // image receiving finished?
+    if(tmpBfr[0] == 1)     // image receiving finished?
     {
         diskChanged = true;
         imageState = IMAGE_LOADED;
@@ -535,14 +532,14 @@ void handleImageReceived(void)
         imageState = IMAGE_REQUESTED;
     }
 
-    imgTracks = tmpTrackBfr[1];
-    imgSides = tmpTrackBfr[2];
-    imgSectorsPerTrack = tmpTrackBfr[3];
+    imgTracks = tmpBfr[1];
+    imgSides = tmpBfr[2];
+    imgSectorsPerTrack = tmpBfr[3];
 
     memset(imageFileName, 0, 32);
-    strncpy(imageFileName, (const char*) (tmpTrackBfr + 4), 31);        // store file name, up to 31 chars
+    strncpy(imageFileName, (const char*) (tmpBfr + 4), 31);        // store file name, up to 31 chars
 
-    debug("handleImageReceived %s, imgTracks: %d, imgSides: %d, imageFileName: %s\n", (tmpTrackBfr[0] == 1) ? "END" : "START", imgTracks, imgSides, imageFileName);
+    debug("handleImageReceived %s, imgTracks: %d, imgSides: %d, imageFileName: %s\n", (tmpBfr[0] == 1) ? "END" : "START", imgTracks, imgSides, imageFileName);
 }
 
 void handleIncommingData(void)

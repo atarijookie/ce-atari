@@ -55,6 +55,7 @@ add_executable(ce_pico_fdd_vsc
         ssd1306.cpp
         uart_rx.cpp
         mfm_write.cpp
+        ipc.cpp
         )
 
 pico_generate_pio_header(ce_pico_fdd_vsc ${CMAKE_CURRENT_LIST_DIR}/uart_rx.pio)
