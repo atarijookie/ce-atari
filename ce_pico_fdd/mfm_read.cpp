@@ -45,6 +45,8 @@ extern TDrivePosition posStreamed, hwPosition, posWritten;
 void fillHalfMfmBuffer(uint8_t what);
 void readTrackData_goToStart(void);
 
+extern uint8_t imgTracks, imgSides, imgSectorsPerTrack;
+
 // extern queue_t fifoToCore0;
 // extern queue_t fifoToCore1;
 
@@ -227,7 +229,7 @@ void clearMfmBuffer(void)
 {
     // copy 'all 4 us' pulses into current streaming buffer to allow shortest possible switch to start of track
     for(int i=0; i<MFM_BUFFER_SIZE; i++) {
-        mfmBuffer[i] = 11;
+        mfmBuffer[i] = 7;
     }
 }
 
@@ -241,10 +243,25 @@ void requestTrackLoad(uint16_t track, uint16_t sector);
 
 void updateStreamPositionByFloppyPosition(void)
 {
+    // How many ms takes to stream 1 sector (whole track is 200 ms)
+    // This would ideally be '200 / imgSectorsPerTrack', but this causes sometimes the last sector in track not be streamed
+    // and thus *SOMETIMES* produces error reading last sector in track with custom fdc routines in fdd test.
+    int timeMsPerSector = 19;
+
     uint32_t now = millis();
-    uint32_t timeSinceTrackStart = now - timeTrackStart;
-    int currentSectorIndex = (timeSinceTrackStart / 18);        // convert timeSinceTrackStart to sector index (0 - 10)
-    int currentSectorNo = MIN(currentSectorIndex + 1, MAX_SECTORS_PER_TRACK);   // limit current sector number
+    uint32_t timeSinceTrackStart = now - timeTrackStart;        // how many ms have passed since track start (0 - 200)
+    uint32_t timeToTrackEnd = 200 - timeSinceTrackStart;        // how many ms we still have until this track ends (0 - 200)
+
+    // not enough time to stream the last sector completely?
+    // set data index to end of stream, will just stream same symbols until the track restarts
+    // (this is what could cause last sector in track not be streamed when timeMsPerSector is too big)
+    if(timeToTrackEnd < timeMsPerSector) {
+        dataIndexInTrack = READTRACKDATA_SIZE_BYTES;
+        return;
+    }
+
+    int currentSectorIndex = (timeSinceTrackStart / timeMsPerSector);           // convert timeSinceTrackStart to sector index (0 - 10)
+    int currentSectorNo = MIN(currentSectorIndex + 1, imgSectorsPerTrack);      // limit current sector number
 
     // from the stream table read offset to this sector
     uint32_t currentSectorStartIndex = getWord(trackData0 + (currentSectorNo * 2));
@@ -277,6 +294,8 @@ void core1_main_loop(void)
 
     uint32_t tReq = 0, tStr = 0;
 
+    int prevSideNo = BIT_IS_H(PIN_SIDE1) ? 0 : 1;
+
     while(1)
     {
         uint32_t now = millis();
@@ -304,6 +323,13 @@ void core1_main_loop(void)
             state = STATE_STREAMING;
         }
 
+        hwPosition.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1; // get the current SIDE
+
+        if(prevSideNo != hwPosition.side) {     // on side change, clear the current mfm buffer
+            prevSideNo = hwPosition.side;
+            clearMfmBuffer();
+        }
+
         // something in the queue for core1? get it, handle it
         IPCbuffer* bfr = ipcGetBufferFromFifo(1);
         if(bfr) {
@@ -326,28 +352,6 @@ void core1_main_loop(void)
 
             bfr->free = true;
         }
-
-        // uint8_t trackGot = 0xff;
-        // while(!queue_is_empty(&fifoToCore1)) {
-        //     queue_try_remove(&fifoToCore1, &trackGot);
-        // }
-        // if(trackGot == hwPosition.track) {
-        //     state = STATE_STREAMING;
-        //     tStr = millis();
-        //     // debug("r->s %d\n", tStr - tReq);
-
-        //     updateStreamPositionByFloppyPosition();
-        // }
-
-        // // MFM read buffer should be refilled?
-        // if(fillWhat != FILL_NONE) {
-        //     uint8_t whatCopy = fillWhat;    // make a copy of global var, so we can clear global var before entering fillHalfMfmBuffer
-        //     fillWhat = FILL_NONE;
-
-        //     if(state == STATE_STREAMING) {
-        //         fillHalfMfmBuffer(whatCopy);
-        //     }
-        // }
 
         // index pulse generating and stream restart
         now = millis();

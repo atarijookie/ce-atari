@@ -532,9 +532,9 @@ void handleImageReceived(void)
         imageState = IMAGE_REQUESTED;
     }
 
-    imgTracks = tmpBfr[1];
+    imgTracks = MIN(tmpBfr[1], MAX_TRACKS);
     imgSides = tmpBfr[2];
-    imgSectorsPerTrack = tmpBfr[3];
+    imgSectorsPerTrack = MIN(tmpBfr[3], MAX_SECTORS_PER_TRACK);
 
     memset(imageFileName, 0, 32);
     strncpy(imageFileName, (const char*) (tmpBfr + 4), 31);        // store file name, up to 31 chars

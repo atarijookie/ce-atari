@@ -44,7 +44,7 @@ extern bool connectedToHost;
 uint8_t mac[6];
 
 int imageState = IMAGE_NOT_LOADED;
-uint8_t imgTracks, imgSides, imgSectorsPerTrack;
+uint8_t imgTracks = 80, imgSides = 2, imgSectorsPerTrack = 9;
 char imageFileName[32];
 bool diskChanged = false;
 uint32_t diskChangeEnd;
@@ -313,11 +313,6 @@ int main()
         // send heartbeat (fw version) once a second
         if (connectedToHost && (now - lastSendFwTime) >= 1000)
         {
-            if(stWantsTheStream) {
-                hwPosition.side = BIT_IS_H(PIN_SIDE1) ? 0 : 1; // get the current SIDE
-                debug("S %d %d\n", hwPosition.side, hwPosition.track);
-            }
-
             sendFwReport(now);
         }
 
