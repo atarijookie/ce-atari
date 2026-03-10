@@ -75,6 +75,8 @@ public:
     ClientInfo* clientGetByFd(int clientFd);
     ClientInfo* clientGetByIndex(int index);
 
+    void closeClientByFd(int& clientFd);
+
     int readRestOfData(ClientInfo* ci, uint8_t* buffer, uint32_t bufferSize);
     bool sendHeaderToChip(int& fdClient, uint16_t cmdCode, uint32_t futureDatalen);                // send header to chip
     bool sendDataToChip(int& fdClient, uint8_t* data, uint32_t len);                               // send data to chip

@@ -50,10 +50,6 @@ public:
     virtual uint32_t getCount(void);
 
     //----------------
-    // for sending data from config stream
-    virtual void sendDataToFd(int fd);
-
-    //----------------
     // READ/WRITE functions for smaller data
     virtual bool recvData(uint8_t *data, uint32_t cnt);
     virtual void sendDataAndStatus(bool fromRetryModule = false);       // by default it's not a retry

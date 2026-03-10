@@ -146,25 +146,6 @@ void AcsiDataTrans::dumpDataOnce(void)
     dumpNextData = true;
 }
 
-void AcsiDataTrans::sendDataToFd(int fd)
-{
-    if(dataDirection == DATA_DIRECTION_WRITE) {
-        count = 0;
-        return;
-    }
-
-    if(count == 0) {    // if there's no data to send, send single zero byte
-        buffer[0]   = 0;
-        count       = 1;
-    }
-
-    uint16_t length = count;
-    write(fd, &length, 2);      // first word - length of data to be received
-
-    write(fd, buffer, count);   // then the data...
-    count = 0;
-}
-
 // send all data to Hans, including status
 void AcsiDataTrans::sendDataAndStatus(bool fromRetryModule)
 {

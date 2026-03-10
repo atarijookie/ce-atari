@@ -117,6 +117,10 @@ void Ikbd::ikbdUartWriteToAll(uint8_t* bfr, int len)
             continue;
         }
 
-        write(ci->fdClient, bfr, len);    // send it
+        int res = send(ci->fdClient, bfr, len, MSG_NOSIGNAL);    // send it
+
+        if(res < 0 && errno == EPIPE) {     // client closed connection?
+            ciIkbd->closeClientByFd(ci->fdClient);
+        }
     }
 }

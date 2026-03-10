@@ -6,12 +6,13 @@
 
 #include "../misc/utils.h"
 #include "../misc/debug.h"
+#include "../misc/global.h"
 #include "bufferedreader.h"
 #include "chipinterface.h"
 
 BufferedReader::BufferedReader()
 {
-    fd = -1;
+    fd = FD_EMPTY;
     gotBytes = 0;
     dataSizeBytes = 0;
     whichSyncTag = SYNC_TAG_HDD;

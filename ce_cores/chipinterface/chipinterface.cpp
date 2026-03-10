@@ -118,9 +118,10 @@ int ChipInterface::acceptSocketIfNeededAndPossible(void)
     }
 
     struct timeval tv;
-    tv.tv_sec = 0;
-    tv.tv_usec = 500000;    // 500 ms timeout on blocking reads
-    setsockopt(newSock, SOL_SOCKET, SO_RCVTIMEO, (const char*) &tv, sizeof(tv));
+    tv.tv_sec = 3;      // 3 seconds timeout
+    tv.tv_usec = 0;
+    setsockopt(newSock, SOL_SOCKET, SO_RCVTIMEO, (const char*) &tv, sizeof(tv));        // recv() timeout
+    setsockopt(newSock, SOL_SOCKET, SO_SNDTIMEO, (const char*) &tv, sizeof(tv));        // send() timeout
 
     // turn off Nagle's algorithm
     int flag = 1;
@@ -488,7 +489,12 @@ bool ChipInterface::sendHeaderToChip(int& fdClient, uint16_t cmdCode, uint32_t f
     uint8_t head[10];
     storeHeaderToBuffer(cmdCode, futureDatalen, head);
 
-    int res = write(fdClient, head, 10);        // send header
+    int res = send(fdClient, head, 10, MSG_NOSIGNAL);        // send header
+
+    if(res < 0 && errno == EPIPE) {     // client closed connection?
+        closeClientByFd(fdClient);
+    }
+
     return (res == 10);
 }
 
@@ -498,7 +504,12 @@ bool ChipInterface::sendDataToChip(int& fdClient, uint8_t* data, uint32_t len)  
         return false;
     }
 
-    int res = write(fdClient, data, len);   // send data
+    int res = send(fdClient, data, len, MSG_NOSIGNAL);   // send data
+
+    if(res < 0 && errno == EPIPE) {     // client closed connection?
+        closeClientByFd(fdClient);
+    }
+
     return (((uint32_t)res) == len);
 }
 
@@ -506,7 +517,7 @@ bool ChipInterface::sendHeaderAndDataToChip(int& fdClient, uint16_t cmdCode, uin
 {
     bool good;
 
-    if(len > 512)       // for larger data send using separate write() commands
+    if(len > 512)       // for larger data send using separate write commands
     {
         if(!sendHeaderToChip(fdClient, cmdCode, len))
         {
@@ -515,9 +526,12 @@ bool ChipInterface::sendHeaderAndDataToChip(int& fdClient, uint16_t cmdCode, uin
         }
 
         good = sendDataToChip(fdClient, data, len);
-        Debug::out(whichLog, LOG_DEBUG, "sendHeaderAndDataToChip - good: %d", good);
+
+        if(!good) {
+            Debug::out(whichLog, LOG_DEBUG, "sendHeaderAndDataToChip - good: %d", good);
+        }
     }
-    else                // for small data first copy data into buffers, then send with one write() command
+    else                // for small data first copy data into buffers, then send with one write command
     {
         if(fdClient < 0) {                      // no client socket? quit
             return false;
@@ -527,7 +541,12 @@ bool ChipInterface::sendHeaderAndDataToChip(int& fdClient, uint16_t cmdCode, uin
         storeHeaderToBuffer(cmdCode, len, bfr);     // store header at start
         memcpy(bfr + 10, data, len);                // copy data after the header
 
-        int res = write(fdClient, bfr, len + 10);   // send header and data
+        int res = send(fdClient, bfr, len + 10, MSG_NOSIGNAL);   // send header and data
+
+        if(res < 0 && errno == EPIPE) {     // client closed connection?
+            closeClientByFd(fdClient);
+        }
+
         good = (res == ((int) (len + 10)));
     }
 
@@ -766,6 +785,22 @@ void ChipInterface::ikbdUartWriteToAll(uint8_t* bfr, int len)
             continue;
         }
 
-        write(clients[i].fdClient, bfr, len);    // send it
+        int res = send(clients[i].fdClient, bfr, len, MSG_NOSIGNAL);    // send it
+
+        if(res < 0 && errno == EPIPE) {     // client closed connection?
+            closeClientByFd(clients[i].fdClient);
+        }
     }
+}
+
+void ChipInterface::closeClientByFd(int& fdClient)
+{
+    Debug::out(whichLog, LOG_INFO, "client fdClient %d disconnected - EPIPE", fdClient);
+
+    ClientInfo* ci = clientGetByFd(fdClient);
+    if(ci) {
+        clientsCloseOne(ci);
+    }
+
+    fdClient = FD_EMPTY;
 }

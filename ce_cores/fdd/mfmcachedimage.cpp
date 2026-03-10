@@ -231,8 +231,8 @@ bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, 
     bfr = currentStreamStart + STREAM_TABLE_SIZE;   // where the MFM data will start (after initial table)
     bytesInBfr = STREAM_TABLE_SIZE;             // no bytes in stream yet
 
-    for(int i=0; i<STREAM_TABLE_ITEMS; i++) {   // init the table for all sectors to start (if sector missing, will restart stream)
-        setRawWordAtIndex(i, STREAM_START_OFFSET);
+    for(int i=0; i<STREAM_TABLE_ITEMS; i++) {   // present sector offset will be init to start of stream, non-existent sector offsets to zero
+        setRawWordAtIndex(i, (i <= params.spt) ? STREAM_START_OFFSET : 0);
     }
 
     // init encoder counters of symbols
