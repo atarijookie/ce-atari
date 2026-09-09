@@ -1,0 +1,49 @@
+# Run from the repository root:
+#   docker compose -f docker/docker-compose.yml up --build
+#
+# Settings persist on the host (default: /opt/ce/settings, same as .env).
+# Override with CE_SETTINGS_HOST=/some/host/path
+#
+# Host filesystem is visible inside the container at /mnt/hostdrive
+# (read-write, so translated/GEM drives can write back). Point GEM paths
+# at /mnt/hostdrive/... in the web UI.
+#
+# network_mode: host is required for discovery: devices UDP-broadcast to
+# port 7200 and the server unicasts the reply to the device on port 7201.
+# Docker bridge NAT (-p 7200:7200/udp) does not deliver LAN broadcasts.
+# Host networking also puts 8080 and 7300-7302 directly on the host.
+# Linux Docker only; `ports:` cannot be used with host mode.
+#
+# USB mice/keyboards/gamepads: IKBD scans /dev/input/by-path and opens
+# /dev/input/event* and /dev/input/js*. Bind-mount the host input tree
+# and allow char major 13 (Linux input) so hotplug nodes can be opened.
+
+services:
+  ce:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: ce-atari
+    network_mode: host
+    environment:
+      CE_WEB_USER: ${CE_WEB_USER:-ce}
+      CE_WEB_PASSWORD: ${CE_WEB_PASSWORD:-ce}
+    device_cgroup_rules:
+      # Linux input subsystem: js*, mouse*, event* (needed for USB hotplug)
+      - "c 13:* rwm"
+    volumes:
+      # Persistent settings (writable). Host path matches SETTINGS_DIR in .env.
+      - type: bind
+        source: ${CE_SETTINGS_HOST:-/opt/ce/settings}
+        target: /opt/ce/settings
+      # Entire host filesystem for HDD / GEM drive emulation
+      - type: bind
+        source: /
+        target: /mnt/hostdrive
+        bind:
+          propagation: rslave
+      # USB / HID discovery (same path IKBD uses on the host)
+      - type: bind
+        source: /dev/input
+        target: /dev/input
+    restart: unless-stopped
