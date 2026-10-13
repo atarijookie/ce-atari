@@ -9,7 +9,6 @@
 #include "utilslib.h"
 
 #include "libdospath.h"
-#include "libcpptests.h"
 
 DirTranslator* dt = NULL;
 extern int logLevelConsole;
@@ -152,16 +151,4 @@ extern "C" void ldp_cleanup(void)
         delete dt;
         dt = NULL;
     }
-}
-
-/*
-    this just runs the tests, not needed for normal usage
-*/
-extern "C" void ldp_runCppTests(void)
-{
-    TestClass *tc = new TestClass();
-
-    tc->runTests();
-
-    delete tc;
 }

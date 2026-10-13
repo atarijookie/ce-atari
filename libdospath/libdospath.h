@@ -70,7 +70,6 @@ extern "C" {
     void ldp_symlink(const std::string& longPathSource, const std::string& longPathDest);
     bool ldp_gotSymlink(const std::string& longPathSource);
     void ldp_cleanup(void);
-    void ldp_runCppTests(void);
 }
 
 #endif

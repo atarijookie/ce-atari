@@ -65,6 +65,7 @@ private:
     bool setDiskItem(SearchParams& sp, DiskItem& di, const std::string &hostPath, const std::string& searchString, const std::string& lonFname, bool isDir);
     static void closeDirSetFlags(SearchParams& sp);
     static void toUpperCaseString(std::string &st);
+    static unsigned char getEntryType(const std::string& dirPath, const struct dirent* de);
 
     bool applySymlinkIfPossible(std::string& inLongPath, std::vector<std::string>* pSymlinksApplied);
 };

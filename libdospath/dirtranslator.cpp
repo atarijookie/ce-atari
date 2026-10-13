@@ -193,6 +193,9 @@ int DirTranslator::feedShortener(const std::string &path, FilenameShortener *fs)
 {
     // Feed the shortener with content of the specified dir. 
     // It's used when creating shornerer (initial feeding) and when refreshing shortener with new dir content
+    // Names are shortened in sorted order (not in readdir() order), so the same dir content always
+    // produces the same short names (e.g. which long name gets '~1' and which '~2'), no matter
+    // in which order the filesystem returns the entries.
 
     UtilsLib::out(LDP_LOG_DEBUG, "TranslatedDisk::feedShortener() - path: %s", path.c_str());
 
@@ -205,6 +208,8 @@ int DirTranslator::feedShortener(const std::string &path, FilenameShortener *fs)
         return createdCount;
     }
 
+    std::vector<std::string> names;                 // collect names first, shorten them after sorting
+
     while(1) {                                      // while there are more files, store them
         struct dirent *de = readdir(dir);           // read the next directory entry
 
@@ -212,8 +217,9 @@ int DirTranslator::feedShortener(const std::string &path, FilenameShortener *fs)
             break;
         }
 
-        if(de->d_type != DT_DIR && de->d_type != DT_REG) {          // not  a file, not a directory?
-            UtilsLib::out(LDP_LOG_DEBUG, "TranslatedDisk::feedShortener() - skipped %s because the type %d is not supported!", de->d_name, de->d_type);
+        unsigned char type = getEntryType(path, de);
+        if(type != DT_DIR && type != DT_REG) {                      // not  a file, not a directory?
+            UtilsLib::out(LDP_LOG_DEBUG, "TranslatedDisk::feedShortener() - skipped %s because the type %d is not supported!", de->d_name, type);
             continue;
         }
 
@@ -221,9 +227,16 @@ int DirTranslator::feedShortener(const std::string &path, FilenameShortener *fs)
             continue;
         }
 
+        names.push_back(de->d_name);
+    }
+    closedir(dir);
+
+    std::sort(names.begin(), names.end());          // plain byte-wise order - same result on every filesystem / locale
+
+    for(size_t i=0; i<names.size(); i++) {
         bool ok, created;
         std::string shortName;
-        ok = fs->longToShortFileName(std::string(de->d_name), shortName, &created);
+        ok = fs->longToShortFileName(names[i], shortName, &created);
 
         if(ok && created) {     // if was able to come up with short name and it was created (not just found in dict), increment counter
             createdCount++;
@@ -231,8 +244,30 @@ int DirTranslator::feedShortener(const std::string &path, FilenameShortener *fs)
     }
 
     UtilsLib::out(LDP_LOG_DEBUG, "TranslatedDisk::feedShortener() - path: %s, found %d new items", path.c_str(), createdCount);
-    closedir(dir);
     return createdCount;
+}
+
+// Returns type of directory entry (DT_DIR, DT_REG, ...). Some filesystems don't fill d_type and report DT_UNKNOWN
+// for every entry - then the type is found out using lstat() (lstat, not stat - so symlinks are still reported as DT_LNK).
+unsigned char DirTranslator::getEntryType(const std::string& dirPath, const struct dirent* de)
+{
+    if(de->d_type != DT_UNKNOWN) {          // filesystem reported the type? use it
+        return de->d_type;
+    }
+
+    std::string fullPath = dirPath;
+    UtilsLib::mergeHostPaths(fullPath, de->d_name);
+
+    struct stat attr;
+    if(lstat(fullPath.c_str(), &attr) != 0) {   // failed to get the type? still unknown
+        return DT_UNKNOWN;
+    }
+
+    if(S_ISDIR(attr.st_mode))   return DT_DIR;
+    if(S_ISREG(attr.st_mode))   return DT_REG;
+    if(S_ISLNK(attr.st_mode))   return DT_LNK;
+
+    return DT_UNKNOWN;                      // other types (sockets, pipes, devices) are not supported anyway
 }
 
 void DirTranslator::toUpperCaseString(std::string &st)
@@ -350,6 +385,7 @@ int DirTranslator::cleanUpShortenersIfNeeded(void)
 
         if (shouldDelete) {
             removed++;
+            delete it->second;                  // free the shortener itself, not just remove it from the map
             mapPathToShortener.erase(it++);
         } else {
             ++it;
@@ -425,11 +461,12 @@ bool DirTranslator::findFirstAndNext(SearchParams& sp, DiskItem& di)
             shortToLongPath(sp.path, longPath, false);
             UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::findFirstAndNext - translated possible short path: %s to long path: %s", sp.path.c_str(), longPath.c_str());
 
-            if (UtilsLib::fileExists(longPath)) {      // matching just one file and it exists? good!
+            if (stat(longPath.c_str(), &attr) == 0) {  // matching just one file and it exists? good! (attr is used below for dir / file detection)
                 std::string justPath, justLongFname;
                 UtilsLib::splitFilenameFromPath(longPath, justPath, justLongFname);       // extract just long filename from the long path
 
-                setDiskItem(sp, di, Internal(sp)->hostPath, Internal(sp)->searchString, justLongFname, S_ISDIR(attr.st_mode));
+                // use the translated (long) justPath, the dir part of sp.path might still contain short names
+                setDiskItem(sp, di, justPath, Internal(sp)->searchString, justLongFname, S_ISDIR(attr.st_mode));
                 closeDirSetFlags(sp);
                 return true;        // got some valid item
             } else {
@@ -438,6 +475,17 @@ bool DirTranslator::findFirstAndNext(SearchParams& sp, DiskItem& di)
         }
 
         // we didn't match single file, we will scan the whole dir
+
+        // the dir part of sp.path might still contain short names, translate it to long path which exists on disk
+        // (refreshOnMiss is true, because the dir we're searching in should exist)
+        std::string longHostPath;
+        shortToLongPath(Internal(sp)->hostPath, longHostPath, true);
+
+        if(!longHostPath.empty()) {         // empty for empty or root path - keep the original then
+            UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::findFirstAndNext - search dir: %s translated to: %s", Internal(sp)->hostPath.c_str(), longHostPath.c_str());
+            Internal(sp)->hostPath = longHostPath;
+        }
+
         toUpperCaseString(Internal(sp)->searchString);
 
         // then build the found files list
@@ -460,12 +508,13 @@ bool DirTranslator::findFirstAndNext(SearchParams& sp, DiskItem& di)
             break;
         }
 
-        if(de->d_type != DT_DIR && de->d_type != DT_REG) {  // not a file, not a directory?
-            UtilsLib::out(LDP_LOG_DEBUG, "TranslatedDisk::findFirstAndNext -- skipped %s because the type %d is not supported!", de->d_name, de->d_type);
+        unsigned char type = getEntryType(Internal(sp)->hostPath, de);
+        if(type != DT_DIR && type != DT_REG) {              // not a file, not a directory?
+            UtilsLib::out(LDP_LOG_DEBUG, "TranslatedDisk::findFirstAndNext -- skipped %s because the type %d is not supported!", de->d_name, type);
             continue;
         }
 
-        bool isDir = (de->d_type == DT_DIR);                // is this a directory?
+        bool isDir = (type == DT_DIR);                      // is this a directory?
         bool wantDirs = (sp.attribs & FA_DIR) == FA_DIR;    // if FA_DIR bit is set in search param attribs, we want also dirs to be included
 
         /* Note on next condition: 
@@ -599,14 +648,15 @@ bool DirTranslator::applySymlinkIfPossible(std::string& inLongPath, std::vector<
 {
     bool foundMatch = false;
     std::string src, dest;
+    unsigned int bestPartsCount = 0;        // count of path parts of the best matching symlink source found so far
 
-    // go through all the stored symlinks in mapSymlink
+    // go through all the stored symlinks in mapSymlink - when more of them match (e.g. '/a' and '/a/b'), the most
+    // specific one (with most path parts) wins, so the result doesn't depend on the order of symlinks in the map
     std::map<std::string, std::string>::iterator it;
     for(it = mapSymlinks.begin(); it != mapSymlinks.end(); ++it) {          // go through the map
         // do a quick check if inLongPath matches any source of symlink - this is quick as it's just comparing 2 string
-        src = it->first;
-        dest = it->second;
-        int res = strncmp(inLongPath.c_str(), src.c_str(), src.length());   // compare one symlink source to part of inLongPath
+        const std::string& thisSrc = it->first;
+        int res = strncmp(inLongPath.c_str(), thisSrc.c_str(), thisSrc.length());   // compare one symlink source to part of inLongPath
 
         if(res != 0) {          // source was not completely found in inLongPath? skip the rest
             continue;
@@ -621,7 +671,7 @@ bool DirTranslator::applySymlinkIfPossible(std::string& inLongPath, std::vector<
 
         // split source into parts, see how many parts it has.
         std::vector<std::string> srcParts;
-        UtilsLib::splitString(src, '/', srcParts);          // explode string to individual parts
+        UtilsLib::splitString(thisSrc, '/', srcParts);      // explode string to individual parts
         unsigned int srcPartsCount = srcParts.size();       // count source parts
 
         // split inLongPath into parts, but take only as many parts as the source has (e.g. only 2 in our example above).
@@ -632,12 +682,14 @@ bool DirTranslator::applySymlinkIfPossible(std::string& inLongPath, std::vector<
         UtilsLib::joinStrings(inParts, inLongSubPath, srcPartsCount);   // create part of inLongPath made out of same count of parts as link source path
 
         // now compare the right count of parts of source and inLongPath. If not a match, check next symlink.
-        res = strcmp(src.c_str(), inLongSubPath.c_str());
+        res = strcmp(thisSrc.c_str(), inLongSubPath.c_str());
 
-        if(res == 0) {          // exact match on path was found, good!
+        if(res == 0 && (!foundMatch || srcPartsCount > bestPartsCount)) {  // exact match on path was found, and it's more specific than previous match? good!
             foundMatch = true;
+            bestPartsCount = srcPartsCount;
+            src = thisSrc;
+            dest = it->second;
             UtilsLib::out(LDP_LOG_DEBUG, "DirTranslator::applySymlinkIfPossible - stored symlink source: %s matches inLongSubPath: %s", src.c_str(), inLongSubPath.c_str());
-            break;
         }
     }
 

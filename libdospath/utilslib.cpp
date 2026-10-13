@@ -232,12 +232,15 @@ bool UtilsLib::fileExists(std::string &hostPath)
 
 void UtilsLib::out(int logLevel, const char *format, ...)
 {
-    va_list args;
+    // NOTE: va_list is consumed by each vprintf() / vfprintf(), so every output gets its own copy of the args
+    va_list args, argsCopy;
     va_start(args, format);
 
     // log to console
     if(logLevel <= logLevelConsole) {   // log level equal or below allowed console value? log to console
-        vprintf(format, args);
+        va_copy(argsCopy, args);
+        vprintf(format, argsCopy);
+        va_end(argsCopy);
         printf("\n");
     }
 
@@ -247,14 +250,16 @@ void UtilsLib::out(int logLevel, const char *format, ...)
 
         FILE *f = fopen(logFilePath.c_str(), "a+t");        // try to open the file
 
+        va_copy(argsCopy, args);
         if(f) {                         // file opened? write to file
-            vfprintf(f, format, args);
+            vfprintf(f, format, argsCopy);
             fprintf(f, "\n");
             fclose(f);
         } else {                        // failed to open the file? write to console
-            vprintf(format, args);
+            vprintf(format, argsCopy);
             printf("\n");
         }
+        va_end(argsCopy);
     }
 
     va_end(args);

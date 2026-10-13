@@ -42,8 +42,8 @@ private:
 
     static void mergeFilenameAndExtension(const std::string& shortFn, const std::string& shortExt, bool extendWithSpaces, std::string& merged);
 
-    const bool shortenName(const std::string& nLong, std::string& nShort);
-    const void shortenExtension(const std::string& nLongExt, std::string& nShortExt);
+    bool shortenName(const std::string& nLong, const std::string& shortExt, std::string& nShort);
+    void shortenExtension(const std::string& nLongExt, std::string& nShortExt);
 
     static void replaceNonLettersAndToUpperCase(std::string &str);
 };

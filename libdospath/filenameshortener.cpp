@@ -70,12 +70,12 @@ bool FilenameShortener::longToShortFileName(const std::string& longFileName, std
     // shorten filename and extension if needed
     std::string shortName, shortExt;
 
-    if(!shortenName(fileName, shortName)) {
+    shortenExtension(fileExt, shortExt);        // extension first - shortenName() needs it to check uniqueness of the whole 8.3 name
+
+    if(!shortenName(fileName, shortExt, shortName)) {
         UtilsLib::out(LDP_LOG_ERROR, "FilenameShortener::longToShortFileName failed to shortenName %s", fileName.c_str());
         return false;
     }
-
-    shortenExtension(fileExt, shortExt);
 
     // create final short name
     mergeFilenameAndExtension(shortName, shortExt, false, shortFileName);
@@ -149,28 +149,38 @@ bool FilenameShortener::shortToLongFileName(const std::string& shortFileName, st
     return false;
 }
 
-const bool FilenameShortener::shortenName(const std::string& nLong, std::string& nShort)
+bool FilenameShortener::shortenName(const std::string& nLong, const std::string& shortExt, std::string& nShort)
 {
-    if(nLong.size() <= 8) {     // long version is max 8 chars? use it, this is OK
-        nShort = nLong;
-        return true;
+    // The returned name (together with shortExt) must be a unique 8.3 name in this dir, otherwise
+    // the reverse (short to long) translation would find only one of the long names.
+    std::string merged;
+
+    if(nLong.size() <= 8) {     // long version is max 8 chars? use it, if this name + ext isn't taken yet
+        mergeFilenameAndExtension(nLong, shortExt, false, merged);
+
+        if(mapReverseFilename.find(merged) == mapReverseFilename.end()) {
+            nShort = nLong;
+            return true;
+        }
+
+        // taken - e.g. 'index.htm' and 'index.html' both make 'INDEX.HTM', or 'abc.txt' and 'ABC.TXT' both make 'ABC.TXT',
+        // so continue below and create '~' version for this one (e.g. 'INDEX~1.HTM')
     }
 
     int ind = 1;
-    char num[12];
-    std::map<std::string, std::string>::iterator it;
+    char num[16];                                       // fits "~" + any int + nul
 
     while(ind < 1000) {
         sprintf(num, "~%d", ind);                       // create numerical end, e.g. '~1'
         int remainingSize = 8 - strlen(num);            // what is the remaining size of name, if we'll use 'num' at the end
         
-        std::string newName = nLong;
-        newName.resize(remainingSize);                  // shorten to remaining size
+        std::string newName = nLong.substr(0, remainingSize);  // shorten to remaining size (substr - nLong can be shorter than that)
         newName += num;                                 // append number
 
-        it = mapFilenameNoExt.find(newName);            // try to find the string in the map
+        mergeFilenameAndExtension(newName, shortExt, false, merged);
 
-        if(it == mapFilenameNoExt.end()) {              // if we don't have this fileName already, use it!
+        // if we don't have this name already, and the whole 8.3 name is not taken either, use it!
+        if(mapFilenameNoExt.find(newName) == mapFilenameNoExt.end() && mapReverseFilename.find(merged) == mapReverseFilename.end()) {
             nShort = newName;
             mapFilenameNoExt.insert( std::pair<std::string, std::string>(nShort, nLong) );    // store this key-value pair
             return true;
@@ -182,7 +192,7 @@ const bool FilenameShortener::shortenName(const std::string& nLong, std::string&
     return false;                                          // failed
 }
 
-const void FilenameShortener::shortenExtension(const std::string& nLongExt, std::string& nShortExt)
+void FilenameShortener::shortenExtension(const std::string& nLongExt, std::string& nShortExt)
 {
     nShortExt = nLongExt;
 
