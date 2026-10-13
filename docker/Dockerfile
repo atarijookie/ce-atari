@@ -11,9 +11,9 @@
 #   docker run --rm --network host \
 #     -v /opt/ce/settings:/opt/ce/settings \
 #     -v /:/mnt/hostdrive:rslave \
-#     -v /dev/input:/dev/input \
+#     -v /dev:/dev \
 #     --device-cgroup-rule='c 13:* rwm' \
-#     -e CE_WEB_USER=ce -e CE_WEB_PASSWORD=ce \
+#     --device-cgroup-rule='b 8:* rwm' \
 #     ce-atari
 #
 # Layout matches the defaults in /.env:
@@ -40,13 +40,9 @@ RUN mkdir -p /src/ce_cores/lib /src/ce_cores/obj \
     && make -C /src/ce_cores -j"$(nproc)"
 
 # ---------------------------------------------------------------------------
-# Stage 2: Go webserver (CGO required for PAM)
+# Stage 2: Go webserver
 # ---------------------------------------------------------------------------
 FROM golang:bookworm AS go-builder
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends libpam0g-dev \
-    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src/webserver
 
@@ -54,7 +50,7 @@ COPY webserver/go.mod webserver/go.sum ./
 RUN go mod download
 
 COPY webserver/ ./
-RUN CGO_ENABLED=1 go build -o /out/webserver .
+RUN CGO_ENABLED=0 go build -o /out/webserver .
 
 # ---------------------------------------------------------------------------
 # Stage 3: runtime image
@@ -64,10 +60,6 @@ FROM debian:bookworm-slim
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         libstdc++6 \
-        libpam0g \
-        libpam-modules \
-        libpam-runtime \
-        passwd \
         tini \
         tzdata \
     && rm -rf /var/lib/apt/lists/*
@@ -80,9 +72,7 @@ ENV CE_DIR=/opt/ce \
     LOG_DIR=/tmp/ce/log \
     PID_DIR=/tmp/ce/pid \
     CONFIG_DRIVE_PATH=/tmp/ce/data/configdrive \
-    HOSTDRIVE=/mnt/hostdrive \
-    CE_WEB_USER=ce \
-    CE_WEB_PASSWORD=ce
+    HOSTDRIVE=/mnt/hostdrive
 
 RUN mkdir -p "$BIN_DIR" "$SETTINGS_DIR" "$DATA_DIR" "$LOG_DIR" "$PID_DIR" "$HOSTDRIVE"
 
@@ -112,6 +102,17 @@ RUN sed -i 's/\r$//' /opt/ce/bin/entrypoint.sh /opt/ce/bin/ce_start.sh \
         /opt/ce/bin/ce_stop.sh /opt/ce/bin/.env \
     && chmod +x /opt/ce/bin/ce_cores.elf /opt/ce/bin/webserver \
         /opt/ce/bin/ce_start.sh /opt/ce/bin/ce_stop.sh /opt/ce/bin/entrypoint.sh
+
+# Fail the build if the files ce_cores loads on start are not where .env says they are.
+# The configdrive drivers (*.bs, *.prg) are gitignored, so they must be present in the build context.
+RUN set -e; cd /opt/ce/bin; . ./.env; \
+    for d in "$CE_DIR" "$BIN_DIR"; do \
+        [ -d "$d" ] || { echo "missing dir from .env: $d" >&2; exit 1; }; \
+    done; \
+    for f in "$CE_DD_BS_L1_FILE" "$CE_DD_BS_L2_FILE" "$CE_DD_PRG_FILE" "$CE_LOGO_FILE" \
+             "$BIN_DIR/ce_cores.elf" "$BIN_DIR/webserver" "$BIN_DIR/static/index.html"; do \
+        [ -f "$f" ] || { echo "missing file from .env: $f" >&2; exit 1; }; \
+    done
 
 WORKDIR /opt/ce/bin
 

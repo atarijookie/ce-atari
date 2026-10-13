@@ -82,6 +82,14 @@ int main(int argc, char *argv[])
     }
 
     //------------------------------------
+    // terminate if some file loaded on start or some dir from .env is missing
+    if(!checkStartupFilesAndDirs()) {
+        logHdd(LOG_ERROR, "Required files or directories are missing, terminating!");
+        printf("\nRequired files or directories are missing, terminating!\n\n\n");
+        return 1;
+    }
+
+    //------------------------------------
     // before touching GPIO make sure that no other instance is running
     if(otherInstanceIsRunning()) {
         logHdd(LOG_ERROR, "Other instance of CosmosEx is running, terminate it before starting a new one!");

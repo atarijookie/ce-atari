@@ -17,6 +17,7 @@ mkdir -p "$DATA_DIR"
 mkdir -p "$LOG_DIR"
 mkdir -p "$SETTINGS_DIR"
 mkdir -p "$PID_DIR"
+mkdir -p "$IKBD_VIRTUAL_DEVICES_PATH"
 
 # make a copy of config drive into the expected destination
 cp -rf "${BIN_DIR}/configdrive" "$CONFIG_DRIVE_PATH"

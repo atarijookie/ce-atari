@@ -20,12 +20,17 @@ import (
 
 type (
 	LoginRequest struct {
-		Username string `json:"username"`
 		Password string `json:"password"`
 	}
 
 	LoginResponse struct {
-		Token string `json:"token"`
+		Token           string `json:"token"`
+		MustSetPassword bool   `json:"mustSetPassword"`
+	}
+
+	SetPasswordRequest struct {
+		OldPassword string `json:"oldPassword"`
+		NewPassword string `json:"newPassword"`
 	}
 
 	Device struct {
@@ -38,7 +43,7 @@ type (
 type Server struct {
 	router        *chi.Mux
 	mu            sync.RWMutex
-	authTokens    map[string]string
+	authTokens    map[string]struct{}
 }
 
 // responseWriter wraps http.ResponseWriter to capture status codes
@@ -104,12 +109,19 @@ func main() {
 
 	// Get local IP address for URL
 	localIP := getLocalIP()
-	url := "http://" + localIP + ":" + port
+	url := "https://" + localIP + ":" + port
 	if localIP == "127.0.0.1" || localIP == "localhost" {
-		url = "http://localhost:" + port
+		url = "https://localhost:" + port
+	}
+
+	// self-signed certificates for HTTPS, kept in SETTINGS_DIR/tls
+	certs, err := newCertManager()
+	if err != nil {
+		log.Fatalf("TLS certificate setup failed: %v", err)
 	}
 
 	s := newServer()
+	s.router.Get("/ca.crt", certs.handleCACert) // public, so the CA can be installed before logging in
 	fmt.Println("Starting server on", addr)
 	fmt.Println("Navigate to:", url)
 
@@ -122,7 +134,7 @@ func main() {
 		}
 	}()
 
-	if err := http.ListenAndServe(addr, s.router); err != nil {
+	if err := listenAndServeHTTPS(addr, s.router, certs); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
 }
@@ -147,10 +159,25 @@ func newServer() *Server {
 	r := chi.NewRouter()
 	s := &Server{
 		router: r,
-		authTokens: map[string]string{},
+		authTokens: map[string]struct{}{},
 	}
 
+	// browsers must revalidate pages instead of using cached copies (304 if unchanged), otherwise
+	// e.g. a login page cached from plain http:// would keep posting to http:// after switching to https://
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Cache-Control", "no-cache")
+			next.ServeHTTP(w, r)
+		})
+	})
+
 	r.Post("/auth/login", s.handleLogin)
+
+	// Public, so pages can check whether the server responds (also on the login page).
+	r.Get("/ping", s.handlePing)
+	r.Get("/js/server_check.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "static/js/server_check.js")
+	})
 
 	// Serve login.html publicly so users can access the login page without authentication.
 	r.Get("/login.html", func(w http.ResponseWriter, r *http.Request) {
@@ -175,6 +202,7 @@ func newServer() *Server {
 		})
 		protected.Use(s.authMiddleware)
 		protected.Post("/auth/logout", s.handleLogout)
+		protected.Post("/auth/password", s.handleSetPassword)
 		protected.Get("/devices", s.handleListDevices)
 		protected.Get("/hdd/{mac}/raw", s.handleGetHDDRaw)
 		protected.Put("/hdd/{mac}/raw", s.handlePutHDDRaw)
@@ -280,9 +308,28 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 			http.Redirect(w, r, "/login.html", http.StatusFound)
 			return
 		}
+		// while the default password is used, only allow setting a new password (and logout)
+		if !passwordAllowedPath(r.URL.Path) && !passwordIsSet() {
+			log.Printf("authMiddleware - no password set yet, redirecting %s to %s", r.URL.Path, setPasswordPage)
+			http.Redirect(w, r, setPasswordPage, http.StatusFound)
+			return
+		}
 		log.Printf("authMiddleware - token valid, allowing access to %s", r.URL.Path)
 		next.ServeHTTP(w, r)
 	})
+}
+
+// setPasswordPage is where the user is sent while no password is stored (default password in use).
+const setPasswordPage = "/set_password.html"
+
+// passwordAllowedPath reports whether path is reachable while the default password is still in use.
+func passwordAllowedPath(path string) bool {
+	switch path {
+	case setPasswordPage, "/auth/password", "/auth/logout":
+		return true
+	}
+	// assets needed to render the set password page
+	return strings.HasPrefix(path, "/css/") || strings.HasPrefix(path, "/js/") || strings.HasPrefix(path, "/img/")
 }
 
 func parseBearerToken(header string) string {
@@ -290,6 +337,17 @@ func parseBearerToken(header string) string {
 		return ""
 	}
 	return strings.TrimSpace(header[7:])
+}
+
+// handlePing tells the pages that the server responds: 204 with a valid session, 401 without one
+// (sessions are kept in memory, so they are gone after a server restart).
+func (s *Server) handlePing(w http.ResponseWriter, r *http.Request) {
+	token := requestToken(r)
+	if token == "" || !s.tokenValid(token) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) tokenValid(token string) bool {

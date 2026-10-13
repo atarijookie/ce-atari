@@ -54,12 +54,13 @@ void ScreencastAcsiCommand::sharedMemoryOpen(int& aSharedMemFd, sem_t** aSharedM
         *aSharedMemPointer = (uint8_t*) mmapRes;                // store pointer
         memset(*aSharedMemPointer, 0, SCREENCAST_BUFFER_SIZE);  // set all to zeros
 
-        FILE *f = fopen("ce_logo.bin", "rb");           // if can open this logo file
+        std::string logoPath = Utils::dotEnvValue("CE_LOGO_FILE", "ce_logo.bin");   // path to logo file
+        FILE *f = fopen(logoPath.c_str(), "rb");        // if can open this logo file
         if(f) {
             fread(*aSharedMemPointer + 1, 1, 32032, f);   // fill the initial screencast buffer with logo
             fclose(f);
         } else {
-            logHdd(LOG_WARNING, "ScreenCastAcsiCommand::openSharedMemory - failed to load ce_logo.bin");
+            logHdd(LOG_WARNING, "ScreenCastAcsiCommand::openSharedMemory - failed to load %s", logoPath.c_str());
         }
 
         logHdd(LOG_DEBUG, "ScreenCastAcsiCommand::openSharedMemory - mmap() success");

@@ -15,8 +15,14 @@
 # Linux Docker only; `ports:` cannot be used with host mode.
 #
 # USB mice/keyboards/gamepads: IKBD scans /dev/input/by-path and opens
-# /dev/input/event* and /dev/input/js*. Bind-mount the host input tree
-# and allow char major 13 (Linux input) so hotplug nodes can be opened.
+# /dev/input/event* and /dev/input/js*. Allow char major 13 (Linux input).
+#
+# USB raw disks for HDD emulation: PATH_RAW_x holds a host device path like
+# /dev/sda, so the host /dev is bind-mounted to /dev (hotplugged disks and
+# /dev/disk/by-label appear live). Allow block major 8 (sd* - SCSI/SATA/USB
+# disks). WARNING: this also gives the container access to any SATA/USB
+# system disk on the host (e.g. /dev/sda on a PC); a Pi booting from SD card
+# (mmcblk*, major 179) is not exposed.
 
 services:
   ce:
@@ -25,25 +31,27 @@ services:
       dockerfile: docker/Dockerfile
     image: ce-atari
     network_mode: host
-    environment:
-      CE_WEB_USER: ${CE_WEB_USER:-ce}
-      CE_WEB_PASSWORD: ${CE_WEB_PASSWORD:-ce}
     device_cgroup_rules:
       # Linux input subsystem: js*, mouse*, event* (needed for USB hotplug)
       - "c 13:* rwm"
+      # SCSI/SATA/USB disks: sd* (raw disk access for HDD emulation)
+      - "b 8:* rwm"
     volumes:
       # Persistent settings (writable). Host path matches SETTINGS_DIR in .env.
       - type: bind
         source: ${CE_SETTINGS_HOST:-/opt/ce/settings}
         target: /opt/ce/settings
+        bind:
+          create_host_path: true
       # Entire host filesystem for HDD / GEM drive emulation
       - type: bind
         source: /
         target: /mnt/hostdrive
         bind:
           propagation: rslave
-      # USB / HID discovery (same path IKBD uses on the host)
+      # Host /dev: USB / HID discovery (/dev/input) and raw USB disks (/dev/sd*).
+      # Docker still mounts its own /dev/shm, /dev/pts, /dev/mqueue on top.
       - type: bind
-        source: /dev/input
-        target: /dev/input
+        source: /dev
+        target: /dev
     restart: unless-stopped

@@ -1793,12 +1793,8 @@ body>#login #dont_have_an_account a:hover { border-bottom: 2px solid #f90 }
 
 <form id="login_form" method="POST" action="/auth/login" style="background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.1); border-radius: 12px; padding: 50px 60px; border: 1px solid #e0e0e0; min-width: 380px;">
 
-    <div class="field_container" style="margin-bottom: 20px;">
-      <input type="text" id="username" name="username" placeholder="Username" required style="width: 100%; box-sizing: border-box;">
-    </div>
-
     <div class="field_container" style="margin-bottom: 25px;">
-      <input type="password" id="password" name="password" placeholder="Password" required style="width: 100%; box-sizing: border-box;">
+      <input type="password" id="password" name="password" placeholder="Password" required autofocus style="width: 100%; box-sizing: border-box;">
     </div>
 
     <div class="field_container" id="error_container" style="display: none; color: #f90; margin-bottom: 15px; text-align: center; font-size: 14px; padding: 10px; background: #fff3cd; border-radius: 6px; border: 1px solid #f0ad4e;">
@@ -1813,9 +1809,19 @@ body>#login #dont_have_an_account a:hover { border-bottom: 2px solid #f90 }
 
 </form>
 
+  <p style="margin-top: 20px; font-size: 13px; color: #666;">
+    Browser warns about the connection? Install the
+    <a href="/ca.crt" style="color: #3baf16;">CosmosEx certificate</a> once to trust this device.
+  </p>
+
 </div>
 
 <script>
+// Opened over plain http:// (e.g. old cached page)? Reload over https://, otherwise login can't work.
+if (window.location.protocol === 'http:') {
+    window.location.replace('https:' + window.location.href.substring(5));
+}
+
 // Check if user is already authenticated on page load
 (function() {
     // Try to fetch a protected endpoint to check if auth token cookie is valid
@@ -1843,7 +1849,6 @@ body>#login #dont_have_an_account a:hover { border-bottom: 2px solid #f90 }
 document.getElementById('sign_in_button').addEventListener('click', function(e) {
     e.preventDefault();
     
-    var username = document.getElementById('username').value;
     var password = document.getElementById('password').value;
     var errorContainer = document.getElementById('error_container');
     var errorMessage = document.getElementById('error_message');
@@ -1851,8 +1856,8 @@ document.getElementById('sign_in_button').addEventListener('click', function(e) 
     // Hide previous errors
     errorContainer.style.display = 'none';
     
-    if (!username || !password) {
-        errorMessage.textContent = 'Please enter both username and password';
+    if (!password) {
+        errorMessage.textContent = 'Please enter the password';
         errorContainer.style.display = 'block';
         return;
     }
@@ -1870,7 +1875,6 @@ document.getElementById('sign_in_button').addEventListener('click', function(e) 
         },
         credentials: 'include', // Include cookies in request and response
         body: JSON.stringify({
-            username: username,
             password: password
         })
     })
@@ -1883,10 +1887,12 @@ document.getElementById('sign_in_button').addEventListener('click', function(e) 
                 if (data.token) {
                     localStorage.setItem('auth_token', data.token);
                 }
+                // Still using the default password? Go set a new one first.
+                var target = data.mustSetPassword ? '/set_password.html' : '/index.html';
                 // Small delay to ensure cookie is set, then redirect
-                console.log('Redirecting to /index.html...');
+                console.log('Redirecting to ' + target + '...');
                 setTimeout(function() {
-                    window.location.replace('/index.html');
+                    window.location.replace(target);
                 }, 100);
             });
         } else {
@@ -1900,7 +1906,7 @@ document.getElementById('sign_in_button').addEventListener('click', function(e) 
     .catch(function(error) {
         console.error('Login error:', error);
         // Show error message
-        errorMessage.textContent = 'Invalid username or password';
+        errorMessage.textContent = 'Invalid password';
         errorContainer.style.display = 'block';
         
         // Re-enable button
@@ -1915,3 +1921,4 @@ document.getElementById('login_form').addEventListener('submit', function(e) {
     document.getElementById('sign_in_button').click();
 });
 </script>
+<script src="/js/server_check.js"></script>

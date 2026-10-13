@@ -50,7 +50,7 @@
             h2, h3 {
                 text-align: center;
             }
-            #logout-button {
+            #logout-button, #password-button {
                 position: absolute;
                 top: 15px;
                 right: 15px;
@@ -65,7 +65,7 @@
                 box-shadow: 0 2px 6px rgba(0,0,0,0.2);
                 transition: background-color 0.3s ease;
             }
-            #logout-button:hover {
+            #logout-button:hover, #password-button:hover {
                 background-color: #555;
             }
             .footer-links {
@@ -87,6 +87,19 @@
             .footer-links span {
                 color: #999;
                 margin: 0 5px;
+            }
+            /* password + logout buttons next to each other in the top right corner */
+            #account-buttons {
+                position: absolute;
+                top: 15px;
+                right: 15px;
+                z-index: 1000;
+                display: flex;
+                gap: 8px;
+            }
+            #account-buttons #logout-button,
+            #account-buttons #password-button {
+                position: static;
             }
         </style>
         <script>
@@ -114,7 +127,10 @@
     </head>
     <body>
     <div class="container">
-    <button id="logout-button" onclick="logout()">Logout</button>
+    <div id="account-buttons">
+        <button id="password-button" onclick="window.location.href='/set_password.html'">Change password</button>
+        <button id="logout-button" onclick="logout()">Logout</button>
+    </div>
         <div class="row">
             <div class="span12">
                 <div id="breadcrumbs-container"></div>
@@ -152,5 +168,6 @@
             <a href="https://joo.kie.sk/?page_id=384" target="_blank">homepage</a><span>|</span><a href="https://joo.kie.sk/?page_id=415" target="_blank">manual</a><span>|</span><a href="credits.html">credits</a>
         </div>
     </div>
-    </body>
+    <script src="/js/server_check.js"></script>
+</body>
 </html>

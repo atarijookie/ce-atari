@@ -133,6 +133,7 @@ extern ExternalServices externalServices;
 //////////////////////////////////////////////////////
 
 void preloadGlobalsFromDotEnv(void);
+bool checkStartupFilesAndDirs(void);   // false if some file loaded on start or dir from .env is missing
 
 #define SPECIAL_FDD_IMAGE_CE_CONF       100
 #define SPECIAL_FDD_IMAGE_FDD_TEST      101
